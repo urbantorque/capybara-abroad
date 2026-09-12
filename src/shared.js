@@ -1168,8 +1168,8 @@ export const PALETTE = {
   monBasin:      0x2a4f6d,      // ...and the basin, which holds the town instead
   monBed:        0x7d8b8e,      // six metres down, and you can see it
   monFoam:       0xe4eef2,
-  monQuay:       0xc4b9a2,
-  monQuayDk:     0xa2977f,
+  monQuay:       0xa89d86,      // darker than it was (L4, E1): a quay at dusk, not at noon
+  monQuayDk:     0x8a806a,
   monConcrete:   0xb0aa9c,      // the tunnel, and it is the only brutal thing here
   monConcreteDk: 0x8b8578,
   monStone:      0xe8dcc0,      // belle-epoque limestone
@@ -2147,6 +2147,47 @@ export function rimInfo() {
            worldC: [_rimC.value.r, _rimC.value.g, _rimC.value.b],
            selfC: [_selfC.value.r, _selfC.value.g, _selfC.value.b] };
 }
+// ---- THE REACH (L4, E3 / design #2) --------------------------------------
+// The nearest thing you could pick up, while E is held, takes a harder rim
+// in a warmer colour — the hand on the verb, said in the one language every
+// prop in the game already speaks. PER MESH, WITHOUT A MATERIAL: props share
+// cached materials by colour, so a rim on one material is a rim on every
+// bottle in the chapter. The rim's uniforms are the two objects above, read
+// at upload time, and onBeforeRender runs before the draw's uniforms are
+// uploaded — so the hook lifts the world rim for that one draw and puts it
+// back after. Nothing is cloned, nothing is allocated, and a mesh that has
+// been let go draws exactly as it did.
+const _reachK = { value: 0 };
+const _reachC = new THREE.Color(1.0, 0.93, 0.80);
+const _reachSaveC = new THREE.Color();
+let _reachSaveK = 0;
+function _reachBefore() {
+  _reachSaveK = _rimK.value; _reachSaveC.copy(_rimC.value);
+  _rimK.value = Math.max(_rimK.value * 2.2, 1.1) * _reachK.value + _rimK.value * (1 - _reachK.value);
+  _rimC.value.lerp(_reachC, 0.7 * _reachK.value);
+}
+function _reachAfter() { _rimK.value = _reachSaveK; _rimC.value.copy(_reachSaveC); }
+const _reachHooked = new Set();
+/**
+ * Mark `root` (a Mesh or a Group of them) as the reachable thing, at
+ * strength k (0 clears). One thing at a time: marking a new root lets the
+ * old one go.
+ */
+export function reachRim(root, k) {
+  _reachK.value = k > 0 ? (k < 1 ? k : 1) : 0;
+  for (const m of _reachHooked) {
+    if (!root || !_reachOwns(root, m)) { m.onBeforeRender = _noop; m.onAfterRender = _noop; _reachHooked.delete(m); }
+  }
+  if (!root || !(k > 0)) return;
+  root.traverse(function (o) {
+    if (!o.isMesh || _reachHooked.has(o)) return;
+    o.onBeforeRender = _reachBefore; o.onAfterRender = _reachAfter;
+    _reachHooked.add(o);
+  });
+}
+function _reachOwns(root, m) { for (let p = m; p; p = p.parent) if (p === root) return true; return false; }
+function _noop() {}
+export function reachInfo() { return { k: _reachK.value, meshes: _reachHooked.size }; }
 /**
  * A PRIVATE material that reads the animal's rim rather than the world's.
  *

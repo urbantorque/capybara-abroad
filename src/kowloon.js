@@ -422,6 +422,51 @@ function hkUpdateTaxi(dt) {
   hkTaxiMover.step(hkTaxiHold ? 0 : dt);
 }
 
+// ---- A POOL OF LIGHT IS ONE DISC WITH A RAMP IN IT (L4, E1 / art #6) ------
+// The pools under the lamps and the signs were four stacked sixteen-sided
+// cylinders each, dimming outward in four steps: a light with three visible
+// contour lines round it, and four times the triangles. One disc, three
+// rings of vertex colour — the centre at the colour, a ring at 0.42 r at a
+// third of it, the rim at black — is a continuous quadratic falloff under
+// additive blending (black adds nothing, so the edge is wherever the eye
+// stops seeing it). 33 vertices and 48 triangles a pool against 4 x 34 and
+// 4 x 64. Takes [x, y, z, r, '#hex' or number] rows; the y is the pool's own
+// (the mesh carries the lift off the tarmac).
+function hkPoolDiscs(rows) {
+  const N = 16;
+  const pos = new Float32Array(rows.length * (1 + 2 * N) * 3);
+  const col = new Float32Array(rows.length * (1 + 2 * N) * 3);
+  const idx = [];
+  const c = new THREE.Color();
+  let v = 0;
+  for (let k = 0; k < rows.length; k++) {
+    const [x, y, z, r, hex] = rows[k];
+    const base = v;
+    c.set(hex);
+    pos[v * 3] = x; pos[v * 3 + 1] = y; pos[v * 3 + 2] = z;
+    col[v * 3] = c.r; col[v * 3 + 1] = c.g; col[v * 3 + 2] = c.b; v++;
+    for (let ring = 0; ring < 2; ring++) {
+      const rr = ring === 0 ? r * 0.42 : r, k2 = ring === 0 ? 0.34 : 0;
+      for (let i = 0; i < N; i++) {
+        const a = i / N * Math.PI * 2;
+        pos[v * 3] = x + Math.cos(a) * rr; pos[v * 3 + 1] = y; pos[v * 3 + 2] = z + Math.sin(a) * rr;
+        col[v * 3] = c.r * k2; col[v * 3 + 1] = c.g * k2; col[v * 3 + 2] = c.b * k2; v++;
+      }
+    }
+    for (let i = 0; i < N; i++) {
+      const j = (i + 1) % N;
+      idx.push(base, base + 1 + j, base + 1 + i);
+      idx.push(base + 1 + i, base + 1 + j, base + 1 + N + j);
+      idx.push(base + 1 + i, base + 1 + N + j, base + 1 + N + i);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(idx);
+  return g;
+}
+
 function hkMerger() {
   return makeMerger(hkG, {
     xform: hkXform, cylSegs: [4, 8, 16], coneSegs: [], sphSegs: [], normals: 'recompute', jitter: 0.065,
@@ -1188,18 +1233,12 @@ function hkBuildCrossing(root) {
   // instrument as the neon pools, and the reason the pavement is not black
   // between the signs
   if (hkLAMP_HEAD.length) {
-    const G = hkMerger();
-    const c = new THREE.Color();
-    for (let i = 0; i < hkLAMP_HEAD.length; i += 3) {
-      for (let r = 3; r >= 0; r--) {
-        const u = (r + 1) / 4;
-        c.set(0xffe0a8).multiplyScalar((1 - u) * (1 - u) * 0.9 + 0.1);
-        G.cyl(hkLAMP_HEAD[i], 0.01 - r * 0.002, hkLAMP_HEAD[i + 2], 4.2 * u, 0.02,
-              '#' + c.getHexString(), 0, 0, 0, 16);
-      }
-    }
-    const gm = new THREE.Mesh(G.build(), new THREE.MeshBasicMaterial({
-      vertexColors: true, transparent: true, opacity: 0.10,
+    // one ramped disc per lamp (hkPoolDiscs) — the four rings were the
+    // contour lines the art review saw from the roof
+    const rows = [];
+    for (let i = 0; i < hkLAMP_HEAD.length; i += 3) rows.push([hkLAMP_HEAD[i], 0, hkLAMP_HEAD[i + 2], 2.1, 0xffe0a8]);
+    const gm = new THREE.Mesh(hkPoolDiscs(rows), new THREE.MeshBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0.16,
       depthWrite: false, blending: THREE.AdditiveBlending }));
     gm.position.y = 0.045;
     gm.renderOrder = 2;
@@ -2018,8 +2057,6 @@ function hkBuildNeon(game, root) {
   }
   // and what all of it does to the tarmac
   {
-    const G = hkMerger();
-    const c = new THREE.Color();
     // SMALL POOLS, NOT A CARPET. Big overlapping patches tile the whole
     // carriageway and the road stops being tarmac and becomes a rug: rendered,
     // sixty of them at three metres across was a quilt of green and blue
@@ -2041,15 +2078,13 @@ function hkBuildNeon(game, root) {
     // prevent, in a rounder shape. The outer radius is now (w + h) x 0.25 — one
     // pool about as wide as its own sign, which is what was meant — and that is
     // a sixth of the area per sign, so they stop merging into one another.
+    // ...AND ONE DISC EACH NOW (L4, E1): the four rings above are history;
+    // hkPoolDiscs puts the same outer radius on a single ramped disc.
+    const rows = [];
     for (let k = 0; k < glows.length / 5; k++) {
       const o = k * 5;
-      const rr = (glows[o + 2] + glows[o + 3]) * 0.42;
-      for (let r2 = 3; r2 >= 0; r2--) {
-        const u = (r2 + 1) / 4;
-        c.set(hkNEON_COLS[glows[o + 4]]).multiplyScalar((1 - u) * (1 - u) * 0.9 + 0.10);
-        G.cyl(glows[o], 0.004 - r2 * 0.002, glows[o + 1], rr * u * 0.60, 0.02,
-              '#' + c.getHexString(), 0, 0, 0, 16);
-      }
+      const rr = (glows[o + 2] + glows[o + 3]) * 0.42 * 0.60;
+      rows.push([glows[o], 0, glows[o + 1], rr, hkNEON_COLS[glows[o + 4]]]);
     }
     // ADDITIVE, at 0.09, is the difference between a wet road and a road with a
     // faint stain on it. Normal blending MULTIPLIES the tarmac it is lying on,
@@ -2057,8 +2092,8 @@ function hkBuildNeon(game, root) {
     // resolved to a very dark grey: measured off the rendered frame, the whole
     // effect was worth about four levels out of two hundred and fifty-five.
     // Light adds.
-    hkGlowMesh = new THREE.Mesh(G.build(),
-      new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.14,
+    hkGlowMesh = new THREE.Mesh(hkPoolDiscs(rows),
+      new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.22,
                                     depthWrite: false, blending: THREE.AdditiveBlending }));
     hkGlowMesh.position.y = 0.05;
     hkGlowMesh.renderOrder = 2;
@@ -4399,8 +4434,13 @@ function hkBuildBus(game, root) {
     const W2 = hkMerger();
     for (let i = 0; i < 6; i++) {
       const wz = -3.6 + i * 1.45;
-      W2.box(hkBUS_HX + 0.02, 1.9, wz, 0.06, 0.85, 1.15, 0xffe6b0);
-      W2.box(-hkBUS_HX - 0.02, 1.9, wz, 0.06, 0.85, 1.15, 0xffe6b0);
+      // 0xffe6b0 -> 0xdcb27a (L4, E1 / art #6): the panes are unlit basic
+      // material, so their colour is their output, and at 0xffe6b0 that was
+      // luma 0.85 in linear against the chapter's 0.70 bloom threshold — six
+      // white blocks a side going past at head height. 0xdcb27a is 0.47:
+      // lit, warm, and under the threshold, so the bloom is the signs'.
+      W2.box(hkBUS_HX + 0.02, 1.9, wz, 0.06, 0.85, 1.15, 0xdcb27a);
+      W2.box(-hkBUS_HX - 0.02, 1.9, wz, 0.06, 0.85, 1.15, 0xdcb27a);
     }
     const wm2 = new THREE.Mesh(W2.build(), new THREE.MeshBasicMaterial({ vertexColors: true }));
     wm2.frustumCulled = false;

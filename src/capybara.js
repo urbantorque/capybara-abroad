@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matSelf, TASKS, rand, randInt, clamp, damp, lerp, waterYAt } from './shared.js';
+import { PALETTE, mat, matSelf, TASKS, rand, randInt, clamp, damp, lerp, waterYAt, reachRim } from './shared.js';
 
 // ===========================================================================
 // AGENT B — THE CAPYBARA
@@ -212,6 +212,8 @@ const capyCLIMB_KICK  = 5.20;       // m/s pushed off the wall by a hop
 const capyCLIMB_KICKY = 5.60;       // and up
 const capyCLIMB_COOL  = 0.34;       // s before the wall will take you back
 const capyGRAB_RADIUS = 1.6;
+const capyREACH_R = 2.5;            // m — the thing that lights up while E is held (L4, E3; see reachRim)
+let capyReachMesh = null, capyReachK = 0;
 const capyGRAB_WINDUP = 0.10;
 // ---- B9: hold to put it down, item 4a ------------------------------------
 // 0.35 s, which is the number item 4a asks for and is comfortably longer than
@@ -1582,9 +1584,24 @@ const capyIDLE_MAX  = 17;
 const capyIDLE_DUR  = 0.85;         // s the shake takes
 const capyIDLE_LOOK = 1.9;          // s the look-around takes — slower, it is a look
 const capyIDLE_DELAY = 4.0;         // seconds of nothing before the first idle beat
-const capyIDLE_BASE = [0.42, 0.58, 0, 0, 0];   // the weights with nothing live
-const capyIDLE_SPAN = [capyIDLE_DUR, capyIDLE_LOOK, 1.35, 1.15, 2.6];
-const capyIdleW = new Float32Array(5);         // resolved weights — never allocated
+const capyIDLE_BASE = [0.42, 0.58, 0, 0, 0, 0];   // the weights with nothing live
+// ---- THE LOOK BACK (L4, E1 / art #8) --------------------------------------
+// The sixth beat. Once the resting lens has opened (game.camInfo.rest, which
+// systems.js publishes as the crane's blend and drifts twenty degrees round
+// the flank on), the animal turns its head over the near shoulder toward the
+// camera, holds it, and lets it go — the glance every animal photograph is
+// waiting for. It is allowed past the neck's ordinary limit (capyGAZE_YAW,
+// 0.55) because a look over the shoulder IS the neck at its limit, and it is
+// a BEAT rather than a track: the head goes there on the idle clock and comes
+// back on its own envelope, so a player who never stands still never sees
+// it and one who does sees it about once a minute.
+const capyIDLE_BACK_YAW = 0.82;     // rad — over the shoulder
+const capyIDLE_BACK_PITCH = -0.10;  // rad — the lens is above the animal
+const capyIDLE_BACK_W = 1.6;        // weight while the rest lens is open
+const capyIDLE_BACK_REST = 0.45;    // camInfo.rest at or above which it is live
+const capyIDLE_SPAN = [capyIDLE_DUR, capyIDLE_LOOK, 1.35, 1.15, 2.6, 2.4];
+let capyIdleBackSide = 1;           // which shoulder, resolved when the beat is drawn
+const capyIdleW = new Float32Array(6);         // resolved weights — never allocated
 let capyIdleUrge = 0;               // 0..1 how much the situation is asking for
 let capyIdleT = 0;                  // s spent standing still
 let capyIdleNext = 12;              // s at which the next beat is due
@@ -1626,6 +1643,7 @@ let capyWetDark = false;
 // water was a flat eight-second fade and the animal never once shook itself.
 let capyShakePend = 0;              // s of the beat ashore left before it starts
 let capyShakeP = -1;                // 0..1 through the shake, -1 when there is none
+let capyShookT = 0;                 // s the shake-dry edge stays published (capy.shookDry) — a find reads it on a quarter-second tick
 let capyShakeSpray = 0;             // s to the next spray of droplets
 // ---- refusals (see capyREFUSE_GAP) ----
 let capyRefuseT = 0;                // throttle on the blown hop
@@ -2864,12 +2882,17 @@ function capyIdlePick(game, capy, stamina) {
   capyIdleW[2] = cold * 1.70;
   capyIdleW[3] = capy.heldProp ? 0.95 : 0;
   capyIdleW[4] = clamp((0.55 - stamina) / 0.55, 0, 1) * 1.15;
-  const live = capyIdleW[2] + capyIdleW[3] + capyIdleW[4];
+  // THE LOOK BACK: live while the rest lens is open and nothing else has the
+  // head (a talker or a noticed local outranks the camera — see the gaze).
+  const ci = game.camInfo;
+  capyIdleW[5] = (ci && ci.rest >= capyIDLE_BACK_REST && capyGazeWantY === 0 && capyGazeWantP === 0 && !capy.heldProp)
+    ? capyIDLE_BACK_W : 0;
+  const live = capyIdleW[2] + capyIdleW[3] + capyIdleW[4] + capyIdleW[5];
   capyIdleUrge = clamp(live * 0.55, 0, 1);
   const total = capyIDLE_BASE[0] + capyIDLE_BASE[1] + live;
   if (!(total > 0)) return 1;
   let r = Math.random() * total;
-  for (let i = 0; i < 5; i++) { r -= capyIdleW[i]; if (r <= 0) return i; }
+  for (let i = 0; i < 6; i++) { r -= capyIdleW[i]; if (r <= 0) return i; }
   return 1;
 }
 
@@ -6223,7 +6246,7 @@ export function createCapybara(game) {
           game.physics.dust(px, body.position.y + 0.10, pz, 3);
         }
       }
-      if (capyShakeP >= 1) capyShakeP = -1;
+      if (capyShakeP >= 1) { capyShakeP = -1; capyShookT = 0.6; }
     } else if (capyShakePend > 0) {
       capyShakePend -= dt;
       if (capyShakePend <= 0) {
@@ -6311,6 +6334,9 @@ export function createCapybara(game) {
     const wetHere = capyAskNum(game, 'soaking', px, pz, 0);
     if (wetHere > capyWetLevel) capyWetLevel = clamp(wetHere, 0, 1);
     capy.wet = capyWetLevel;
+    // the shake-dry as an EDGE, held long enough for the finds' tick (L4, E3)
+    if (capyShookT > 0) capyShookT -= dt;
+    capy.shookDry = capyShookT > 0;
 
     // ---- upright lock + yaw drive, both CRITICALLY DAMPED ------------
     // The yaw still goes THROUGH the solver (never teleported) so the nose/tail
@@ -6618,12 +6644,30 @@ export function createCapybara(game) {
       if (!canDig && !capyClinging && !capyDiving && capyWhiffCool <= 0) {
         capyWhiffCool = capyREFUSE_GAP;
         capyWhiffT = capyWHIFF_DUR;
-        capySfxAt.volume = 0.24; capySfxAt.pitch = 1.35;
-        game.sfx('rustle', capySfxAt);
+        // a low click (L4, E3) — the UI's own detent, an octave down — not a
+        // rustle: a rustle is the sound of touching something and this is
+        // the sound of touching nothing
+        capySfxAt.volume = 0.30; capySfxAt.pitch = 0.55;
+        game.sfx('tick', capySfxAt);
       }
     }
     if (capyWhiffCool > 0) capyWhiffCool -= dt;
     if (capyWhiffT > 0) capyWhiffT -= dt;
+    // ---- THE REACH (L4, E3): while E is held with nothing in the mouth, the
+    // nearest thing inside 2.5 m takes the reach rim (reachRim in shared.js).
+    // Resolved every frame it is held — one nearestGrabbable, which the grab
+    // path already pays for on the press — and let go on the release.
+    {
+      let want = null;
+      if (input.action && !capy.heldProp && !capyClinging && !capyDiving && !capySwimming) {
+        const ph = game.physics;
+        const p = ph && typeof ph.nearestGrabbable === 'function' ? ph.nearestGrabbable(capyPosition, capyREACH_R) : null;
+        want = p && p.mesh ? p.mesh : null;
+      }
+      capyReachK = damp(capyReachK, want ? 1 : 0, want ? 14 : 8, dt);
+      if (want) capyReachMesh = want; else if (capyReachK < 0.01) capyReachMesh = null;
+      reachRim(capyReachK > 0.01 ? capyReachMesh : null, capyReachK);
+    }
     if (capySmugT > 0) capySmugT -= dt;
 
     // =================================================================
@@ -7089,6 +7133,12 @@ export function createCapybara(game) {
               game.sfx('rustle', { volume: 0.15, pitch: 0.85 });
             } else if (capyIdleAct === 4) {
               game.sfx('gasp', { volume: 0.16, pitch: 0.72 });
+            } else if (capyIdleAct === 5) {
+              // which shoulder: the one the lens is over. camYaw is the
+              // bearing from the animal TO the camera; the nose is +z at
+              // rotation zero, so a positive local bearing is the left.
+              const loc = capyWrapAngle(input.camYaw - capy.group.rotation.y);
+              capyIdleBackSide = loc >= 0 ? 1 : -1;
             }
           }
         }
@@ -7109,12 +7159,17 @@ export function createCapybara(game) {
     else if (capyIdleAct === 2) idleRollWant = Math.sin(capyIdleP * Math.PI * 2 * 11) * idleEnv * 0.10;
     if (capyShakeP >= 0) idleRollWant += Math.sin(capyShakeP * Math.PI * 2 * 7) * dryEnv * 0.36;
     capyIdleRoll = damp(capyIdleRoll, idleRollWant, 30, dt);
+    // The look back (5) rides the envelope's plateau: a raised cosine over a
+    // 2.4 s beat is at the shoulder for about a second, which is a glance
+    // held, not a swivel.
     capyIdleYaw = damp(capyIdleYaw,
-      capyIdleAct === 1 ? Math.sin(capyIdleP * Math.PI * 2) * idleEnv * 0.62 : 0, 9, dt);
+      capyIdleAct === 1 ? Math.sin(capyIdleP * Math.PI * 2) * idleEnv * 0.62
+      : capyIdleAct === 5 ? Math.min(1, idleEnv * 1.35) * capyIDLE_BACK_YAW * capyIdleBackSide : 0, 9, dt);
     capyIdlePitch = damp(capyIdlePitch,
       capyIdleAct === 3 ? Math.sin(capyIdleP * Math.PI * 2 * 3) * idleEnv * 0.07
       : capyIdleAct === 4 ? idleEnv * 0.10
-      : capyIdleAct === 2 ? idleEnv * 0.06 : 0, 9, dt);
+      : capyIdleAct === 2 ? idleEnv * 0.06
+      : capyIdleAct === 5 ? Math.min(1, idleEnv * 1.35) * capyIDLE_BACK_PITCH : 0, 9, dt);
     capyIdleCrouch = damp(capyIdleCrouch, capyIdleAct === 2 ? idleEnv * 0.045 : 0, 8, dt);
     capyIdleEar = damp(capyIdleEar, capyIdleAct === 2 ? idleEnv : 0, 8, dt);
     capyIdleChew = damp(capyIdleChew,

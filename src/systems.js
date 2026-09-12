@@ -395,7 +395,19 @@ const sysSHADE_WHITE = new THREE.Color(1, 1, 1);
 // does not stop it being that — but seven degrees of world instead of seven
 // degrees of pavement. And sysREST_W 0.55 -> 0.80 below, which lands the
 // settled lens ON the arrival composition instead of six degrees short of it.
-const sysCAM_PITCH = 34 * Math.PI / 180;
+// ---- 34 -> 24 (L4, E1 / art #3) -------------------------------------------
+// The paragraph above moved the lens toward the arrival shot and stopped
+// seven degrees short of a frame with a horizon in it: at 34 down with a 24
+// degree half-FOV the horizon was still ten degrees above the top edge while
+// WALKING, which is most of a session. Measured by qa/b5-cam.js: the horizon
+// was off the top of the frame at a walk in nineteen of nineteen chapters.
+// At 24 down and a 26 degree half-FOV (sysFOV_BASE 52) the horizon sits two
+// degrees inside the top edge: a strip of sky at a walk, the landmark in the
+// frame you steer in, and the ground plane still most of the picture. The
+// sprint dolly below is trimmed to match so the running lens stays at the
+// validated 16, and the rest lens (sysREST_W of the way to the arrival
+// pitch) lands at ~18 instead of ~20.
+const sysCAM_PITCH = 24 * Math.PI / 180;
 // The rig sits ~7.4 m above the animal; the vertical half-FOV is 24; so at the
 // old 41 the top edge of the frame pointed 17 degrees BELOW horizontal and met
 // flat ground 24 m out. Every biome was said to be fine with that, because
@@ -427,7 +439,11 @@ const sysCAM_MAX   = 16;
 const sysSHOT_DIST_MAX = 30;
 // ...and the floor a shot may ask for with `near`. See frameShot.
 const sysSHOT_DIST_MIN = 3.0;
-const sysCAM_DEF   = 9.5;
+// 9.5 -> 10.5 (L4, E1): a flatter boom at the same length puts the rig a
+// metre lower over the animal; a metre longer keeps the eye where it was
+// (10.5 * sin 24 = 4.3 m, against 9.5 * sin 34 = 5.3) without the nose
+// filling the frame.
+const sysCAM_DEF   = 10.5;
 // How far back ALONG THE TORII PATH the eye rides. 5.2 m is three gates: near
 // enough to keep the animal large, far enough that the gates read as a tunnel.
 const sysTORII_BACK = 5.2;
@@ -521,7 +537,11 @@ const sysAUDIT_SHOULDER = 0.45;
 // relief — and it costs nothing at a waddle, because it is on the same 0..1
 // scalar and that scalar is zero when the animal is standing still.
 const sysCAM_DOLLY   = 1.2;
-const sysCAM_DOLLY_P = 18 * Math.PI / 180;
+// 18 -> 8 (L4, E1): the base pitch came down ten degrees, so the drop that
+// took 34 to the arrival lens's 16 at a sprint now takes 24 to the same 16.
+// The running frame is unchanged to the degree; the walking one is the
+// change.
+const sysCAM_DOLLY_P = 8 * Math.PI / 180;
 // ---- ...AND THE PLAYER MAY ASK TO LOOK UP (v33) -------------------------
 // `skyward()` has existed since chapter 7 and five chapters publish it: the rig
 // has always known how to raise the eye and there has never been a way to ASK
@@ -610,6 +630,16 @@ const sysREST_T      = 1.0;   // s of banked stillness before it starts to open 
 const sysREST_LAMBDA = 1.15;  // opening out: ~2.5 s, under the player's notice
 const sysREST_DROP   = 5.0;   // ...and closing again: under half a second
 const sysREST_SKY    = 2.0;   // what skyT follows the rest voice at
+// ---- ...AND IT DRIFTS ROUND THE FLANK (L4, E1 / art #8) -------------------
+// The resting lens is the frame shown most (see THE RESTING LENS), and it was
+// a photograph of the animal's rump: the tidy-up parks the rig dead astern,
+// and a capybara seen from directly behind is an oval with two ears. Twenty
+// degrees round the flank, on the same scalar the crane opens on, is a three-
+// quarter rear view — the pose every animal photograph is taken at — and it
+// is what lets the look-back beat in capybara.js (THE LOOK BACK) read as a
+// face rather than the back of a head. Always the same side, so the second
+// rest in a chapter composes like the first.
+const sysREST_FLANK  = 20 * Math.PI / 180;
 // ---- ...AND THE RESTING FRAME IS ALLOWED TO BREATHE ----------------------
 // Once the rig opens out and the player stops, NOTHING in the frame moves that
 // the camera is responsible for: the eye is a damped spring that has converged,
@@ -792,7 +822,11 @@ const sysFLY_CLEAR   = 2;
 // Bounded hard at both ends: a lens that can reach 70 degrees distorts the
 // low-poly silhouettes this whole art direction is built on, and one that can
 // go under 40 makes the rig feel like it is standing on the animal.
-const sysFOV_BASE    = 48;
+// 48 -> 52 (L4, E1): two degrees more half-FOV, which is the other half of
+// "is the horizon in frame" (see the note under sysFOV_MAX). Stored as a
+// DELTA in the prefs file (fvd), so a player who never touched the row moves
+// with the base and a player who did keeps their offset.
+const sysFOV_BASE    = 52;
 const sysFOV_MIN     = 41;
 const sysFOV_MAX     = 61;
 // RAISED FROM 7.0 (v33). The half-FOV is the other half of "is the horizon in
@@ -1028,6 +1062,8 @@ const sysVOID_HOLD   = 0.35;   // s outside before it fires — never on one bad
 // from somewhere you can still see the world from would be the more annoying
 // bug of the two.
 const sysVOID_PAD    = 4;
+const sysVOID_WALL   = 24;     // m past the pad that is a wall rather than a rescue (L4)
+const sysVOID_WALL_V = 1.6;    // m/s the wall walks you back at
 
 // ---- Opera House camera keep-out -------------------------------------------
 // This USED to be one fat AABB (x +/-14.5, z -13.5..5.5, y < 17) covering the
@@ -2305,7 +2341,14 @@ const sysAIR = {
     haze: PALETTE.monHaze, hazeK: 0.86,
     bg: PALETTE.monSkyLow, bgK: 0.62,
     sun: PALETTE.monSun, sunK: 0.46,
-    hemi: PALETTE.monSkyTop, gnd: PALETTE.monQuayDk, hemiK: 0.86, amb: 0.46,
+    // hemiK 0.86 -> 0.70, amb 0.46 -> 0.28 (L4, E1 / art #6): the quay read
+    // brighter than its own sky — measured on the resting frame the ground
+    // band and the sky band were both 100/255 (qa/l4-bands.mjs), which is a
+    // noon quay under a dusk sky. An ambient of 0.46 was four times
+    // Sydney's, a flat fill lifting every pale stone to the same value. The
+    // lamps and the windows are emissive and keep their level; the town
+    // comes down to sit under them.
+    hemi: PALETTE.monSkyTop, gnd: PALETTE.monQuayDk, hemiK: 0.70, amb: 0.28,
   },
   cave: {
     fogN: 10, fogF: 165,
@@ -3674,7 +3717,7 @@ let sysFovPref = sysFOV_BASE;
 // a second set of sizes: every size in this sheet is already a clamp() in
 // px and vw, so one factor moves all of them and keeps every relationship
 // between them exactly as it was drawn.
-const sysTEXT_STOPS = [0.9, 1, 1.15];
+const sysTEXT_STOPS = [0.9, 1, 1.15, 1.32];   // ...and a fourth stop (L4, E3): 1.15 was not large on a television
 let sysTextK = 1;
 // ---- HOLD TO TOGGLE (F4) --------------------------------------------------
 // Off by default and deliberately: holding is the right default feel for both
@@ -3749,8 +3792,13 @@ function sysPrefsRead() {
   // file must degrade to a default and never to a NaN in a camera.
   if (typeof o.lk === 'number' && o.lk === o.lk) sysLookK = clamp(o.lk, sysLOOK_MIN, sysLOOK_MAX);
   sysLookInv = !!o.li;
-  if (typeof o.fv === 'number' && o.fv === o.fv) sysFovPref = clamp(o.fv, sysFOV_MIN, sysFOV_MAX);
-  if (typeof o.tk === 'number' && o.tk === o.tk) sysTextK = clamp(o.tk, 0.9, 1.15);
+  // fvd is the offset from sysFOV_BASE (L4, E1); fv was the absolute value
+  // and is read only from a file written before fvd existed, and only when it
+  // is not the old base — a file that says 48 was a player who never opened
+  // the row, and they get the new base like everyone else.
+  if (typeof o.fvd === 'number' && o.fvd === o.fvd) sysFovPref = clamp(sysFOV_BASE + o.fvd, sysFOV_MIN, sysFOV_MAX);
+  else if (typeof o.fv === 'number' && o.fv === o.fv && o.fv !== 48) sysFovPref = clamp(o.fv, sysFOV_MIN, sysFOV_MAX);
+  if (typeof o.tk === 'number' && o.tk === o.tk) sysTextK = clamp(o.tk, 0.9, 1.32);
   sysHoldToggle = !!o.ht;
   sysWearPick = typeof o.wp === 'string' ? o.wp : '';
   sysCaptions = !!o.cc;
@@ -3774,7 +3822,7 @@ function sysPrefsWrite() {
       m: sysVolMaster, u: sysVolMusic, s: sysVolSfx,
       mm: sysMuteMaster ? 1 : 0, um: sysMuteMusic ? 1 : 0, sm: sysMuteSfx ? 1 : 0,
       c: calmPreference(),
-      lk: sysLookK, li: sysLookInv ? 1 : 0, fv: sysFovPref, tk: sysTextK,
+      lk: sysLookK, li: sysLookInv ? 1 : 0, fvd: sysFovPref - sysFOV_BASE, tk: sysTextK,
       ht: sysHoldToggle ? 1 : 0,
       wp: sysWearPick,
       cc: sysCaptions ? 1 : 0,
@@ -7372,7 +7420,7 @@ function sysBuildCSS() {
   // those clamps was measured against a specific element at a specific
   // viewport — P2 was an entire batch about this card on a phone — and
   // rounding them to a scale would undo that work to make a number smaller.
-  const tXs = 'clamp(7.5px,1.15vw,9.5px)';   // a caption, a stamp
+  const tXs = 'clamp(9px,1.15vw,10.5px)';    // a caption, a stamp — floor 7.5 -> 9, cap 9.5 -> 10.5 (L4, E3): nine and a half pixels of tracked caps is a rumour
   const tSm = 'clamp(8.5px,1.7vw,10.5px)';   // a label
   const tMd = 'clamp(11px,1.9vw,11px)';      // body: the size most of the HUD is
   const tLg = 'clamp(13px,2.4vw,15px)';      // a lead line
@@ -8819,8 +8867,11 @@ function sysBuildCSS() {
    and quieter. Nothing here changes the pill's shape, its paper or its
    entrance — a toast is still one object, said three ways. */
 '.capyui-toast.say{font-style:italic;font-weight:700;letter-spacing:0;}',
-'.capyui-toast.note{font-style:normal;font-weight:700;color:' + inkSoft + ';',
-  'font-size:clamp(9.5px,1.9vw,11.5px);letter-spacing:.14em;text-transform:uppercase;',
+/* inkSoft -> 0.88 of the ink (L4, E3 / writing #5): at 0.70 over the paper
+   the reward pills measured under 4.5:1 and read as a footnote to their own
+   moment. Still a step quieter than a sentence; no longer grey. */
+'.capyui-toast.note{font-style:normal;font-weight:700;color:' + sysRgba(PALETTE.ibisHead, 0.88) + ';',
+  'font-size:clamp(10px,1.9vw,12px);letter-spacing:.14em;text-transform:uppercase;',
   'padding:6px 16px;box-shadow:' + shSm + ';}',
 /* The closing sentences. Held five seconds rather than two and a half, one
    step up in size, and it arrives on its own — see toast(). It is the only
@@ -9352,9 +9403,14 @@ function sysBuildCSS() {
   'transition:color .95s ease-out .14s,transform 1.1s ' + mGlide + ' .14s;}',
 '.capyui-fade.trip.rise .capyui-fadename{color:' + sysRgba(PALETTE.ibisHead, 0.26) + ';',
   'transform:none;}',
+/* ...AND A WASH OF PAPER BEHIND IT (L4, E3 / writing #5): full-bleed ink over
+   the world was unreadable over a white wall in Venice and a white shelf in
+   Antarctica. A soft ellipse of the paper colour, most of it gone by the
+   edges, so the card is still type over the place and not a box on it. */
 '.capyui-place{position:absolute;left:0;right:0;top:31%;z-index:58;display:flex;',
   'flex-direction:column;align-items:center;gap:7px;pointer-events:none;text-align:center;',
-  'padding:0 18px;opacity:0;transform:translateY(12px);',
+  'padding:22px 18px 26px;opacity:0;transform:translateY(12px);',
+  'background:radial-gradient(ellipse 46% 78% at 50% 50%,' + sysRgba(PALETTE.sail, 0.66) + ' 0%,' + sysRgba(PALETTE.sail, 0.40) + ' 55%,' + sysRgba(PALETTE.sail, 0) + ' 100%);',
   'transition:opacity .9s ease,transform .9s ' + mGlide + ';}',
 '.capyui-place.show{opacity:1;transform:translateY(0);}',
 '.capyui-place h2{font-size:' + tHu + ';color:' + ink + ';font-weight:700;',
@@ -20852,7 +20908,7 @@ export function createSystems(game) {
       return best;
     },
     function (v) { sysTextK = sysTEXT_STOPS[clamp(Math.round(v), 0, sysTEXT_STOPS.length - 1)]; sysTextApply(); },
-    function (v) { return ['small', 'normal', 'large'][clamp(Math.round(v), 0, 2)]; });
+    function (v) { return ['small', 'normal', 'large', 'larger'][clamp(Math.round(v), 0, 3)]; });
   // THE GOVERNOR'S ROW (L4, qa #4): auto · pretty · fast, three stops in the
   // text row's shape. `auto` hands the rung to the clock in update(); the
   // other two pin it, and sysPerfSet applies the pin at once so the change
@@ -23555,7 +23611,10 @@ export function createSystems(game) {
     } else if (def.par !== undefined) {
       line = 'timed  ·  a good one is ' + def.par.toFixed(def.dp) + def.unit;
     } else {
-      line = 'timed  ·  no par set on this one';
+      // dropped (L4, E3): "timed · no par set on this one" is the game
+      // apologising for a table; the row reads as its clue until there is a
+      // number to show
+      return when ? (base ? base + '\n' + when : when) : base;
     }
     if (when) line = when + '  ·  ' + line;
     return base ? base + '\n' + line : line;
@@ -23718,8 +23777,61 @@ export function createSystems(game) {
   // off; three is the most that can be read before the first one goes.
   const sysTOAST_MAX = 3;
   const sysTOAST_HOLD = { say: 2600, note: 2200, last: 5200 };
+  // ---- THE FIRST MINUTE (L4, E3 / design #2, writing #4, player #2) --------
+  // Measured on a fresh file with a naive three-minute drive (qa/l4-first-
+  // minute.js): twenty to twenty-five pills in minute one — the arrival card
+  // still up, four teaching lines, the ambient narration, a tick, a FOUND
+  // for something the player did not know was a thing, and an INCIDENT card
+  // at twenty-three seconds. A player who has read nothing is being told
+  // everything at once, and the pill stack is three deep for the first
+  // minute of the game, which is the one minute that decides whether there
+  // is a second.
+  //
+  // So a fresh file — nothing ticked, nothing found, at the moment the game
+  // starts — gets a BUDGET for its first three minutes: a line in the
+  // game's voice (a 'say') is held until six seconds have passed since the
+  // last pill and two and a half since the last tick, and at most two are
+  // held; a third arriving pushes the oldest out unsaid, because an ambient
+  // line said twenty seconds late is worse than one not said. Ticks ('note')
+  // pass — a tick is an answer to the player — and the closing sentences
+  // always pass. After three minutes, or on any file with a history, the
+  // writer is exactly what it was. sysFreshT is game time since that start
+  // and is not saved: a file reloaded in its second minute is a file with a
+  // history, which is the correct reading.
+  const sysFRESH_TOAST_T = 180;     // s of a fresh file the budget covers
+  const sysFRESH_GAP = 6.0;         // s between lines in the game's voice
+  const sysFRESH_TICK_GAP = 2.5;    // s a line waits after a tick pill
+  const sysFRESH_HELD = 2;          // lines held; older ones are let go
+  const sysFRESH_FIND_T = 300;      // s before a chapter-neutral find can land
+  const sysFRESH_RUNG_T = 90;       // s before the incident chain counts, absent a tick
+  let sysFresh = false, sysFreshT = 0;
+  let sysToastLastAt = -1e9, sysTickLastAt = -1e9;
+  const sysToastHeld = [];
+  function sysFreshBudget() { return sysFresh && sysFreshT < sysFRESH_TOAST_T; }
+  function sysToastDrain() {
+    if (!sysToastHeld.length) return;
+    const now = game.state.time;
+    if (now - sysToastLastAt < sysFRESH_GAP || now - sysTickLastAt < sysFRESH_TICK_GAP) return;
+    const t = sysToastHeld.shift();
+    toastNow(t.text, t.kind);
+  }
   function toast(text, kind) {
     if (text == null) return;
+    const k0 = (kind === 'note' || kind === 'last') ? kind : 'say';
+    if (k0 === 'say' && sysFreshBudget()) {
+      const now = game.state.time;
+      if (now - sysToastLastAt < sysFRESH_GAP || now - sysTickLastAt < sysFRESH_TICK_GAP) {
+        sysToastHeld.push({ text: text, kind: k0 });
+        while (sysToastHeld.length > sysFRESH_HELD) sysToastHeld.shift();
+        return;
+      }
+    }
+    if (k0 === 'note') sysTickLastAt = game.state.time;
+    toastNow(text, kind);
+  }
+  function toastNow(text, kind) {
+    if (text == null) return;
+    sysToastLastAt = game.state.time;
     // ---- AND NOTHING SPEAKS OVER THE LEDGER --------------------------------
     // The end card is the last word by construction now rather than by
     // whoever happens to fire last. A toast raised while it is up is DROPPED,
@@ -26885,6 +26997,7 @@ export function createSystems(game) {
         // Additive, like everything below it. See jrChapInc.
         inc: jrChapInc, scn: jrChapScene,
         told: jrIncTold ? 1 : 0,   // the chain explainer, once (N1)
+        rtold: riddleTold ? 1 : 0, // "the arrow, then.", once (L3-14; saved, L4 E5)
         // ...and the other economy (B8). See jrChapPho.
         pho: jrChapPho, fed: jrChapFed,
         // ...and THE PERCH's high-water mark (N2). See jrChapPerch.
@@ -27789,7 +27902,11 @@ export function createSystems(game) {
       return !!c.capy.heldProp && findPeople(c.p.x, c.p.z, 14) >= 4 &&
              findHeat(c.p.x, c.p.z, 14) === 0;
     },
-    'most-wanted':   function (c) { return findHeat(c.p.x, c.p.z, 20) >= 5; },
+    // >= 8, held four seconds (L4, E3): five was a Sydney lawn on arrival.
+    'most-wanted':   function (c) {
+      if (findHeat(c.p.x, c.p.z, 20) >= 8) { findS.mwT = (findS.mwT || 0) + c.dt; return findS.mwT >= 4; }
+      findS.mwT = 0; return false;
+    },
     // You stood still, in plain sight, next to somebody who had had enough of
     // you, until they stopped minding. It is the only thing in this game that
     // is completed by waiting and not moving, and wariness is the only clock
@@ -27859,7 +27976,14 @@ export function createSystems(game) {
       findS.rainT = 0;
       return t > 22;
     },
-    'wrung-out':     function (c) { return (c.capy.wet || 0) >= 0.995; },
+    // The shake-dry AFTER twenty seconds soaked (L4, E3): "wet" was met by
+    // the first harbour. capy.shookDry is the edge capybara.js publishes.
+    'wrung-out':     function (c) {
+      const w = c.capy.wet || 0;
+      if (w >= 0.6) findS.wetT = (findS.wetT || 0) + c.dt;
+      else if (w < 0.05) findS.wetT = 0;
+      return !!c.capy.shookDry && (findS.wetT || 0) >= 20;
+    },
     'nothing-left':  function (c) { return !!c.capy.blown; },
     // Eight bars of moving on the beat somewhere the game is not counting. The
     // two chapters that DO count are excluded, because there it is a task.
@@ -28370,7 +28494,10 @@ export function createSystems(game) {
     // talking about itself; what it was missing was WHICH of the two
     // things had happened, and the mark was never going to say that as
     // well as the word does.
-    toast('found  ·  ' + (def ? def.text : id), 'note');
+    // 'noticed', not 'found' (L4, E3 / writing #4): the player did not go
+    // looking, the game noticed. The word is the difference between a
+    // secret and a surveillance report.
+    toast('noticed  ·  ' + (def ? def.text : id), 'note');
     sfx('chime', { volume: 0.42, pitch: 1.62 });
     const cp = game.capy && game.capy.position;
     if (cp) confettiBurst(cp.x, cp.y + 0.45, cp.z, 6);
@@ -28460,6 +28587,11 @@ export function createSystems(game) {
       // of them would be evaluated four times a second in all seventeen places,
       // asking after a gondola in Antarctica.
       if (row.chapter && row.chapter !== n) continue;
+      // ...and the ones about the moveset or the clock wait out the first
+      // five minutes of a fresh file (L4, E3): a FOUND for a thing the
+      // player did not know was a thing, twenty seconds in, is noise with a
+      // chime on it. The place finds are about a thing in front of them.
+      if (!row.chapter && sysFresh && sysFreshT < sysFRESH_FIND_T) continue;
       const f = sysFINDS[id];
       if (!f) continue;
       let hit = false;
@@ -29993,6 +30125,7 @@ export function createSystems(game) {
       for (const k in inc) if (typeof inc[k] === 'number') jrChapInc[k] = inc[k];
       for (const k in scn) if (typeof scn[k] === 'number') jrChapScene[k] = scn[k];
       jrIncTold = !!jrFile.told;
+      riddleTold = !!jrFile.rtold;
       notoSeenTier = notoTier();   // N1: a restored rank is not news
       // ...and the other economy (B8). An older file has neither key and reads
       // as zero of each, which is what it was.
@@ -30050,6 +30183,9 @@ export function createSystems(game) {
     started = true;
     game.state.started = true;
     startMs = performance.now();
+    // THE FIRST MINUTE (L4, E3): a file with nothing on it. See sysFreshT.
+    sysFresh = doneCount === 0 && findCount() === 0;
+    sysFreshT = 0;
     titleEl.classList.add('gone');
     todoEl.classList.add('show');
 
@@ -30079,6 +30215,20 @@ export function createSystems(game) {
     // Sydney leaf at all.
     jrSeen[chapterOf(where)] = 1;
     const landed = cdef.biome !== 'sydney' ? biomeGo(cdef.biome) : false;
+    // ---- ...AND SYDNEY'S REGULAR IS TOLD BY HAND (L4, E5) -------------------
+    // The tier reaches npc.js on biome:enter and nowhere else, and Sydney is
+    // the one place the game never ENTERS — it boots there. So a file with
+    // the waiter at tier 3 came back to a waiter who had never met you
+    // (measured, qa/l4-pal-seed.js: tier 0 in Sydney, 3 in Pasto, same
+    // file). The same two calls the enter handler makes, for the one start
+    // that does not fire it.
+    if (!landed) {
+      const t0 = jrChapPal[chapterOf(where)] || 0;
+      try {
+        if (typeof game.palSet === 'function') game.palSet(t0);
+        if (t0 >= 1 && typeof game.palArm === 'function') game.palArm(t0);
+      } catch (e) { /* an older npc.js has no regulars */ }
+    }
     // The atmosphere blend is a ~1 s damp and there is nothing to cross-fade
     // FROM on frame one: land on the chapter's own light rather than open the
     // game with a second of a Sydney afternoon over a volcano.
@@ -32263,6 +32413,7 @@ export function createSystems(game) {
   }
 
   let backVoidT = 0;
+  let backVoidBox = null;   // the rectangle the animal is outside of, for the rescue's landing
   function backVoid(dt) {
     const capy = game.capy;
     if (!capy || !capy.body || !capy.position || ended || transBusy) { backVoidT = 0; return; }
@@ -32281,9 +32432,32 @@ export function createSystems(game) {
       if (!b && game.biome && typeof game.biome.boundsOf === 'function') {
         b = game.biome.boundsOf(game.biome.current);
       }
-      if (b) lost = sysOutside(b, p.x, p.z);
+      if (b) { lost = sysOutside(b, p.x, p.z); if (lost) backVoidBox = b; }
+      // ---- THE EDGE IS A WALL BEFORE IT IS A RESCUE (L4) ------------------
+      // Just past the line on ground that is still ground — Kyoto's plane
+      // runs on for ever east of the last collider — a teleport is the wrong
+      // verb: the walker who is holding W is outside again in six seconds
+      // however far inside the landing is (measured, qa/l4-kyoto-edge.js).
+      // So inside sysVOID_WALL metres of the line the outward half of the
+      // velocity is taken off and a gentle inward one put on, and the animal
+      // simply cannot get further. Further than that — a carrier, a launch,
+      // a fall — is the rescue as before. Only for a single rectangle: the
+      // chapters that publish a rects list are the ones with real edges.
+      if (lost && b && !b.rects && capy.body && isFinite(b.x0 + b.x1 + b.z0 + b.z1)) {
+        const v = capy.body.velocity;
+        const ox = p.x < b.x0 - sysVOID_PAD ? -1 : p.x > b.x1 + sysVOID_PAD ? 1 : 0;
+        const oz = p.z < b.z0 - sysVOID_PAD ? -1 : p.z > b.z1 + sysVOID_PAD ? 1 : 0;
+        const beyond = Math.max(ox < 0 ? b.x0 - sysVOID_PAD - p.x : ox > 0 ? p.x - b.x1 - sysVOID_PAD : 0,
+                                oz < 0 ? b.z0 - sysVOID_PAD - p.z : oz > 0 ? p.z - b.z1 - sysVOID_PAD : 0);
+        if (beyond < sysVOID_WALL && !capy.carriedBy) {
+          if (ox && v.x * ox > 0) v.x = -ox * sysVOID_WALL_V; else if (ox) v.x = Math.min(v.x * ox, -sysVOID_WALL_V) * ox;
+          if (oz && v.z * oz > 0) v.z = -oz * sysVOID_WALL_V; else if (oz) v.z = Math.min(v.z * oz, -sysVOID_WALL_V) * oz;
+          lost = false;
+          backVoidBox = null;
+        }
+      }
     }
-    if (!lost) { backVoidT = 0; return; }
+    if (!lost) { backVoidT = 0; backVoidBox = null; return; }
     backVoidT += dt;
     if (backVoidT < sysVOID_HOLD) return;
     backVoidT = 0;
@@ -32293,7 +32467,8 @@ export function createSystems(game) {
       try { game.condor.release(); } catch (e) { /* it may already have let go */ }
     }
     capy.carriedBy = null;
-    if (backRescue(true)) toast('that is not part of the world. put you back.');
+    if (backRescue(true, backVoidBox)) toast('that is not part of the world. put you back.');
+    backVoidBox = null;
   }
 
   /**
@@ -32304,13 +32479,36 @@ export function createSystems(game) {
    * `quiet` suppresses the toast for a caller that wants to say something more
    * specific — see backVoid.
    */
-  function backRescue(quiet) {
+  // ---- ...AND A BOUNDS RESCUE LANDS WELL INSIDE THE LINE (L4) --------------
+  // Measured on a naive drive in Kyoto (qa/l4-kyoto-edge.js): the ground is
+  // a plane, so walking east never falls — it walks past the last collider
+  // at x = 170 and the bounds rescue fires. The oldest crumb was FIVE METRES
+  // inside the line, the walker was outside again in six seconds, and the
+  // first-minute probe read four "put you back" in five seconds. A crumb is
+  // four seconds of walking, and four seconds of walking toward an edge is
+  // still beside it. So a rescue that was asked for by a rectangle pulls
+  // its landing toward that rectangle's centre until it is sysBACK_INSIDE
+  // metres in on both axes (a rects list falls back to the first rect). A
+  // void fall (no box) lands where it always did.
+  const sysBACK_INSIDE = 14;
+  function backInside(to, box) {
+    if (!to || !box) return to;
+    const b = box.rects && box.rects.length ? box.rects[0] : box;
+    if (!isFinite(b.x0 + b.x1 + b.z0 + b.z1)) return to;
+    const cx = (b.x0 + b.x1) * 0.5, cz = (b.z0 + b.z1) * 0.5;
+    const hx = Math.max(0, (b.x1 - b.x0) * 0.5 - sysBACK_INSIDE), hz = Math.max(0, (b.z1 - b.z0) * 0.5 - sysBACK_INSIDE);
+    const x = clamp(to.x, cx - hx, cx + hx), z = clamp(to.z, cz - hz, cz + hz);
+    if (x === to.x && z === to.z) return to;
+    return { x: x, y: Math.max(to.y, sysGroundY(x, z) + 0.6), z: z };
+  }
+  function backRescue(quiet, box) {
     const capy = game.capy;
     if (!capy || !capy.body || transBusy) return false;
     if (game.condor && game.condor.mounted) return false;
-    const to = backRing.length ? backRing[0]
-             : (game.biome && game.biome.spawnOf ? game.biome.spawnOf(game.biome.current) : null);
+    let to = backRing.length ? backRing[0]
+           : (game.biome && game.biome.spawnOf ? game.biome.spawnOf(game.biome.current) : null);
     if (!to) return false;
+    if (box) to = backInside(to, box);
     // Whatever had hold of the animal has to let go, or the frame after the
     // teleport drags it straight back: a held prop crossing the map is the same
     // soft-lock the departures board already has customs for.
@@ -36042,6 +36240,11 @@ export function createSystems(game) {
    * `kind` and `type` are what it WAS — see the ring above. Both optional.
    */
   function incAdd(x, z, key, kind, type) {
+    // THE FIRST MINUTE (L4, E3 / design #3): on a fresh file nothing on the
+    // ladder counts until the player has ticked something on purpose or
+    // ninety seconds have gone — the review's first card was AN INCIDENT at
+    // twenty-three seconds, for three bins knocked while learning the keys.
+    if (sysFresh && sysFreshT < sysFRESH_RUNG_T && doneCount === 0) return;
     if (!started || game.state.paused) return;
     if (typeof x !== 'number' || x !== x) return;
     const t = game.state.time;
@@ -36548,7 +36751,7 @@ export function createSystems(game) {
       return 'they had one word for most of it: ' + nm.toLowerCase();
     }
     return variety === 1 ? 'they had a word for what you did'
-                         : 'they had ' + variety + ' words for what you did';
+                         : 'they had ' + sysNumWord(variety) + ' words for what you did';
   }
   /**
    * THE PAGE (Q2). Rebuilt from nothing every time the journal opens — the
@@ -37287,7 +37490,9 @@ export function createSystems(game) {
       // still for 1.1 s and the camera ends up in front of you and W walks you
       // backwards, because the stick is camera-relative and the camera had
       // moved. It has been that way since the rig was written; it is one term.
-      camYawTarget = sysDampAngle(camYawTarget, capy.group.rotation.y + Math.PI, sysCAM_AUTO_L, dt);
+      camYawTarget = sysDampAngle(camYawTarget,
+                                  capy.group.rotation.y + Math.PI + sysREST_FLANK * clamp(skyRestT / sysREST_W, 0, 1),
+                                  sysCAM_AUTO_L, dt);
     }
     if (mounted !== flyWas) {
       flyWas = mounted;
@@ -38122,6 +38327,7 @@ export function createSystems(game) {
     // cannot change usefully faster than four times a second. Raw dt, not the
     // scaled one — a find should not take longer to notice in slow motion.
     findTick(game.state.rawDt || dt);
+    if (sysFresh && started && !game.state.paused) { sysFreshT += dt; sysToastDrain(); }
     // THE HERD RUNS LAST OF ALL, and that is the whole reason it needs no
     // per-chapter surgery in the updaters: systems.js is the last module in
     // the frame (env → …16 biomes… → weather → props → capy → condor → npcs →
@@ -38305,7 +38511,7 @@ export function createSystems(game) {
       riddleT += dt;
       if (riddleT > sysRIDDLE_T) {
         riddleShown = true;
-        if (!riddleTold) { riddleTold = true; toast('the arrow, then.', 'note'); }
+        if (!riddleTold) { riddleTold = true; saveSoon(); toast('the arrow, then.', 'note'); }
       }
     }
     const topRec = taskRec[todoTopId];

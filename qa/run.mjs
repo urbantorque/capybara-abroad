@@ -49,6 +49,10 @@ const ASSERTS = [
   // ~10 s, which is half of what this suite took before it. What it still
   // cannot do is BOOT the file: that needs a browser, and qa/l4-ks.js is the
   // step that opens dist/ from file:// and asserts started and musAudit().ks.
+  // THE VOICE (L4, E5): no line lives in two pools, and the two regulars
+  // found by kind rather than by their first line are still on the table.
+  ['qa/l4-lines-dups.mjs', 'dialogue pools: no line in two pools'],
+  ['qa/l4-pal-static.cjs',  'the two regulars found by kind (Sydney, Pasto)'],
   ['build.mjs',           'the one-file build: wraps, splices, no collisions, writes dist/'],
 ];
 const REPORTS = [

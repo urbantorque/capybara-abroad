@@ -235,7 +235,7 @@ const npcLINES = {
             'Well. It has been busier than I have.',
             'It is not showing anybody. It is just sitting with them.',
             'Do you think somebody is missing all this?'],
-  startle: ['Oi!', 'Bloody hell.', 'What was that?', 'Right then.', 'That’s not a wombat.', 'Strewth.',
+  startle: ['Oi!', 'Bloody hell.', 'Hang on. What?', 'Right then.', 'That’s not a wombat.', 'Strewth.',
             'Nope. Nope nope nope.', 'Is it meant to be here?', 'It’s the size of a labrador.',
             'Do NOT let it near the esky.'],
   laugh:   ['Aww, look at him!', 'He’s just going about his day.', 'He’s having a lovely time.',
@@ -253,16 +253,16 @@ const npcLINES = {
             { t: 'Been round the world and come back for the sandwiches.', after: 'pho-run' }],
   // What somebody says the second time you come near them. See the npcWARY_*
   // block: this is the whole of what being remembered sounds like.
-  wary:    ['You again.', 'Oh, it’s you.', 'I’m watching you, mate.', 'Not again.',
+  wary:    ['Oh, look who it is.', 'Oh, it’s you.', 'I’m watching you, mate.', 'Not again.',
             'Right. I see you.', 'Don’t even think about it.', 'I know your game.',
-            'Nope. Nope nope nope.'],
+            'Not you. Not today.'],
   stolen:  ['That’s my hat!', 'Get out of it!', 'Oi! Come back here!', 'You little ratbag!',
             'Give it back, mate!', 'That was forty dollars!', 'I need that! I’m ginger!'],
   giveUp:  ['…where’d he go?', 'Unbelievable.', 'Right. Yep.', 'Fair enough, I suppose.',
             'I’m not chasing a rodent through the gardens.', 'It’s only a hat. It’s only a hat.'],
   photo:   ['Say cheese!', 'Hold still, mate.', 'Beautiful.', 'One for the album.',
             'Nobody at work is going to believe this.', 'Closer. Closer. Too close.'],
-  chase:   ['Not the roses!', 'Get out of it!', 'Oi! OI!', 'Right, that’s it.', 'Off the garden bed!',
+  chase:   ['Not the roses!', 'Go on — GET!', 'Oi! OI!', 'Right, that’s it.', 'Off the garden bed!',
             'Those are PRIZE roses!', 'Thirty years I’ve done this bed!'],
   breath:  ['I’m too old for this.', 'Every bloody Tuesday.', 'Gone, has he.', 'Terrific.',
             'I’ve got a bad knee, you know.', 'They don’t pay me enough. They don’t pay me at all.'],
@@ -328,9 +328,9 @@ const npcLINES = {
             'Everything’s in G, mate.', 'Tips go in the hat. The HAT.',
             { t: 'Watch the hat, would you. Just — watch the hat.', before: 'busker-hat' },
             { t: 'Hat’s empty, mate. Ask the rodent.', after: 'busker-hat' }],
-  buskRob: ['That’s my hat!', 'That’s my takings!', 'Oi — I’m working here!', 'Mate. MATE.',
+  buskRob: ['Oi — that’s the hat!', 'That’s my takings!', 'Oi — I’m working here!', 'Mate. MATE.',
             'There was eleven dollars in that!', 'I have been robbed by a rodent.'],
-  buskSad: ['Right. Where was I.', 'Every Sunday, this.', 'Back to it, then.', 'Terrific.',
+  buskSad: ['Right. Where was I.', 'Every Sunday, this.', 'Back to it, then.', 'Great. Great stuff.',
             'I’ll write a song about it.', 'This one’s about a capybara.'],
   cafe:    ['…and she said no, obviously.', 'The coffee here is criminal.', 'Lovely spot, this.',
             'Is that a very large guinea pig?', 'We should get the ferry after.',
@@ -347,7 +347,7 @@ const npcLINES = {
             'Murray, we have TALKED about this.', 'He’s never done this before.',
             'MURRAY. Look at me. MURRAY.', 'I’ve got treats! I’ve got the good treats!',
             'That’s it. No park for a week.'],
-  queueUp: ['There’s a line, mate.', 'Oi. Back of the queue.', 'We were all waiting.', 'Unbelievable.'],
+  queueUp: ['There’s a line, mate.', 'Oi. Back of the queue.', 'We were all waiting.', 'Honestly.'],
   soaked:  ['AAGH!', 'That is COLD.', 'Oh, marvellous.', 'I am drenched.', 'Wonderful. Just wonderful.'],
   mugged:  ['Get off! GET OFF!', 'They’re on me!', 'Not the chips! NOT THE CHIPS!', 'Aaagh — birds!'],
   // ---- Mr Whippy, when she stops -------------------------------------
@@ -384,7 +384,7 @@ const npcLINES = {
   standUp: ['GET OFF THE TABLE!', 'That is our LUNCH!', 'Excuse me — EXCUSE ME!',
             'He’s ON the table!', 'Off! OFF!'],
   serve:   ['Two flat whites, yeah?', 'Won’t be a moment.', 'Sorry about the rodent.',
-            'Table four, table four.', 'I only started Tuesday.',
+            'Table four, table four.', 'Is this normal here? Is this a normal day?',
             'Do I charge it? Can I charge it?', 'It has a hat. Why has it got a hat.',
             'I’m putting it on the specials board.'],
 
@@ -1264,6 +1264,11 @@ export function createNPCs(game) {
     'border-bottom:1px solid ' + bubEdge + ';';
   for (let i = 0; i < BUB; i++) {
     const el = document.createElement('div');
+    // A class NAME and nothing on it: every style is the cssText below, and
+    // no sheet in the game selects this. It exists so a probe can watch the
+    // four slots from the DOM (qa/l4-lines-soak.js) instead of guessing which
+    // unlabelled div under the HUD is a bubble (L4, E5).
+    el.className = 'capynpc-bubble';
     el.style.cssText = BUB_CSS;
     const tail = document.createElement('div');
     tail.style.cssText = TAIL_CSS;
@@ -1819,15 +1824,27 @@ export function createNPCs(game) {
     // for four versions had no reaction at all: the slide had a scrape, a
     // camera term and a dust plume, and nobody in nineteen chapters could see
     // it coming.
-    slide:    ['LOOK OUT —', 'It is not stopping!', 'Get out of the way!',
-               'It is on its belly!', 'Coming through, apparently.',
-               'Whoa — whoa!', 'Mind yourself!'],
+    //
+    // IN THE SAME REGISTER AS THE POOL ABOVE IT (L4, E5). The first cut of
+    // this was the only pool in the table that shouted — 'LOOK OUT —', 'Get
+    // out of the way!', three exclamation marks in seven lines — in a file
+    // whose rule for a bystander is that the sentence is dry and the animal
+    // is the joke. `rush` is what the same person says about the same animal
+    // going past upright, and it never raises its voice; this is the same
+    // person a second later, lower to the ground.
+    slide:    ['It is on its belly. It is still going.',
+               'That is not how those are meant to go.',
+               'No brakes on that, apparently.',
+               'It is coming through whether we like it or not.',
+               'Mind your feet. Mind — well.',
+               'Is that a way of walking, now.',
+               'Lower than I would have thought possible.'],
     // ---- AND ONE MORE, FOR SOMEBODY WHO REMEMBERS YOU (v19) --------------
     // Said when you come back to a person you have already had a go at, and
     // held to the same chapter-neutral standard as the four above: no season,
     // no country, no building, nothing that assumes what you did. A person who
     // is watching you is not a person accusing you of anything specific.
-    wary:     ['You again.', 'I am watching you.', 'Mm.', 'I know what you are.',
+    wary:     ['You again.', 'I am watching you.', 'Right.', 'I know what you are.',
                'Not this time.', 'I have got my eye on you.', 'Oh, it is back.'],
     // ---- ...AND ONE FOR SOMEBODY WHO HAS DECIDED YOU ARE FINE (v22) ------
     // The mirror of `wary`, to the same chapter-neutral standard: no season,
@@ -1847,7 +1864,7 @@ export function createNPCs(game) {
     drizzle:  ['Here it comes.', 'Of course it is.', 'That was not forecast.',
                'Ah. Lovely.', 'Right on time.', 'I did not bring a coat.',
                'It will pass.'],
-    clearing: ['There we are.', 'That is better.', 'It has stopped.',
+    clearing: ['There. Done.', 'That is better.', 'It has stopped.',
                'Blue, look.', 'Short one, that.', 'Told you it would pass.'],
     // What you say when something drifts past your face. Deliberately smaller
     // than the others — this is a person noticing, not a person commenting.
@@ -2084,7 +2101,7 @@ export function createNPCs(game) {
     // exception, and it only reads as one because the sixteen above it are
     // not exceptions.
     pantanal: {
-      wary:     ['Ha. You again.', 'Still here, then.', 'You are no trouble.',
+      wary:     ['Ha. You again.', 'Still with us, then.', 'You are no trouble.',
                  'Sit where you like, primo.',
                  'Nobody here has ever asked you to leave.',
                  'You have been here longer than I have.'],
@@ -2112,7 +2129,7 @@ export function createNPCs(game) {
                  'Nine of us and one of you, and you are the problem.',
                  'There is nowhere for you to have come from.',
                  'You never sign in. Nobody ever signs in.'],
-      incident: ['Three, on a station of nine people.', 'Nobody is going to believe this.',
+      incident: ['Three, on a station of nine people.', 'Nobody back home is going to believe this.',
                  'I am writing this one down.',
                  'We are eight hundred miles from another one of anything.',
                  'That is the most that has happened since March.',
@@ -2518,12 +2535,12 @@ export function createNPCs(game) {
   const npcLOC_CHAT_R   = 13.0;  // m apart — near enough to call across to
   const npcLOC_CHAT_LOOK= 5.0;   // s the pair go on facing each other
   const npcLOC_CHAT = {
-    open: ['Morning.', 'You are here early.', 'Still here, then.', 'Any news?',
-           'Busy?', 'How is it looking?', 'Did you see that?', 'All right?',
+    open: ['Morning.', 'You are here early.', 'Still about, then?', 'Any news?',
+           'Busy?', 'How is it looking?', 'See anything?', 'All right?',
            'Same again tomorrow.', 'Long one today.'],
-    back: ['Same as ever.', 'Mm.', 'Ask me later.', 'Do not.', 'Could be worse.',
+    back: ['Same as ever.', 'Mm-hm.', 'Ask me later.', 'Do not.', 'Could be worse.',
            'Not really.', 'Every day.', 'It will keep.', 'Nearly done.',
-           'You said that yesterday.'],
+           'You said that last week.'],
   };
 
   // =======================================================================
@@ -3386,7 +3403,7 @@ export function createNPCs(game) {
                         'You and I are going to have a word.',
                         'That is the third thing.',
                         'No. No, no, no.'];
-  const npcLOC_MARCH_END = ['There you are.',
+  const npcLOC_MARCH_END = ['Got you.',
                             'Right. Settle down.',
                             'That will do.',
                             'I have got you.',
@@ -3490,7 +3507,7 @@ export function createNPCs(game) {
   // ...and what they say while trailing you across a square wanting it back.
   const npcLOC_CHASE = ['That is mine.', 'Give it here.', 'Bring it back.',
                         'Where are you going with that?', 'Come here.',
-                        'I am not asking twice.', 'That is not yours.'];
+                        'I am not asking twice.', 'That belongs on my counter.'];
   // ...AND A POOL FOR THE END OF ONE, which retrieval did not have. Hitting the
   // npcOWN_OUT_T ceiling used to draw from npcLOC_SAY.rush — 'Whoa!', 'Mind
   // out!', 'Somebody is in a hurry.' — which is a BYSTANDER watching the animal
@@ -3498,7 +3515,7 @@ export function createNPCs(game) {
   // is walking back to their stall empty-handed. Every other give-up beat in
   // the game has its own pool (Pasto's paWheeze and paScold, Sydney's giveUp);
   // this is the chapter-neutral one, because it runs in seventeen of them.
-  const npcLOC_GIVEUP = ['Keep it, then.', 'It is not worth it.', 'Fine. Have it.',
+  const npcLOC_GIVEUP = ['Keep it, then.', 'Not worth the chase.', 'Fine. Have it.',
                          'I am not chasing you round the square.',
                          'That is that, then.', 'Go on, then.'];
   let locChainFrom = null, locChainT = 0;
@@ -3970,9 +3987,17 @@ export function createNPCs(game) {
   // One pool per chapter, because these two chapters HAVE voices — every other
   // line in Pasto is in its own register and a witness answering in Sydney's
   // would be the only flat sentence in the plaza.
-  const npcWIT_CHAIN = ['What?', 'What was that?', 'Did you see that?', 'Hm?',
-                        'What is going on over there?', 'Oh, what now.',
-                        'Something is happening.', 'Everybody all right?'];
+  //
+  // ...AND SYDNEY'S WAS A BYTE-FOR-BYTE COPY OF npcLOC_CHAIN (L4, E5). The
+  // paragraph above argued for a pool per chapter and then shipped the
+  // neutral one under a second name, so the one cast in the game with a
+  // Sydney accent answered a bang in the same eight words as a tea stall in
+  // Uji. Written in the promenade's own register now, and no line here is in
+  // any other pool — qa/l4-lines-dups.mjs holds that.
+  const npcWIT_CHAIN = ['Eh?', 'What was that, then?', 'Did you see that, mate?',
+                        'What’s going on over there?', 'Now what.',
+                        'Something’s happening.', 'Everyone right?',
+                        'That’ll be the wombat.'];
   // ...and the same for a chain of three. One pool per chapter for the reason
   // the two above have one: these two places have voices, and a Sydneysider
   // saying a line written for a plaza in Nariño is the only flat sentence in
@@ -5592,8 +5617,8 @@ export function createNPCs(game) {
   const npcPHOTO_ARM   = 1.55;  // rad the arms come up. A phone, not a salute.
   const npcPHOTO_WAIT  = 30;    // s into a session before anybody may take one (M5)
   const npcPHOTO_HEAT  = 0.50;  // over this the square is too cross to admire you
-  const npcLOC_PHOTO = ['Hold still. Hold still.', 'Nobody is going to believe this.',
-    'Look at it. Just look at it.', 'One picture. One.',
+  const npcLOC_PHOTO = ['Hold still. Hold still.', 'They will say I made this up.',
+    'Stay like that. Just like that.', 'One picture. One.',
     'It is not even bothered.', 'That is going on the internet.',
     'My sister will not believe me.', 'It has been there ten minutes.'];
   // ---- ...AND THE ONE FOR WHEN SOMETHING IS SITTING ON IT (N2) -----------
@@ -5671,8 +5696,8 @@ export function createNPCs(game) {
   const npcLOC_PAT = ['There. Good.', 'All right. All right.',
     'You are a very large animal.', 'Yes. Hello.',
     'Do not get comfortable.', 'Look at the state of you.',
-    'Right. That is enough of that.'];
-  const npcLOC_PRAISE = ['…was that deliberate?', 'Well. That happened.',
+    'Right. That will do.'];
+  const npcLOC_PRAISE = ['…was that deliberate?', 'Well. That was a thing.',
                          'Nobody asked you to do that.', 'Hm. Yes. Good.',
                          'I saw that.', 'You are pleased with yourself.',
                          'Right in front of me, as well.',
@@ -7103,20 +7128,68 @@ export function createNPCs(game) {
   // The never-twice guard still works, because it compares the RESOLVED
   // string against the last one — not an index into a list whose length now
   // changes as the chapter goes on.
+  //
+  // ---- ...AND THE SAME BAG THE OTHER SEVENTEEN DRAW FROM (L4, E5) --------
+  // Until now this was a roll: a random index, nudged along by up to three if
+  // it landed on this person's last line or on the last line anybody said
+  // from this pool. That is a guard against SAYING IT TWICE RUNNING and it is
+  // no guard at all against saying it seven times in five minutes, which is
+  // what the fresh-eyes playtest counted in Reykjavík (one line, seven
+  // bubbles) and what a Sydney soak counts in the first two minutes on the
+  // promenade: a pool of eight rolled thirty times repeats, and it repeats
+  // whether or not the guard nudges the roll.
+  //
+  // `localLine` has never had the problem, because it does not roll. It keeps
+  // a shuffled BAG per person per pool and draws until the bag is empty, so a
+  // person cannot repeat until they have been through everything they have
+  // to say — and then it hands the pick to the six-deep echo ring, so two
+  // mouths in one square cannot say the same thing in the same breath. Both
+  // of those are promises this cast never had, and they are the same promises
+  // the roadmap's 0.85 distinct-over-total is asking for.
+  //
+  // So this is the bag-and-ring discipline, verbatim in shape: `bags` is
+  // created lazily because the roster record's initialiser predates it (the
+  // local's is built with one), the signature is the same length-plus-first-
+  // line the local uses so a pool that CHANGES under a task refills, and the
+  // key is folded in so two roster pools that happen to share a shape do not
+  // share a bag. `lastLine` and `npcLastGlobal` are still written — the
+  // former is read by qa/n2-said.js and the latter is the old chorus fence —
+  // but neither is consulted for the pick any more; the bag's own opening
+  // guard and the ring between them cover both.
   // =======================================================================
   function pickLine(npcRec, key) {
     const raw = npcLINES[key];
     if (!raw) return;
-    const arr = localResolve(raw, npcRec);
-    if (!arr.length) return;
-    let i = randInt(0, arr.length - 1);
-    for (let k = 0; k < 3 && arr.length > 2 &&
-         (arr[i] === npcRec.lastLine || arr[i] === npcLastGlobal[key]); k++) {
-      i = (i + 1) % arr.length;
+    const pool = localResolve(raw, npcRec);
+    if (!pool.length) return;
+    if (!npcRec.bags) npcRec.bags = {};
+    const sig = key + '|' + pool.length + '' + pool[0];
+    let bag = npcRec.bags[sig];
+    if (!bag || !bag.length) {
+      bag = npcRec.bags[sig] = pool.slice();
+      for (let i = bag.length - 1; i > 0; i--) {
+        const j = randInt(0, i);
+        const t = bag[i]; bag[i] = bag[j]; bag[j] = t;
+      }
+      // The refilled bag must not open on the line they have just said —
+      // the same one-swap guard localLine uses, on this record's own field.
+      if (bag.length > 1 && bag[bag.length - 1] === npcRec.lastLine) {
+        const t = bag[bag.length - 1]; bag[bag.length - 1] = bag[0]; bag[0] = t;
+      }
     }
-    npcRec.lastLine = arr[i];
-    npcLastGlobal[key] = arr[i];
-    npcRec.speak(arr[i]);
+    let line = bag.pop();
+    // ...and the ring gets the last word, as a TRADE and never a discard, so
+    // the bag's promise about this one person survives the square's promise
+    // about the last few seconds. See localLine.
+    if (bag.length && npcEchoHas(line)) {
+      for (let i = bag.length - 1; i >= 0; i--) {
+        if (!npcEchoHas(bag[i])) { const t = bag[i]; bag[i] = line; line = t; break; }
+      }
+    }
+    npcEchoPush(line);
+    npcRec.lastLine = line;
+    npcLastGlobal[key] = line;
+    npcRec.speak(line);
   }
 
   // ------------------------------------------------------------ photo flash
@@ -7302,7 +7375,7 @@ export function createNPCs(game) {
   const npcLOC_ERRAND = ['Coming through.', 'Mind the — thank you.', 'Hot. Hot hot hot.',
                          'Not for you.', 'Same as every day.'];
   const npcLOC_ERR_LOST = ['That was for somebody.', 'Right. Again, then.',
-                           'I will make another one. Not for you.', 'Every time. Every single time.'];
+                           'I will make another one. Not for you.', 'Every time. I do not know why I bother.'];
   function localErrandStep(r, dt) {
     const E = r.errand;
     if (!E) return false;
@@ -9419,7 +9492,9 @@ export function createNPCs(game) {
     // still looks up, still hops — and only the memory it writes is smaller.
     // Scaling the alarm instead would have made the animal quiet by making the
     // world unresponsive, which is the opposite of the thing.
-    const wleft = rec.alarm * capyQuiet;
+    // ...and O2's tier-four softening, which the two cast regulars could not
+    // have without it (E5): npcPalSoft is 1 for everybody but the regular.
+    const wleft = rec.alarm * capyQuiet * npcPalSoft(rec);
     if (wleft > (rec.wary || 0)) rec.wary = wleft;
     else if (rec.wary > 0) { rec.wary -= dt / npcWARY_T; if (rec.wary < 0) rec.wary = 0; }
     rec.moveX = rec.moveX || 0; rec.moveZ = rec.moveZ || 0;
@@ -12085,6 +12160,13 @@ export function createNPCs(game) {
   // ================================================================== events
   game.events.on('biome:enter', (p) => {
     parkBubbles();
+    // ---- WHERE THIS ARRIVAL IS FROM, FOR THE RUMOUR (L4, E5) -------------
+    // Read here and not in npcRumArm, which is handed a place NAME by
+    // systems.js and no biome. This handler is registered before that
+    // module's (main.js builds npcs first), so the field is set by the time
+    // rumourArm is called for the same crossing. See npcRumArm.
+    npcRumFrom = (p && p.from) || '';
+    npcRumTo = (p && p.name) || '';
     // ---- ONE TIER PER VISIT, AND THIS IS THE WHOLE OF "PER VISIT" (O1) --
     // Cleared here and nowhere else. npcPalStep sets it on the first
     // warming and systems.js decides what a warming is worth.
@@ -12192,7 +12274,10 @@ export function createNPCs(game) {
     }
     for (let i = 0; i < game.npcs.length; i++) {
       const r = game.npcs[i];
-      if (r) { r.wary = 0; r.alarm = 0; }
+      // ...and `fam`, for the same reason the locals' is cleared above: the
+      // only roster record that carries one is a chapter's regular (E5), and
+      // a tier is meant to cost twenty-five seconds on every visit.
+      if (r) { r.wary = 0; r.alarm = 0; if (r.fam !== undefined) r.fam = 0; }
     }
     // A carry frozen by a mid-carry departure must not resume on re-entry:
     // the first stepHuman frame would teleport the capybara from the spawn
@@ -13718,6 +13803,36 @@ export function createNPCs(game) {
                                // pays inside a couple of steps of arriving
   let npcRumLine = '';
   let npcRumT = 0;
+  let npcRumFrom = '', npcRumTo = '';   // the crossing, by biome. See biome:enter.
+  let npcRumSaid = 0, npcRumLast = '';  // E5: for the harness — spent lines, and the last
+  let npcRumWhy = '';                   // ...and which rule armed the live one
+  // ---- THE FIRST CROSSING ALWAYS CARRIES WORD (L4, E5) --------------------
+  // systems.js arms a rumour when the last place has counts worth repeating:
+  // one incident or scene, or six photographs and feedings. Sydney is where
+  // every journey starts and Pasto is the only door out of it, so the first
+  // crossing anybody makes is Sydney to Pasto — and on a quiet first chapter
+  // it arrived with nothing to say. MEASURED on the fresh-file drive: a
+  // player who reads nothing has an incident by 23 s and would have heard
+  // this; a player who did what the paper asked — sit, watch, be
+  // photographed — crossed in silence, which is backwards. The one place in
+  // the game that has certainly heard about you is the second one, because
+  // a capybara loose in Sydney is news whether or not it broke anything.
+  //
+  // So this crossing, and only this one, arms without counts: the line the
+  // writing review asked for by name, and the only `heardBad` line that does
+  // not accuse — word came up, that is all. It yields to systems.js when that
+  // module has a real kind for the arrival, because a reputation or a proper
+  // incident rumour is the bigger sentence; it fills the gap and never
+  // overrides. A `from` that is not Sydney or a `name` that is not Pasto
+  // leaves the rule alone entirely.
+  // Taken FROM the pool rather than written twice: the line is heardBad's
+  // own, found by its opening words so a rewording there breaks this loudly
+  // (palAudit's `find` rule) instead of leaving two spellings of one line.
+  const npcRUM_FIRST = (function () {
+    const p = npcLOC_SAY.heardBad;
+    for (let i = 0; i < p.length; i++) if (p[i].indexOf('Word came up from') === 0) return p[i];
+    return p[0];
+  })();
   /**
    * Arm the line for this arrival. `place` is the previous chapter's NAME —
    * "Kyoto & Uji" — and `kind` is which pool, decided by whoever knows what
@@ -13733,6 +13848,13 @@ export function createNPCs(game) {
   function npcRumArm(place, kind) {
     npcRumLine = '';
     npcRumT = npcRUM_WAIT;
+    npcRumWhy = '';
+    if (!kind && !place && npcRumFrom === 'sydney' && npcRumTo === 'pasto') {
+      npcRumLine = npcRUM_FIRST.split('{P}').join('Sydney');
+      npcRumWhy = 'first';
+      return npcRumLine;
+    }
+    npcRumWhy = kind || '';
     // ---- ...AND THE TWO KINDS THAT NAME NO PLACE (item 6) ----------------
     // NOTORIETY comes through this same door and not a second one, because
     // ONE LINE PER ARRIVAL is a rule about the arrival and not about the
@@ -13754,7 +13876,10 @@ export function createNPCs(game) {
   }
   /** The armed line and its clock, for the harness. Nothing in src reads it. */
   function npcRumAudit() {
-    return { line: npcRumLine, t: +npcRumT.toFixed(2), r: npcRUM_R };
+    return { line: npcRumLine, t: +npcRumT.toFixed(2), r: npcRUM_R,
+             // E5: the crossing, the rule that armed it, and what was spent
+             from: npcRumFrom, to: npcRumTo, why: npcRumWhy,
+             said: npcRumSaid, last: npcRumLast };
   }
   function npcRumStep(dt) {
     if (!npcRumLine || !game.state.started) return;
@@ -13765,7 +13890,10 @@ export function createNPCs(game) {
     if (!p) return;
     // A line that lands is spent; one that finds nobody is kept and tried
     // again, which is the whole point of arming it.
-    if (saySomebodyNear(p.x, p.z, npcRUM_R, npcRumLine)) npcRumLine = '';
+    if (saySomebodyNear(p.x, p.z, npcRUM_R, npcRumLine)) {
+      npcRumSaid++; npcRumLast = npcRumLine;
+      npcRumLine = '';
+    }
   }
 
   // =========================================================================
@@ -13936,6 +14064,30 @@ export function createNPCs(game) {
   // Measured: the item guessed the two empty chapters were the Pantanal and
   // Son Doong, and both of those have seven locals each; they are simply
   // thirty metres from the spawn, which the arming below makes irrelevant.
+  //
+  // ---- ...AND THEN NINETEEN (L4, E5) --------------------------------------
+  // "They walk" was the whole objection, and it was an objection to a fixed
+  // regular, not to a regular. The waiter walks between four tables and the
+  // woman with the broom patrols a plaza, and both of them come back to where
+  // they were — which is more than can be said for the gondolier, who is a
+  // point. Nothing below cares whether the person moves; the line is armed
+  // and waits for earshot, the gift is set down where they are standing, and
+  // `fam` is a number on a record. What the two chapters lacked was a way to
+  // NAME one of their people, and the roster has had one since the first
+  // build: `kind`. A row may carry `kind:` instead of `find:` and is looked
+  // up in the chapter's cast (`humans`, `paHumans`) by that field — the first
+  // of that kind, which is stable because the roster is built in one order at
+  // boot and never reordered. Sydney has one waiter; Pasto has two abuelas
+  // and the first is the regular, and the paper never says which.
+  //
+  // The seams a walking cast member has against a local are all record
+  // shape, and they are collected in the four npcPalRec* helpers below rather
+  // than spread over the step: position is `group.position` rather than
+  // `x`/`z`, the mouth is `speak` rather than `anchor.speak`, "free" is a
+  // state test rather than `!own && sat <= 0`, and nobody writes `fam` on a
+  // roster record — localsStep does it for locals and never sees the cast —
+  // so the step below runs the same law for its one cast regular. That is
+  // the whole port.
   //
   // ---- WHAT EARNS A TIER, AND WHAT IT COSTS ------------------------------
   // `fam` crossing npcFAM_HEAT — which is THE CALM, read on one person. It is
@@ -14111,6 +14263,33 @@ export function createNPCs(game) {
               'Always Tea. That is what the street calls you now. My fault.',
               'The traffic stops for nothing, so you go slowly. Slowly is the whole trick.',
               'The little stool. The blue one. It is not for customers.'] },
+    // ---- THE TWO WHO WALK (L4, E5) — see ...AND THEN NINETEEN above --------
+    // `kind`, not `find`: the waiter's lines are a pool shared with nobody, but
+    // the cast is looked up by what it IS rather than by what it says, because
+    // that field exists on the roster and a first line does not.
+    //
+    // THE WAITER. Every line he has is about the docket, because a waiter who
+    // has started on a Tuesday and found a capybara on table four has no other
+    // way of thinking about it; the name is the table, and by the fifth tier
+    // the table is yours.
+    sydney: { who: 'the waiter', kind: 'waiter', call: 'Table Four',
+      gift: 'coffee', giftSay: 'Flat white. It was for the couple on six. They have gone.',
+      tiers: ['We are full. We are full for you, specifically.',
+              'Back. Same table. It is still not a table for you.',
+              'Table Four. That is what is on the docket now. I did not write it.',
+              'The ten-to horn is the Manly boat. Everybody runs for the wrong one.',
+              'The chair by the rail. I have stopped seating people on it.'] },
+    // THE WOMAN WITH THE BROOM. She has a philosophy and it does not change
+    // for a friend, so every tier is the same sentence about not running,
+    // said more kindly. Her name for you is the insult she has always used,
+    // which in Nariño, from her, is nearly affection.
+    pasto: { who: 'the woman with the broom', kind: 'abuela', call: 'Sinvergüenza',
+      gift: 'arepa', giftSay: 'Arepa. Eat it before I change my mind, mijo.',
+      tiers: ['I do not run. So sit, then.',
+              'You came back. I told you I would still be here.',
+              'Sinvergüenza. That is your name now. From me it is a kind one.',
+              'The good empanadas are on the far stall, and only before ten.',
+              'The step by the church door is swept. Nobody else sits on it.'] },
   };
   // ---- WHAT THE FRIENDSHIP BUYS (O2) --------------------------------------
   // O1 built the memory and the lines. These are the two tiers that are not
@@ -14133,23 +14312,78 @@ export function createNPCs(game) {
   let npcPalTier = 0;                     // O2: handed over by systems.js. See npcPalSet.
   let npcPalGiftT = 0, npcPalGiven = 0;   // O2: the gift clock, and the session count
   let npcPalGiftP = null;                 // O2: the last one, while it is still lying there
+  let npcPalSaid = 0;                     // E5: lines the regular's own mouth has said this session
+  let npcPalLast = '';                    // ...and the last one, for the harness
+  // ---- ONE RECORD SHAPE, SEEN FROM HERE (L4, E5) ---------------------------
+  // The four seams between a local and a member of the steering cast, each
+  // one a function so the step below reads the same for both. A local has
+  // `biome`; a roster record never does, and that is the test — `fig` would
+  // be wrong (a point local has none either) and `kind` is on both shapes in
+  // a chapter with a cast and props shaped like people.
+  const npcPAL_BUSY_ST = { flee: 1, plunge: 1, swim: 1, chase: 1, cornered: 1,
+                           retrieve: 1, gather: 1, wheeze: 1, scandal: 1 };
+  const npcPAL_NEAR = 7;    // m — the addLocal default `near`, for the cast's fam
+  function npcPalIsCast(rec) { return !!(rec && !rec.biome && rec.group); }
+  function npcPalX(rec) { return rec.biome ? rec.x : rec.group.position.x; }
+  function npcPalZ(rec) { return rec.biome ? rec.z : rec.group.position.z; }
+  function npcPalY(rec) { return rec.biome ? rec.y : rec.group.position.y; }
+  /** Standing there with a mouth, and not in the middle of something. The
+   *  local half is the armed line's original gate, unchanged. */
+  function npcPalFree(rec) {
+    if (!rec) return false;
+    if (rec.biome) return (rec.talkCd || 0) <= 0 && !!(rec.fig && rec.anchor && !rec.own);
+    // THE CAST IS NEVER QUIET AND ALWAYS CARRYING SOMETHING. Measured with a
+    // seeded tier-3 file (qa/l4-pal-seed.js): the animal parked 1.6 m from
+    // the waiter for fourteen seconds and he never once read as free — the
+    // Quay crowd's chatter keeps every talkCd above zero (192 bubbles in two
+    // minutes) and the flat-white errand keeps carryT above it. A greeting
+    // is allowed to interrupt a remark and to be said over a tray; only a
+    // real state — a flee, a chase, a swim — is a reason not to.
+    // ...and the cooldown a cast member carries after a line is FOURTEEN
+    // seconds (traced: cd 14.16 counting down while the animal stood at
+    // 1.6 m), so waiting for it to reach zero is waiting for the whole
+    // window. Three seconds since the last bubble is enough for a greeting.
+    // The abuela's job is to chase you, and a chase that has caught up —
+    // inside three metres — is exactly where her line belongs.
+    const cp = game.capy && game.capy.position;
+    const near = cp ? Math.hypot(cp.x - rec.group.position.x, cp.z - rec.group.position.z) < 3.2 : false;
+    const busy = npcPAL_BUSY_ST[rec.state] && !(rec.state === 'chase' && near);
+    return !!(rec.group && rec.group.visible && typeof rec.speak === 'function' &&
+              (rec.talkCd || 0) <= 11.5 && !busy);
+  }
+  /** Their own mouth, whichever shape it is. Returns true if a bubble went up. */
+  function npcPalSay(rec, text) {
+    if (!rec || !text) return false;
+    try {
+      if (rec.biome) { rec.anchor.speak(text); rec.cd = Math.max(rec.cd || 0, 4.5); }
+      else { rec.lastLine = text; rec.speak(text); }
+    } catch (e) { return false; }
+    npcPalSaid++; npcPalLast = text;
+    return true;
+  }
+  /** The chapter's steering cast, or null — the mapping peopleNear and
+   *  saySomebodyNear use, and the only two chapters that have one. */
+  function npcPalCastOf(live) {
+    return live === 'sydney' ? humans : live === 'pasto' ? paHumans : null;
+  }
   /**
-   * THE REGULAR IN THE LIVE CHAPTER, OR NULL. Cached per chapter, and the
-   * cache is only filled by a HIT: a chapter's locals are registered while it
-   * builds, so the first call can legitimately come before the person exists,
-   * and a cached null would be permanent for the session. A miss re-searches
-   * twice a second, which is a handful of string tests, and stops mattering
-   * the moment the chapter has finished building.
+   * WHO THE ROW NAMES, IN THIS CHAPTER'S PEOPLE, OR NULL. The `find` search
+   * over locals as it always was, or the `kind` search over the cast — and
+   * one function rather than two copies, because npcPalAudit had its own
+   * copy of the `find` loop and a third shape would have made it three.
    */
-  function npcPalPick(dt) {
-    const live = game.biome && game.biome.current;
-    if (!live || !npcPAL[live]) { npcPalRec = null; npcPalFor = live || ''; return null; }
-    if (npcPalFor === live && npcPalRec) return npcPalRec;
-    if (npcPalFor !== live) { npcPalFor = live; npcPalRec = null; npcPalFind = 0; }
-    npcPalFind -= dt || 0;
-    if (npcPalFind > 0) return null;
-    npcPalFind = 0.5;
-    const find = npcPAL[live].find;
+  function npcPalSeek(live) {
+    const row = npcPAL[live];
+    if (!row) return null;
+    if (row.kind) {
+      const cast = npcPalCastOf(live);
+      if (!cast) return null;
+      for (let i = 0; i < cast.length; i++) {
+        const h = cast[i];
+        if (h && h.kind === row.kind && h.group && typeof h.speak === 'function') return h;
+      }
+      return null;
+    }
     for (let i = 0; i < locals.length; i++) {
       const L = locals[i];
       // The traveller is excluded BY NAME rather than by luck: they are the
@@ -14160,9 +14394,31 @@ export function createNPCs(game) {
       if (!L || L.biome !== live || L.trav || !L.lines || !L.lines.length) continue;
       const f = L.lines[0];
       const t = typeof f === 'string' ? f : (f && f.t);
-      if (t && t.indexOf(find) >= 0) { npcPalRec = L; return L; }
+      if (t && t.indexOf(row.find) >= 0) return L;
     }
     return null;
+  }
+  /**
+   * THE REGULAR IN THE LIVE CHAPTER, OR NULL. Cached per chapter, and the
+   * cache is only filled by a HIT: a chapter's locals are registered while it
+   * builds, so the first call can legitimately come before the person exists,
+   * and a cached null would be permanent for the session. A miss re-searches
+   * twice a second, which is a handful of string tests, and stops mattering
+   * the moment the chapter has finished building. (Pasto's cast is built on
+   * `biome:enter`, after this module's first step in the chapter, so the
+   * same re-search is what finds the woman with the broom.)
+   */
+  function npcPalPick(dt) {
+    const live = game.biome && game.biome.current;
+    if (!live || !npcPAL[live]) { npcPalRec = null; npcPalFor = live || ''; return null; }
+    if (npcPalFor === live && npcPalRec) return npcPalRec;
+    if (npcPalFor !== live) { npcPalFor = live; npcPalRec = null; npcPalFind = 0; }
+    npcPalFind -= dt || 0;
+    if (npcPalFind > 0) return null;
+    npcPalFind = 0.5;
+    const hit = npcPalSeek(live);
+    if (hit) npcPalRec = hit;
+    return hit;
   }
   /**
    * HOLD A LINE UNTIL THE REGULAR CAN SAY IT. systems.js owns the tier and
@@ -14254,7 +14510,7 @@ export function createNPCs(game) {
     if (p.held) return true;                       // in the mouth counts as still theirs
     const b = p.body.position;
     if (b.y < -100) { npcPalGiftP = null; return false; }   // hidden or destroyed
-    const dx = b.x - rec.x, dz = b.z - rec.z;
+    const dx = b.x - npcPalX(rec), dz = b.z - npcPalZ(rec);
     if (dx * dx + dz * dz > npcPAL_GIFT_KEEP * npcPAL_GIFT_KEEP) { npcPalGiftP = null; return false; }
     return true;
   }
@@ -14262,10 +14518,11 @@ export function createNPCs(game) {
     const row = npcPAL[npcPalFor];
     if (!row || !row.gift || !game.physics || typeof game.physics.spawnProp !== 'function') return null;
     const yaw = rec.yaw || rec.face || 0;
-    const gx = rec.x + Math.sin(yaw) * npcPAL_GIFT_D + Math.cos(yaw) * 0.35;
-    const gz = rec.z + Math.cos(yaw) * npcPAL_GIFT_D - Math.sin(yaw) * 0.35;
+    const rx = npcPalX(rec), rz = npcPalZ(rec);
+    const gx = rx + Math.sin(yaw) * npcPAL_GIFT_D + Math.cos(yaw) * 0.35;
+    const gz = rz + Math.cos(yaw) * npcPAL_GIFT_D - Math.sin(yaw) * 0.35;
     let p = null;
-    try { p = game.physics.spawnProp(row.gift, gx, gz, rec.y); } catch (e) { p = null; }
+    try { p = game.physics.spawnProp(row.gift, gx, gz, npcPalY(rec)); } catch (e) { p = null; }
     if (!p) return null;
     p.owner = null;
     p.disturbed = true;
@@ -14278,9 +14535,8 @@ export function createNPCs(game) {
     rec.gest = Math.max(rec.gest || 0, 1.1);
     if (row.giftSay && (rec.talkCd || 0) <= 0) {
       rec.talkCd = rand(8, 16);
-      rec.lookX = rec.x; rec.lookZ = rec.z;
-      rec.cd = Math.max(rec.cd || 0, 4.0);
-      try { rec.anchor.speak(row.giftSay); } catch (e) { /* optional */ }
+      rec.lookX = rx; rec.lookZ = rz;
+      npcPalSay(rec, row.giftSay);
     }
     return p;
   }
@@ -14332,7 +14588,7 @@ export function createNPCs(game) {
   const npcLOC_ERR_TY  = ['You did it. You actually did it.',
                           'Good. That is one less thing.',
                           'I saw. Thank you.',
-                          'You are all right, you are.',
+                          'You are one of the good ones, you are.',
                           'That is twice now, is it? Or am I counting wrong.'];
   let npcErrProp = null;      // the parcel, while it is out
   let npcErrT = 0;            // s until they may ask again
@@ -14346,10 +14602,10 @@ export function createNPCs(game) {
     if (!row || !row.gift || !game.physics ||
         typeof game.physics.spawnProp !== 'function') return null;
     const yaw = rec.yaw || rec.face || 0;
-    const gx = rec.x + Math.sin(yaw) * npcPAL_GIFT_D - Math.cos(yaw) * 0.35;
-    const gz = rec.z + Math.cos(yaw) * npcPAL_GIFT_D + Math.sin(yaw) * 0.35;
+    const gx = npcPalX(rec) + Math.sin(yaw) * npcPAL_GIFT_D - Math.cos(yaw) * 0.35;
+    const gz = npcPalZ(rec) + Math.cos(yaw) * npcPAL_GIFT_D + Math.sin(yaw) * 0.35;
     let p = null;
-    try { p = game.physics.spawnProp(row.gift, gx, gz, rec.y); } catch (e) { p = null; }
+    try { p = game.physics.spawnProp(row.gift, gx, gz, npcPalY(rec)); } catch (e) { p = null; }
     if (!p) return null;
     p.owner = null;
     p.disturbed = true;
@@ -14357,7 +14613,14 @@ export function createNPCs(game) {
     npcErrTTL = npcERR_TTL;
     rec.gest = Math.max(rec.gest || 0, 1.1);
     sfx('rustle', rec, 0.42, 0.95);
-    if (rec.cd <= 0) { rec.cd = rec.cool * rand(0.9, 1.5); localLine(rec, npcLOC_ERR_ASK); }
+    // A local draws from their bag; a cast regular has no `cool` and no
+    // anchor, so the ask goes through the ring and their own mouth (E5).
+    if (rec.biome) {
+      if (rec.cd <= 0) { rec.cd = rec.cool * rand(0.9, 1.5); localLine(rec, npcLOC_ERR_ASK); }
+    } else if ((rec.talkCd || 0) <= 0) {
+      rec.talkCd = rand(8, 16);
+      npcPalSay(rec, npcPickSay(npcLOC_ERR_ASK));
+    }
     return p;
   }
   /** The parcel is gone from the world, one way or another. */
@@ -14395,7 +14658,7 @@ export function createNPCs(game) {
       // pavement between you and one person is one thing too many, and there
       // is no way for the player to tell which is which.
       if (npcPalTier >= npcERR_T && npcErrT <= 0 && cp && !npcPalGiftOut(rec) &&
-          Math.hypot(cp.x - rec.x, cp.z - rec.z) < npcERR_R) {
+          Math.hypot(cp.x - npcPalX(rec), cp.z - npcPalZ(rec)) < npcERR_R) {
         if (npcErrAsk(rec)) npcErrT = npcERR_CD;
       }
       return;
@@ -14411,10 +14674,17 @@ export function createNPCs(game) {
     // anybody a favour, and the mouth is what makes it a delivery.
     if (!p.held || !cp) return;
     const live = game.biome && game.biome.current;
-    for (let i = 0; i < locals.length; i++) {
-      const L = locals[i];
-      if (!L || L === rec || L.biome !== live || !L.group) continue;
-      const dx = cp.x - L.x, dz = cp.z - L.z;
+    // ...and "somebody" is the chapter's people, whichever shape they are: in
+    // the two chapters with a cast the locals array has nobody in it, so the
+    // recipient search walks the cast there (E5). Same radius, same verb.
+    const cast = npcPalCastOf(live);
+    const n = cast ? cast.length : locals.length;
+    for (let i = 0; i < n; i++) {
+      const L = cast ? cast[i] : locals[i];
+      if (!L || L === rec || !L.group) continue;
+      if (cast ? (!L.group.visible || typeof L.speak !== 'function') : L.biome !== live) continue;
+      const lx = npcPalX(L), lz = npcPalZ(L);
+      const dx = cp.x - lx, dz = cp.z - lz;
       if (dx * dx + dz * dz > npcERR_TO_R * npcERR_TO_R) continue;
       // Done. They take it out of the animal's mouth, which is the one verb
       // props.js already has for this — see localOwnStep's caught branch.
@@ -14423,9 +14693,13 @@ export function createNPCs(game) {
           game.physics.release(null);
         }
       } catch (e) { /* the mouth is not worth an exception */ }
-      if (L.cd <= 0) { L.cd = L.cool * rand(0.8, 1.4); localLine(L, npcLOC_ERR_GOT); }
-      L.flV -= 4;
-      L.flYaw = Math.atan2(cp.x - L.x, cp.z - L.z);
+      if (cast) {
+        if ((L.talkCd || 0) <= 0) { L.talkCd = rand(8, 16); L.lookX = cp.x; L.lookZ = cp.z; L.speak(npcPickSay(npcLOC_ERR_GOT)); }
+      } else {
+        if (L.cd <= 0) { L.cd = L.cool * rand(0.8, 1.4); localLine(L, npcLOC_ERR_GOT); }
+        L.flV -= 4;
+        L.flYaw = Math.atan2(cp.x - lx, cp.z - lz);
+      }
       npcErrDone++;
       npcErrThank = npcLOC_ERR_TY[randInt(0, npcLOC_ERR_TY.length - 1)];
       npcErrForgive();
@@ -14455,23 +14729,36 @@ export function createNPCs(game) {
    * off in it, and nothing in the game would ever say so.
    */
   function npcPalAudit() {
+    const cp = game.capy && game.capy.position;
     const out = { found: [], missing: [], live: (game.biome && game.biome.current) || '',
                   line: npcPalLine, warm: npcPalWarm,
                   tier: npcPalTier, given: npcPalGiven,
                   giftIn: +npcPalGiftT.toFixed(1),
                   giftOut: !!(npcPalRec && npcPalGiftOut(npcPalRec)),
                   gift: (npcPAL[npcPalFor] && npcPAL[npcPalFor].gift) || null,
-                  soft: npcPalRec ? npcPalSoft(npcPalRec) : 1 };
+                  soft: npcPalRec ? npcPalSoft(npcPalRec) : 1,
+                  // E5: the armed line's two clocks, whether the person it
+                  // waits for is free and in earshot RIGHT NOW, and how many
+                  // lines this mouth has actually said — so a probe can tell
+                  // "armed and waiting" from "armed and never spoken" from
+                  // "spent", which from outside were one sentence.
+                  keep: +npcPalKeep.toFixed(1), tryIn: +npcPalT.toFixed(2),
+                  who: npcPalRec ? (npcPalRec.biome ? 'local' : npcPalRec.kind) : '',
+                  free: !!(npcPalRec && npcPalFree(npcPalRec)),
+                  st: npcPalRec ? (npcPalRec.state || '') : '', cd: npcPalRec ? +((npcPalRec.talkCd || 0)).toFixed(2) : 0,
+                  vis: !!(npcPalRec && (npcPalRec.biome ? npcPalRec.fig : (npcPalRec.group && npcPalRec.group.visible))),
+                  dist: npcPalRec && cp ? +Math.hypot(cp.x - npcPalX(npcPalRec), cp.z - npcPalZ(npcPalRec)).toFixed(1) : -1,
+                  fam: npcPalRec ? +(npcPalRec.fam || 0).toFixed(2) : 0,
+                  said: npcPalSaid, last: npcPalLast };
+    // Sydney's cast exists from boot; Pasto's from its first `biome:enter`.
+    // A `kind` row in a chapter whose cast is not built yet reports missing,
+    // which is honest: nobody is there to be the regular until it is.
     for (const k in npcPAL) {
-      let hit = null;
-      for (let i = 0; i < locals.length; i++) {
-        const L = locals[i];
-        if (!L || L.biome !== k || L.trav || !L.lines || !L.lines.length) continue;
-        const f = L.lines[0], t = typeof f === 'string' ? f : (f && f.t);
-        if (t && t.indexOf(npcPAL[k].find) >= 0) { hit = L; break; }
-      }
-      if (hit) out.found.push({ b: k, who: npcPAL[k].who, x: +hit.x.toFixed(1),
-                                z: +hit.z.toFixed(1), fam: +(hit.fam || 0).toFixed(2) });
+      const hit = npcPalSeek(k);
+      if (hit) out.found.push({ b: k, who: npcPAL[k].who, x: +npcPalX(hit).toFixed(1),
+                                y: +npcPalY(hit).toFixed(2),
+                                z: +npcPalZ(hit).toFixed(1), fam: +(hit.fam || 0).toFixed(2),
+                                cast: npcPalIsCast(hit) });
       else out.missing.push(k);
     }
     return out;
@@ -14479,6 +14766,35 @@ export function createNPCs(game) {
   function npcPalStep(dt) {
     if (!game.state.started) return;
     const rec = npcPalPick(dt);
+    const cp = game.capy && game.capy.position;
+    // The regular's position and whether they are standing there with a free
+    // mouth, read once — both shapes, see npcPalFree (E5).
+    const rx = rec ? npcPalX(rec) : 0, rz = rec ? npcPalZ(rec) : 0;
+    const d2 = rec && cp ? (rx - cp.x) * (rx - cp.x) + (rz - cp.z) * (rz - cp.z) : 1e9;
+    const free = rec ? npcPalFree(rec) : false;
+    // `free` includes the mouth clock; the gift and the errand want the
+    // person standing there and not mid-something, and do not care whether
+    // they have just spoken.
+    const idle = rec ? (rec.biome ? !!(rec.fig && !rec.own && rec.sat <= 0)
+                                  : !!(rec.group.visible && !npcPAL_BUSY_ST[rec.state] && rec.carryT < 0))
+                     : false;
+    // ---- THE CAST REGULAR'S FAM, ON THE LOCALS' OWN LAW (E5) -------------
+    // localsStep grows `fam` by THE CALM inside a person's circle and fades
+    // it outside, and it walks `locals` only — a roster record has never had
+    // the field. This is that paragraph, for one person, with the addLocal
+    // default radius and no heat term (the cast's chapters have heat sites,
+    // but the locals' famRate reads them per person and the difference for
+    // one regular is a rounding). It is cleared on `biome:enter` with
+    // everybody else's, in this module's own handler.
+    if (rec && npcPalIsCast(rec)) {
+      const calmNow = typeof game.calm === 'function' ? game.calm() : 0;
+      if (rec.fam === undefined) rec.fam = 0;
+      if (d2 < npcPAL_NEAR * npcPAL_NEAR && calmNow > 0.25 && (rec.wary || 0) < npcWARY_HEAT) {
+        rec.fam = Math.min(1, rec.fam + (dt / npcFAM_T) * calmNow);
+      } else if (rec.fam > 0) {
+        rec.fam = Math.max(0, rec.fam - dt / ((rec.wary || 0) > npcWARY_HEAT ? npcFAM_FADE * 0.12 : npcFAM_FADE));
+      }
+    }
     // ---- the armed line, waiting for its person -------------------------
     if (npcPalLine) {
       npcPalKeep -= dt;
@@ -14487,16 +14803,15 @@ export function createNPCs(game) {
         npcPalT -= dt;
         if (npcPalT <= 0) {
           npcPalT = npcPAL_TRY;
-          const p = game.capy && game.capy.position;
           // Their own mouth, and not saySomebodyNear's nearest free one: this
           // line belongs to one person, and being said by the man on the next
           // stall is worse than not being said at all.
-          if (rec && p && rec.fig && rec.anchor && (rec.talkCd || 0) <= 0 && !rec.own &&
-              (rec.x - p.x) * (rec.x - p.x) + (rec.z - p.z) * (rec.z - p.z) < npcPAL_R * npcPAL_R) {
+          if (rec && cp && free && d2 < npcPAL_R * npcPAL_R) {
             rec.talkCd = rand(10, 22);
-            rec.lookX = p.x; rec.lookZ = p.z;
-            rec.cd = Math.max(rec.cd || 0, 4.5);   // and they do not talk over themselves
-            try { rec.anchor.speak(npcPalLine); } catch (e) { /* the bubble is optional */ }
+            rec.lookX = cp.x; rec.lookZ = cp.z;
+            // ...and they do not talk over themselves: npcPalSay holds a
+            // local's `cd`; a cast member's is the talkCd just written.
+            npcPalSay(rec, npcPalLine);
             npcPalLine = '';
           }
         }
@@ -14508,12 +14823,9 @@ export function createNPCs(game) {
     // player sees it happen rather than finding it. They will not do it to an
     // empty street (npcPAL_GIFT_R) and they will not do it twice in a minute.
     if (npcPalGiftT > 0) npcPalGiftT -= dt;
-    if (rec && npcPalTier >= npcPAL_GIFT_T && npcPalGiftT <= 0 && rec.fig &&
-        !npcPalGiftOut(rec) &&
-        !rec.own && rec.sat <= 0 && (rec.wary || 0) < npcWARY_HEAT) {
-      const cp = game.capy && game.capy.position;
-      if (cp && (rec.x - cp.x) * (rec.x - cp.x) + (rec.z - cp.z) * (rec.z - cp.z)
-                < npcPAL_GIFT_R * npcPAL_GIFT_R) {
+    if (rec && npcPalTier >= npcPAL_GIFT_T && npcPalGiftT <= 0 && idle &&
+        !npcPalGiftOut(rec) && (rec.wary || 0) < npcWARY_HEAT) {
+      if (cp && d2 < npcPAL_GIFT_R * npcPAL_GIFT_R) {
         npcPalGiftT = npcPAL_GIFT_CD * rand(0.9, 1.25);
         npcPalGive(rec);
       }
@@ -14523,7 +14835,7 @@ export function createNPCs(game) {
     // meeting is still somebody giving you something rather than somebody
     // asking you for a favour. Both are gated on being near them and neither
     // will run while the other's prop is lying on the pavement.
-    if (rec && rec.fig && !rec.own && rec.sat <= 0) npcErrStep(rec, dt);
+    if (rec && idle) npcErrStep(rec, dt);
     // ...and the thank-you rides the SAME armed-line channel the tiers do,
     // rather than a second one — see npcPalArm's note on one mouth, one line.
     if (npcErrThank && !npcPalLine) {

@@ -19,7 +19,7 @@ async page => {
   // tries all four directions and stops as soon as it has enough frames in
   // each band, and a band with no frames prints as a GAP rather than being
   // quietly averaged into the one next to it.
-  const TAG = 'after';
+  const TAG = 'l4after';
   const RAISE_KEY = 'KeyV';      // the held eye-raise. Does nothing before job 2a.
   const WALK_LO = 3.4, WALK_HI = 4.8, RUN_LO = 6.6;
   const WANT = 40;               // frames per band before the direction sweep stops
@@ -28,8 +28,14 @@ async page => {
   await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
   await page.reload();
   await page.waitForTimeout(6000);
-  await page.mouse.click(640, 400);
+  // THE BEGIN BUTTON, NOT A CLICK ON THE BACKDROP (L4). The click at (640,
+  // 400) landed on the title card and started nothing, so every keyboard
+  // band below was a gap and the idle band was the title's drift rig: the
+  // 12 Sep before-set was nineteen rows of the title card. Assert started.
+  await page.evaluate(() => { const b = document.querySelector('.capyui-go'); if (b) b.click(); });
   await page.waitForTimeout(3000);
+  const started = await page.evaluate(() => !!(window.__capy && window.__capy.state.started));
+  if (!started) throw new Error('b5-cam: the game did not start');
 
   const names = await page.evaluate(async () => {
     const src = await (await fetch('/src/shared.js', { cache: 'no-store' })).text();
