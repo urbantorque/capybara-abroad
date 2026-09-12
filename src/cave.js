@@ -78,6 +78,7 @@ let cavGame = null;
 let cavBuilt = false;
 let cavRoot = null;
 let cavTime = 0;
+let cavRiverMover = null;            // the river's bed (L3-9)
 
 // THE ECHO
 let cavEchoLight = null, cavEchoRing = null, cavEchoRingMat = null;
@@ -4926,6 +4927,15 @@ export function createCave(game) {
       if (!cavBuilt) return;
       if (!game.biome.isActive('cave')) return;
       cavTime += dt;
+      // ---- THE RIVER (L3-9): heard from the bank, from the water nearest you
+      if (!cavRiverMover && game.sfxMover) cavRiverMover = game.sfxMover('river', { key: 'cav:river', near: 16, far: 110 });
+      if (cavRiverMover && game.capy && game.capy.position) {
+        const p = game.capy.position;
+        const rz = Math.max(-96, Math.min(44, p.z));
+        const rx = Math.max(cavRIVER_X - cavRIVER_W + 2, Math.min(cavRIVER_X + cavRIVER_W - 2, p.x));
+        cavRiverMover.at(rx, cavWATER + 0.3, rz);
+        cavRiverMover.set(0.55);
+      }
       cavUpdateEcho(game, dt);
       cavUpdateEchoBack(game, dt);
       cavUpdateWorms(dt);

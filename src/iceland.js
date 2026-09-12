@@ -80,6 +80,7 @@ const iceLAG_Z0  = -78, iceLAG_Z1 = -26;                // the glacial lagoon
 const iceLAG_HX  = 62;
 const iceLAG_Y   = -1.0;
 const iceSPRING_Y = -0.30;           // the hot pool sits higher than the lagoon
+let iceSteamMover = null;            // the steam field's bed (L3-9)
 
 // --- the glacier -------------------------------------------------------------
 // One long U-shaped tongue. The cross-section is a QUARTIC rather than a
@@ -4735,6 +4736,18 @@ export function createIceland(game) {
       if (!iceBuilt) return;
       if (!game.biome.isActive('iceland')) return;
       iceTime += dt;
+      // ---- THE STEAM (L3-9): the field's bed, from the nearest vent ------
+      if (!iceSteamMover && game.sfxMover) iceSteamMover = game.sfxMover('steam', { key: 'ice:steam', near: 14, far: 90 });
+      if (iceSteamMover && game.capy && game.capy.position) {
+        const p = game.capy.position;
+        let best = null, bd = 1e9;
+        for (let i = 0; i < iceVENT_SITES.length; i++) {
+          const v = iceVENT_SITES[i];
+          const d = (v.x - p.x) * (v.x - p.x) + (v.z - p.z) * (v.z - p.z);
+          if (d < bd) { bd = d; best = v; }
+        }
+        if (best) { iceSteamMover.at(best.x, iceTerrain(best.x, best.z) + best.h, best.z); iceSteamMover.set(best.h > 1 ? 1 : 0.6); }
+      }
 
       // the sea and the lagoon
       iceRipT += dt;

@@ -13814,6 +13814,36 @@ export function createSystems(game) {
         sysAudioSet(m.mid.g.gain, Math.max(0.0001, 0.70 * k), now, 0.9);
         sysAudioSet(m.low.g.gain, Math.max(0.0001, 0.30 * k), now, 0.9);
       } },
+    // ---- TWO MORE BEDS (L3-9), for the three chapters LIFT2 left silent ----
+    // Venice's water is still, so its bed is not a river: it is the lagoon
+    // LAPPING the Molo, a low band under a slow swell of gain, at the point
+    // of the quay nearest you. Iceland's is the steam field — a hiss with a
+    // wobble and a rumble under it, at the nearest fumarole. The cave's river
+    // is the river recipe, low, from the water nearest you.
+    lap: { level: 0.08, near: 12, far: 80, bed: true,
+      build: function (m, out) {
+        m.low = sysMoverNoise(m, out, 'bandpass', 280, 1.2, 0.55);
+        m.mid = sysMoverNoise(m, out, 'bandpass', 900, 0.8, 0.18);
+        const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.17;
+        const lg = ac.createGain(); lg.gain.value = 0.28;
+        lfo.connect(lg); lg.connect(m.low.g.gain); lfo.start(); m.src.push(lfo);
+      },
+      throttle: function (m, k, now) {
+        sysAudioSet(m.low.g.gain, Math.max(0.0001, 0.55 * k), now, 1.2);
+        sysAudioSet(m.mid.g.gain, Math.max(0.0001, 0.18 * k), now, 1.2);
+      } },
+    steam: { level: 0.07, near: 14, far: 90, bed: true,
+      build: function (m, out) {
+        m.hi = sysMoverNoise(m, out, 'bandpass', 2400, 0.5, 0.60);
+        m.low = sysMoverNoise(m, out, 'lowpass', 140, 0.7, 0.35);
+        const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.31;
+        const lg = ac.createGain(); lg.gain.value = 700;
+        lfo.connect(lg); lg.connect(m.hi.f.frequency); lfo.start(); m.src.push(lfo);
+      },
+      throttle: function (m, k, now) {
+        sysAudioSet(m.hi.g.gain, Math.max(0.0001, 0.60 * k), now, 1.0);
+        sysAudioSet(m.low.g.gain, Math.max(0.0001, 0.35 * k), now, 1.0);
+      } },
     // A lot of people, none of whom you can make out. A crowd is not a level,
     // it is a thing that keeps almost arriving somewhere.
     crowd: { level: 0.12, near: 30, far: 180, bed: true,

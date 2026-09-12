@@ -200,6 +200,7 @@ let venRoot = null;
 let venTime = 0;
 let venPhase = venTIDE_START;
 let venWaterY = venTIDE_LOW;
+let venLapMover = null;               // the lagoon's bed (L3-9)
 let venWaterMesh = null, venWaterMat = null;
 let venWaterAttr = null, venWaterBase = null, venRipT = 0;
 let venLagoonMesh = null;
@@ -5755,6 +5756,15 @@ export function createVenice(game) {
       venUpdateOrologio(game, dt);
       venUpdateMirror(game);
       api.waterLevel = venWaterY;          // published, and it is the whole chapter
+      // ---- THE LAP (L3-9): the lagoon at the Molo's edge, nearest you ----
+      if (!venLapMover && game.sfxMover) venLapMover = game.sfxMover('lap', { key: 'ven:lap', near: 12, far: 80 });
+      if (venLapMover && game.capy && game.capy.position) {
+        const p = game.capy.position;
+        const lx = Math.max(-38, Math.min(32, p.x));
+        venLapMover.at(lx, venWaterY, venMOLO_Z1 + 1.2);
+        // ...and louder on the flood: acqua alta is water that moves
+        venLapMover.set(0.6 + 0.4 * Math.max(0, Math.min(1, (venWaterY - venTIDE_LOW) / 1.2)));
+      }
       venUpdateGondola(game, dt);
       venUpdateTraghetto(game, dt);
       venUpdateVolo(game, dt);
