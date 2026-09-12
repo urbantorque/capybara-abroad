@@ -849,20 +849,26 @@ function antGroundSlip(x, z) {
  * one surface in the chapter whose entire character is that it is different
  * from the snow around it.
  */
+// The material beside the pitch (L4, audio #4): the last answer, read by
+// capybara.js through surfaceMat() straight after surfacePitch(). This is the
+// chapter the materials were built for — four of its six grounds are ice or
+// snow and every one of them played as a plank or a cobble.
+let antSurfMat = 'stone';
+function antSurf(p, m) { antSurfMat = m; return p; }
 function antSurfacePitch(x, z, y) {
-  if (antInZone('deck', x, z) && y > antWATER - 0.2) return 1.30;   // an aluminium hull
-  if (antInZone('jetty', x, z)) return 1.26;                        // hollow timber
-  if (antFloeAt(x, z) >= 0) return 1.12;                            // sea ice is drummy
+  if (antInZone('deck', x, z) && y > antWATER - 0.2) return antSurf(1.30, 'metal');   // an aluminium hull
+  if (antInZone('jetty', x, z)) return antSurf(1.26, 'timber');                       // hollow timber
+  if (antFloeAt(x, z) >= 0) return antSurf(1.12, 'ice');                              // sea ice is drummy
   if (antGlacierH(x, z) > antWATER) {
     // the blue tongue, on the same test antGroundSlip uses so the two tables
     // can never disagree about where it is
-    if (x <= antBLUE.xIn && z >= antBLUE.z0 - 16 && z <= antBLUE.z1 + 16) return 1.34;
-    return 1.06;
+    if (x <= antBLUE.xIn && z >= antBLUE.z0 - 16 && z <= antBLUE.z1 + 16) return antSurf(1.34, 'ice');
+    return antSurf(1.06, 'ice');
   }
   const hd = antHighwayD(x, z);
-  if (hd >= 0 && hd < antHIGH_W * 1.5) return 1.22;                 // polished guano ice
-  if (antTerrain(x, z) > 6.5) return 0.90;                          // snow
-  return 1.0;                                                       // rock
+  if (hd >= 0 && hd < antHIGH_W * 1.5) return antSurf(1.22, 'ice');                   // polished guano ice
+  if (antTerrain(x, z) > 6.5) return antSurf(0.90, 'snow');                           // snow
+  return antSurf(1.0, 'stone');                                                       // rock
 }
 
 function antNavBlocked(x, z) { return antIsOverWater(x, z); }
@@ -6086,6 +6092,7 @@ export function createAntarctic(game) {
     waterHeightAt: antWaterHeightAt,
     groundSlip: antGroundSlip,
     surfacePitch: antSurfacePitch,
+    surfaceMat: function () { return antSurfMat; },
     inZone: antInZone,
     navBlocked: antNavBlocked,
     SPAWN: antSPAWN,

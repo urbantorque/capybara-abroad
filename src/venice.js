@@ -870,8 +870,13 @@ function venNavBlocked(x, z, r) {
 
 /** Footfall voice: stone almost everywhere, timber on the boards, and a splash
  *  of a step wherever the tide is actually over the paving. */
+// The material beside the pitch (L4, audio #4): the last answer, read through
+// surfaceMat() straight after surfacePitch(). The calli at 1.16 had been a
+// plank; a narrow stone street is stone, and the pitch is why it echoes.
+let venSurfMat = 'stone';
+function venSurf(p, m) { venSurfMat = m; return p; }
 function venSurfacePitch(x, z, y) {
-  if (venBoardOut > 0.5 && venOnBoards) return 1.26;
+  if (venBoardOut > 0.5 && venOnBoards) return venSurf(1.26, 'timber');
   // `y` WAS DECLARED AND NEVER READ, so anything BUILT over water sounded like
   // the water. The Rialto's deck is four metres up — measured, y 5.55 — and it
   // footfalled at 1.12, the wet-canal pitch, in the chapter whose own task is
@@ -879,19 +884,19 @@ function venSurfacePitch(x, z, y) {
   // same. Sydney's ladder has used a height test for the podium since it was
   // written; this is that test.
   const over = venIsOverWater(x, z);
-  if (over && y < venWaterHeightAt(x, z) + 0.5) return 1.12;
+  if (over && y < venWaterHeightAt(x, z) + 0.5) return venSurf(1.12, 'stone');
   // ---- AND THE WHOLE DRY CITY WAS ONE FOOTSTEP ---------------------------
   // Measured across the molo, the calli, a campo, the fondamenta, the café and
   // the arcades: every one of them 0.98, with the square at 1.02. Four per cent
   // across a chapter, against Sydney's 0.82..1.22 — and the 1.26 duckboard
   // branch above is gated on the capy's own latch, so nothing else could ever
   // reach it. The zones have existed the whole time.
-  if (venInZone('square', x, z)) return 1.06;    // trachyte, laid in bands
-  if (venInZone('calli', x, z)) return 1.16;     // hard, narrow, and it echoes
-  if (venInZone('campo', x, z)) return 1.02;
-  if (venInZone('molo', x, z)) return 0.94;      // worn Istrian, close to water
-  if (venInZone('cafe', x, z)) return 0.78;      // boards and matting
-  return 0.98;
+  if (venInZone('square', x, z)) return venSurf(1.06, 'stone');    // trachyte, laid in bands
+  if (venInZone('calli', x, z)) return venSurf(1.16, 'stone');     // hard, narrow, and it echoes
+  if (venInZone('campo', x, z)) return venSurf(1.02, 'stone');
+  if (venInZone('molo', x, z)) return venSurf(0.94, 'stone');      // worn Istrian, close to water
+  if (venInZone('cafe', x, z)) return venSurf(0.78, 'grass');      // boards and matting — the matting is what you hear
+  return venSurf(0.98, 'stone');
 }
 
 // ============================================================== THE SQUARES =
@@ -5681,6 +5686,7 @@ export function createVenice(game) {
     },
     navBlocked: venNavBlocked,
     surfacePitch: venSurfacePitch,
+    surfaceMat: function () { return venSurfMat; },
     SPAWN: venSPAWN,
 
     // landmarks, for the beacons and the map

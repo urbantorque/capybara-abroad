@@ -193,9 +193,18 @@ function mainMakeTime(game) {
      * should be run at. Called by game.tick and by nobody else.
      */
     step(raw) {
-      // Nothing to stop behind an open journal, and a freeze that survived a
-      // pause would be spent the instant the card closed.
-      if (game.state.paused) { time.clear(); return raw; }
+      // ---- A PAUSE KEEPS THE BEAT (L4, qa #7) -----------------------------
+      // This used to clear() here: "a freeze that survived a pause would be
+      // spent the instant the card closed". It also threw the beat away.
+      // Measured: slowmo(0.4, 4), Esc at 0.5 s, resume at 3 s, timeScale
+      // 1.00 — the remaining two and a half seconds of the condor's roll,
+      // the flood, the cave drop, gone to a stray Esc or a tab switch (hidden
+      // sets `paused` too). So under pause nothing moves: the timers are not
+      // decremented, the ease is not advanced, and the world gets `raw` back
+      // because the world is not being stepped anyway. The moment the player
+      // paused in is the moment they come back to. clear() stays the biome
+      // change's, which calls it by name.
+      if (game.state.paused) return raw;
 
       if (slowT > 0) slowT -= raw;
       const slowWant = slowT > 0 ? slowS : 1;
@@ -552,6 +561,29 @@ function mainMakeBiomes(game) {
       const s = setOf(name);
       if (thing && thing.isObject3D) s.objects.push(thing);
       else if (thing) s.bodies.push(thing);
+    },
+    // ---- THE OPPOSITE OF CLAIM (L4) ---------------------------------------
+    // A body removed from the world for good was still listed in its
+    // chapter's set, and attach(name, true) put it back. The errand prop is
+    // the case that measured (qa/l4r-qa-leak.js): npc.js spawns it in the live
+    // chapter, so the hook above files it under that chapter; leaving mid-
+    // errand detaches the chapter and npc.js then removeProp()s it on
+    // `biome:enter` — world.removeBody on a body already out is a no-op, and
+    // the set still had it. Every return re-added one more KINEMATIC cup with
+    // no prop behind it: Kyoto 2→3→4, Hanoi 3→4→4, Monaco 6→6→8 kinematic
+    // bodies over three visits. Anything taken out of the world or the scene
+    // on purpose calls this; `vis` is index-aligned with `objects`, so the two
+    // are spliced together.
+    disown(thing) {
+      if (!thing) return;
+      const obj = !!thing.isObject3D;
+      for (const s of sets.values()) {
+        const arr = obj ? s.objects : s.bodies;
+        const i = arr.indexOf(thing);
+        if (i < 0) continue;
+        arr.splice(i, 1);
+        if (obj && s.vis && s.vis.length > i) s.vis.splice(i, 1);
+      }
     },
     /** Register a biome's lifecycle hooks: { ensureBuilt(), onEnter(), onExit() }. */
     register(name, api) { setOf(name).api = api; },
@@ -1340,6 +1372,9 @@ const MAIN_DOF_RADIUS = 1.6;
 const mainPostSize = new THREE.Vector2();
 // Rate limit on the composite pass's own failure log — see game.tick's finally.
 let mainPostLoudAt = 0;
+// Substeps the solver took since the top of the last game.tick. See the
+// postStep listener in mainBoot and the perf snapshot at the top of tick.
+let mainSubsteps = 0;
 // Scratch for the airlight ray basis. Nothing in post.render allocates.
 const mainAirR = new THREE.Vector3();
 const mainAirU = new THREE.Vector3();
@@ -1380,6 +1415,7 @@ function mainMakePost(game) {
       // v48. Light IN the air rather than on the things in it.
       airLight: 0.0,
       crease: 0.0,
+      creaseWide: 1,     // the wide octave's on/off; the governor's rung 3 writes 0
     },
     render() { renderer.setRenderTarget(null); renderer.render(game.scene, game.camera); },
     resize() {},
@@ -1593,6 +1629,10 @@ function mainMakePost(game) {
       cu.uFocalPx.value = (vh * 0.5) /
         Math.tan(THREE.MathUtils.DEG2RAD * 0.5 * cam.fov);
       cu.uCreaseK.value = game.state.noCrease ? 0 : p.crease;
+      // The wide octave's weight is a constant except on the governor's third
+      // rung (systems.js, THE GOVERNOR), which writes creaseWide 0: the
+      // 4..112 px gather is the composite's least cache-friendly term.
+      cu.uCreaseW.value.z = p.creaseWide === 0 ? 0 : MAIN_CREASE_WK;
       // ---- the airlight's ray basis ------------------------------------
       // Three world vectors, rebuilt once a frame, so the fragment shader can
       // get a world ray out of its own uv with two multiplies and an add and
@@ -1748,6 +1788,14 @@ function mainBoot() {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
+  // ---- THE COUNTERS COUNT THE WHOLE FRAME (L4, qa #8) -------------------
+  // three.js resets renderer.info on every render() call by default, and the
+  // composite pass is several of them, the last a full-screen quad — so the
+  // perf overlay (backquote) and every probe that read info.render after the
+  // frame saw ONE call and ONE triangle, for years. Reset by hand at the top
+  // of game.tick instead, and the numbers are the frame's: Hanoi 365 calls /
+  // 481k triangles, shadow pass included. See the top of game.tick.
+  renderer.info.autoReset = false;
 
   // ---------------------------------------------------------------------
   // THE GRAPHICS CARD IS ALLOWED TO GO AWAY.
@@ -1893,6 +1941,10 @@ function mainBoot() {
     game.world = new CANNON.World({ gravity: new CANNON.Vec3(0, -24, 0) });
   }
   biome._patchWorld();
+  // The substep count for the perf overlay: cannon-es keeps it in a local
+  // inside World.step, so it is counted here off the event every internal
+  // step fires, and snapshotted at the top of game.tick with the render info.
+  game.world.addEventListener('postStep', function () { mainSubsteps++; });
 
   // 2..8 gameplay modules. Sydney content is captured as it is built; the
   // capybara, condor and systems are biome-neutral and stay resident always.
@@ -2154,6 +2206,24 @@ function mainBoot() {
     // back a capybara somewhere else entirely. See the two listeners up in
     // mainBoot.
     if (glLost) return;
+    // ---- LAST FRAME'S NUMBERS, THEN THE COUNTERS GO BACK TO ZERO ----------
+    // renderer.info.autoReset is off (see mainBoot), so at this point the
+    // counters hold the whole of the previous frame — the shadow pass, the
+    // scene, the composite. They are copied on to game.state.perf FIRST,
+    // because systems.js reads them from inside its update, which runs
+    // before this frame's render and would otherwise read zero; then reset.
+    // `programs` is a running total (shaders compile on first sight and are
+    // never released), `contacts` is the solver's list as it stands, and
+    // `substeps` is what the postStep counter saw since the last reset.
+    {
+      const ri = renderer.info;
+      const pf = game.state.perf || (game.state.perf = { calls: 0, triangles: 0, programs: 0, contacts: 0, substeps: 0 });
+      pf.calls = ri.render.calls; pf.triangles = ri.render.triangles;
+      pf.programs = ri.programs ? ri.programs.length : 0;
+      pf.contacts = game.world ? game.world.contacts.length : 0;
+      pf.substeps = mainSubsteps; mainSubsteps = 0;
+      ri.reset();
+    }
     if (dt > 0.1) dt = 0.1;              // tab-switch guard
     game.state.rawDt = dt;
     // THE ONE PLACE THE WORLD'S CLOCK IS SET. Everything below — the solver,

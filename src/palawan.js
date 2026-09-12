@@ -625,6 +625,10 @@ function palBloomYaw() {
   return dl >= dr ? L : R;
 }
 
+// The material beside the pitch (L4, audio #4): the last answer, read through
+// surfaceMat() straight after surfacePitch(). Two sands and a bamboo deck.
+let palSurfMat = 'sand';
+function palSurf(p, m) { palSurfMat = m; return p; }
 function palSurfacePitch(x, z, y) {
   // ---- AND THE BOAT IS BAMBOO WHEREVER IT HAPPENS TO BE ------------------
   // The bamboo row was gated on `inZone('jetty')`, so it covered the jetty and
@@ -632,11 +636,11 @@ function palSurfacePitch(x, z, y) {
   // is the chapter's FIRST TASK, spends the whole of that ride out over water
   // and answered 0.86, wet sand. The one place the chapter is sure you will
   // stand, on the one surface it is proudest of.
-  if (palCarrying) return 1.32;
-  if (palInZone('jetty', x, z) && y > 0.6) return 1.32;    // bamboo deck, and it rings
-  if (z < palISLE_Z) return 1.06;                          // wet limestone
-  if (z > palBEACH_Z) return 0.80;                         // dry sand, and it says nothing
-  return 0.86;                                             // wet sand
+  if (palCarrying) return palSurf(1.32, 'timber');
+  if (palInZone('jetty', x, z) && y > 0.6) return palSurf(1.32, 'timber');   // bamboo deck, and it rings
+  if (z < palISLE_Z) return palSurf(1.06, 'stone');                          // wet limestone
+  if (z > palBEACH_Z) return palSurf(0.80, 'sand');                          // dry sand, and it says nothing
+  return palSurf(0.86, 'sand');                                              // wet sand
 }
 
 // ============================================================== THE ISLAND ==
@@ -4569,6 +4573,7 @@ export function createPalawan(game) {
     inZone: palInZone,
     navBlocked: palNavBlocked,
     surfacePitch: palSurfacePitch,
+    surfaceMat: function () { return palSurfMat; },
     SPAWN: palSPAWN,
 
     /**

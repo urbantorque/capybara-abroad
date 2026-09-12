@@ -41,6 +41,15 @@ const ASSERTS = [
   ['qa/audit-tasks.mjs',  'tasks and finds: acts, arrivals, both award paths'],
   ['qa/p2-clues.mjs',     'every task has a clue and a place; no stray lone capital'],
   ['qa/p3-glyph.mjs',     'the measured-task glyph; no orphaned RECORDS key'],
+  // THE ARTEFACT IS BUILT, EVERY TIME (L4, qa #11). The two failures this
+  // build has had — the `$'` splice and the worklet that would not load from
+  // file:// — were visible only by opening the file, because nothing here ever
+  // made it. build.mjs exits 1 on a contract violation (a collision, a module
+  // it cannot wrap, a splice it cannot anchor) and writes dist/ on success;
+  // ~10 s, which is half of what this suite took before it. What it still
+  // cannot do is BOOT the file: that needs a browser, and qa/l4-ks.js is the
+  // step that opens dist/ from file:// and asserts started and musAudit().ks.
+  ['build.mjs',           'the one-file build: wraps, splices, no collisions, writes dist/'],
 ];
 const REPORTS = [
   ['qa/p7-tokens.cjs',    'the HUD vocabulary: radii, type steps, shadows'],
@@ -49,8 +58,9 @@ const REPORTS = [
 
 function run(file) {
   if (!existsSync(file)) return { missing: true };
+  const t0 = Date.now();
   const r = spawnSync(process.execPath, [file], { encoding: 'utf8' });
-  return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
+  return { code: r.status, out: (r.stdout || '') + (r.stderr || ''), ms: Date.now() - t0 };
 }
 
 let failed = 0, ran = 0;
@@ -61,7 +71,7 @@ for (const [f, what] of ASSERTS) {
   if (r.missing) { console.log('MISSING  ' + f); failed++; continue; }
   const ok = r.code === 0;
   if (!ok) failed++;
-  console.log((ok ? 'pass  ' : 'FAIL  ') + f.padEnd(22) + what);
+  console.log((ok ? 'pass  ' : 'FAIL  ') + f.padEnd(22) + what + (r.ms >= 3000 ? '  (' + (r.ms / 1000).toFixed(1) + ' s)' : ''));
   if (!ok) console.log(r.out.split('\n').filter(Boolean).slice(-12).map(l => '        ' + l).join('\n'));
 }
 console.log('\n--- reports (cannot fail the build) ---');

@@ -1479,7 +1479,7 @@ const capyDigPayload = { position: capyPosition, fall: 0 };
 // record shapes the collider carried — a cast member or a local — and npc.js
 // is the only thing that reads it.
 const capyBargePayload = { rec: null, speed: 0, x: 0, z: 0 };
-const capySfxOpts = { pitch: 1, volume: 1, wet: 0 };   // reused — update() may not allocate
+const capySfxOpts = { pitch: 1, volume: 1, wet: 0, mat: 'grass' };   // reused — update() may not allocate
 // The same thing, with a place. `at` is a permanent reference to the position
 // mirror, which is rewritten in place every frame, so this object is built once
 // and never again. See THE SOUND COMES FROM SOMEWHERE in the contract.
@@ -2510,23 +2510,40 @@ function capyWaterY(env, x, z) {
  * anybody should make. Every number here is a world-layout constant that
  * already exists in CONTRACT.md.
  */
+// ---- ...AND WHAT IT IS MADE OF, BESIDE THE PITCH (L4, audio #4) -----------
+// The step voice has eight materials now (systems.js, sfxStep) and `pitch` is
+// fine variation inside one, so every row below names its material as well.
+// The name is the LAST ANSWER, published on `capySurfMat` by the same call
+// that returns the pitch — update() may not allocate, and a pair per footfall
+// would — exactly as audioPlace leaves its pan on sysSfxPan for sfx() to read
+// next. A chapter that publishes surfacePitch may publish surfaceMat() beside
+// it, a getter for its own last answer; one that does not gets the name the
+// old three branches would have derived from the pitch, so nothing regresses.
+let capySurfMat = 'grass';
+function capySurf(pitch, mat) { capySurfMat = mat; return pitch; }
+function capySurfMatFor(pitch) { return pitch < 0.9 ? 'grass' : pitch > 1.15 ? 'timber' : 'stone'; }
 function capySurfacePitch(game, env, x, z, y) {
   const b = game.biome;
-  if (!b) return 0.82;
+  if (!b) return capySurf(0.82, 'grass');
   // A biome may simply answer for itself. The ladder below is nine chapters of
   // rectangles written before there was anywhere to put them; anything new
   // publishes surfacePitch(x, z, y) and never appears here at all.
   const api = capyBiomeApi(game);
   if (api && typeof api.surfacePitch === 'function') {
     const v = api.surfacePitch(x, z, y);
-    if (typeof v === 'number' && v === v) return clamp(v, 0.5, 1.6);
+    if (typeof v === 'number' && v === v) {
+      const p = clamp(v, 0.5, 1.6);
+      let m = typeof api.surfaceMat === 'function' ? api.surfaceMat() : null;
+      if (typeof m !== 'string' || !m) m = capySurfMatFor(p);
+      return capySurf(p, m);
+    }
   }
   if (b.isActive('sydney')) {
     // the Opera House podium and its ceremonial stair are dressed sandstone
-    if (y > 0.9 && x > -13.5 && x < 13.5 && z > -12.5 && z < 7.5) return 1.0;
+    if (y > 0.9 && x > -13.5 && x < 13.5 && z > -12.5 && z < 7.5) return capySurf(1.0, 'stone');
     // the boardwalk and the ferry wharf are timber
-    if (z < -7 && z > -25) return 1.22;
-    return 0.82;
+    if (z < -7 && z > -25) return capySurf(1.22, 'timber');
+    return capySurf(0.82, 'grass');
   }
   if (b.isActive('quay')) {
     // THE OLD LADDER WAS WRITTEN AS IF z GREW TOWARD MANLY. It does not: the
@@ -2539,19 +2556,19 @@ function capySurfacePitch(game, env, x, z, y) {
     // Ask the chapter where things are instead of guessing from one axis.
     const q = game.quay;
     if (q && q.inZone) {
-      if (q.inZone('deck', x, z)) return 1.24;    // the ferry herself
+      if (q.inZone('deck', x, z)) return capySurf(1.24, 'timber');    // the ferry herself
       // corso BEFORE manly: the corso rect is inside the manly rect, so the
       // broader test would answer first and the paved street would be sand.
-      if (q.inZone('corso', x, z)) return 1.0;    // paved, and roofed both sides
-      if (q.inZone('manly', x, z)) return 0.82;   // the beach around it
-      if (q.inZone('apron', x, z)) return 1.0;    // the paved apron at the Quay
+      if (q.inZone('corso', x, z)) return capySurf(1.0, 'stone');     // paved, and roofed both sides
+      if (q.inZone('manly', x, z)) return capySurf(0.82, 'sand');     // the beach around it
+      if (q.inZone('apron', x, z)) return capySurf(1.0, 'stone');     // the paved apron at the Quay
     }
-    return 1.22;                                  // the finger wharves
+    return capySurf(1.22, 'timber');              // the finger wharves
   }
   if (b.isActive('pasto')) {
     // the plaza is cobbled; the flanks of Galeras are not
-    if (x > -24 && x < 24 && z > 8 && z < 46) return 1.0;
-    return 0.82;
+    if (x > -24 && x < 24 && z > 8 && z < 46) return capySurf(1.0, 'stone');
+    return capySurf(0.82, 'grass');
   }
   if (b.isActive('kyoto')) {
     const k = game.kyoto;
@@ -2568,13 +2585,13 @@ function capySurfacePitch(game, env, x, z, y) {
     // `kyoInZone` has answered 'torii', 'bamboo' and 'uji' the whole time and
     // the ladder asked for none of them. Ask the chapter where things are.
     if (k && k.inZone) {
-      if (k.inZone('gion', x, z)) return 1.0;    // granite setts
-      if (k.inZone('zen', x, z)) return 0.86;    // raked gravel — soft, but crunchier
-      if (k.inZone('uji', x, z)) return 1.02;    // the granite spine and its gutter
-      if (k.inZone('bamboo', x, z)) return 0.78; // leaf litter over soft earth
-      if (k.inZone('torii', x, z)) return 1.0;   // gravel over stone steps
+      if (k.inZone('gion', x, z)) return capySurf(1.0, 'stone');     // granite setts
+      if (k.inZone('zen', x, z)) return capySurf(0.86, 'gravel');    // raked gravel — soft, but crunchier
+      if (k.inZone('uji', x, z)) return capySurf(1.02, 'stone');     // the granite spine and its gutter
+      if (k.inZone('bamboo', x, z)) return capySurf(0.78, 'grass');  // leaf litter over soft earth
+      if (k.inZone('torii', x, z)) return capySurf(1.0, 'gravel');   // gravel over stone steps
     }
-    return 0.82;
+    return capySurf(0.82, 'grass');
   }
   if (b.isActive('cali')) {
     // TWO OF THIS CHAPTER'S SIX SURFACES. Measured, `inZone` answered nothing
@@ -2584,33 +2601,34 @@ function capySurfacePitch(game, env, x, z, y) {
     // and 'river' zones that the ladder never asked for either.
     const c = game.cali;
     if (c && c.inZone) {
-      if (c.inZone('dancefloor', x, z)) return 1.24;   // a sprung board floor
-      if (c.inZone('terrace', x, z)) return 1.20;      // the mirador's planks
-      if (c.inZone('street', x, z)) return 1.0;
-      if (c.inZone('cane', x, z)) return 0.72;         // trash and soft earth
+      if (c.inZone('dancefloor', x, z)) return capySurf(1.24, 'timber');   // a sprung board floor
+      if (c.inZone('terrace', x, z)) return capySurf(1.20, 'timber');      // the mirador's planks
+      if (c.inZone('street', x, z)) return capySurf(1.0, 'stone');
+      if (c.inZone('cane', x, z)) return capySurf(0.72, 'grass');          // trash and soft earth
     }
-    return 0.82;
+    return capySurf(0.82, 'grass');
   }
   if (b.isActive('rio')) {
     const r = game.rio;
     // the calcadao is set stone, the avenue is asphalt, and Selaron's steps are
-    // glazed tile — the hardest, brightest footfall in the game
+    // glazed tile — the hardest, brightest footfall in the game (and at 1.18
+    // it played as TIMBER until the material was named beside the pitch)
     if (r && r.inZone) {
-      if (r.inZone('calcadao', x, z)) return 1.06;
-      if (r.inZone('avenue', x, z)) return 0.98;
-      if (r.inZone('santateresa', x, z)) return 1.18;
+      if (r.inZone('calcadao', x, z)) return capySurf(1.06, 'stone');
+      if (r.inZone('avenue', x, z)) return capySurf(0.98, 'stone');
+      if (r.inZone('santateresa', x, z)) return capySurf(1.18, 'stone');
     }
-    return 0.82;                                                     // the sand
+    return capySurf(0.82, 'sand');                                   // the sand
   }
   if (b.isActive('iceland')) {
     const i = game.iceland;
     // ice is the hardest, brightest footfall there is; the pier is timber; the
     // basalt headland and the city street are stone; the moss is nothing at all
-    if (i && i.groundSlip && i.groundSlip(x, z) > 0.3) return 1.30;
+    if (i && i.groundSlip && i.groundSlip(x, z) > 0.3) return capySurf(1.30, 'ice');
     if (i && i.inZone) {
-      if (i.inZone('pier', x, z)) return 1.24;
-      if (i.inZone('cliff', x, z)) return 1.04;
-      if (i.inZone('city', x, z)) return 1.0;
+      if (i.inZone('pier', x, z)) return capySurf(1.24, 'timber');
+      if (i.inZone('cliff', x, z)) return capySurf(1.04, 'stone');
+      if (i.inZone('city', x, z)) return capySurf(1.0, 'stone');
     }
     // THE MORAINE HAD NO ROW, AND IT IS THE HUNDRED METRES THE PLAYER CLIMBS
     // MOST OFTEN. `iceGroundKind` has named four grounds since it was written
@@ -2618,8 +2636,8 @@ function capySurfacePitch(game, env, x, z, y) {
     // approach to the glacier, walked again on every run attempt — sounded
     // exactly like the moss on the lava field. It is the noisiest ground in
     // the chapter and it was the quietest.
-    if (i && i.groundKind && i.groundKind(x, z) === 'moraine') return 1.12;
-    return 0.82;
+    if (i && i.groundKind && i.groundKind(x, z) === 'moraine') return capySurf(1.12, 'gravel');
+    return capySurf(0.82, 'grass');
   }
   if (b.isActive('drift')) {
     // ONE HARD-CODED RECTANGLE FOR A CHAPTER OF THIRTY ISLANDS. The rect is
@@ -2628,25 +2646,25 @@ function capySurfacePitch(game, env, x, z, y) {
     // the crown and a pebble that are `kind: 'pale'`. So twenty-nine islands
     // out of thirty had the wrong footfall, and the table saying which was
     // which has been in drift.js since the archipelago was laid out.
-    if (x > 14 && x < 32 && z > 32 && z < 36) return 1.26;   // the jetty planks
+    if (x > 14 && x < 32 && z > 32 && z < 36) return capySurf(1.26, 'timber');   // the jetty planks
     const d = game.drift;
     if (d && typeof d.islandKind === 'function') {
       const k = d.islandKind(x, z);
-      if (k === 'bare') return 1.04;      // dry stone with nothing on it
-      if (k === 'pale') return 0.86;      // the crumbly pale rock
+      if (k === 'bare') return capySurf(1.04, 'stone');    // dry stone with nothing on it
+      if (k === 'pale') return capySurf(0.86, 'gravel');   // the crumbly pale rock
     }
-    return 0.80;
+    return capySurf(0.80, 'grass');
   }
   if (b.isActive('sahara')) {
     const sa = game.sahara;
     if (sa && sa.inZone) {
-      if (sa.inZone('erg', x, z)) return 0.74;    // sand, and a lot of it
-      if (sa.inZone('souk', x, z)) return 1.02;   // beaten earth over stone
-      if (sa.inZone('square', x, z)) return 0.94;
+      if (sa.inZone('erg', x, z)) return capySurf(0.74, 'sand');     // sand, and a lot of it
+      if (sa.inZone('souk', x, z)) return capySurf(1.02, 'stone');   // beaten earth over stone
+      if (sa.inZone('square', x, z)) return capySurf(0.94, 'stone');
     }
-    return 0.86;
+    return capySurf(0.86, 'sand');
   }
-  return 0.82;
+  return capySurf(0.82, 'grass');
 }
 
 function capyWrapAngle(a) {
@@ -6718,6 +6736,7 @@ export function createCapybara(game) {
         // both unchanged.
         if (!capySwimming && grounded && !carried && !capySliding) {
           capySfxOpts.pitch = capySurfacePitch(game, env, px, pz, body.position.y);
+          capySfxOpts.mat = capySurfMat;      // the same call's other answer — read now
           // a walk whispers, a run carries — and the very first stride out of
           // a standstill is quiet rather than a slap
           capySfxOpts.volume = clamp(gaitSpeed / capyRUN, 0, 1) * 0.85 + 0.15;

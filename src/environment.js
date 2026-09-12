@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, dampAngle, lerp, grain, swayMesh, leafMesh, makeMerger, warnOnce } from './shared.js';
+import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, dampAngle, lerp, grain, swayMesh, leafMesh, makeMerger, warnOnce, skyDomeLit } from './shared.js';
 
 // ===========================================================================
 // AGENT A — ENVIRONMENT.  Sydney as low-poly stage dressing.
@@ -2351,7 +2351,9 @@ export function createEnvironment(game) {
   // CLONED, for the reason grain() clones: mat() hands back a SHARED cached
   // material and writing a flag onto it writes it onto every other mesh that
   // asked for the same colour and options.
-  const skyMat = mat(envVC_BASE, { vertexColors: true, fog: false, side: THREE.BackSide, flatShading: false }).clone();
+  // ...AND NOT LIT BY THE KEY (L4, E1): see skyDomeLit in shared.js. The dome
+  // keeps the light it was painted under whatever the key does to the lawn.
+  const skyMat = skyDomeLit(mat(envVC_BASE, { vertexColors: true, fog: false, side: THREE.BackSide, flatShading: false }).clone());
   skyMat.depthWrite = false;
   const sky = new THREE.Mesh(skyGeo, skyMat);
   sky.frustumCulled = false;
@@ -2695,7 +2697,12 @@ export function createEnvironment(game) {
   A.box(0, 0.95, -4, 25.2, 0.22, 15.2, PALETTE.sandstoneDark);
   A.box(0, 1.13, -4, 26.1, 0.14, 16.1, PALETTE.sandstone);
   A.box(0, 1.175, -4, 25.3, 0.05, 15.3, PALETTE.stone);
-  envStaticBox(game, 0, 0.6, -4, 13, 0.6, 8);
+  // `camSolid`: the lens's boom stops IN FRONT of this block rather than
+  // passing its floor through it — see sysCAM_CLEAR_HARD in systems.js. The
+  // plinth carries it for the animal at its foot with the eye over the deck
+  // (the review's 70 %-slab frame); the three shell colliders below carry it
+  // because the sails are DoubleSide and an eye inside them sees vault.
+  envStaticBox(game, 0, 0.6, -4, 13, 0.6, 8).userData = { camSolid: true };
   envNavR.push(-13.2, -12.2, 13.2, 4.2);
 
   // ---- the great ceremonial staircase up the southern face -----------------
@@ -2830,9 +2837,10 @@ export function createEnvironment(game) {
   //   restaurant    -12.56  -8.82   -0.10   2.82 /  4.20
   // The 2.1 m corridor between the two clusters (x -2.47 .. -0.36) is the deep
   // central valley, and it stays walkable.
-  envStaticBox(game, 5.94, 4.0, -5.40, 6.30, 4.0, 5.60);
-  envStaticBox(game, -7.61, 3.2, -5.93, 5.14, 3.2, 4.08);
-  envStaticBox(game, -10.69, 1.6, 1.36, 1.87, 1.6, 1.46);
+  // camSolid: see the plinth above, and sysCAM_CLEAR_HARD.
+  envStaticBox(game, 5.94, 4.0, -5.40, 6.30, 4.0, 5.60).userData = { camSolid: true };
+  envStaticBox(game, -7.61, 3.2, -5.93, 5.14, 3.2, 4.08).userData = { camSolid: true };
+  envStaticBox(game, -10.69, 1.6, 1.36, 1.87, 1.6, 1.46).userData = { camSolid: true };
 
   const arch = new THREE.Mesh(A.build(), matVC);
   arch.castShadow = true;

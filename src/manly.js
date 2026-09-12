@@ -904,9 +904,14 @@ function manNavBlocked(x, z, r) {
   return false;
 }
 /** < 0.9 soft, ~1.0 stone, > 1.15 hollow timber. */
+// The material beside the pitch (L4, audio #4): the last answer, read through
+// surfaceMat() straight after surfacePitch(). Half this chapter is sand and
+// it had the same lowpass as a lawn.
+let manSurfMat = 'sand';
+function manSurf(p, m) { manSurfMat = m; return p; }
 function manSurfacePitch(x, z, y) {
-  if (z > manSHOP_Z - 1) return 1.02;                 // the Corso is paving
-  if (z > manDUNE_Z + 1) return 1.0;                  // the promenade
+  if (z > manSHOP_Z - 1) return manSurf(1.02, 'stone');          // the Corso is paving
+  if (z > manDUNE_Z + 1) return manSurf(1.0, 'stone');           // the promenade
   // ---- ...AND EVERYTHING EAST OF THE POINT WAS ONE SOUND ------------------
   // `x > manPOINT_X` is 47% of the walkable map — 3,240 cells of 6,854 — and it
   // returned bare stone for all of it. Two of the chapter's best-drawn places
@@ -915,16 +920,16 @@ function manSurfacePitch(x, z, y) {
   // half a metre of water and whose deck is worn sandstone with forty years of
   // feet on it. The headland is genuinely rock; those two are not, and they are
   // exactly the two places a player goes east to reach.
-  if (manPoolDeck(x, z)) return 1.14;                 // hollow-sounding sandstone deck
-  if (manInPool(x, z)) return 0.88;                   // tiled floor, under water
+  if (manPoolDeck(x, z)) return manSurf(1.14, 'stone');          // hollow-sounding sandstone deck
+  if (manInPool(x, z)) return manSurf(0.88, 'stone');            // tiled floor, under water
   {
     const sdx = x - manSHELLY.x, sdz = z - manSHELLY.z;
     // the cove itself is shell grit and coarse sand, not the platform round it
-    if (sdx * sdx + sdz * sdz < manSHELLY.r * manSHELLY.r * 0.55) return 0.80;
+    if (sdx * sdx + sdz * sdz < manSHELLY.r * manSHELLY.r * 0.55) return manSurf(0.80, 'sand');
   }
-  if (x > manPOINT_X || x < manBEACH_X0) return 1.04; // rock
-  if (manBoatCarrying) return 1.22;                   // and the boat is timber
-  return 0.72;                                        // sand, which eats a footfall
+  if (x > manPOINT_X || x < manBEACH_X0) return manSurf(1.04, 'stone'); // rock
+  if (manBoatCarrying) return manSurf(1.22, 'timber');           // and the boat is timber
+  return manSurf(0.72, 'sand');                                  // sand, which eats a footfall
 }
 
 /** Inside the ocean pool's water box. */
@@ -4757,6 +4762,7 @@ export function createManly(game) {
     inZone: manInZone,
     navBlocked: manNavBlocked,
     surfacePitch: manSurfacePitch,
+    surfaceMat: function () { return manSurfMat; },
     SPAWN: manSPAWN,
 
     /**

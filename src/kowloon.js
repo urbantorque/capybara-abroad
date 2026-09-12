@@ -633,17 +633,23 @@ function hkNavBlocked(x, z, r) {
   const rr = r || 0.6;
   return Math.abs(x) > hkFACE - rr && z > hkST_Z0 && z < hkST_Z1;
 }
+// The material beside the pitch (L4, audio #4): the last answer, read through
+// surfaceMat() straight after surfacePitch(). The sign is the one steel thing
+// you stand on here; the scaffold is bamboo and stays timber — that is what
+// the row says it is made of, whatever a review's shorthand called it.
+let hkSurfMat = 'stone';
+function hkSurf(p, m) { hkSurfMat = m; return p; }
 function hkSurfacePitch(x, z, y) {
-  if (y > hkROOF_Y - 1.5) return 1.14;                 // a concrete roof deck
+  if (y > hkROOF_Y - 1.5) return hkSurf(1.14, 'stone');            // a concrete roof deck
   // THE HEIGHT FALLBACK IS A ONE-AXIS GUESS, so ask WHERE first. `y > 8` meant
   // bamboo, and the neon sign is steel and glass at y 9.2: standing on the sign
   // — a whole task — rang like a scaffold pole. Everything above eight metres
   // in this chapter is not lattice.
-  if (hkInZone('sign', x, z)) return 1.36;             // steel angle and glass
-  if (y > 8) return 1.30;                              // bamboo, and it rings
-  if (hkInZone('pier', x, z)) return 1.24;             // the pontoon's planks
-  if (hkInZone('market', x, z)) return 0.96;           // wet tile
-  return 1.02;
+  if (hkInZone('sign', x, z)) return hkSurf(1.36, 'metal');        // steel angle and glass
+  if (y > 8) return hkSurf(1.30, 'timber');                        // bamboo, and it rings
+  if (hkInZone('pier', x, z)) return hkSurf(1.24, 'timber');       // the pontoon's planks
+  if (hkInZone('market', x, z)) return hkSurf(0.96, 'stone');      // wet tile
+  return hkSurf(1.02, 'stone');
 }
 
 // ============================================================== THE CLIMB ===
@@ -5293,6 +5299,7 @@ export function createKowloon(game) {
     inZone: hkInZone,
     navBlocked: hkNavBlocked,
     surfacePitch: hkSurfacePitch,
+    surfaceMat: function () { return hkSurfMat; },
     SPAWN: hkSPAWN,
     // the open-top. It MOVES — ask, never cache.
     bus() { return hkBusPos; },

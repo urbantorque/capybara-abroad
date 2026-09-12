@@ -901,18 +901,23 @@ function monGroundSlip(x, z) {
 // everywhere else". Narrow tests first — the quay ladder in chapter 3 was found
 // returning wharf timber for the whole of Manly because a broad test sat above
 // a narrow one.
+// The material beside the pitch (L4, audio #4): the last answer, read through
+// surfaceMat() straight after surfacePitch(). The atrium's marble at 1.34
+// had been a plank; it is the brightest stone in the game now, as written.
+let monSurfMat = 'stone';
+function monSurf(p, m) { monSurfMat = m; return p; }
 function monSurfacePitch(x, z, y) {
   // The salon is carpet over board; the atrium is marble and rings.
-  if (monInRect(monZ.atrium, x, z)) return 1.34;
-  if (monInCasino(x, z)) return 1.22;
-  if (monOnPontoon(x, z)) return 1.30;
+  if (monInRect(monZ.atrium, x, z)) return monSurf(1.34, 'stone');
+  if (monInCasino(x, z)) return monSurf(1.22, 'timber');
+  if (monOnPontoon(x, z)) return monSurf(1.30, 'timber');
   // The steps: granite, and the one place in this chapter everybody stands.
-  if (monInRect(monZ.steps, x, z)) return 1.14;
-  if (monRoad(x, z) < monTRACK_HALF + 0.4) return 0.96;
+  if (monInRect(monZ.steps, x, z)) return monSurf(1.14, 'stone');
+  if (monRoad(x, z) < monTRACK_HALF + 0.4) return monSurf(0.96, 'stone');
   // The Rock and the palace square: worn stone, eight hundred years of it.
-  if (monInRect(monZ.palace, x, z)) return 1.08;
-  if (monInRect(monZ.rock, x, z)) return 0.88;
-  return 1.04;
+  if (monInRect(monZ.palace, x, z)) return monSurf(1.08, 'stone');
+  if (monInRect(monZ.rock, x, z)) return monSurf(0.88, 'stone');
+  return monSurf(1.04, 'stone');
 }
 
 // ----------------------------------------------------------------- the zones
@@ -5050,6 +5055,7 @@ export function createMonaco(game) {
     waterHeightAt: monWaterHeightAt,
     groundSlip: monGroundSlip,
     surfacePitch: monSurfacePitch,
+    surfaceMat: function () { return monSurfMat; },
     inZone: monInZone,
     // ---- THE SALON IS A DIFFERENT ROOM FROM THE HARBOUR (P4) ------------
     // sysROOMS already carries two comments about this chapter having two

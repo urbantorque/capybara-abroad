@@ -513,15 +513,20 @@ function cavNavBlocked(x, z, r) { return cavIsOverWater(x, z); }
  * the ground sounds like when you cannot see it. Every zone below is one the
  * chapter already publishes.
  */
+// The material beside the pitch (L4, audio #4): the last answer, read through
+// surfaceMat() straight after surfacePitch(). The river's wet gravel is the
+// first row in the game to name gravel; the rimstone at 1.18 had been a plank.
+let cavSurfMat = 'stone';
+function cavSurf(p, m) { cavSurfMat = m; return p; }
 function cavSurfacePitch(x, z, y) {
-  if (z > cavMOUTH_Z) return 0.82;                   // leaf litter, outside
-  if (cavInZone('doline', x, z)) return 0.86;        // and under the hole
-  if (cavInZone('river', x, z)) return 0.92;         // wet gravel, and it grinds
-  if (cavInZone('roost', x, z)) return 0.70;         // guano, deep and soft
-  if (cavInZone('pearls', x, z)) return 1.18;        // rimstone, and it is hollow
-  if (cavInZone('phyto', x, z)) return 1.12;         // phytokarst, sharp and dry
-  if (Math.abs(z - cavWALL.z) < 16) return 1.08;     // calcite rings
-  return 1.0;
+  if (z > cavMOUTH_Z) return cavSurf(0.82, 'grass');                 // leaf litter, outside
+  if (cavInZone('doline', x, z)) return cavSurf(0.86, 'grass');      // and under the hole
+  if (cavInZone('river', x, z)) return cavSurf(0.92, 'gravel');      // wet gravel, and it grinds
+  if (cavInZone('roost', x, z)) return cavSurf(0.70, 'grass');       // guano, deep and soft
+  if (cavInZone('pearls', x, z)) return cavSurf(1.18, 'stone');      // rimstone, and it is hollow
+  if (cavInZone('phyto', x, z)) return cavSurf(1.12, 'stone');       // phytokarst, sharp and dry
+  if (Math.abs(z - cavWALL.z) < 16) return cavSurf(1.08, 'stone');   // calcite rings
+  return cavSurf(1.0, 'stone');
 }
 
 /**
@@ -4809,6 +4814,7 @@ export function createCave(game) {
     },
     navBlocked: cavNavBlocked,
     surfacePitch: cavSurfacePitch,
+    surfaceMat: function () { return cavSurfMat; },
     SPAWN: cavSPAWN,
     flow(x, z) { return cavFlowAt(x, z, cavFlow); },
     /** THE THIRD CHAPTER TO PUBLISH IT. See cavClimbAt. */

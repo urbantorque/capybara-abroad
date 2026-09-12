@@ -1863,6 +1863,59 @@ export function shadeInfo() {
   return { sky: _skyOcc.value, on: _shadeOn, tint: [+c.r.toFixed(3), +c.g.toFixed(3), +c.b.toFixed(3)] };
 }
 
+// ---------------------------------------------------------------------------
+// THE SKY IS NOT LIT BY THE KEY (L4, E1) — see sysKEY in systems.js.
+//
+// Every sky dome in this game is a LAMBERT sphere seen from inside — the shared
+// one in systems.js, Sydney's in environment.js — and it has always been lit
+// by the same three lights as the ground: the zenith takes the hemisphere's
+// GROUND colour (its inward normal points down), the side opposite the sun
+// takes the sun, the side round the sun takes nothing but sky and ambient.
+// The painters (sysSkyPaint, the envDeTint ramp) were tuned under that rig,
+// and the key light moves that rig: measured on the first L4 after-set, the
+// Quay's zenith came back 2.6 times darker than the morning's frame (a grey
+// bar across the top of the picture) and the Erg's sky went from pink to
+// olive. A dome is a picture of the light, not a thing standing in it, so it
+// is exempt: the hook below scales each light's contribution on the dome by
+// the ratio the key applied to that light — sun, fill, and the two indirect
+// terms — which puts the sky back bit for bit at whatever the key is doing
+// to the world under it. At (1, 1, 1) the shader is the one it replaces.
+//
+// Light INDEX 0 is the sun and 1 is the fill: three sorts shadow-casting
+// lights first (WebGLLights.setup), the sun is the only directional that
+// casts, and no chapter adds a third directional. UNROLLED_LOOP_INDEX is
+// what three substitutes for `i` when it unrolls the loop, so the select is
+// a compile-time constant on each copy of the body.
+// ---------------------------------------------------------------------------
+const _keyDome = { value: new THREE.Vector3(1, 1, 1) };   // x sun, y fill, z hemisphere + ambient
+/** systems.js publishes the key's three ratios here once a frame (pre / post). */
+export function keyDomeTick(sunK, fillK, indK) { _keyDome.value.set(sunK, fillK, indK); }
+export function keyDomeInfo() { const v = _keyDome.value; return [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)]; }
+function _skyDomeInject(shader) {
+  shader.uniforms.uKeyDome = _keyDome;
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <lights_pars_begin>', '#include <lights_pars_begin>\nuniform vec3 uKeyDome;')
+    .replace('#include <lights_fragment_begin>', THREE.ShaderChunk.lights_fragment_begin
+      .replace('directionalLight = directionalLights[ i ];',
+               'directionalLight = directionalLights[ i ];\n\t\tdirectionalLight.color *= ( UNROLLED_LOOP_INDEX == 0 ) ? uKeyDome.x : uKeyDome.y;')
+      .replace('vec3 irradiance = getAmbientLightIrradiance( ambientLightColor );',
+               'vec3 irradiance = getAmbientLightIrradiance( ambientLightColor ) * uKeyDome.z;')
+      .replace('irradiance += getHemisphereLightIrradiance( hemisphereLights[ i ], geometryNormal );',
+               'irradiance += getHemisphereLightIrradiance( hemisphereLights[ i ], geometryNormal ) * uKeyDome.z;'));
+}
+function _skyDomeKey() { return 'skydome'; }
+/**
+ * Mark a dome's material as sky. Takes the PRIVATE material a dome already
+ * clones for itself (a dome has no rim, so there is no hook here to lose)
+ * and returns it with the exemption compiled in.
+ */
+export function skyDomeLit(m) {
+  m.onBeforeCompile = _skyDomeInject;
+  m.customProgramCacheKey = _skyDomeKey;
+  m.needsUpdate = true;
+  return m;
+}
+
 // `irradiance` is the accumulated indirect (ambient + light probes + every
 // hemisphere light); lights_fragment_END is what hands it to RE_IndirectDiffuse,
 // so scaling it here — after the include, before the end — is the whole term.

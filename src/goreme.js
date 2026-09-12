@@ -643,11 +643,15 @@ function gorNavBlocked(x, z, r) {
   const rr = r || 0.6;
   return x < gorCLIFF.x + 10 + rr || x > 84 - rr;
 }
+// The material beside the pitch (L4, audio #4): the last answer, read through
+// surfaceMat() straight after surfacePitch(). Tuff dust is sand — it gives.
+let gorSurfMat = 'stone';
+function gorSurf(p, m) { gorSurfMat = m; return p; }
 function gorSurfacePitch(x, z, y) {
-  if (y > 4 && gorAboard) return 1.36;                  // a wicker basket. it creaks.
-  if (gorInZone('town', x, z)) return 1.02;             // cobbles
-  if (gorInZone('field', x, z)) return 0.88;            // beaten dirt
-  return 0.92;                                          // tuff dust, and there is a lot of it
+  if (y > 4 && gorAboard) return gorSurf(1.36, 'timber');           // a wicker basket. it creaks.
+  if (gorInZone('town', x, z)) return gorSurf(1.02, 'stone');       // cobbles
+  if (gorInZone('field', x, z)) return gorSurf(0.88, 'grass');      // beaten dirt
+  return gorSurf(0.92, 'sand');                                     // tuff dust, and there is a lot of it
 }
 
 // ================================================================= THE WIND ==
@@ -5577,6 +5581,7 @@ export function createGoreme(game) {
     inZone: gorInZone,
     navBlocked: gorNavBlocked,
     surfacePitch: gorSurfacePitch,
+    surfaceMat: function () { return gorSurfMat; },
     SPAWN: gorSPAWN,
 
     /** The SECOND chapter to publish it. A verb that comes back is vocabulary. */

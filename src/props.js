@@ -573,10 +573,126 @@ let physShardHead = 0;
 // ===========================================================================
 // 1. PHYSICS WORLD
 // ===========================================================================
+// ---- THE SWEEP THAT NEVER BROKE (L4) ---------------------------------------
+// cannon-es's SAPBroadphase.collisionPairs (vendor/cannon-es.js ~5480) asks
+// needBroadphaseCollision BEFORE checkBounds, so a static body `continue`s past
+// every other static in the list instead of `break`ing at the first one out of
+// range — the sweep degrades toward N² in a chapter that is mostly statics.
+// MEASURED (qa/l4r-qa-bp.js): Kyoto, 719 static boxes (a torii leg each),
+// 118,429 needBroadphaseCollision calls per substep and 5.05 ms of broadphase
+// against Sydney's 3,420 / 0.38 ms; Cali 50,475. vendor/ is not edited; the
+// world gets this subclass instead.
+//
+// The bounds test goes first and it is the AABB, not the sphere: internalStep
+// marks the list dirty every substep, sortList then updates every AABB and
+// sorts by aabb.lowerBound on the axis, and useBoundingBoxes is on — so once
+// bj.aabb.lowerBound is past bi.aabb.upperBound no later body can overlap bi
+// on that axis and the break is exact. (Upstream's sphere test is kept for a
+// broadphase without bounding boxes; a torii leg's sphere is ±3 m where its
+// box is ±0.15, which is most of the difference between 5k and 1k pairs.)
+//
+// ---- AND TWO THINGS OF MASS ZERO NEVER MEET --------------------------------
+// needBroadphaseCollision rejects static–static and sleeping–sleeping, not
+// KINEMATIC–static or KINEMATIC–KINEMATIC. A carrier (the ferry, a floe, a
+// gondola, the chiva, a crowd collider) against the heightfield is a full
+// convexHeightfield walk every substep whose contact then moves nothing, both
+// inverse masses being zero. MEASURED (qa/l4r-qa-phys.js): 18.5 heightfield
+// pairs a substep in Antarctica (fifteen floes), 17.6 in Venice (sixteen
+// gondolas), 189 broadphase pairs in Sydney from 54 crowd colliders. There are
+// some sixty KINEMATIC constructors across the chapter modules, so the rule
+// lives here rather than as a group on each: a pair with no DYNAMIC body in it
+// never enters the narrowphase. The capybara and the props are DYNAMIC and
+// keep every contact they had — the ride test in capybara.js reads the capy's
+// own contacts, and nothing in src reads a kinematic-vs-static one.
+//
+// ---- AND THE AXIS IS THE ONE THAT TESTS LEAST ------------------------------
+// The sweep axis was x for ever (cannon's default) and Kyoto's torii path runs
+// mostly along z, so its legs share an x-interval and the bounds break arrives
+// late. MEASURED (qa/l4-bp-axis.js) — pairs a sweep must test per substep by
+// axis: Kyoto x 14,618 / z 4,027; Cali x 11,143 / z 9,327; Sydney x 2,435 /
+// z 1,747. Not cannon's autoDetectAxis: that picks the axis of greatest
+// POSITION VARIANCE, and y wins that in every chapter (a parked body a
+// kilometre down, the heightfield) while testing 100k. Once every
+// physBP_AXIS_EVERY substeps the three counts are taken directly — three
+// sorts of the list and a counting sweep, well under a millisecond and less
+// often than every two seconds — and the cheapest axis is kept. Any axis is
+// correct; this is only a choice of order.
+const physBP_AXIS_EVERY = 240;
+class physSAPBroadphase extends CANNON.SAPBroadphase {
+  pickAxis() {
+    const bodies = this.axisList, N = bodies.length, keys = ['x', 'y', 'z'];
+    let best = this.axisIndex, bestTests = Infinity;
+    for (let a = 0; a < 3; a++) {
+      const k = keys[a];
+      const s = bodies.slice().sort((p, q) => p.aabb.lowerBound[k] - q.aabb.lowerBound[k]);
+      let tests = 0;
+      for (let i = 0; i < N && tests < bestTests; i++) {
+        const hi = s[i].aabb.upperBound[k];
+        for (let j = i + 1; j < N; j++) { if (s[j].aabb.lowerBound[k] > hi) break; tests++; }
+      }
+      if (tests < bestTests) { bestTests = tests; best = a; }
+    }
+    if (best !== this.axisIndex) { this.axisIndex = best; this.sortList(); }
+  }
+  collisionPairs(world, p1, p2) {
+    const bodies = this.axisList, N = bodies.length;
+    const boxes = this.useBoundingBoxes;
+    if (this.dirty) { this.sortList(); this.dirty = false; }
+    // ...and straight after the list changes size, which is a chapter arriving.
+    if (boxes && ((this.physSub = (this.physSub | 0) + 1) % physBP_AXIS_EVERY === 1 || N !== this.physN)) { this.physN = N; this.pickAxis(); }
+    const ax = this.axisIndex;
+    const axisKey = ax === 0 ? 'x' : ax === 1 ? 'y' : 'z';
+    for (let i = 0; i !== N; i++) {
+      const bi = bodies[i];
+      const hi = boxes ? bi.aabb.upperBound[axisKey] : 0;
+      for (let j = i + 1; j < N; j++) {
+        const bj = bodies[j];
+        if (boxes) { if (bj.aabb.lowerBound[axisKey] > hi) break; }
+        else if (!CANNON.SAPBroadphase.checkBounds(bi, bj, ax)) break;
+        if (!this.needBroadphaseCollision(bi, bj)) continue;
+        this.intersectionTest(bi, bj, p1, p2);
+      }
+    }
+  }
+  needBroadphaseCollision(a, b) {
+    if (a.type !== CANNON.Body.DYNAMIC && b.type !== CANNON.Body.DYNAMIC) return false;
+    return super.needBroadphaseCollision(a, b);
+  }
+}
+
+// ---- THE MATRIX THAT WAS A HASH TABLE --------------------------------------
+// World.collisionMatrixTick swaps two ArrayCollisionMatrix and resets one — a
+// plain JS array whose `length` was set to n(n-1)/2 by setNumObjects, which
+// V8 stores as a dictionary at that size: every one of the 292,206 writes of
+// the reset is a hash insert. MEASURED with world.doProfiling (qa/l4-bp-
+// prof.js), per substep: Kyoto 8.70 ms in collisionMatrixTick against 1.62 ms
+// of broadphase and 1.23 of solver — more than every other phase together;
+// Sydney 0.39 ms of a 1.55 ms step. The same matrix on a Uint8Array is a
+// fill(). The index cannon uses, i(i+1)/2 + j - 1, runs past n(n-1)/2 on the
+// last row (a JS array grew under it), so `set` grows the store itself and
+// both matrices are replaced, since the swap makes each of them the current.
+class physCollisionMatrix extends CANNON.ArrayCollisionMatrix {
+  constructor() { super(); this.matrix = new Uint8Array(1024); }
+  setNumObjects(n) {
+    const need = ((n * (n + 1)) >> 1) + 1;
+    if (this.matrix.length < need) this.matrix = new Uint8Array(Math.ceil(need * 1.25));
+  }
+  set(bi, bj, value) {
+    let i = bi.index, j = bj.index;
+    if (j > i) { const t = j; j = i; i = t; }
+    const k = ((i * (i + 1)) >> 1) + j - 1;
+    if (k >= this.matrix.length) { const m = new Uint8Array(Math.ceil((k + 1) * 1.5)); m.set(this.matrix); this.matrix = m; }
+    this.matrix[k] = value ? 1 : 0;
+  }
+  reset() { this.matrix.fill(0); }
+}
+
 export function createPhysicsWorld(game) {
   const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -24, 0) });
-  world.broadphase = new CANNON.SAPBroadphase(world);
+  world.broadphase = new physSAPBroadphase(world);
   world.broadphase.useBoundingBoxes = true;
+  world.collisionMatrix = new physCollisionMatrix();
+  world.collisionMatrixPrevious = new physCollisionMatrix();
   world.solver.iterations = 10;
   world.solver.tolerance = 0.002;
   world.allowSleep = true;
@@ -2534,6 +2650,13 @@ function physRemoveProp(prop) {
   if (prop.onCollide) prop.body.removeEventListener('collide', prop.onCollide);
   physBodyToProp.delete(prop.body.id);
   physGame.world.removeBody(prop.body);
+  // ...and out of its chapter's set, or the next arrival puts the body back.
+  // See THE OPPOSITE OF CLAIM in main.js — the errand cup that leaked once a
+  // visit.
+  if (physGame.biome && typeof physGame.biome.disown === 'function') {
+    physGame.biome.disown(prop.body);
+    physGame.biome.disown(prop.mesh);
+  }
   physDestroyPayload.prop = prop;
   physGame.events.emit('prop:destroy', physDestroyPayload);
 }

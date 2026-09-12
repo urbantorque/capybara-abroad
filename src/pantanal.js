@@ -813,13 +813,18 @@ function panInZone(name, x, z) {
 }
 function panNavBlocked(x, z, r) { return panTerrain(x, z) < panWATER - 0.1; }
 /** < 0.9 soft, ~1.0 stone, > 1.15 hollow timber. */
+// The material beside the pitch (L4, audio #4): the last answer, read through
+// surfaceMat() straight after surfacePitch(). Everything soft here is grass
+// but the sandbar, which is the one bright ground in the chapter.
+let panSurfMat = 'grass';
+function panSurf(p, m) { panSurfMat = m; return p; }
 function panSurfacePitch(x, z, y) {
   for (let i = 0; i < panBRIDGES.length; i++) {
     const b = panBRIDGES[i];
-    if (Math.abs(z - b.z) < b.len * 0.5 && panOnRoad(x, z) > 0.2) return 1.24;
+    if (Math.abs(z - b.z) < b.len * 0.5 && panOnRoad(x, z) > 0.2) return panSurf(1.24, 'timber');
   }
-  if (panOnRoad(x, z) > 0.2) return 0.94;      // packed dirt
-  if (panAntCarrying) return 0.78;
+  if (panOnRoad(x, z) > 0.2) return panSurf(0.94, 'grass');      // packed dirt
+  if (panAntCarrying) return panSurf(0.78, 'grass');
   // ---- ...AND THREE OF THE CHAPTER'S OWN NAMED GROUNDS FELL THROUGH -------
   // A surface ladder must ask the chapter where things are (v25, the Quay) and
   // this one asked about two of six. Measured with api.surfacePitch: the
@@ -828,10 +833,10 @@ function panSurfacePitch(x, z, y) {
   // as did the CAMALOTE MATS, which are the ground the camalote task happens
   // on, and the FAZENDA YARD, which is swept dirt with three people standing
   // on it. Every one of those already has a test written for something else.
-  if (panInZone('sandbar', x, z)) return 1.05;   // dry river sand
-  if (panMatAtXZ(x, z)) return 0.60;             // a raft of vegetation, over water
-  if (panInZone('fazenda', x, z)) return 0.90;   // swept, packed, walked on daily
-  return 0.68;                                  // wet grass, which eats a footfall
+  if (panInZone('sandbar', x, z)) return panSurf(1.05, 'sand');    // dry river sand
+  if (panMatAtXZ(x, z)) return panSurf(0.60, 'grass');             // a raft of vegetation, over water
+  if (panInZone('fazenda', x, z)) return panSurf(0.90, 'grass');   // swept, packed, walked on daily
+  return panSurf(0.68, 'grass');                                   // wet grass, which eats a footfall
 }
 
 // ================================================================== BUILDING ==
@@ -5681,6 +5686,7 @@ export function createPantanal(game) {
     inZone: panInZone,
     navBlocked: panNavBlocked,
     surfacePitch: panSurfacePitch,
+    surfaceMat: function () { return panSurfMat; },
     SPAWN: panSPAWN,
     /** the river is going somewhere, gently */
     flow(x, z) { return panFlowAt(x, z, panFlow); },

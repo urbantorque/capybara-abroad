@@ -627,21 +627,26 @@ function hanGroundSlip(x, z) {
 // ORDER MATTERS AND THE NARROW TESTS COME FIRST — the quay ladder in chapter 3
 // was found returning wharf timber for the whole of Manly because a broad test
 // sat above a narrow one. Every rect below is checked before the fallbacks.
+// The material beside the pitch (L4, audio #4): the last answer, read through
+// surfaceMat() straight after surfacePitch(). Long Bien is the first steel
+// deck in the game to sound like one; the train street is ballast.
+let hanSurfMat = 'stone';
+function hanSurf(p, m) { hanSurfMat = m; return p; }
 function hanSurfacePitch(x, z) {
   // The Huc: lacquered timber over water, and the most hollow thing here.
   if (x <= hanHUC.x0 + 2 && x >= hanHUC.x1 - 2 &&
-      Math.abs(z - (hanHUC.z0 + hanHUC.z1) * 0.5) < 3) return 1.30;
+      Math.abs(z - (hanHUC.z0 + hanHUC.z1) * 0.5) < 3) return hanSurf(1.30, 'timber');
   // Long Bien: a hundred and twenty years of riveted steel deck.
-  if (hanInRect(hanZ.bridge, x, z)) return 1.22;
+  if (hanInRect(hanZ.bridge, x, z)) return hanSurf(1.22, 'metal');
   // The market: wet boards, cardboard and leaf. The deadest floor in the city.
-  if (hanInRect(hanZ.market, x, z)) return 0.86;
+  if (hanInRect(hanZ.market, x, z)) return hanSurf(0.86, 'grass');
   // The bia hoi corner: spilt beer on tile, and ninety-six plastic stools.
-  if (hanInRect(hanZ.bia, x, z)) return 1.12;
-  if (hanLaneAt(x, z) < hanLaneW + 0.4) return 0.94;
-  if (Math.abs(z - hanTRAIN.z) < hanTRAIN.half && x > hanTRAIN.x0 && x < hanTRAIN.x1) return 1.10;
+  if (hanInRect(hanZ.bia, x, z)) return hanSurf(1.12, 'stone');
+  if (hanLaneAt(x, z) < hanLaneW + 0.4) return hanSurf(0.94, 'stone');
+  if (Math.abs(z - hanTRAIN.z) < hanTRAIN.half && x > hanTRAIN.x0 && x < hanTRAIN.x1) return hanSurf(1.10, 'gravel');
   // The dyke path round the lake: packed earth, not pavement.
-  if (hanInRect(hanZ.dyke, x, z)) return 0.90;
-  return 1.02;
+  if (hanInRect(hanZ.dyke, x, z)) return hanSurf(0.90, 'grass');
+  return hanSurf(1.02, 'stone');
 }
 
 // ------------------------------------------------------------------ zones ---
@@ -4436,6 +4441,7 @@ export function createHanoi(game) {
     waterHeightAt: hanWaterHeightAt,
     groundSlip: hanGroundSlip,
     surfacePitch: hanSurfacePitch,
+    surfaceMat: function () { return hanSurfMat; },
     inZone: hanInZone,
     navBlocked: hanNavBlocked,
     randomPointIn: hanRandomPointIn,

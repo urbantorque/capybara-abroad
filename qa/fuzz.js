@@ -5,10 +5,30 @@ async page => {
   // back IDENTICAL — maxSpeed 0, the same end position to the decimetre, and no
   // errors, which reads as seventeen clean passes and is seventeen runs against
   // a title screen. A suite that cannot fail is worse than no suite.
+  //
+  // ---- ...AND IT REGRESSED TO EXACTLY THAT (L4, qa #1) --------------------
+  // The fix above was `page.mouse.click(640, 400)`, and the title card's
+  // pointerdown handler starts the game only when the press lands on the
+  // BACKDROP — the click landed on the card, the eight random keys were
+  // dropped by the `started` gate, and the L3 closeout's "fuzz clean in
+  // nineteen chapters" was nineteen rows of maxSpeed 0 and stuckFrames 460
+  // that nobody read. Three things, so it cannot happen a third time:
+  //   1. Enter is the door (startResume, the same one the player uses).
+  //   2. `started` is written into every row.
+  //   3. The sweep FAILS — a `fail` list in the JSON and a thrown Error at
+  //      the end, so run-code exits non-zero — when started is not true, or
+  //      when any chapter's maxSpeed is under 1 m/s, or when any chapter has
+  //      a NaN frame, a void fall or a lastError. A row with maxSpeed 0 is
+  //      not a clean chapter, it is a harness that did not press anything.
+  // `solverSaves` is a cumulative counter nothing resets, and the suite's
+  // own keepsake teleport (950, 12, 950 reaching 90 m/s) was the source of
+  // every clamp it reported — so it is read as a DELTA over the eight
+  // seconds of input, and the teleport's own clamps are a separate column.
   await page.goto('http://localhost:5188/index.html');
   await page.waitForTimeout(6000);
-  await page.mouse.click(640, 400);
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(3000);
+  const started = await page.evaluate(() => !!(window.__capy && window.__capy.state.started));
   const names = ['sydney', 'pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland',
                  'sahara', 'drift', 'venice', 'kowloon', 'palawan', 'goreme',
                  'manly', 'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi'];
@@ -34,6 +54,7 @@ async page => {
       let nanFrames = 0, belowVoid = 0, minY = 1e9, maxY = -1e9, maxSpeed = 0;
       let camNaN = 0, stuckFrames = 0, lastX = 0, lastZ = 0;
       const held = new Set();
+      const saves0 = g.state.solverSaves || 0;     // cumulative; see the header
       const t0 = performance.now();
       while (performance.now() - t0 < 8000) {
         if (rnd() < 0.09) {
@@ -54,6 +75,7 @@ async page => {
         lastX = p.x; lastZ = p.z;
       }
       for (const k of held) up(k);
+      const saves1 = g.state.solverSaves || 0;     // read BEFORE the keepsake teleport
       // ---- ...AND THE THREE THINGS BATCH ONE ADDED (v23) -----------------
       // Every one of them is a state machine or a force that runs on every
       // frame in every chapter, so the fuzz is exactly where they belong.
@@ -176,6 +198,7 @@ async page => {
       const calmNow = (g.hud && g.hud.calmAudit) ? +g.hud.calmAudit().calm.toFixed(2) : 'n/a';
       console.error = oe;
       return {
+        biome: g.biome.current, started: g.state.started,
         keepHover, keepRescues,
         hiddenNow, stuckHidden,
         roomFor: room ? room.biome : 'n/a', roomWet: room ? +room.wet.toFixed(3) : 'n/a',
@@ -187,14 +210,35 @@ async page => {
         gustRoamMax: +roamMax.toFixed(2), gustRoamN: roamN,
         nanFrames, camNaN, belowVoid, stuckFrames,
         minY: +minY.toFixed(2), maxY: +maxY.toFixed(2), maxSpeed: +maxSpeed.toFixed(1),
-        solverSaves: g.state.solverSaves || 0,
+        // the fuzz's own clamps over the eight seconds, and the teleport's,
+        // apart — the second column is the harness measuring itself
+        solverSaves: saves1 - saves0,
+        keepSaves: (g.state.solverSaves || 0) - saves1,
         end: [+g.capy.position.x.toFixed(1), +g.capy.position.y.toFixed(1), +g.capy.position.z.toFixed(1)],
         errs: errs.slice(0, 6), lastError: g.state.lastError || null,
       };
     }, n);
   }
+  // ---- THE GATE --------------------------------------------------------
+  // Written into the file AND thrown, so a caller reading the JSON and a
+  // caller reading run-code's exit status both see it. Every rule here is
+  // one the title card passes silently: started, moved, no NaN, no fall, no
+  // error, and landed in the chapter it was sent to.
+  const fail = [];
+  if (started !== true) fail.push('started !== true after Enter (the fuzz ran against the title card)');
+  for (const n of names) {
+    const r = res[n] || {};
+    if (r.started !== true) fail.push(n + ': started ' + r.started);
+    if (r.biome !== n) fail.push(n + ': biome read ' + r.biome);
+    if (!(r.maxSpeed >= 1)) fail.push(n + ': maxSpeed ' + r.maxSpeed + ' < 1 (no input reached the animal)');
+    if (r.nanFrames) fail.push(n + ': nanFrames ' + r.nanFrames);
+    if (r.camNaN) fail.push(n + ': camNaN ' + r.camNaN);
+    if (r.belowVoid) fail.push(n + ': belowVoid ' + r.belowVoid);
+    if (r.lastError) fail.push(n + ': lastError ' + String(r.lastError).slice(0, 120));
+  }
   await page.evaluate(async (o) => {
     await fetch('/shot?name=fuzz.json', { method: 'POST',
       body: btoa(unescape(encodeURIComponent(JSON.stringify(o, null, 1)))) });
-  }, res);
+  }, { started, fail, pass: fail.length === 0, res });
+  if (fail.length) throw new Error('fuzz FAILED (' + fail.length + '):\n  ' + fail.join('\n  '));
 }
