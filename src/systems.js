@@ -25845,7 +25845,13 @@ export function createSystems(game) {
     // one big thing was a sentence with a star on it again. Now the block
     // keeps the star, THE BIG ONE HERE and the name, and only the sentence
     // steps aside for the row that carries it (.row).
-    const marqOn = !!(wowDef && wowRec && !wowRec.done && !wayOn);
+    // ...AND `wayOn` IS NOT "FINISHED" ANY MORE (L4-0). L3's E3 put the
+    // way-on row on the paper from the first minute, so `wayOn` went true in
+    // every chapter from frame one and this gate — written when it meant
+    // "the chapter is done" — hid the signpost, the name, the live line and
+    // the bar in all nineteen chapters for a day. The word that means what
+    // this line wanted is `wayDone`.
+    const marqOn = !!(wowDef && wowRec && !wowRec.done && !wayDone);
     if (marqOn && marqId !== wowDef.id) {
       marqId = wowDef.id;
       marqNameEl.textContent = sysSay(typeof wowDef.wow === 'string' ? wowDef.wow : '');
