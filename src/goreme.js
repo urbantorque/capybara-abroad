@@ -4776,7 +4776,15 @@ function gorUpdateBalloon(game, dt) {
   if (!gorSunMet && gorSun >= 0.465) {
     gorSunMet = true;
     if (gorAboard && gorBalY > gy + 2.5 && typeof game.record === 'function') {
-      game.record('sunrise', gorBalY - gy);
+      const alt = gorBalY - gy;
+      game.record('sunrise', +alt.toFixed(0));
+      // ---- THE NUMBER, SAID AT THE MOMENT IT IS MADE (L5) --------------
+      // The altitude at the rim filed silently and turned up on the paper
+      // later. The first light reaches the basket: a wash of warm sparks
+      // off the envelope's mouth, the metres said, and the par with them.
+      if (typeof game.sparks === 'function') game.sparks(gorBalX, gorBalY + 4, gorBalZ, 44, { spd: 3.5, up: 1.5, grav: 1.2, drag: 0.9, life: 2.4, size: 0.6, rgb: [2.4, 1.7, 0.8] });
+      if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
+      gorToast('the first light, at ' + alt.toFixed(0) + ' m — ' + (alt >= 110 ? 'over the town. a good one.' : alt >= 55 ? 'the layer over the valley. a hundred and ten is the town.' : 'just off the field. higher next dawn — it comes round.'));
     }
   }
 

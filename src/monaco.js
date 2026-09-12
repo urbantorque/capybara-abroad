@@ -295,6 +295,27 @@ const monME_LIGHTS = 3;           // the start: three ticks and a chime
 const monME_STEP_T = 0.9;         // s between them
 let monMeG = null, monMeBody = null;
 let monMeS = 0, monMeV = 0, monMeLat = 0, monMeYaw = 0, monMeLean = 0;
+// ---- CONTACT, AND THE PODIUM (L5) --------------------------------------------
+// The most complete simulation of the nineteen and it had no contact: a
+// lane's width from a pack car was "beside" and nothing more. THE RUB: inside
+// monME_RUB of a pack car's lane with the noses overlapping, the pack shoves
+// back — you are put a lane's width away from it, a tenth of your speed
+// gone, a clink and a shudder and sparks off the panels; once per
+// monME_RUB_T so a long side-by-side is a series of rubs rather than a
+// buzz. THE PODIUM: a lap won (P1) is champagne off the pit wall and two
+// shells over the harbour, the world held; a lap not won is the cheer.
+const monME_RUB = 1.05, monME_RUB_T = 0.8, monME_RUB_LOSS = 0.10;
+let monMeRubT = 0, monMeRubs = 0, monPodiums = 0;
+function monPodium(game) {
+  monPodiums++;
+  if (typeof game.slowmo === 'function') game.slowmo(0.5, 1.3);
+  if (typeof game.sparks === 'function') game.sparks(monWATCH_MID.x, monWATCH_MID.y + 1.5, monWATCH_MID.z, 60, { spd: 6, up: 5, grav: 9, drag: 0.7, life: 1.5, size: 0.3, rgb: [2.2, 2.0, 1.2], spread: 0.5 });
+  if (typeof game.firework === 'function') {
+    game.firework((monPORT.x0 + monPORT.x1) * 0.5 - 12, 34, (monPORT.z0 + monPORT.z1) * 0.5, { n: 48, size: 1.5, rgb: [2.4, 1.6, 0.8] });
+    setTimeout(function () { try { if (game.biome && game.biome.current === 'monaco') game.firework((monPORT.x0 + monPORT.x1) * 0.5 + 14, 38, (monPORT.z0 + monPORT.z1) * 0.5 - 8, { n: 48, size: 1.5, rgb: [2.2, 2.2, 1.4] }); } catch (e) { /* the sky is a gift */ } }, 650);
+  }
+  monToast('P1 — the podium. champagne off the pit wall, and the harbour lit for it.');
+}
 let monMeTX = 0, monMeTY = 0, monMeTZ = 0;
 let monRaceOn = false;            // at the wheel
 let monRaceT = -1;                // s since GO; < 0 is the lights
@@ -3058,6 +3079,19 @@ function monUpdateRace(game, dt) {
     gap = ((gap % monTrackTotal) + monTrackTotal) % monTrackTotal;
     if (gap > monTrackTotal / 2) gap -= monTrackTotal;
     const beside = Math.abs(monCarLat[j] - monMeLat) < monME_LANE;
+    // THE RUB (L5): panels touching, and the pack shoves back
+    if (monMeRubT > 0) monMeRubT -= dt;
+    if (Math.abs(monCarLat[j] - monMeLat) < monME_RUB && Math.abs(gap) < monME_NOSE * 0.9 && monMeRubT <= 0 && monMeV > 3) {
+      monMeRubT = monME_RUB_T; monMeRubs++;
+      const away = monMeLat >= monCarLat[j] ? 1 : -1;
+      monMeLat = clamp(monMeLat + away * 0.9, -monME_LAT, monME_LAT);
+      monMeV *= 1 - monME_RUB_LOSS;
+      monSfx('clink', { volume: 0.5, pitch: 0.7, force: true });
+      monSfx('thud', { volume: 0.3, pitch: 1.1, force: true });
+      if (typeof game.shake === 'function') game.shake(0.09);
+      if (typeof game.sparks === 'function') game.sparks(monMeTX - away * 0.9 * Math.cos(monMeYaw), monMeTY + 0.5, monMeTZ + away * 0.9 * Math.sin(monMeYaw), 14, { spd: 3, up: 1, grav: 9, drag: 1.0, life: 0.5, size: 0.18, rgb: [2.4, 1.6, 0.6] });
+      if (monMeRubs === 1) monToast('contact. they do not move over for you — go round.');
+    }
     if (beside && gap > 0 && gap < monME_NOSE) {
       if (monMeV > monCarV[j] * 0.92) { monMeV = monCarV[j] * 0.92; holding = j; }
     } else if (beside && gap <= 0 && gap > -monME_NOSE) {
@@ -3109,6 +3143,8 @@ function monUpdateRace(game, dt) {
     }
     monToast((monRacePassed >= monCarG.length ? 'P1. ' : 'P' + (monCarG.length - monRacePassed + 1) + '. ') +
              lapT.toFixed(1) + ' s · again if you like');
+    // THE PODIUM (L5): a lap WON is champagne and the harbour lit
+    if (monRacePassed >= monCarG.length) monPodium(game);
     monRacePassed = 0;
     for (let j = 0; j < monCarG.length; j++) monRaceAhead[j] = monCarU[j] > monMeS;
   }
@@ -5180,7 +5216,8 @@ export function createMonaco(game) {
     /** Which car the animal is on, or -1. */
     riding() { return monRider; },
     // ---- THE GRAND PRIX (X1) --------------------------------------------
-    race() { return { on: monRaceOn, t: monRaceT, s: monMeS, v: monMeV, lat: monMeLat, passed: monRacePassed, lap: monRaceLap, done: monRaceDone, total: monTrackTotal }; },
+    race() { return { on: monRaceOn, t: +monRaceT.toFixed(2), s: +monMeS.toFixed(1), v: +monMeV.toFixed(2), lat: +monMeLat.toFixed(2), passed: monRacePassed, lap: monRaceLap, done: monRaceDone, total: +monTrackTotal.toFixed(1), rubs: monMeRubs, podiums: monPodiums, dist: +monMeDist.toFixed(1),
+                       cars: monCarU.map(function (u, j) { return [+u.toFixed(1), +monCarV[j].toFixed(1), monCarLat[j]]; }) }; },
     gridCar() { return { x: monMeTX, z: monMeTZ }; },
     // the camera sits behind the car while you drive it, close and low: the
     // helm rig is a ship's (21 m, 27°) and on a street with walls it was
@@ -5195,6 +5232,10 @@ export function createMonaco(game) {
       if (o && o.take && !monRaceOn) monRaceTake(monGame);
       if (o && typeof o.s === 'number') monMeS = o.s;
       if (o && typeof o.v === 'number') monMeV = o.v;
+      if (o && typeof o.lat === 'number') monMeLat = o.lat;
+      if (o && typeof o.passed === 'number') { monRacePassed = o.passed; for (let j = 0; j < monRaceAhead.length; j++) monRaceAhead[j] = false; }
+      if (o && typeof o.dist === 'number') monMeDist = o.dist;
+      if (o && o.podium) monPodium(monGame);
       return this.race();
     },
     ridingSpeed() { return monRider >= 0 ? monCarV[monRider] : 0; },

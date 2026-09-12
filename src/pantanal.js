@@ -282,6 +282,17 @@ const panBOSS_V = [2.7, 3.3, 3.9];       // m/s in each round
 const panBOSS_BREATH = 4.5;              // s under after a take
 let panHuntI = -1, panHuntOn = false, panHuntDone = false, panHuntT = 0, panHuntRip = 0;
 let panHuntTook = 0, panHuntSaved = 0;
+// ---- THE LUNGE, AND THE LAST OF HIM (L5) -------------------------------------
+// The best-blended marquee in the game and its two sharpest moments were a
+// toast: O Grandão closing on the tail, and the third wheek that finishes
+// him. THE LUNGE: inside panLUNGE_R of the last follower the world drops to
+// 0.7x for half a second, once a round, with the jaws under the surface —
+// the beat that says "now". THE LAST OF HIM: the third wheek holds the
+// world at half speed, throws the river up where he goes under, and swings
+// the lens to the line's flank so the whole herd and the thrash are in the
+// one frame.
+const panLUNGE_R = 7.5;
+let panLungeRound = -1;
 let panBossLives = panBOSS_LIVES, panBossRound = 0, panBossUnder = 0, panBossBeaten = false, panBossHits = 0;
 /** The last capybara on the line, or null. */
 function panLastFollower() {
@@ -310,7 +321,7 @@ function panHuntStart(game) {
   if (bi < 0) return;
   const c = panCaimanAt[bi];
   c.hunt = 1; c.hx = c.x; c.hz = c.z; c.hyaw = c.yaw0;
-  panHuntI = bi; panHuntOn = true; panHuntT = 0;
+  panHuntI = bi; panHuntOn = true; panHuntT = 0; panLungeRound = -1;
   panBossLives = panBOSS_LIVES; panBossRound = 0; panBossUnder = 0; panBossBeaten = false; panBossHits = 0;
   panRipple(c.x, c.z, 2.6);
   panSfx.volume = 0.5; panSfx.pitch = 0.45;
@@ -374,6 +385,15 @@ function panUpdateHunt(game, dt, p) {
   if (wl) {
     game.wowLive('O GRANDÃO ' + hearts + ' · ' + Math.round(d) + ' m behind the last one · WHEEK at it', across);
   }
+  // THE LUNGE (L5): once a round, the beat before the take
+  if (d < panLUNGE_R && panLungeRound !== panBossRound) {
+    panLungeRound = panBossRound;
+    if (typeof game.slowmo === 'function') game.slowmo(0.7, 0.5);
+    panSfx.volume = 0.5; panSfx.pitch = 0.42;
+    game.sfx('thud', placeCue(panSfx, c.hx, panWATER, c.hz, 80));
+    panRipple(c.hx, c.hz, 2.4);
+    if (typeof game.punch === 'function') game.punch(0.06);
+  }
   if (d < panHUNT_TAKE) {
     // it has the last one: off the line, a splash, and away to the far bank
     tail.st = 'graze'; tail.order = -1;
@@ -408,6 +428,12 @@ function panHuntHear(game, p) {
   // THE THIRD: gone for good, and the whole line turns round for it
   panBossBeaten = true;
   panRipple(c.hx, c.hz, 4.5);
+  // ...AND IT IS SEEN (L5): the world held, the river thrown up, the lens on the flank
+  if (typeof game.slowmo === 'function') game.slowmo(0.5, 1.4);
+  if (typeof game.sparks === 'function') game.sparks(c.hx, panWATER + 0.3, c.hz, 50, { spd: 5.5, up: 3.5, grav: 9, drag: 0.6, life: 1.3, size: 0.32, rgb: [1.15, 1.35, 1.5] });
+  if (typeof game.frameShot === 'function') {
+    game.frameShot({ yaw: Math.atan2(p.x - c.hx, p.z - c.hz) + 0.5, dist: 15, pitch: 7 * Math.PI / 180, raise: 1.2, hold: 2.6 });
+  }
   panSfx.volume = 0.7; panSfx.pitch = 0.42;
   game.sfx('splash', placeCue(panSfx, c.hx, panWATER, c.hz, 120));
   game.sfx('whistle', { volume: 0.3, pitch: 1.3, force: true });

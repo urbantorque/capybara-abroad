@@ -2030,6 +2030,39 @@ const cavCOL_LAND  = 5.0;     // ...and below this, it has landed
 const cavCOL_VY    = -3.4;    // m/s of descent before it is a fall and not a step
 const cavCOL_TICK  = 17;      // m of drop the tick asks for
 let cavColFall = 0, cavColFrom = 0, cavColDrop = 0, cavColBest = 0;
+// ---- THE RINGS OF LIGHT, AND THE RISER (L5) ----------------------------------
+// One decision — step off — and a second and a half of falling with nothing
+// in it but the swifts. Three hoops of the shaft's own daylight hang in the
+// drop now, off the cap's edge and drifting outward as they go down, so the
+// step-off has a BEARING and the fall has A/D in it: through one is a chime
+// and a burst of the light, through all three is the shaft answering (the
+// motes stirred to full, the score at the top). The score rises with the
+// drop the whole way down — a fall is the one thing this game had that made
+// no music. The lens goes low and looks up the shaft for the length of it.
+const cavCOL_RINGS = [[22, 0.0], [14, 0.22], [6, 0.44]];    // height over the foot, bearing offset
+const cavCOL_RING_BEAR = 1.35;    // rad, the side of the cap the hoops hang off
+const cavCOL_RING_R = 2.6;        // m, the hoop; through is inside it
+let cavColRingMeshes = null, cavColRingsThrough = 0, cavColRingsBest = 0;
+function cavColRingAt(k) {
+  const r = cavCOL_RINGS[k];
+  const a = cavCOL_RING_BEAR + r[1];
+  const out = 5.2 + k * 1.1;
+  return { x: cavCOL.x + Math.cos(a) * out, y: cavColBase + r[0], z: cavCOL.z + Math.sin(a) * out };
+}
+function cavBuildColRings(root) {
+  cavColRingMeshes = [];
+  const geo = new THREE.TorusGeometry(cavCOL_RING_R, 0.16, 6, 28);
+  for (let k = 0; k < cavCOL_RINGS.length; k++) {
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: new THREE.Color(1.7, 1.55, 1.15), transparent: true, opacity: 0.55,
+                                                                 depthWrite: false, fog: false, toneMapped: false, blending: THREE.AdditiveBlending }));
+    const at = cavColRingAt(k);
+    m.position.set(at.x, at.y, at.z);
+    m.rotation.x = Math.PI / 2;
+    m.castShadow = false; m.receiveShadow = false;
+    root.add(m);
+    cavColRingMeshes.push(m);
+  }
+}
 let cavColDone = false, cavColTopped = false, cavColP = null;
 let cavColOn = false;          // is a descent in progress — see the note below
 // the gate inputs, published for the instrument only
@@ -2049,11 +2082,11 @@ function cavUpdateColumn(game, dt) {
   // ---- the climb and the drop, on the signpost (W1) ---------------------
   if (!cavColDone && inGlade && typeof game.wowLive === 'function') {
     if (cavColOn && cavColDrop > 1) {
-      game.wowLive('FALLING · ' + cavColDrop.toFixed(0) + ' m · the swifts are with you',
+      game.wowLive('FALLING · ' + cavColDrop.toFixed(0) + ' m · ' + cavColRingsThrough + ' of 3 hoops · the swifts are with you',
                    clamp(cavColDrop / cavCOL_TICK, 0, 1));
     } else if (above > 3) {
       game.wowLive('on the column · ' + Math.round(above) + ' m up' +
-                   (above > cavCOL.h - 3 ? ' · the top. step off' : ''),
+                   (above > cavCOL.h - 3 ? ' · the top. step off toward the hoops of light' : ''),
                    clamp(above / cavCOL.h, 0, 1) * 0.5);
     }
   }
@@ -2089,6 +2122,10 @@ function cavUpdateColumn(game, dt) {
       // is seen. The same beat the marquee card takes, longer.
       if (typeof game.slowmo === 'function') game.slowmo(0.5, 1.8);
       game.sfx('gasp', { volume: 0.5, pitch: 0.9 });
+      cavColRingsThrough = 0;
+      // THE LENS GOES LOW (L5): from the floor's side, looking up the shaft
+      if (typeof game.frameShot === 'function')
+        game.frameShot({ yaw: cavCOL_RING_BEAR + Math.PI * 0.5, dist: 15, pitch: -18 * Math.PI / 180, raise: -1.5, hold: 2.6 });
     }
   } else {
     cavColP = p;
@@ -2097,6 +2134,24 @@ function cavUpdateColumn(game, dt) {
       // the form comes ON over about half a second and holds
       cavColFall = Math.min(1, cavColFall + dt * 2.2);
       cavMoteStir = 1;                      // ...and the shaft stirs round it
+      // THE RISER (L5): the score climbs with the drop, held every frame
+      if (game.music && typeof game.music.swell === 'function') game.music.swell(0.35 + 0.65 * clamp(cavColDrop / cavCOL.h, 0, 1));
+      // THE RINGS (L5): through one is inside its hoop at its height
+      for (let k = cavColRingsThrough; k < cavCOL_RINGS.length; k++) {
+        const at = cavColRingAt(k);
+        if (Math.abs(p.y - at.y) > 1.3) continue;
+        const rx = p.x - at.x, rz = p.z - at.z;
+        if (rx * rx + rz * rz > cavCOL_RING_R * cavCOL_RING_R) continue;
+        cavColRingsThrough = k + 1;
+        game.sfx('chime', { volume: 0.55, pitch: 1.4 + k * 0.25, force: true });
+        if (typeof game.sparks === 'function') game.sparks(at.x, at.y, at.z, 26, { spd: 3.5, up: 0.5, grav: 1.5, drag: 1.2, life: 1.4, size: 0.5, rgb: [2.0, 1.8, 1.3] });
+        if (typeof game.punch === 'function') game.punch(0.05);
+        if (cavColRingsThrough === cavCOL_RINGS.length) {
+          cavColRingsBest = 3;
+          if (game.music && typeof game.music.swell === 'function') game.music.swell(1);
+          game.sfx('chime', { volume: 0.8, pitch: 2.1, force: true });
+        }
+      }
       // ...and the paper counts it as it happens, the way the log ride does
       if (typeof game.recordLive === 'function' && cavColDrop > 2) {
         game.recordLive('the-column', cavColDrop);
@@ -2123,10 +2178,12 @@ function cavUpdateColumn(game, dt) {
           game.sfx('thud', cavSfx);
           if (typeof game.shake === 'function') game.shake(0.16);
           if (typeof game.record === 'function') game.record('the-column', drop);
+          if (cavColRingsThrough > 0 && cavColRingsBest < cavColRingsThrough) cavColRingsBest = cavColRingsThrough;
           if (!cavColDone) {
             cavColDone = true;
             cavTask(game, 'the-column');
-            game.toast('all sixteen of them came down with you.');
+            game.toast(cavColRingsThrough === 3 ? 'all sixteen of them came down with you — through every hoop of the light.'
+                     : 'all sixteen of them came down with you.' + (cavColRingsThrough > 0 ? ' ' + cavColRingsThrough + ' of the hoops.' : ''));
             if (typeof game.frameShot === 'function')
               game.frameShot({ yaw: 0, dist: 15, pitch: 0.10, raise: 3.2, hold: 3.0 });
           }
@@ -2210,6 +2267,7 @@ function cavBuildColumn(game, root) {
   mesh.castShadow = true; mesh.receiveShadow = true;
   mesh.name = 'cavColumn';
   root.add(mesh);
+  cavBuildColRings(root);                   // the hoops of light in the drop (L5)
 }
 
 function cavBuildDoline(game, root) {
@@ -4912,6 +4970,8 @@ export function createCave(game) {
     column: { x: cavCOL.x, z: cavCOL.z },
     /** ...and the beacon tracks the CAP, which is where the moment starts. */
     marqueeAt() { return { x: cavCOL.x, y: cavColTop, z: cavCOL.z }; },
+    /** THE HOOPS, for the harness (L5). */
+    colRings() { return { rings: cavCOL_RINGS.map(function (r, k) { return cavColRingAt(k); }), through: cavColRingsThrough, best: cavColRingsBest, on: cavColOn, drop: +cavColDrop.toFixed(1), top: cavColTop }; },
     wall: { x: 0, z: cavWALL.z + 8 },
     roost: { x: cavROOST.x, z: cavROOST.z },
     pearls: { x: cavPEARLS.x, z: cavPEARLS.z },

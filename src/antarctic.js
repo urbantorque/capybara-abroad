@@ -4347,6 +4347,28 @@ function antUpdatePod(game, dt) {
           game.frameShot({ yaw: antBoatYaw + Math.PI, dist: 26, pitch: 0.24,
                            raise: 6.5, hold: 3.2, over: true });
       }
+      // ---- THE BREACH, ONCE, AND SEEN FROM THE BOAT (L5) ---------------
+      // Six tonnes of animal leaving the water at two thirds of the run —
+      // and now the lens comes off the wake and on to it: the world at half
+      // speed, the camera on the far side of the boat from the bull so the
+      // tender is in the foreground and the breach fills the frame behind.
+      if (!antBreachDone && antPodRide > antPOD_RIDE * 0.62 && antBreachT < 0) {
+        antBreachDone = true;
+        antBreachT = 0;
+        antBreachIdx = 4;                                   // the bull
+        const bx = antPodX[antBreachIdx] || antPodCX, bz = antPodZ[antBreachIdx] || antPodCZ;
+        antSfx('splash', placeCue({ volume: 0.62, pitch: 0.36, force: true }, bx, antWATER, bz, 150));
+        if (typeof game.shake === 'function') game.shake(0.10);
+        antToast('all of it. out of the water. all of it.');
+        if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
+        if (typeof game.slowmo === 'function') game.slowmo(0.5, 1.3);
+        if (typeof game.frameShot === 'function') {
+          const cp = game.capy && game.capy.position;
+          const yaw = cp ? Math.atan2(cp.x - bx, cp.z - bz) : antBoatYaw + Math.PI;
+          game.frameShot({ yaw: yaw, dist: 20, pitch: 5 * Math.PI / 180, raise: 2.2, hold: 2.4, over: true });
+        }
+        if (typeof game.sparks === 'function') game.sparks(bx, antWATER + 0.4, bz, 44, { spd: 5.5, up: 3.5, grav: 9, drag: 0.6, life: 1.3, size: 0.34, rgb: [1.2, 1.4, 1.6] });
+      }
     } else {
       // ---- AND YOU CAN LOSE THEM, WHICH IS NEW --------------------------
       // Not instantly: a boat that drops to seventeen metres for half a
@@ -4391,6 +4413,10 @@ function antUpdatePod(game, dt) {
       antPodStateT = 0;
       antSlowT = 0;
       antPodToldGap = false;
+      // THE RUN IS THE RIDE (L5): the escort's seconds do not count toward the
+      // tick — measured, eight seconds of escort plus one of the run ticked
+      // the marquee before the pod had led anywhere
+      antPodRide = 0;
       antPodRunPX = antPodCX; antPodRunPZ = antPodCZ;
       antToast('they have broken north. that is the lead. GO.');
       antSfx('splash', placeCue({ volume: 0.6, pitch: 0.42 },
@@ -4424,26 +4450,8 @@ function antUpdatePod(game, dt) {
       //
       // The record still gets the best of the ride, because antPodBest is
       // banked above and flushed when the ride ends — see antPodEndRide.
-      if (antPodRide >= antPOD_RIDE && !antRideDone) {
-        antRideDone = true;
-        antRecord('orca-ride', antPodBest);
-        antTask('orca-ride');
-        antPodAnswers();                                   // W1
-        // FRAMED — chapters 12-17 asked for a shot in none of their marquees.
-        // Measured at the tick: the camera sits dead astern (yaw = heading +
-        // 180.0 deg, held to a tenth of a degree for the whole ride), 22.05 m
-        // back, pitched 25.5 degrees DOWN with a 10.54 m raise — a helicopter
-        // plate of the boat's own wake. `yaw` is the bearing FROM the animal TO
-        // the camera, so astern is what we keep; what has to change is the
-        // DOWN-ANGLE, because the pod is level with the sea and the breach apex
-        // is staged 5.3 m above it.
-        // `over`, because this marquee happens AT THE HELM and a shot is
-        // weighted to nothing under the helm rig by default — measured, the
-        // first version of this line changed the lens by 0.00. See frameShot.
-        if (typeof game.frameShot === 'function')
-          game.frameShot({ yaw: antBoatYaw + Math.PI, dist: 26, pitch: 0.24,
-                           raise: 6.5, hold: 3.2, over: true });
-      }
+      // (L5) the tick is the RUN's — see the run block above; the escort only
+      // keeps the clock warm on the paper
       // ---- THE BREACH, ONCE ----------------------------------------------
       //
       // The pod porpoises and it spy-hops, and both of those are things it
@@ -4453,17 +4461,7 @@ function antUpdatePod(game, dt) {
       // happens once, which is what makes it one. (A thing that happens every
       // forty seconds is scenery; a thing that happens once is a memory —
       // the same argument the Pantanal's egrets are built on.)
-      if (!antBreachDone && antPodRide > antPOD_RIDE * 0.62 && antBreachT < 0) {
-        antBreachDone = true;
-        antBreachT = 0;
-        antBreachIdx = 4;                                   // the bull
-        antSfx('splash', placeCue({ volume: 0.62, pitch: 0.36, force: true },
-                                  antPodX[antBreachIdx] || antPodCX, antWATER,
-                                  antPodZ[antBreachIdx] || antPodCZ, 150));
-        if (typeof game.shake === 'function') game.shake(0.10);
-        antToast('all of it. out of the water. all of it.');
-        if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
-      }
+      // (L5) the bull's breach is the run's too — see antPodBreach
     } else {
       antPodRide = Math.max(0, antPodRide - dt * 0.8);
     }

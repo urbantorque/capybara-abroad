@@ -3019,6 +3019,15 @@ function manBuildGroper(root) {
  */
 let manBarrelG = null, manBarrel = 0, manBarrelT = 0, manBarrelHiss = 0, manBarrelBest = 0;
 let manBarrelForce = false;   // test hook: barrelDebug(true) stands the lip up wherever the animal is
+// ---- THE BARREL IS A MOMENT, AND THE SAND IS A FRAME (L5) --------------------
+// The barrel was the best thing on the beach and it was a hiss and a toast.
+// Two seconds inside and the lens comes round to the wave's flank, close,
+// with the lip over the animal, the world at 0.6x, spray off the face; the
+// toast on the way out says the best. And the ride that makes the sand is
+// SEEN from the sand: the lens ahead of the animal on the beach looking back
+// at it and the wave behind, which is the photograph every surf beach has.
+const manBARREL_BEAT = 2.0;   // s inside before it is a moment
+let manBarrelBeat = false;
 function manBuildBarrel(root) {
   const g = new THREE.Group();
   const M = manMerger();
@@ -3056,11 +3065,12 @@ function manUpdateBarrel(game, dt, p, riding, speed) {
   if (on !== manBarrelG.visible) manBarrelG.visible = on;
   if (!on) {
     if (manBarrelT > 1.0) {
-      if (manBarrelT > manBarrelBest) manBarrelBest = manBarrelT;
-      if (typeof game.toast === 'function') game.toast('a barrel · ' + manBarrelT.toFixed(1) + ' s');
+      const pb = manBarrelT > manBarrelBest;
+      if (pb) manBarrelBest = manBarrelT;
+      if (typeof game.toast === 'function') game.toast('a barrel · ' + manBarrelT.toFixed(1) + ' s' + (pb && manBarrelBest > manBarrelT + 0.01 ? '' : pb ? ' · your longest' : ' · best ' + manBarrelBest.toFixed(1)));
       game.sfx('cheer', { volume: 0.5, pitch: 1.1, force: true });
     }
-    manBarrelT = 0;
+    manBarrelT = 0; manBarrelBeat = false;
     return;
   }
   manBarrelG.position.set(p.x, manWave.y, p.z);
@@ -3075,6 +3085,17 @@ function manUpdateBarrel(game, dt, p, riding, speed) {
       game.sfx('hiss', { volume: 0.32, pitch: 0.7, force: true });
     }
     if (Math.random() < dt * 14) manPuffSpray(p.x + rand(-4, 4), manWave.y + 3.0, p.z + 0.8, 2, 0.6);
+    // THE BARREL IS A MOMENT (L5): two seconds in, the lens on the flank under the lip
+    if (!manBarrelBeat && manBarrelT > manBARREL_BEAT) {
+      manBarrelBeat = true;
+      const v = game.capy && game.capy.velocity;
+      const heading = v && (Math.abs(v.x) + Math.abs(v.z)) > 0.5 ? Math.atan2(v.x, v.z) : 0;
+      if (typeof game.slowmo === 'function') game.slowmo(0.6, 0.9);
+      if (typeof game.frameShot === 'function') game.frameShot({ yaw: heading + Math.PI * 0.5, dist: 9, pitch: 3 * Math.PI / 180, raise: 0.6, hold: 1.8, near: true });
+      if (typeof game.sparks === 'function') game.sparks(p.x, manWave.y + 2.2, p.z, 30, { spd: 4, up: 2, grav: 9, drag: 0.6, life: 1.0, size: 0.26, rgb: [1.2, 1.45, 1.7] });
+      if (game.music && typeof game.music.swell === 'function') game.music.swell(0.8);
+      if (typeof game.toast === 'function') game.toast('INSIDE. the lip is over you.');
+    }
     if (typeof game.wowLive === 'function' &&
         !(typeof game.taskDone === 'function' && game.taskDone('all-the-way'))) {
       game.wowLive('IN THE BARREL · ' + manBarrelT.toFixed(1) + ' s · ' + manRideDist.toFixed(0) + ' m of ' + manALL_THE_WAY,
@@ -4314,6 +4335,13 @@ function manUpdateSurfTasks(game, dt) {
         manPuffSpray(p.x, manWave.y + 0.4, p.z + 1.2, 12, 0.9);
         manRideEndT = 4.0;
         if (typeof game.slowmo === 'function') game.slowmo(0.6, 1.0);
+        // SEEN FROM THE SAND (L5): the lens ahead on the beach, the wave behind
+        if (typeof game.frameShot === 'function') {
+          const v = capy.velocity;
+          const heading = v && (Math.abs(v.x) + Math.abs(v.z)) > 0.5 ? Math.atan2(v.x, v.z) : 0;
+          game.frameShot({ yaw: heading, dist: 14, pitch: 6 * Math.PI / 180, raise: 1.0, hold: 3.0 });
+        }
+        if (typeof game.sparks === 'function') game.sparks(p.x, manWave.y + 0.6, p.z, 36, { spd: 4.5, up: 2.5, grav: 9, drag: 0.6, life: 1.1, size: 0.28, rgb: [1.2, 1.45, 1.7] });
         if (typeof game.confetti === 'function') game.confetti(p.x, p.y + 1.0, p.z, 18);
         game.sfx('cheer', { volume: 0.7, pitch: 1.05, force: true });
         manSaysNow('guard',
@@ -4818,7 +4846,7 @@ export function createManly(game) {
     surfHeight(x, z) { return manSurfY(x, z); },
 
     /** W1: the barrel, for the harness — force it up, or read it. */
-    barrelDebug(force) { if (force !== undefined) manBarrelForce = !!force; return { k: manBarrel, t: manBarrelT, best: manBarrelBest }; },
+    barrelDebug(force) { if (force !== undefined) manBarrelForce = !!force; return { k: +manBarrel.toFixed(2), t: +manBarrelT.toFixed(2), best: +manBarrelBest.toFixed(2), beat: manBarrelBeat }; },
     update(dt) {
       if (!manBuilt) return;
       if (!game.biome.isActive('manly')) return;
