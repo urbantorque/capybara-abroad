@@ -15183,8 +15183,55 @@ export function createSystems(game) {
     return v * musSkyVel * (1 + (Math.random() + Math.random() - 1) * sysMUS_VEL_H);
   }
 
+  // =========================================================================
+  // THE STRING (L3-12) — a Karplus–Strong string in an AudioWorklet.
+  //
+  // Every plucked voice in this file decays by a gain ramp on an oscillator:
+  // nothing rings by itself, so the koto, the charango, the cavaco, the
+  // guembri, the twang and this pluck all shared one decay shape. A native
+  // DelayNode in a feedback loop is clamped to one render quantum (128
+  // samples, ~344 Hz at 44.1k), which is no use for a pluck at 70-88, so
+  // the string is one AudioWorkletProcessor with ten slots: a noise burst
+  // through a pluck-position comb, a fractional delay line tuned to the
+  // pitch, the classic two-point average as the loss filter, a per-note
+  // decay for the duration asked for, and a pan. Scheduled by `at`, so a
+  // note the scheduler placed two seconds ahead starts on its own sample.
+  //
+  // THE OLD RECIPE IS THE FALLBACK, on the same call: no audioWorklet (G7),
+  // a module that fails to load, or the node not yet built all leave
+  // musPluck exactly what it was. Only the generic pluck goes through the
+  // string; the koto bends, the guembri rattles on the drum bus, and both
+  // keep their own recipes.
+  // =========================================================================
+  const sysMUS_KS_SRC = "class CapyKS extends AudioWorkletProcessor {\n  constructor() {\n    super();\n    this.N = 10;\n    this.slots = [];\n    for (let i = 0; i < this.N; i++) {\n      this.slots.push({ buf: new Float32Array(4096), len: 100, w: 0, prev: 0, act: false,\n                        vel: 0, decay: 0.996, pL: 0.7, pR: 0.7, life: 0, peak: 0 });\n    }\n    this.queue = [];\n    this.port.onmessage = (e) => { const m = e.data; if (m && m.t === 'pluck') this.queue.push(m); };\n  }\n  pluck(m) {\n    let s = null, quiet = 1e9;\n    for (let i = 0; i < this.N; i++) {\n      const c = this.slots[i];\n      if (!c.act) { s = c; break; }\n      if (c.peak < quiet) { quiet = c.peak; s = c; }\n    }\n    const len = Math.max(2, Math.min(4000, sampleRate / Math.max(20, m.hz)));\n    const n = Math.floor(len) + 1;\n    const pos = Math.max(0.05, Math.min(0.5, m.pos || 0.28));\n    const d = Math.max(1, Math.floor(len * pos));\n    const b = s.buf;\n    for (let k = 0; k < n; k++) b[k] = Math.random() * 2 - 1;\n    for (let k = n - 1; k >= 0; k--) { const j = k - d; b[k] = 0.5 * (b[k] - (j >= 0 ? b[j] : 0)); }\n    for (let k = n; k < 4096; k++) b[k] = 0;\n    s.len = len; s.w = n; s.prev = 0; s.act = true; s.life = 0; s.peak = 1;\n    s.vel = m.vel || 0.1;\n    const dur = Math.max(0.3, m.dur || 2.5);\n    s.decay = Math.exp(Math.log(0.001) / (dur * m.hz));\n    const p = Math.max(-1, Math.min(1, m.pan || 0));\n    s.pL = Math.cos((p + 1) * Math.PI / 4); s.pR = Math.sin((p + 1) * Math.PI / 4);\n  }\n  process(inputs, outputs) {\n    const out = outputs[0];\n    const L = out[0], R = out.length > 1 ? out[1] : out[0];\n    const n = L.length;\n    const t0 = currentTime;\n    if (this.queue.length) {\n      const keep = [];\n      for (let i = 0; i < this.queue.length; i++) {\n        const q = this.queue[i];\n        if (q.at <= t0 + n / sampleRate + 0.001) this.pluck(q); else keep.push(q);\n      }\n      this.queue = keep;\n    }\n    for (let si = 0; si < this.N; si++) {\n      const s = this.slots[si];\n      if (!s.act) continue;\n      const b = s.buf, len = s.len, vel = s.vel, decay = s.decay, pL = s.pL, pR = s.pR;\n      let w = s.w, prev = s.prev, peak = 0;\n      for (let i = 0; i < n; i++) {\n        const rp = w - len;\n        const i0 = Math.floor(rp);\n        const fr = rp - i0;\n        const a = b[(i0 + 8192) & 4095], c = b[(i0 + 1 + 8192) & 4095];\n        const x = a + (c - a) * fr;\n        const y = 0.5 * (x + prev) * decay;\n        prev = x;\n        b[w] = y;\n        w = (w + 1) & 4095;\n        const v = y * vel;\n        L[i] += v * pL; R[i] += v * pR;\n        const ay = y < 0 ? -y : y;\n        if (ay > peak) peak = ay;\n      }\n      s.w = w; s.prev = prev; s.peak = peak; s.life += n / sampleRate;\n      if (s.life > 0.2 && peak < 0.0005) s.act = false;\n    }\n    return true;\n  }\n}\nregisterProcessor('capy-ks', CapyKS);";
+  let musKsNode = null, musKsReady = false, musKsTried = false, musKsN = 0;
+  const sysMUS_KS_LEVEL = 1.3;   // the noise fill against the triangle it replaces (measured: Manly's top band came up 24 dB, still under the S2 shelf)
+  function musKsInit() {
+    if (musKsTried || !ac || !ac.audioWorklet || typeof URL === 'undefined' || typeof Blob === 'undefined') return;
+    musKsTried = true;
+    let url = '';
+    try { url = URL.createObjectURL(new Blob([sysMUS_KS_SRC], { type: 'application/javascript' })); }
+    catch (e) { return; }
+    ac.audioWorklet.addModule(url).then(function () {
+      try {
+        musKsNode = new AudioWorkletNode(ac, 'capy-ks', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
+        musKsNode.connect(musPluckDry);
+        musKsNode.connect(musSend);
+        musKsReady = true;
+      } catch (e) { musKsReady = false; musKsNode = null; }
+    }, function () { musKsReady = false; });
+  }
   function musPluck(when, midi, panv, vel) {
     const hz = sysMidiHz(midi);
+    if (musKsReady && musKsNode && musPluckDry) {
+      const rel = rand(2.4, 4.2);
+      try {
+        musKsNode.port.postMessage({ t: 'pluck', at: when, hz: hz, vel: vel * sysMUS_KS_LEVEL,
+                                     pan: panv, dur: rel, pos: rand(0.2, 0.36) });
+        musKsN++;
+        return;
+      } catch (e) { /* the recipe below */ }
+    }
     const rel = rand(2.4, 4.2);
     const o = ac.createOscillator(); o.type = 'triangle'; o.frequency.value = hz;
     const o2 = ac.createOscillator(); o2.type = 'sine'; o2.frequency.value = hz * 2.008;
@@ -17869,6 +17916,7 @@ export function createSystems(game) {
     // then taken off the send entirely, so a chapter never pays for a room it
     // is not in.
     musSend = ac.createGain(); musSend.gain.value = 1;
+    musKsInit();   // THE STRING (L3-12): a worklet, built once the graph exists
     musWet = ac.createGain(); musWet.gain.value = 1;
     musWet.connect(musVol);
     for (let k = 0; k < 2; k++) {
@@ -32528,6 +32576,8 @@ export function createSystems(game) {
       second: !!sysMUS_2ND[musPalN], secondN: musSecondN,
       // THE MELODY (L3, F2): where the walk is, and how many cells have played
       melDeg: musMelDeg, melCells: musMelCells, melN: musMelN, melNext: musMelNext, throws: musThrows,
+      // THE STRING (L3-12): is the worklet up, and how many plucks it has taken
+      ks: musKsReady, ksN: musKsN,
       skyVel: +musSkyVel.toFixed(4),
       band: (musPal && musPal.band) || null, bar: musBarIndex,
       // The rhythm GRID, for the crossing hold (F3b). `beatLen` 0 is the
