@@ -64,3 +64,8 @@ position. The chapters that have their own keep them.
 
 Every batch: the marquee's own probe (`qa/l5-*.js`), `qa/fuzz.js` started
 in nineteen chapters, `npm test` green.
+
+## After (13 Sep 2026)
+
+Done in four commits, L5-1 to L5-4; the scores after and what the
+instruments said are in CONTRACT.md's top section. Average 6.8 → 8.1.

@@ -1,3 +1,152 @@
+## THE MARQUEE PASS — NINETEEN BIG ONES, EACH A NOTCH HIGHER (L5 — 13 Sep 2026)
+
+Asked for: an assessment of the marquee in each of the nineteen chapters —
+depth, wow and interest, out of ten — and then every one of them lifted a
+full notch, so the average sits at eight or more; extend what is there
+where it can be extended, rethink the weak ones outright. The assessment
+was made from the code (ROADMAP-LIFT5.md carries the table: average 6.8,
+the Manta at 4.0 the lowest, the Crossing at 8.7 the highest). Four
+commits, L5-1 to L5-4; every batch under playwright with its own probe
+(`qa/l5-*.js`, sixteen of them), the fuzz started in nineteen chapters and
+`npm test` 14/14 on every commit.
+
+### The rule the pass was built on
+
+A marquee is lifted by giving it one of four things it did not have: a
+VERB where it was a ride (the manta's leap, the chiva's sidestep, the pho
+run's horn, the conductor's rhythm, the column's hoops); a NUMBER you can be
+better at where the number measured sitting still (the leap in metres, the
+landmark chain, the calls in time, the gates as seconds); a SECOND GO where
+it happened once (the pho run, the jetpack, the helicopter, the lantern
+relit, every tide higher); and a FRAME — the world at half speed, the lens
+where the moment is, the place answering — where the payout was a toast (the
+breach, the humpback, the dive, the plume, the eighth ring, the third wheek,
+the barrel, the podium, the encore). Nothing was trimmed to make room; the
+ticks, the pars already met and the saves are untouched, except three rows
+whose unit changed, which carry `gen: 2` and drop a saved gen-1 figure on
+restore rather than read it as the new unit.
+
+### The rethinks (L5-1)
+
+**THE MANTA (palawan, was 4.0).** THE LEAP: through the climb and the arc
+Space jumps off its back with 85 % of the manta's own climb under you, and
+the row is metres clear of the water at the top (par 4.5; measured 4.5 at
+u 0.915 — the best leap is the moment it clears the surface, not the top).
+THE LEAN: A/D banks it. THE SECOND MANTA: one in company, a beat late, its
+own breach behind you. THE BREACH IS SEEN: 0.45x, the lens low on the flank
+(`over: true`), a sheet of spray, every tern put up.
+
+**THE PHO RUN (hanoi, was 5.3).** THE HORN: Space, and the rider holding you
+goes out to their own side. THE SPILL: two hard kerbs take a bowl off the
+rack; the stall refills it. THE COLD: past 150 s the run is OVER. THE
+SECOND RUN: E at the stall, every time. The third drop is a moment.
+
+**THE CONCERT (sydney, was 5.3).** EVERY NOTE CALLS WIDER (`game.concert.call`
+takes the note; the reach grows half again per note; the house is topped
+up to eight); THE HOUSE ANSWERS a beat after every note, the ferry on the
+second; THE ENCORE is the harbour's — seven shells behind the sails, the
+opera shot held, the sails lit for ten seconds. The no-house state is SAID.
+
+**THE PARTY BUS (cali, was 5.7).** THE BANNERS: three cloths over half the
+street, too tall to hop — the far rail is the second verb, and the band
+LEANS a second out. Ten hazards; the row is 'cleared N of the ten'. THE
+FESTOON: forty-one bulbs on the rails, lit by the night (0.22 → 2.1). THE
+PERFECT RUN: the band's three strums and the city twice.
+
+### The birds and the boats (L5-2)
+
+**THE CONDOR** (THE DIVE: the tuck marked — wind, 0.7x, the lens on the
+flank, the speed said; THE PLUME: through the crater's cough, once a ride).
+**THE FRIGATEBIRD** (THE LANDMARK CHAIN: the loaf, the Christ, a pass over
+the arches in one flight; the row is the chain, gen 2; the Lapa link is a
+PASS — eight seconds up and down from fifty metres — because a bird that
+came down at Lapa was a free link). **THE FERRY** (THE HUMPBACK: once a
+passage, in the Heads, thirty metres off the beam, the world at half speed
+and the lens from the deck). **THE RIVER RUN** (THE GATES ARE SECONDS: two
+off the clock each; a par of 42; the mill spun up at the finish).
+
+### The skies (L5-3)
+
+**THE AURORA** (THE CONDUCTOR: calls in rhythm are a run and the run is the
+row, gen 2, par 6; every fourth takes the whole sky; THE SKY COMES DOWN
+after four minutes and a call brings it back). **THE JETPACK** (the rings
+fill the tank; the fourth slowed; dust on every landing; the second run).
+**THE LANTERN** (it dims after five minutes, the flies go home, the
+archipelago goes dark; more flies relight it higher and the islands answer
+again). **THE ACQUA ALTA** (every tide 9 cm higher to a cap of 1.22 m; the
+crest of every tide a moment). **THE HELICOPTER** (E on the H is a lap
+every time; the eighth ring held and framed).
+
+### The rest (L5-4)
+
+**THE DROP INTO THE LIGHT** (three hoops of daylight in the fall, the score
+rising with the drop, the lens looking up the shaft). **THE BIG WAVE** (the
+barrel seen from the flank at two seconds; the sand seen from the sand).
+**THE HERD CROSSING** (the lunge; the third wheek held and framed). **THE
+ORCA POD** (the run is the ride — the escort could tick it; the breach seen
+from the boat). **THE GRAND PRIX** (THE RUB: the pack shoves back; THE
+PODIUM: champagne and the harbour lit). **THE BALLOON SUNRISE** (the first
+light said, with the number and the par).
+
+### The channel
+
+`game.sparks(x, y, z, n, o)` and `game.firework(x, y, z, o)` in systems —
+one InstancedMesh of 120 additive squares over 1.0, pooled, camera-facing,
+with the shell's thud and pop placed and heard from four hundred metres.
+The world answering, biome-neutral, the way confetti was the animal's own.
+
+### What the instruments said that the design did not expect
+
+- **The flight model's tuck is a run, not a plunge**: a long tuck from 85 m
+  reaches 20–21 m/s at 4–6 m/s of sink; the dive threshold sits where only
+  the tuck goes (19.5), not at the 24 the design wanted.
+- **A bird that came down at Lapa was a landmark**: the third link had to be
+  a pass (eight seconds up, down from fifty metres).
+- **The roof carry drifts a passenger across a corner** (lx +1.0 → −0.6 over
+  16 m): the probe holds the rail as a hand would; a player does too.
+- **The animal floats at the waterline, so `depth` never reads deep enough**
+  to end a leap; the landing is the surface line on the way down.
+- **The pod goes home if the boat is north of z −40**, so a forced escort at
+  the berth is a patrol on the next frame.
+- **The escort ticked the marquee**: eight seconds of escort plus one of the
+  run. The run resets the clock.
+
+### The scores, after
+
+| # | marquee | before | after |
+|---|---|---|---|
+| 1 | THE CONCERT | 5.3 | 7.7 |
+| 2 | THE CONDOR RIDE | 7.3 | 8.0 |
+| 3 | THE FERRY TO MANLY | 6.3 | 7.7 |
+| 4 | THE RIVER RUN | 7.0 | 7.7 |
+| 5 | THE PARTY BUS | 5.7 | 7.7 |
+| 6 | THE FRIGATEBIRD | 6.0 | 7.7 |
+| 7 | THE AURORA | 6.3 | 8.0 |
+| 8 | THE JETPACK | 7.7 | 8.3 |
+| 9 | THE LANTERN | 7.3 | 8.3 |
+| 10 | THE ACQUA ALTA | 7.3 | 7.7 |
+| 11 | THE HELICOPTER | 7.3 | 8.0 |
+| 12 | THE MANTA RIDE | 4.0 | 7.7 |
+| 13 | THE BALLOON SUNRISE | 8.3 | 8.7 |
+| 14 | THE BIG WAVE | 7.7 | 8.3 |
+| 15 | THE HERD CROSSING | 8.7 | 9.0 |
+| 16 | THE DROP INTO THE LIGHT | 6.3 | 8.0 |
+| 17 | THE ORCA POD | 8.0 | 8.7 |
+| 18 | THE GRAND PRIX | 8.3 | 8.7 |
+| 19 | THE PHO RUN | 5.3 | 7.7 |
+
+Average 6.8 → 8.1. The scores are the same reading of the same rubric as
+the assessment, from the code; a playtest is the honest next instrument.
+
+### Owed
+
+The chiva's roof carry drifting a passenger across a corner (a physics
+finding, not this pass's). A scripted floor for the four re-authored pars
+(the leap 4.5, the chain 3, the calls 6, the river 42). The Uji finish
+frame (the existing shot lands under the surface for a frame). The
+humpback for the Manly chapter's own ferry arrival (only the Quay's has
+one).
+
 ## THE FOURTH LIFT — THE CAMERA, THE HOUR, THE CHASE AND THE DEPARTURE (L4 — 12–13 Sep 2026)
 
 Asked for, a fourth time: functional and enjoyable lifted to memorable —
