@@ -49,7 +49,8 @@ finish framed).
 **M3 — the skies.** THE AURORA (the conductor: calls in rhythm bring the
 burst; the sky fades and can be called back); THE JETPACK (dust, the last
 ring slowed, the minaret framed); THE LANTERN (it dims, and can be relit
-higher); THE ACQUA ALTA (a gondola in the flood; ride it out); THE
+higher); THE ACQUA ALTA (planned as a gondola in the flood; built as EVERY
+TIDE HIGHER — each crest raises the next, and every crest is a moment); THE
 HELICOPTER (a second run; ring eight slowed and framed).
 
 **M4 — the rest.** THE BALLOON (the altitude said at the rim); THE BIG
