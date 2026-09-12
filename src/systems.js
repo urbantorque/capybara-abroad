@@ -3531,6 +3531,22 @@ let sysTextK = 1;
 // verbs, and this is an access setting rather than a mode. See sysLatch.
 let sysHoldToggle = false;
 let sysWearPick = '';          // the wardrobe pick (L3-7); '' is the place's own
+// ---- SOUND AS TEXT (L3-13, UX review B2). The wheek, the horn, Strokkur's
+// warning, the bell and the siren were audio-only cues. With this on, the
+// named cues the world plays are also a short toast — the sound's name, in
+// the game's own words, once per sound every few seconds.
+let sysCaptions = false;
+const sysCUE_TEXT = {
+  horn: 'a horn', geyser: 'the ground rumbles', siren: 'a siren', bonsho: 'a temple bell',
+  campanile: 'the campanile', muezzin: 'the call to prayer', organ: 'the organ', cheer: 'a cheer',
+  bark: 'a dog', gull: 'gulls', whistle: 'a whistle', thud: 'a thud', splash: 'a splash',
+  chime: 'a chime', berg: 'ice, cracking', groan: 'the ice groans', tram: 'a tram bell',
+  cleaver: 'a cleaver', mahjong: 'mahjong tiles', pigeons: 'pigeons, all at once',
+  darbuka: 'a drum', cart: 'a cart', vendor: 'a vendor calling', bowls: 'bowls, stacked',
+  cicada: 'cicadas', magpie: 'a magpie', lorikeet: 'lorikeets', higurashi: 'evening cicadas',
+  shishi: 'the shishi-odoshi', wheek: 'WHEEK', purr: 'a purr', grunt: 'a grunt', chatter: 'teeth',
+};
+const sysCueLast = Object.create(null);
 let sysRunLatch = false, sysSlideLatch = false, sysRunWas = false, sysSlideWas = false;
 /**
  * A held boolean, turned into a toggled one, on the PRESS edge.
@@ -3575,6 +3591,7 @@ function sysPrefsRead() {
   if (typeof o.tk === 'number' && o.tk === o.tk) sysTextK = clamp(o.tk, 0.9, 1.15);
   sysHoldToggle = !!o.ht;
   sysWearPick = typeof o.wp === 'string' ? o.wp : '';
+  sysCaptions = !!o.cc;
   sysMuteMaster = !!o.mm;
   sysMuteMusic  = !!o.um;
   sysMuteSfx    = !!o.sm;
@@ -3596,6 +3613,7 @@ function sysPrefsWrite() {
       lk: sysLookK, li: sysLookInv ? 1 : 0, fv: sysFovPref, tk: sysTextK,
       ht: sysHoldToggle ? 1 : 0,
       wp: sysWearPick,
+      cc: sysCaptions ? 1 : 0,
     }));
   } catch (e) { sysPrefsOff = true; }
 }
@@ -7865,6 +7883,7 @@ function sysBuildCSS() {
 '.capyui-pickeyebrow{display:block;margin-bottom:4px;font-style:normal;font-weight:700;',
   'font-size:clamp(8px,1.6vw,9.5px);letter-spacing:.24em;text-transform:uppercase;',
   'color:' + sysRgba(PALETTE.ibisHead, 0.5) + ';}',
+'.capyui-pickeyebrow.soft{margin-bottom:2px;font-weight:600;color:' + sysRgba(PALETTE.ibisHead, 0.38) + ';}',
 /* ...AND IT LOSES ITS FIXED HEIGHT WITH IT. The hero is 84-124 px tall with
    overflow:hidden, which is right when the picture is beside the words and
    clips the words off entirely once it is above them: measured at 390 px the
@@ -14552,6 +14571,7 @@ export function createSystems(game) {
   }
 
   let musNextIdx = -1;   // the chord after this one, chosen now so the bass can lean toward it
+  let musVerseN = 0;     // chords so far, for the verse (every fourth thins the pad)
   function musSetChord(idx, when, xf) {
     const chord = musPal.chords[idx];
     { const nxA = musPal.next[idx] || musPal.next[0]; musNextIdx = nxA[randInt(0, nxA.length - 1)]; }
@@ -14559,6 +14579,12 @@ export function createSystems(game) {
     musPrevChord = musCurChord;
     musCurChord = chord;
     musUsed.length = 0;
+    // ---- THE VERSE (L3-13, audio review 6c). The pad was four voices for
+    // ever. Every fourth chord the outer two sit out — a period the ear can
+    // feel, and six to eight dB less low-mid for a quarter of the time. Pad
+    // palettes only: a band's pad is already almost nothing.
+    musVerseN++;
+    const thin = musPal.bus > 0.1 && (musVerseN % 4 === 3);
     for (let i = 0; i < musVoices.length; i++) {
       const v = musVoices[i];
       const n = sysMusPick(chord, v.note, v.centre, musUsed);
@@ -14567,10 +14593,14 @@ export function createSystems(game) {
       const idle = v.banks[1 - v.active];
       const act = v.banks[v.active];
       const hz = sysMidiHz(n);
+      const lvl = (thin && (i === 0 || i === 3)) ? 0 : v.level;
       for (let k = 0; k < idle.oscs.length; k++) idle.oscs[k].frequency.setValueAtTime(hz, when);
       idle.g.gain.setValueAtTime(0, when);
-      idle.g.gain.linearRampToValueAtTime(v.level, when + fade);
-      act.g.gain.setValueAtTime(v.level, when);
+      idle.g.gain.linearRampToValueAtTime(lvl, when + fade);
+      idle.lvlNow = lvl;
+      // the outgoing bank leaves from where it IS: a voice that sat the last
+      // chord out must not come back for the crossfade
+      act.g.gain.setValueAtTime(act.lvlNow === undefined ? v.level : act.lvlNow, when);
       act.g.gain.linearRampToValueAtTime(0, when + fade);
       v.active = 1 - v.active;
     }
@@ -17930,7 +17960,15 @@ export function createSystems(game) {
     musDry = ac.createGain(); musDry.gain.value = 0.5;
     musDry.connect(musVol);
     musPluckDry = ac.createGain(); musPluckDry.gain.value = 0.42;
-    musPluckDry.connect(musVol);
+    // ---- A PRESENCE SHELF ON THE STRUCK NOTES (L3-13, audio review 6b) ----
+    // An hour of everything under 1.3 kHz: the beds, the pad's cut, the bass
+    // as the loudest bin. Fatigue in this mix is low-mid masking, not
+    // harshness. Two dB at 2.8 kHz on the plucks ONLY — not the pad, not the
+    // send — so the struck notes sit above the beds instead of inside them,
+    // and it stays under the S2 shelf at 5.5 kHz.
+    const pluckShelf = ac.createBiquadFilter();
+    pluckShelf.type = 'highshelf'; pluckShelf.frequency.value = 2800; pluckShelf.gain.value = 2.0;
+    musPluckDry.connect(pluckShelf); pluckShelf.connect(musVol);
     // The bombo goes almost entirely dry: a 3.6 s convolution tail on a drum is
     // a cathedral, and this one is standing in an open square.
     musDrum = ac.createGain(); musDrum.gain.value = 0.62;
@@ -18402,6 +18440,15 @@ export function createSystems(game) {
     }
     const fn = sfxTable[name];
     if (!fn) return;
+    // ---- SOUND AS TEXT (L3-13): see sysCaptions. Before the audio gates, so
+    // a player with the sound off still gets the words.
+    if (sysCaptions && sysCUE_TEXT[name] && !(opts && opts.ui)) {
+      const tnow = (game.state && game.state.time) || 0;
+      if (tnow - (sysCueLast[name] || -99) > 6) {
+        sysCueLast[name] = tnow;
+        toast('\u266a ' + sysCUE_TEXT[name], 'note');
+      }
+    }
     // Never construct the AudioContext here: it may only be born from a genuine
     // user gesture (audioUnlock). Before that, sound is silently dropped.
     if (!ac || !acMaster || ac.state !== 'running') return;
@@ -19370,6 +19417,13 @@ export function createSystems(game) {
         // job on a rail of unrelated chips and is just a wide gap here.
         done > 0 ? 'chapter one' : 'chapter one · start here'));
     }
+    // ---- ON A FRESH FILE THE OTHER EIGHTEEN SAY WHERE THEY COME (L3-13) --
+    // Nothing is locked — a stranger may still open on Antarctica ("too cold
+    // to walk. take the boat.") — but the shelf offered all nineteen as
+    // equals, and the hero tile was the only thing saying it was the door.
+    // A soft eyebrow on the rest, gone the moment there is anything on the
+    // file, so the shelf reads as one door and eighteen places behind it.
+    if (!hero && jrFileCount === 0) body.appendChild(sysEl('em', 'capyui-pickeyebrow soft', 'after Sydney'));
     body.appendChild(sysEl('b', null, d.name));
     body.appendChild(sysEl('i', null, d.hint));
     // The hero is the only one with room for a third line, and there is
@@ -20215,6 +20269,9 @@ export function createSystems(game) {
   // slide down a glacier — and holding a key for a minute is the one input
   // this game asks for that some hands cannot give. Everything else here is a
   // tap already, and a toggle on a tap is just a bug.
+  const pauseCc = pauseSwitch('sound as text',
+    function () { return sysCaptions; },
+    function (v) { sysCaptions = !!v; });
   const pauseHold = pauseSwitch('hold to toggle run and slide',
     function () { return sysHoldToggle; },
     function (v) {
@@ -20222,7 +20279,7 @@ export function createSystems(game) {
       // Leaving the setting must not leave a latch on.
       sysRunLatch = false; sysSlideLatch = false;
     });
-  void pauseLook; void pauseInv; void pauseFov; void pauseText; void pauseHold;
+  void pauseLook; void pauseInv; void pauseFov; void pauseText; void pauseHold; void pauseCc;
 
   // ---- THE WARDROBE (L3-7). See sysWearPick. Rebuilt every time the card
   // opens, because what has been earned changes.

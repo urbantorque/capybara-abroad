@@ -1,0 +1,22 @@
+async page => {
+  const errs = []
+  page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
+  await page.setViewportSize({ width: 1280, height: 760 })
+  await page.goto('http://localhost:5188/')
+  await page.waitForTimeout(5000)
+  const tiles = await page.evaluate(() => { const b = Array.from(document.querySelectorAll('button')).find(x => /choose a place|go somewhere else/i.test(x.textContent)); b.click(); return null })
+  await page.waitForTimeout(900)
+  const eyebrows = await page.evaluate(() => Array.from(document.querySelectorAll('.capyui-pickeyebrow.soft')).length)
+  await page.screenshot({ path: 'qa/l3-cc-shelf.png', clip: { x: 120, y: 470, width: 1040, height: 290 } })
+  await page.keyboard.press('Digit1')
+  await page.waitForTimeout(6000)
+  await page.keyboard.press('Escape'); await page.waitForTimeout(500)
+  await page.evaluate(() => { const b = Array.from(document.querySelectorAll('.capyui-pausebtn')).find(x => /settings/i.test(x.textContent)); b.click() })
+  await page.waitForTimeout(400)
+  const sw = await page.evaluate(() => { const l = Array.from(document.querySelectorAll('.capyui-setcalm')).find(x => /sound as text/.test(x.textContent)); if (!l) return null; const box = l.querySelector('input'); box.click(); return box.checked })
+  await page.keyboard.press('Escape'); await page.waitForTimeout(800)
+  await page.keyboard.press('KeyQ'); await page.waitForTimeout(700)
+  const toasts = await page.evaluate(() => Array.from(document.querySelectorAll('.capyui-toast')).map(e => e.textContent))
+  const err = await page.evaluate(() => window.__capy.state.lastError || null)
+  await page.evaluate((o) => fetch('/shot?name=l3-cc.json', { method: 'POST', body: btoa(unescape(encodeURIComponent(JSON.stringify(o))))}), { eyebrows, sw, toasts, err, errs })
+}
