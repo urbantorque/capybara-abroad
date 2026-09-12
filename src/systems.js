@@ -3536,6 +3536,7 @@ let sysWearPick = '';          // the wardrobe pick (L3-7); '' is the place's ow
 // named cues the world plays are also a short toast — the sound's name, in
 // the game's own words, once per sound every few seconds.
 let sysCaptions = false;
+let sysArrowsNow = false;      // arrows straight away (L3-14): the riddle switched off
 const sysCUE_TEXT = {
   horn: 'a horn', geyser: 'the ground rumbles', siren: 'a siren', bonsho: 'a temple bell',
   campanile: 'the campanile', muezzin: 'the call to prayer', organ: 'the organ', cheer: 'a cheer',
@@ -3592,6 +3593,7 @@ function sysPrefsRead() {
   sysHoldToggle = !!o.ht;
   sysWearPick = typeof o.wp === 'string' ? o.wp : '';
   sysCaptions = !!o.cc;
+  sysArrowsNow = !!o.ar;
   sysMuteMaster = !!o.mm;
   sysMuteMusic  = !!o.um;
   sysMuteSfx    = !!o.sm;
@@ -3614,6 +3616,7 @@ function sysPrefsWrite() {
       ht: sysHoldToggle ? 1 : 0,
       wp: sysWearPick,
       cc: sysCaptions ? 1 : 0,
+      ar: sysArrowsNow ? 1 : 0,
     }));
   } catch (e) { sysPrefsOff = true; }
 }
@@ -20272,6 +20275,9 @@ export function createSystems(game) {
   const pauseCc = pauseSwitch('sound as text',
     function () { return sysCaptions; },
     function (v) { sysCaptions = !!v; });
+  const pauseAr = pauseSwitch('arrows straight away',
+    function () { return sysArrowsNow; },
+    function (v) { sysArrowsNow = !!v; if (v) riddleShown = true; });
   const pauseHold = pauseSwitch('hold to toggle run and slide',
     function () { return sysHoldToggle; },
     function (v) {
@@ -20279,7 +20285,7 @@ export function createSystems(game) {
       // Leaving the setting must not leave a latch on.
       sysRunLatch = false; sysSlideLatch = false;
     });
-  void pauseLook; void pauseInv; void pauseFov; void pauseText; void pauseHold; void pauseCc;
+  void pauseLook; void pauseInv; void pauseFov; void pauseText; void pauseHold; void pauseCc; void pauseAr;
 
   // ---- THE WARDROBE (L3-7). See sysWearPick. Rebuilt every time the card
   // opens, because what has been earned changes.
@@ -25457,6 +25463,28 @@ export function createSystems(game) {
 
 
   let hintT = 0, hintHas = false, hintX = 0, hintZ = 0, hintY = NaN;
+  // ---- RIDDLE FIRST (L3-14, design review 1). Every row resolved to a
+  // point with an arrow, metres and a beacon before the player had asked,
+  // so the dominant activity was GPS-following. A row arrives as its clue
+  // now; the arrow, the metres, the beacon and the chart's ring come after
+  // sysRIDDLE_T seconds on that row without a tick, or the moment F is
+  // pressed. The first row of a chapter keeps its arrow (the Kyoto first-
+  // five finding is why the arrow exists), and so do the marquee and the way
+  // on. "arrows straight away" on the settings card switches it off.
+  const sysRIDDLE_T = 40;
+  let riddleT = 0, riddleShown = true, riddleForce = false, riddleTold = false;
+  function riddleFirst(id) {
+    if (!id || id === sysWAY_ID) return true;
+    const r = taskRec[id];
+    if (!r || !r.def) return true;
+    if (r.def.wow) return true;
+    // "the first row" is the first thing you do here: until something in
+    // this chapter is ticked, whatever is on top keeps its arrow
+    const rec = chapRec[r.chapter || todoChapter()];
+    if (!rec) return true;
+    for (let i = 0; i < rec.ids.length; i++) { const t = taskRec[rec.ids[i]]; if (t && t.done && rec.ids[i].indexOf('to-') !== 0) return false; }
+    return true;
+  }
   let todoTopId = '';
 
   // --- the rolling window --------------------------------------------------
@@ -25614,6 +25642,7 @@ export function createSystems(game) {
     if (open.length < 2) return;              // nothing to choose between
     let i = open.indexOf(todoTopId);
     if (i < 0) i = 0;
+    riddleForce = true;   // F asks for the arrow (L3-14)
     todoPin = open[((i + step) % open.length + open.length) % open.length];
     todoRefresh();
     sfx('pop', { volume: 0.22, pitch: 1.5 });
@@ -25837,6 +25866,9 @@ export function createSystems(game) {
       todoTopId = top;
       hintHas = false;
       hintT = 0;                                   // resolve on the next frame
+      riddleT = 0;
+      riddleShown = sysArrowsNow || riddleForce || riddleFirst(top);
+      riddleForce = false;
       const h = top ? sysHINTS[top] : null;
       const clue = sysSay(h ? (typeof h.clue === 'function' ? h.clue() : h.clue) : '');
       clueEl.textContent = todoParLine(top, clue);
@@ -29825,7 +29857,11 @@ export function createSystems(game) {
       if (cg) { camYawTarget = cg.rotation.y; camHandT = 0; camIdleT = 0; }
     }
     // Move the arrow to the next thing you have not done. See todoStep.
-    if (c === 'KeyF' && started) todoStep(e.shiftKey ? -1 : 1);
+    if (c === 'KeyF' && started) {
+      // ...and with one row open, F is the arrow itself (L3-14)
+      if (!riddleShown) { riddleShown = true; sfx('pop', { volume: 0.22, pitch: 1.5 }); }
+      todoStep(e.shiftKey ? -1 : 1);
+    }
     if (c === 'ShiftLeft' || c === 'ShiftRight') input.run = true;
     // The four audio keys, kept exactly as they were — they are muscle memory
     // for anybody who has played this before R4 put the same four settings on a
@@ -37359,8 +37395,16 @@ export function createSystems(game) {
       }
     }
     todoTuckTick(dt);
+    // the riddle's clock (L3-14): the arrow comes on its own after a while
+    if (!riddleShown && started && !game.state.paused && !transBusy) {
+      riddleT += dt;
+      if (riddleT > sysRIDDLE_T) {
+        riddleShown = true;
+        if (!riddleTold) { riddleTold = true; toast('the arrow, then.', 'note'); }
+      }
+    }
     const topRec = taskRec[todoTopId];
-    if (topRec && hintHas && !mounted) {
+    if (topRec && hintHas && !mounted && riddleShown) {
       const hx = hintX - p.x, hz = hintZ - p.z;
       const hd = Math.sqrt(hx * hx + hz * hz);
       // THE ARROW IS A SCREEN-SPACE QUANTITY, so it is measured on the screen.
@@ -38112,7 +38156,7 @@ export function createSystems(game) {
         if (mapT >= 1 / sysMAP_HZ) {
           mapT = 0;
           const cg = capy && capy.group;
-          mapGoal.ok = hintHas && !mounted;
+          mapGoal.ok = hintHas && !mounted && riddleShown;
           mapGoal.x = hintX; mapGoal.z = hintZ;
           // The readout, off the same two numbers the pin is drawn from, so
           // the chip and the chart can never disagree. Twelve times a second,
