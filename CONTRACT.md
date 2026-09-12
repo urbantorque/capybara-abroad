@@ -112,16 +112,64 @@ walking to one line (tally · row · arrow · metres); copy/paste the journey on
 the settings card; the pad's legend on the title; the world clock stops under
 the pause card.
 
-### STILL OPEN
+### THE OPEN ITEMS, TAKEN (L3-7 to L3-10, 12 Sep 2026)
 
-Hanoi's authored asphalt quads are wound face-down and have never drawn (the
-road is the ground's vertex-colour lerp) — fixing it darkens every road, so it
-is a decision. The errand (people carrying things A→B through the barge
-layer), the skill-gated rows, the wardrobe on the pause card, costume reads,
-the herd as a witness, notoriety that can go down, the mouths on the roster,
-the Sahara crowd's cones, per-palette pad spectra and a moving bass, occlusion
-on movers, the world route map — all in ROADMAP-LIFT3.md's source reports and
-not started.
+**L3-7.** Hanoi's asphalt quads were wound clockwise from above and a FrontSide
+Lambert had culled every one since the chapter shipped — the road in every
+Hanoi frame was the ground's vertex-colour lerp. Wound face up; the road is
+a road. **The ladder comes down**: `notoScore` subtracts a point per gift
+and half a point per photograph (`sysNOTO_FED/PHO`); `notoCheck` announces a
+fall as `WORD HAS SOFTENED · they fed you. the place has stopped counting.`;
+`marFree` refuses anybody with `gifted`; `game.notoWarm(n)` (as much
+affection as trouble here, and some of it) sends the welcome party at any
+tier. **The herd is a witnessed thing**: six or more following, moving, in
+front of people, is `incAdd(..., 'parade')` every seven seconds — through
+every gate the chain has — and two in a chain is THE PIED PIPER. **The
+wardrobe**: the settings card lists the costumes earned; `sysWearPick`
+travels (prefs `wp`); the dinner jacket halves `monEYE_FILL`; the snorkel is
+a third more breath (`capySTAM_BREATH × 0.75`).
+
+**L3-8. THE ERRAND.** `errand: { to: [dx, dz], carry, every, dwell, v }` on
+a local (`localErrandStep`): a real prop spawned at home and carried in the
+hand (kinematic, like the roster's cups), walked to `to`, removed there,
+back, and again after `every`. The barge (the rush latch inside 2.4 m) or a
+grab takes it (`localErrandLost`: `dropOwned` with the animal's momentum, the
+spill gate's fingerprint, a line from `npcLOC_ERR_LOST`, home, restock at
+0.45 × every). A leg that cannot be walked is given up after 20 s (the
+Pantanal's cattleman stalled at another man's feet; his `to` ends 3 m
+short now). Thirty-one errands across fourteen chapters, every one
+measured to complete (qa/l3-errand2.js). Sydney's `coffee-spill` row is
+gated to Sydney — a flat white spilt in Venice ticked a Gardens line. Also:
+**three pad spectra** (`musWave` felt/reed/string by `createPeriodicWave`,
+`sysMUS_PAD_OF` by palette, trimmed by `sysMUS_SPEC_K` to within ±2 dB RMS of
+the S2 measurements; qa/s1-spectrum.js), **the bass walks** root → fifth at
+half the dwell → whole-tone approach under the next root 0.35 s early, with
+the next chord chosen at `musSetChord` (`musNextIdx`) so the approach is
+right; **a lip** on the brass stab (a tanh shaper driven 0.3 → 1.4 over
+40 ms, level compensated) and **a bar** under the mallet (bandpass Q 14 at
+the fundamental beside the dry partials); **THE ROUTE** — `sysBuildRouteMap`,
+nineteen dots at their longitude and latitude on a strip above the shelf,
+the chapter order a dotted thread, the places stood in stamped, per-place
+label offsets (`sysROUTE_LBL`) so no two names sit on each other.
+
+**L3-9.** Mouths: `npcFace(f, mood, blink, talk)` poses a 3 cm dark box — an
+"o" astonished, wide and flat cross, open/shut on the gesture clock while
+`gest > 0`; one more instance on the roster (`iMouth`), one mesh on a local.
+The Jemaa crowd's cones wear a sash and a hem. **Movers are occluded**:
+`sysCamClear` from the ear to the source once a quarter-second per live
+non-bed mover, `m.occ` damped, `sysMOVER_OCC_LP` 16 kHz off the top and
+`sysMOVER_OCC_G` 0.45 off the level. The Sydney ibis (`bin-chicken`) is a
+second teacher for THE HERD (`alt:` on the skills row).
+
+**L3-10.** Three beds: `lap` at the Molo's edge nearest you (louder on the
+flood), `steam` at the nearest fumarole, the cave river from the water
+nearest you.
+
+**Still open**: the Quay/Venice/Mong Kok instanced crowds' welded arms (a
+shoe on its own instance), the wide crease octave (needs its own pixel
+ceiling), skill-gated finds, costume `when:` lines, a Karplus-Strong
+string. The Cali dancers were already moving on the beat — LIFT2's note was
+stale.
 
 ## THE BIG ONES, LIFTED AGAIN — FIVE RIDICULOUS ONES, AND THE LADDER SAID OUT LOUD (X1–X5, N1, L1–L10 — 11 Sep 2026)
 
