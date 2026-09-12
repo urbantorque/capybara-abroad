@@ -189,6 +189,7 @@ let gorBalBurn = 0;
 // do rather than a thing you hit.
 let gorSunBurned = false;    // has the burner been lit inside the window
 let gorSunNagged = false;    // ...and has the chief said so, once
+let gorSunMet = false;       // this dawn's rim crossing has filed its altitude (L4 E4)
 let gorSunDoves = false;     // the flock round the basket, once per sunrise
 let gorAboard = false, gorAboardT = 0, gorFlown = false;
 let gorBoardTold = false;
@@ -4633,10 +4634,33 @@ function gorUpdateBalloon(game, dt) {
     // marquee. Exactly the cowbird bug in the Pantanal, and the fix is the
     // same: bank the peak here, report it ONCE when the flight is over.
     if (alt > gorPeakAlt) gorPeakAlt = alt;
+    // ---- THE SUN IS COMING, AND THE NUMBER IS WHERE YOU MEET IT (L4 E4) ----
+    // `sunrise` is the marquee and it paid out as a gate: aboard, above 55 m,
+    // burner lit inside an eleven-second window. The number in it is not the
+    // peak — that is three-winds — but how high you were AT THE MOMENT the sun
+    // cleared the rim (gorSun crossing 0.465, the same edge the tick uses),
+    // which is a timing on the one control the chapter has: burn early and
+    // you are at a hundred and fifty when it comes; burn late and you meet it
+    // at sixty. Filed once per dawn on that crossing frame, aboard, and the
+    // dawn comes round every gorCYCLE seconds, so the row re-arms itself.
+    //
+    // WHO HAS THE LINE. For the last twenty seconds before the rim — the
+    // countdown the signpost already prints — the running figure is the
+    // altitude you would meet it at if it came now, and it takes the paper off
+    // three-winds and on-the-trailer for exactly that window; both stand down
+    // below rather than fight it, and get the line back the frame after the
+    // crossing. A frame the balloon is on the ground at the rim files nothing:
+    // `gorAboard` is the gate, as it is for the tick.
+    const gorSunIn = (gorSUN_P + 0.115 * 0.48 - gorPhase) * gorCYCLE;
+    const sunLive = !gorSunMet && gorSun < 0.465 && gorSunIn > 0 && gorSunIn <= 20;
+    if (sunLive && typeof game.recordLive === 'function') game.recordLive('sunrise', alt);
+    // (the crossing itself is latched OUTSIDE this aboard block, below the
+    // tasks — a dawn met from the field must not file the altitude you
+    // happen to board at ten seconds later)
     // how high this flight has got, on the paper, while it is still going up
     // (v32). Twelve is the record's own floor — see gorFlightEnd — so a hop off
     // a chimney does not put a number on the card.
-    if (game.recordLive && gorPeakAlt > 12) game.recordLive('three-winds', gorPeakAlt);
+    if (!sunLive && game.recordLive && gorPeakAlt > 12) game.recordLive('three-winds', gorPeakAlt);
     // ---- ...AND ON THE WAY DOWN IT IS A DIFFERENT NUMBER (v36) ------------
     // The chapter's last task is a landing accuracy and it was only ever
     // readable after the basket was on the ground, which is a metre too late to
@@ -4648,7 +4672,7 @@ function gorUpdateBalloon(game, dt) {
     // It takes the line off `three-winds` above it on purpose and only when
     // both halves of "coming in" are true: under thirty metres, and sinking.
     // A climb through thirty on the way up is still the altimeter's.
-    if (game.recordLive && alt < 30 && gorBalVY < -0.15) {
+    if (!sunLive && game.recordLive && alt < 30 && gorBalVY < -0.15) {
       const ltx = gorTruckX + Math.sin(gorTruckYaw) * 2.4;
       const ltz = gorTruckZ + Math.cos(gorTruckYaw) * 2.4;
       game.recordLive('on-the-trailer', Math.hypot(gorBalX - ltx, gorBalZ - ltz));
@@ -4744,6 +4768,17 @@ function gorUpdateBalloon(game, dt) {
       if (typeof game.shake === 'function') game.shake(0.12);
     }
   }
+  // ---- THE RIM, CROSSED (L4 E4) --------------------------------------------
+  // Latched once per dawn whether or not anybody is up, so a dawn watched from
+  // the field is a dawn with no number rather than one that files the first
+  // altitude you reach afterwards. Filed only aboard, off the ground — the
+  // same two facts the tick asks for. See the sunrise record note above.
+  if (!gorSunMet && gorSun >= 0.465) {
+    gorSunMet = true;
+    if (gorAboard && gorBalY > gy + 2.5 && typeof game.record === 'function') {
+      game.record('sunrise', gorBalY - gy);
+    }
+  }
 
   // ---- the landing --------------------------------------------------------
   // AND SOMEBODY HAS TO BE IN IT. gorFlown latches for good the first time the
@@ -4812,6 +4847,9 @@ function gorUpdateClock(game, dt) {
 
   // the sun: nothing, then everything, over about eighteen seconds
   gorSun = gorSmooth(clamp((gorPhase - gorSUN_P) / 0.115, 0, 1));
+  // ...and the next dawn is a new answer: the crossing latch (see the
+  // sunrise record in gorUpdateBalloon) lets go once the sun is back under
+  if (gorSun < 0.1) gorSunMet = false;
   // the LIGHT leads the sun — the sky is bright long before the disc is over the
   // ridge, which is the whole reason anybody is up at this hour
   gorDawnLit = damp(gorDawnLit, clamp((gorPhase - gorLAUNCH_P) / 0.30, 0, 1), 1.4, dt);
@@ -5404,6 +5442,7 @@ export function createGoreme(game) {
       gorSun = 0; gorDawnLit = 0; gorWarned = false; gorSyncSaid = false;
       // D4.3: a fresh dawn is a fresh burn, a fresh nag and a fresh flock.
       gorSunBurned = false; gorSunNagged = false; gorSunDoves = false;
+      gorSunMet = false;
       // C4: and a fresh call. The toast is the only thing that tells a player
       // the wheek reaches the horses at all, so a second visit gets it again.
       gorToldCall = false;

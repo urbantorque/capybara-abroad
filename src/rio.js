@@ -3485,6 +3485,38 @@ let rioCalcMark = 0;                   // which quarter of the run has been mark
 let rioCalcPaid = false;               // has THIS run already crossed the 132?
 let rioCalcLastX = 0;                  // where she was last seen ON it, for onExit
 
+// ---- THE FRIGATEBIRD HAS A NUMBER (L4 E4) ----------------------------------
+// The second chapter with a bird, and the same row as Pasto's: the bird's top
+// speed while you are hanging off it, per ride. Everything about why it is
+// the speed and not the seconds or the height — and how this shares the live
+// line with condor.js's `thermal-peak` without flickering — is in the note on
+// pastoUpdateCondorRide in pasto.js, and this is the same shape with the
+// host's own ride id. condor.js knows which chapter it is in; this file only
+// ever runs it while `rio` is the live biome, so a Pasto ride can never file
+// here and a Rio one can never file there.
+let rioRideTop = 0;                    // m/s — the fastest this ride has gone
+let rioRideWas = false;                // mounted last frame, for the edge
+function rioRideFile(game) {
+  if (rioRideTop > 5 && typeof game.record === 'function') game.record('fragata-ride', rioRideTop);
+  rioRideTop = 0;
+}
+function rioUpdateFragataRide(game) {
+  const c = game.condor;
+  const mounted = !!(c && c.mounted);
+  if (mounted) {
+    const b = c.body;
+    const v = b && b.velocity;
+    const s = v ? Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z) : 0;
+    if (s === s && s > rioRideTop) rioRideTop = s;
+    if (typeof game.recordLive === 'function') {
+      game.recordLive('fragata-ride', rioRideTop > 5 ? rioRideTop : undefined);
+    }
+  } else if (rioRideWas) {
+    rioRideFile(game);
+  }
+  rioRideWas = mounted;
+}
+
 // ---- IT DOES NOT STOP HAPPENING WHEN IT IS TICKED (R7) ---------------------
 // `if (rioCalcDone) return` on the first line killed the whole thing the moment
 // it paid out: the 132 m span tracker, the four-stage tick ladder, the step-off
@@ -4347,6 +4379,9 @@ export function createRio(game) {
       // has to be settled, not merely cleared.
       if (rioCalcOn && rioGame) rioCalcFile(rioGame, Math.abs(rioCalcLastX - rioCalcFrom));
       rioCalcOn = false; rioCalcMark = 0; rioCalcPaid = false;
+      // ...and the bird's ride, on the same rule — see rioRideFile
+      if (rioRideWas && rioGame) rioRideFile(rioGame);
+      rioRideWas = false;
       rioArpoadorUp = false;
       rioCombo = 0; rioRiding = false; rioBondeRideT = 0;
       // AND THE WAVE WAS NOT ON THE LIST. `rioWaveFrom` is the z the current
@@ -4570,6 +4605,7 @@ export function createRio(game) {
       if (!game.biome.isActive('rio')) return;
       rioTime += dt;
       rioUpdateFlyover(game, dt);
+      rioUpdateFragataRide(game);
 
       // the swell
       rioRipT += dt;

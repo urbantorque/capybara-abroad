@@ -5078,6 +5078,7 @@ export function createCapybara(game) {
         }
       }
       capy.sliding = capySliding;
+      capy.clinging = capyClinging;   // read by THE MOVEMENT NAMES in systems.js (L4, E4)
       // For sysBedScrape. Published unconditionally so a reader never has to
       // ask whether the last slide left a stale value behind it — while
       // `sliding` is false these numbers simply are not read.

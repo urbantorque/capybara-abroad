@@ -4902,12 +4902,32 @@ function driUpdateLantern(game, dt) {
                  (near ? 'at the lantern' : Math.round(d) + ' m to the plinth') + wind,
                  0.6 * Math.min(driFliesAwake, driFLIES_NEED) / driFLIES_NEED + 0.4 * clamp(1 - d / 260, 0, 1));
   }
+  // ---- AND HOW MANY YOU BROUGHT IS THE NUMBER (L4 E4) ------------------------
+  // The signpost clamps the count at six because six is the tick; the record
+  // does not, because the wood has twenty-two and a wheek wakes up to four,
+  // and bringing more of them up the hill than the lantern strictly needs is
+  // the only thing about this climb you can be better at. On the paper while
+  // the string is growing; filed once, below, with the count the moment the
+  // paper takes — BEFORE the orchard wakes at the light and joins in.
+  //
+  // ON THE GROUND ONLY. This runs after driUpdateColumns, driUpdateSeeds and
+  // driUpdateFlight in the frame, so an unconditional call here would take
+  // the line off `updraft`, `driftseed` and `long-gap` for the whole climb —
+  // and those three are the numbers the climb is made of. All three are
+  // airborne by construction (a column, a seed-head, a gap), so the count
+  // has the paper while you walk and hands it over the moment you leave the
+  // ground. recPaint reads the id once a frame, so there is no flicker.
+  if (!driLit && driFliesAwake > 0 && capy.grounded && driSeedHeld < 0 &&
+      typeof game.recordLive === 'function') {
+    game.recordLive('lantern', driFliesAwake);
+  }
 
   if (!driLit && near && input && input.actionPressed) {
     if (driFliesAwake >= driFLIES_NEED) {
       driLit = true;
       driLitT = 12;
       driTask('lantern');
+      if (typeof game.record === 'function') game.record('lantern', driFliesAwake);
       // ---- AND THE WHOLE ORCHARD COMES (L8) -----------------------------
       // Six lampflies lit it; the other forty wake at the light and come up
       // the hill after you, a few frames apart so it arrives as a river of

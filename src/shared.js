@@ -3287,7 +3287,11 @@ export const TASKS = [
 //           See sysMarqueePoint.
 export const CHAPTERS = [
   { n: 1, biome: 'sydney',  name: 'Sydney',          sub: 'the gardens, unsupervised',
-    arrive: '',           far: 400,  tall: false, pal: 0,
+    // door: the count that opens the way on (L4, F4), overriding the seventy
+    // per cent everywhere else asks. Ten of nineteen and the marquee: the
+    // first border about twelve minutes in on a fresh file rather than thirty,
+    // in the one chapter whose job is to show there are eighteen more.
+    arrive: '',           far: 400,  tall: false, pal: 0, door: 10,
     hint: 'the gardens, unsupervised',                open: 'be a menace.', way: 'the ferry wharf at the Quay',
     keep: 'a tourist’s hat',
     marquee: { x: 0, z: 2.5, up: 11, say: 'the Opera House steps' },
@@ -4026,6 +4030,74 @@ export const RECORDS = {
   'the-stools':      { label: 'had', unit: ' down at once', better: 'higher', dp: 0, par: 30 },
   'the-train':       { label: 'stood your ground within', unit: ' m of it', better: 'lower', dp: 2, par: 1.8 },
   'pho-run':       { label: 'three bowls in', unit: ' s', better: 'lower', dp: 1, par: 95 },
+  // ---- EVERY MARQUEE A NUMBER (L4 E4) --------------------------------------
+  // Nineteen wow rows and eight of them had a record; the other eleven — the
+  // BEST thing in each of eleven chapters — were switches you flipped once.
+  // Each of these is a figure the marquee's own code was already computing
+  // (the concert's house, the chiva's cable tally, the ring count, the ride
+  // clock, the drop) or the one skill the set piece actually has (the tuck,
+  // the burner). The same api-key rule as R7: every key here is the wow
+  // TASK's id, or the chapter board and the picker cannot find it.
+  //
+  // EVERY PAR IN THIS BLOCK IS AUTHORED, NOT MEASURED. The pars above were
+  // set against a scripted floor and that is the right way; these were
+  // written without a browser, from the chapter's own gate figures, and each
+  // comment names the number it came from so the floor can be measured later
+  // (qa/l4-records.js is the probe). A par past a hard ceiling in the code is
+  // unreachable, so where the code has a ceiling the par sits under it.
+  //
+  // Chapter 1. The house is capped at eight (npcCONCERT_N) and the tick asks
+  // for two of them in place. Six is three quarters of the forecourt.
+  'opera-stage':   { label: 'drew a house of', unit: '', better: 'higher', dp: 0, par: 6 },
+  // Chapters 2 and 6, the two chapters with a bird. A ride has no clock on it
+  // — it ends when you let go, so seconds aloft would reward sitting there —
+  // and the height is already `thermal-peak`. What the flight teaches is the
+  // TUCK ('Shift to tuck and pick up speed'): condorTUCK_V is 0.82 of
+  // condorVMAX (28), which is 22.96 m/s held level, and a dive goes past it
+  // to the 28 m/s cap. Twenty-two is a tuck held long enough to get there.
+  'condor-ride':   { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1, par: 22 },
+  'fragata-ride':  { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1, par: 22 },
+  // Chapter 5. Seven cables over 465 m and the tally only counts if you are
+  // still on the roof at the top — cali.js's own rule for the toast, kept for
+  // the record. Seven clean is the ceiling and the band's line; six is a ride
+  // that gave one away.
+  'chiva-mirador': { label: 'ducked', unit: ' of the seven cables', better: 'higher', dp: 0, par: 6 },
+  // Chapter 7. The sky never goes back down once it is up, so this is the
+  // stay: seconds within iceCALL_R (16 m) of the spring with the curtains at
+  // full, in the water or on the bank. Idling, deliberately — the whole
+  // chapter's other row (hot-spring, par 58) rewards the same thing and this
+  // is the half of it that happens after the sky comes. Ninety is a minute
+  // and a half under it, the third soak mark plus the rise.
+  'aurora':        { label: 'under the sky for', unit: ' s', better: 'higher', dp: 1, par: 90 },
+  // Chapter 9. Six light it; the wood has twenty-two and a wheek wakes up to
+  // four. Ten is the six and one more good shout. Once per session — the
+  // lantern stays lit by design (see driLit in drift.js's onEnter).
+  'lantern':       { label: 'lit it with', unit: ' lampflies', better: 'higher', dp: 0, par: 10 },
+  // Chapter 10. The middle of the square is under water for about 84 s of
+  // the 205 s cycle — 12.5 s of the rise past tide 0.676, 57.4 s of high
+  // water, 14 s of the fall — and the surge runs at 1.35 m/s toward the Molo
+  // the whole way up. Seventy is staying in it for nearly all of it.
+  'acqua-alta':    { label: 'in the flood for', unit: ' s', better: 'higher', dp: 1, par: 70 },
+  // Chapter 11. Ring one to ring eight is 314.9 m of straight lines; at
+  // hkHELI_VMAX (16 m/s) that is a 19.7 s floor with no turning and no climb.
+  // Thirty-two is the torii margin over a machine floor — a person who has
+  // to climb for four of them and turn for all of them.
+  'symphony':      { label: 'the eight rings in', unit: ' s', better: 'lower', dp: 1, par: 32 },
+  // Chapter 12. The ride is authored — palMANTA_RIDE is 22 s and E lets go —
+  // so this is the one row here where the number is "did you stay on". The
+  // par is the whole ride, which is the only good one there is.
+  'the-manta':     { label: 'held on for', unit: ' s', better: 'higher', dp: 1, par: 22 },
+  // Chapter 13. Not the peak (that is three-winds): how high you were AT THE
+  // MOMENT the sun cleared the rim, which is a timing on the burner. The
+  // marquee's own gate is 55 m and the burner stops at gorCEIL (205); a
+  // hundred and ten is twice the gate, one layer up in 'back over the town'.
+  // Re-armed every dawn: gorCYCLE is 156 s and the sun comes round again.
+  'sunrise':       { label: 'met the sun at', unit: ' m up', better: 'higher', dp: 0, par: 110 },
+  // Chapter 16. cave.js already measured and filed this drop and only the row
+  // was missing. The column is 28 m (cavCOL.h), the tick asks for 17, and a
+  // step off the very top lands the full height; twenty-five is the top,
+  // give or take the metre you lose stepping off.
+  'the-column':    { label: 'dropped', unit: ' m', better: 'higher', dp: 0, par: 25 },
 };
 
 

@@ -334,6 +334,18 @@ try {
               ' with a live line, ' + (recs.length - noPar.length) + ' with a par' +
               (noPar.length ? '\n  no par (no figure in the source to derive one from): ' +
                               noPar.join(', ') : ''));
+  // ---- 8b. every marquee a number (L4 E4) ---------------------------------
+  // The wow row is the best thing in its chapter, and a wow with no RECORDS
+  // row is a switch you flip once — eleven of nineteen were, before L4. A
+  // WARN and a count rather than a blocker: a new chapter's marquee arriving
+  // without its number is a judgement to make on the chapter, not a defect in
+  // the build, and the roadmap's instrument is the printed fraction.
+  const recIds = new Set(recs.map(r => r.id));
+  const wowsAll = tasks.filter(t => t.wow);
+  const wowsNoRec = wowsAll.filter(t => !recIds.has(t.id));
+  console.log('wows with a record: ' + (wowsAll.length - wowsNoRec.length) + '/' + wowsAll.length +
+              (wowsNoRec.length ? ' — without: ' + wowsNoRec.map(t => t.id).join(', ') : ''));
+  for (const t of wowsNoRec) P('WARN', t.id, 'marquee task with no RECORDS row (chapter ' + t.chapter + ')');
 }
 
 // ---- report --------------------------------------------------------------

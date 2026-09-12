@@ -5462,6 +5462,62 @@ export function createNPCs(game) {
     }
     try { game.state.doneLook = n; } catch (e) { /* optional */ }
   });
+  // ---- THE DEPARTURE (L4, F4) --------------------------------------------
+  // Leaving a place was a horn and a white. systems.js now holds the fade
+  // for two and a half seconds and says 'chapter:leave' first; the heads
+  // turn exactly as they do for 'chapter:done', and the nearest three people
+  // with a mouth say one of the farewells — the same line pool in every
+  // chapter, because a goodbye is the one thing everybody says the same way
+  // — spaced a beat apart so they do not talk over each other. The regular,
+  // if they know you (tier 1 or more), says theirs instead, with your name
+  // on it. Every line goes through the person's own bag-and-ring mouth.
+  const npcLEAVE = ['Off, then.', 'Go on. Go.', 'That was something.', 'Mind how you go.',
+                    'Come back when it is quieter.', 'We will tell people.', 'Same time next year.',
+                    'Nobody will believe us.', 'Take the hat. Just take it.'];
+  const npcLEAVE_R = 16;    // m — a farewell is said to somebody who is leaving, not shouted
+  game.events.on('chapter:leave', function (ev) {
+    const capy = game.capy;
+    if (!capy || !capy.position) return;
+    const live = game.biome && game.biome.current;
+    if (!live) return;
+    const cx = capy.position.x, cz = capy.position.z;
+    const r2 = npcLEAVE_R * npcLEAVE_R;
+    const near = [];
+    for (let i = 0; i < locals.length; i++) {
+      const r = locals[i];
+      if (r.biome !== live || !r.group || !r.anchor || !r.fig) continue;
+      const dx = cx - r.x, dz = cz - r.z, d2 = dx * dx + dz * dz;
+      if (d2 > r2) continue;
+      r.chatYaw = Math.atan2(dx, dz); r.chatT = npcDONE_LOOK;
+      near.push({ d2: d2, say: function (t) { r.anchor.speak(t); r.cd = Math.max(r.cd || 0, 5); }, rec: r });
+    }
+    const cast = live === 'sydney' ? humans : live === 'pasto' ? paHumans : null;
+    if (cast) for (let i = 0; i < cast.length; i++) {
+      const r = cast[i];
+      if (!r || !r.group || !r.group.visible || typeof r.speak !== 'function') continue;
+      if (r.state === 'flee' || r.state === 'plunge' || r.state === 'swim') continue;
+      const dx = cx - r.group.position.x, dz = cz - r.group.position.z, d2 = dx * dx + dz * dz;
+      if (d2 > r2) continue;
+      r.lookX = cx; r.lookZ = cz; r.witX = cx; r.witZ = cz; r.witT = npcDONE_LOOK;
+      near.push({ d2: d2, say: function (t) { r.lastLine = t; r.speak(t); }, rec: r });
+    }
+    near.sort(function (a, b) { return a.d2 - b.d2; });
+    const pal = npcPalRec;
+    const tier = npcPalTier || 0;
+    let said = 0;
+    for (let i = 0; i < near.length && said < 3; i++) {
+      const p = near[i];
+      const isPal = pal && p.rec === pal && tier >= 1 && npcPAL[live];
+      const line = isPal
+        ? (npcPAL[live].call ? npcPAL[live].call + '. Come back.' : 'Come back.')
+        : npcLEAVE[randInt(0, npcLEAVE.length - 1)];
+      (function (say, t, delay) { setTimeout(function () { try { say(t); } catch (e) { /* gone */ } }, delay); })(p.say, line, said * 650);
+      said++;
+    }
+    npcLeaveSaid += said;
+    try { game.state.leaveSaid = said; } catch (e) { /* optional */ }
+  });
+  let npcLeaveSaid = 0;
   game.events.on('prop:water', function (p) {
     if (!p || !p.position) return;
     // A splash is heard further than it is felt, so it is a wider circle and a

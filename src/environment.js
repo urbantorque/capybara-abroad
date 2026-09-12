@@ -60,6 +60,21 @@ let envConcertNotes = 0;
 let envConcertOff = 0;       // s off the stage while a concert is on
 let envStagePulse = 0;       // 0..1, decays; a wheek from the stage lights the sails
 let envConcertDone = false;  // this concert has paid out (the tick is idempotent; this gates the cheer)
+// ---- THE HOUSE IS THE NUMBER (L4 E4) ---------------------------------------
+// The marquee ticked at two listeners and stopped counting. The forecourt can
+// send eight (npcCONCERT_N), and how many of them a wheek from the stage
+// actually pulls over depends on who was within reach when the first note
+// went — so the peak of the house IN PLACE, per concert, is the record. On the
+// paper every frame the concert is on (recordLive), filed ONCE when the concert
+// ends, whichever way it ends: the leave timer, or travel. Never per frame —
+// see the record-spam note in the RECORDS table.
+let envConcertPeak = 0;
+function envConcertFile(game) {
+  if (envConcertPeak > 0 && game && typeof game.record === 'function') {
+    game.record('opera-stage', envConcertPeak);
+  }
+  envConcertPeak = 0;
+}
 // ---- THE ENCORE (L5) --------------------------------------------------------
 // The house cheered and that was the end of it. For eight seconds after the
 // cheer the stage is still yours: one more wheek with the house still there
@@ -3546,6 +3561,7 @@ export function createEnvironment(game) {
       if (envConcertOn) {
         envConcertOn = false; envConcertNotes = 0;
         if (game.concert && typeof game.concert.end === 'function') game.concert.end();
+        envConcertFile(game);          // a concert cut short by travel still counts
       }
       return;
     }
@@ -3561,6 +3577,14 @@ export function createEnvironment(game) {
         envConcertOff = on ? 0 : envConcertOff + dt;
         const house = (game.concert && typeof game.concert.house === 'function') ? game.concert.house(false) : 0;
         const coming = (game.concert && typeof game.concert.house === 'function') ? game.concert.house(true) : 0;
+        // ...and the house, on the paper, for as long as the concert is on —
+        // through the tick and the encore, because the house keeps arriving
+        // after the cheer and the number is the most of them at once. See
+        // envConcertPeak. Not gated on envConcertDone: the record outlives it.
+        if (house > envConcertPeak) envConcertPeak = house;
+        if (typeof game.recordLive === 'function') {
+          game.recordLive('opera-stage', envConcertPeak > 0 ? envConcertPeak : undefined);
+        }
         if (!envConcertDone) {
           if (typeof game.wowLive === 'function') {
             const nn = Math.min(envConcertNotes, envCONCERT_NOTES);
@@ -3585,6 +3609,7 @@ export function createEnvironment(game) {
           envConcertOn = false;
           envConcertNotes = 0; envEncoreT = 0;
           if (game.concert && typeof game.concert.end === 'function') game.concert.end();
+          envConcertFile(game);        // the house goes home: the number is final
         }
       }
     }
@@ -3778,6 +3803,10 @@ export function createEnvironment(game) {
         envConcertNotes = 0;
         envConcertDone = false;
         envConcertOff = 0;
+        envConcertPeak = 0;            // a new concert is a new house
+        // opened with no figure: the paper shows the standing best alone until
+        // somebody is actually in place (the documented opening call)
+        if (typeof game.recordLive === 'function') game.recordLive('opera-stage');
         const coming = (game.concert && typeof game.concert.call === 'function') ? game.concert.call(0, 2.5) : 0;
         if (typeof game.toast === 'function') {
           game.toast(coming > 0 ? 'they are coming over. keep going' : 'nobody about. keep going anyway');

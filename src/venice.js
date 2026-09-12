@@ -267,6 +267,13 @@ let venWasFlooded = false;
 const venLOOK_R = 12;
 const venFLOOD_GRACE = 18;
 let venFloodWin = 0;
+// seconds of THIS stay in the flooded square — see IN IT, FOR HOW LONG
+let venFloodInT = 0;
+/** The stay is over: one number for how long it was. Never per frame. */
+function venFloodFile(game) {
+  if (venFloodInT > 3 && game && typeof game.record === 'function') game.record('acqua-alta', venFloodInT);
+  venFloodInT = 0;
+}
 let venBoardRunT = -1, venBoardFrom = 0, venBoardOff = 0;
 let venOnBoards = false;
 let venSpritzDone = false, venPigeonDone = false, venBoardDone = false;
@@ -5278,6 +5285,40 @@ function venUpdateTide(game, dt) {
       venSfx('splash', { volume: 0.6, pitch: 0.7, at: { x: p.x, y: venWaterHeightAt(p.x, p.z), z: p.z } });
     }
   }
+  // ---- IN IT, FOR HOW LONG (L4 E4) -----------------------------------------
+  // The marquee is one tide's crest with you in the square, and it is done
+  // once. The flood itself comes round every 205 s and the middle of the
+  // square is under water for about 84 of them — 12.5 s of the rise past tide
+  // 0.676, 57.4 s of high water, 14 s of the fall — with the surge running at
+  // up to 1.35 m/s toward the Molo the whole way up. Staying in it for all of
+  // that is a thing you can be better at, every cycle, ticked or not: seconds
+  // in the square with the sea over the paving under your own feet (not the
+  // middle's — the steps and the Molo are dry at the top, and dry does not
+  // count). On the paper every frame it runs; filed once on the edge that ends
+  // it — out of the square, or the water gone — and from onExit.
+  //
+  // THE BOARDS ARE NOT THE FLOOD. The passerelle stands over the same water,
+  // so time up on it does not count and the clock simply pauses there
+  // (`venOnBoards`, a frame stale — it is set in venUpdateTasks, which runs
+  // after this). The stay itself is not ended by the boards: step back down
+  // and the same number carries on. And this runs FIRST in the frame, so on a
+  // frame `passerelle` or `pigeon-storm` hands over a figure, that later call
+  // has the paper and this one does not — recPaint reads the id once, at the
+  // end of the frame, and the line hands over rather than flickering.
+  {
+    const wet = !!(p && venInZone('square', p.x, p.z) && venIsOverWater(p.x, p.z));
+    if (wet) {
+      if (!venOnBoards) {
+        venFloodInT += dt;
+        if (typeof game.recordLive === 'function') {
+          game.recordLive('acqua-alta', venFloodInT > 1 ? venFloodInT : undefined);
+        }
+      }
+    } else if (venFloodInT > 0) {
+      venFloodFile(game);
+    }
+  }
+
   // ---- armed: the tide comes up round you, or you leave -------------------
   if (venFloodArm && !venFloodDone) {
     const inSq = !!(p && venInZone('square', p.x, p.z));
@@ -5601,6 +5642,7 @@ export function createVenice(game) {
       venBoardRunT = -1; venRialtoFrom = 0; venRialtoHigh = 0; venRialtoT = 0;
       venSwimHas = false; venGondRideT = 0;
       venVoloAboard = false; venVoloConfT = -1;
+      venFloodFile(game);             // the stay in the flood, settled before it is forgotten
     },
   });
 

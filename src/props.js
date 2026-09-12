@@ -2000,6 +2000,7 @@ export function createProps(game) {
     spawnKeep: physSpawnKeep,
     stageKeep: physStageKeep,
     keepOut: physKeepOut,
+    flash: physFlash,          // the coda flashes each keepsake as its note sounds (L4, F4)
     removeProp: physRemoveProp,
     update: physUpdate,
     // extras (handy for npc.js / systems.js — additive, nothing depends on them)
@@ -3385,7 +3386,12 @@ function physRelease(impulse) {
   // ...and this one only if there was a launch vector. physPutIn calls this
   // function with null to get the held-state transition for free, and a prop
   // lowered into a basket has not been thrown at anybody.
-  if (impulse) { prop.thrownT = physGame.state.time; physThrowN++; }
+  if (impulse) {
+    prop.thrownT = physGame.state.time; physThrowN++;
+    // ...and from where (L4, E4): THE LONG SHOT is a throw that lands in
+    // water more than ten metres from here, and nothing kept the origin.
+    prop.throwX = b.position.x; prop.throwZ = b.position.z;
+  }
   capy.heldProp = null;
   physSetSolo(prop, false);
   // Only a real throw arms a spill — setting a cup down gently leaves it intact.

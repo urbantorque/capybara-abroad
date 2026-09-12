@@ -2474,6 +2474,53 @@ let pastoVentT = 5, pastoNaveT = 4, pastoBushT = 0;
 const pastoVentAt = { x: 0, y: 0, z: 0 };
 const pastoNaveAt = { x: 0, y: 6, z: 42 };
 
+// ================================================================ THE RIDE ==
+// THE CONDOR RIDE HAS A NUMBER (L4 E4). `condor-ride` is the chapter's marquee
+// and it ticked at twelve seconds in the talons and never asked anything again.
+// A ride has no clock on it — it ends when you let go, so seconds aloft would
+// reward sitting there — and the height is already `thermal-peak`, filed by
+// condor.js. What the flight actually TEACHES is the tuck: 'Shift to tuck and
+// pick up speed, then Space' is the one control line it says, condorTUCK_V is
+// 0.82 of condorVMAX and a dive goes past it. So: the bird's top speed while
+// you are hanging off it, per ride.
+//
+// Read off `game.condor.body`, which condor.js publishes, rather than off the
+// passenger — the capybara's body is a constraint away and its velocity is the
+// solver's answer, not the flight's. On the paper every mounted frame through
+// recordLive; filed ONCE on the frame the talons open (mounted goes false),
+// and from onExit, so a ride cut short by travel still counts.
+//
+// TWO LIVE NUMBERS ON ONE BIRD, AND WHO HAS THE LINE. condor.js hands
+// `thermal-peak` to recordLive only on frames the passenger is higher than it
+// has ever been, and condor.update runs AFTER this file's — so on a frame the
+// bird is climbing past its best the later call wins and the altimeter has the
+// paper; on every other frame the speed does. recPaint reads the id once, at
+// the end of the frame, so the two never flicker: the line hands over at the
+// start of a climb past best and hands back when the climb stops. Same
+// arrangement goreme.js already runs between three-winds and on-the-trailer.
+let pastoRideTop = 0;          // m/s — the fastest this ride has gone
+let pastoRideWas = false;      // mounted last frame, for the edge
+function pastoRideFile(game) {
+  if (pastoRideTop > 5 && typeof game.record === 'function') game.record('condor-ride', pastoRideTop);
+  pastoRideTop = 0;
+}
+function pastoUpdateCondorRide(game) {
+  const c = game.condor;
+  const mounted = !!(c && c.mounted);
+  if (mounted) {
+    const b = c.body;
+    const v = b && b.velocity;
+    const s = v ? Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z) : 0;
+    if (s === s && s > pastoRideTop) pastoRideTop = s;
+    if (typeof game.recordLive === 'function') {
+      game.recordLive('condor-ride', pastoRideTop > 5 ? pastoRideTop : undefined);
+    }
+  } else if (pastoRideWas) {
+    pastoRideFile(game);
+  }
+  pastoRideWas = mounted;
+}
+
 function pastoUpdateVoices(game, dt) {
   const capy = game.capy;
   if (!capy || !capy.position || !game.sfx) return;
@@ -3216,6 +3263,7 @@ export function createPasto(game) {
       pastoUpdateBell(dt);
       pastoUpdateStalls();
       pastoUpdateCarroza(game, dt);
+      pastoUpdateCondorRide(game);
       pastoUpdateTalc(game, dt);
       pastoUpdateSwifts(game, dt);
       pastoUpdateVoices(game, dt);
@@ -3306,6 +3354,9 @@ function pastoBuild(game) {
       pastoBellRest();
     },
     onExit() {
+      // the ride in progress is FILED before it is forgotten — see pastoRideFile
+      if (pastoRideWas) pastoRideFile(game);
+      pastoRideWas = false;
       if (!pastoBellHinge) return;
       if (game.world.constraints.indexOf(pastoBellHinge) >= 0) game.world.removeConstraint(pastoBellHinge);
     },

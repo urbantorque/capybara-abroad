@@ -228,6 +228,18 @@ let hkHeliVX = 0, hkHeliVY = 0, hkHeliVZ = 0, hkHeliBank = 0, hkHeliPitch = 0;
 let hkHeliOn = false, hkHeliCool = 0, hkHeliRotorK = 0, hkHeliMover = null, hkHeliAir = 0;
 let hkRingMeshes = null, hkRingMats = null, hkRingNext = 0, hkRingsDone = false, hkRingT = 0;
 let hkHeliTold = false, hkHeliBest = 0;
+// ---- THE EIGHT RINGS HAVE A CLOCK (L4 E4) ----------------------------------
+// `symphony` is the chapter's marquee and it was eight switches in a row.
+// Ring one to ring eight is 314.9 m of straight lines, and at hkHELI_VMAX
+// that is a 19.7 s floor before a single turn or a metre of climb — so the
+// time from the FIRST ring to the eighth is a lap, the same shape as the torii
+// tunnel, and the reason to get back in the helicopter once the shore is lit.
+// Starts on ring one (not on take-off: the flight to the first ring is not
+// the run), on the paper every frame it runs, filed once at ring eight. -1 is
+// not running. Getting out of the helicopter mid-run abandons it silently —
+// the line drops by itself (sysREC_STALE) and nothing is filed. onEnter puts
+// the rings back and the clock with them.
+let hkRingClock = -1;
 let hkFerryGroup = null, hkFerryBody = null;
 let hkFerryT = 0, hkFerryDir = 1, hkFerryRideT = 0, hkFerryFrom = 0;
 let hkHornDone = false;
@@ -1411,6 +1423,7 @@ function hkHeliTake(game) {
   hkSfx('chime', { volume: 0.6, pitch: 0.95 });
   hkSay('W/S forward and back · A/D turn · hold Space to climb, let go to sink · E on the H to get out');
   if (!hkRingsDone) hkRingNext = 0;
+  hkRingClock = -1;                       // the rings start again, so does the lap
 }
 function hkHeliLeave(game) {
   const capy = game.capy;
@@ -1512,16 +1525,25 @@ function hkUpdateHeli(game, dt) {
   hkHeliAir += dt;
   if (hkHeliY - hkROOF_Y > hkHeliBest) hkHeliBest = hkHeliY - hkROOF_Y;
   // ---- the rings ----------------------------------------------------------
+  // ...and the clock on them, running from the first to the last. See hkRingClock.
+  if (!hkRingsDone && hkRingClock >= 0) {
+    hkRingClock += dt;
+    if (typeof game.recordLive === 'function') game.recordLive('symphony', hkRingClock);
+  }
   if (!hkRingsDone && hkRingNext < hkRING_N) {
     const r = hkRINGS[hkRingNext];
     const d = Math.hypot(hkHeliX - r[0], hkHeliY - r[1], hkHeliZ - r[2]);
     if (d < hkRING_TAKE) {
       hkRingNext++;
+      if (hkRingNext === 1) hkRingClock = 0;          // the lap starts here
       hkSfx('chime', { volume: 0.5, pitch: 0.9 + hkRingNext * 0.07, force: true });
       if (typeof game.confetti === 'function') game.confetti(hkHeliX, hkHeliY + 1, hkHeliZ, 10);
       if (typeof game.punch === 'function') game.punch(0.06);
       if (hkRingNext >= hkRING_N) {
         hkRingsDone = true;
+        // the lap is over: one number, filed once. See hkRingClock.
+        if (hkRingClock > 0 && typeof game.record === 'function') game.record('symphony', hkRingClock);
+        hkRingClock = -1;
         // THE EIGHTH RING IS THE EIGHTH WHEEK: the show comes on if it is not
         // on, and the finale is spent on the next beat.
         if (hkShowT < 0) hkPhase = hkSHOW_ON + 0.002;
@@ -5261,7 +5283,7 @@ export function createKowloon(game) {
       hkShow = 0; hkShowT = -1; hkLitCount = 0; hkWarned = false; hkSoonSaid = false;
       // X2: the helicopter is back on its H and the rings are unlit
       hkHeliX = hkHELI.x; hkHeliY = hkROOF_Y; hkHeliZ = hkHELI.z; hkHeliYaw = hkHELI.yaw;
-      hkHeliVX = 0; hkHeliVY = 0; hkHeliVZ = 0; hkRingNext = 0; hkRingsDone = false;
+      hkHeliVX = 0; hkHeliVY = 0; hkHeliVZ = 0; hkRingNext = 0; hkRingsDone = false; hkRingClock = -1;
       if (hkHeliG) { hkHeliG.position.set(hkHeliX, hkHeliY, hkHeliZ); hkHeliG.rotation.set(0, hkHeliYaw, 0); }
       hkSkyward = 0;
       hkPoleT = -1; hkFerryRideT = 0; hkSignStandT = 0;

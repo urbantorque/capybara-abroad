@@ -2531,6 +2531,15 @@ function caliStepChiva(game, dt) {
           game.toast('every cable got you, and you are still up here. that is the band’s favourite kind.');
         }
       }
+      // ---- AND THE TALLY IS THE RECORD (L4 E4) ---------------------------
+      // The marquee ticked at the top and the count of clean cables was spoken
+      // once and thrown away. It is the one thing on this ride you can be
+      // BETTER at — the road, the speed and the stops are all hers — so it is
+      // `chiva-mirador`'s number, filed here on the same rule as the toast:
+      // only if you were still on the roof at the top. Zero is a real answer
+      // (every cable got you) and files as one; a ride you fell off does not.
+      // Once, at the top, never per cable — see the record-spam note.
+      if (caliOnRoof && typeof game.record === 'function') game.record('chiva-mirador', caliWireClear);
       caliWireClear = 0;
     }
   }
@@ -2597,6 +2606,14 @@ function caliStepChiva(game, dt) {
     game.wowLive('on the roof · ' + caliWireClear + ' of ' + nWires + ' cables · ' +
                  Math.round(Math.max(0, caliRouteLen - caliChivaS)) + ' m to the top',
                  clamp(caliChivaS / Math.max(1, caliRouteLen), 0, 1));
+  }
+  // ...and the tally on the paper as a RECORD, which outlives the tick: on
+  // the roof, while she is climbing, the count so far against the standing
+  // best. Not gated on caliMiradorDone — this is the reason to ride her
+  // again. Filed at the top; see the arrival block in the drive above.
+  if (caliOnRoof && (caliChivaState === 'rolling' || caliChivaState === 'stopped') &&
+      typeof game.recordLive === 'function') {
+    game.recordLive('chiva-mirador', caliWireClear);
   }
   caliUpdateFireworks(game, dt);
 

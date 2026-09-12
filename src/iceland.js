@@ -4226,6 +4226,40 @@ function iceUpdateSpring(game, dt) {
                  0.1 + 0.8 * iceAurora);
   }
   if (iceAurKick > 0) iceAurKick = Math.max(0, iceAurKick - dt / 3.2);
+
+  // ---- THE STAY (L4 E4) ------------------------------------------------------
+  // `aurora` is the chapter's marquee and it paid out on one wheek. The sky
+  // never goes back down once it is up (iceAurora only ever climbs), the call
+  // answers every time, and the climb is a fixed ramp — so none of those is a
+  // thing you can be better at. What the chapter values is staying: the hot
+  // spring's row is 'sat still for' and its six marks escalate downward on
+  // purpose. This is the other half of the same idea, after the sky has come:
+  // seconds within iceCALL_R of the spring — the radius the sky answers from —
+  // with the curtains at full, in the water or out on the bank.
+  //
+  // WHO HAS THE LINE. In the water the soak's own recordLive is called every
+  // frame (above), and that figure is the reward itself, so it keeps the paper;
+  // the sky's number is handed over only on frames the soak clock is not
+  // running — climb out onto the bank and the line reads 'under the sky for'.
+  // The clock itself runs either way. Filed once on the edge that ends the
+  // stay: walking out of the radius, or travel (onExit). Never per frame.
+  {
+    const nearSky = iceAurora >= 0.9 && dx * dx + dz * dz < iceCALL_R * iceCALL_R;
+    if (nearSky) {
+      iceSkyT += dt;
+      if (!(inPool && still) && typeof game.recordLive === 'function') {
+        game.recordLive('aurora', iceSkyT > 1 ? iceSkyT : undefined);
+      }
+    } else if (iceSkyT > 0) {
+      iceSkyFile(game);
+    }
+  }
+}
+let iceSkyT = 0;                    // s of this stay under the full sky, at the spring
+/** The stay is over: one number for how long it was. See THE STAY. */
+function iceSkyFile(game) {
+  if (iceSkyT > 3 && game && typeof game.record === 'function') game.record('aurora', iceSkyT);
+  iceSkyT = 0;
 }
 let iceAurUpSaid = false;
 /** A wheek near the spring under the aurora. See THE CALL. */
@@ -4601,6 +4635,7 @@ export function createIceland(game) {
       if (iceWhaleFin) iceWhaleFin.visible = false;
     },
     onExit() {
+      iceSkyFile(game);               // the stay under the sky, settled before it is forgotten
       iceSlideT = -1; iceCatCarrying = false; iceCatRodeT = 0;
       iceGeyRiding = false; iceGeyPeak = 0;
       icePuffinsUp = 0;

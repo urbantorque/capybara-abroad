@@ -2444,6 +2444,14 @@ function palUpdateManta(game, dt) {
                : u < 0.85 ? 'on the manta · it is going up'
                : 'on the manta · THE SURFACE', u);
   }
+  // ---- AND THE SECONDS ARE THE RECORD (L4 E4) --------------------------------
+  // The ride is authored — palMANTA_RIDE seconds, one lap, one roll, one
+  // breach — and E is the only verb on it, so the only number in it is how
+  // long you held on. Twenty-two is the whole ride and the par; a bail through
+  // the roll files what it got to. On the paper every ride frame (the dive's
+  // own depth line stands down for it — see palUpdateTasks), filed once when
+  // the ride ends, below, or from onExit.
+  if (typeof game.recordLive === 'function') game.recordLive('the-manta', palMantaRideT);
   const bail = !!(input && input.actionPressed && palMantaCool <= 0 && palMantaRideT > 1.2);
 
   if (capy && capy.body) {
@@ -2481,6 +2489,8 @@ function palUpdateManta(game, dt) {
   }
 
   if (u >= 1 || bail) {
+    // the ride is over: one number for how long it was. See the record note above.
+    if (palMantaRideT > 1 && typeof game.record === 'function') game.record('the-manta', palMantaRideT);
     palMantaRideT = -1;
     palMantaCool = 0.6;
     if (capy) capy.carriedBy = null;
@@ -4263,7 +4273,12 @@ function palUpdateTasks(game, dt) {
   // you are on. Below the turtle and the cathedral in this function on purpose
   // — both of those are more specific attempts and both are allowed to take
   // the line off this one while they are open.
-  if (under && game.recordLive) game.recordLive('first-dive', depth);
+  // ...AND NOT WHILE YOU ARE ON THE MANTA (L4 E4). The ride is at six metres
+  // down for most of its length, and palUpdateManta runs BEFORE this in the
+  // frame, so an unconditional call here would take `the-manta`'s line off
+  // the paper for the whole ride. A depth you are being carried at is not a
+  // dive anyway.
+  if (under && palMantaRideT < 0 && game.recordLive) game.recordLive('first-dive', depth);
 
   // ---- the crack ----------------------------------------------------------
   if (!palToldCrack && !palCrackDone && palInZone('crack', p.x, p.z)) {
@@ -4504,6 +4519,8 @@ export function createPalawan(game) {
       // A ride in progress holds the animal PARKED; leaving the chapter in the
       // middle of one would carry that hold into the next chapter.
       if (palMantaRideT >= 0 && game.capy) game.capy.carriedBy = null;
+      // ...and a ride cut short by travel is filed for what it got to
+      if (palMantaRideT > 1 && typeof game.record === 'function') game.record('the-manta', palMantaRideT);
       palMantaRideT = -1; palMantaCool = 0;
     },
   });
