@@ -5470,8 +5470,101 @@ function quayBridgeEcho(game) {
   }
 }
 
+// ============================================================== THE WHALE ==
+// THE HUMPBACK (L5). Seventy honest seconds of helmsmanship — yachts, the
+// bridge, dolphins over 6.5 m/s, the Heads under the keel — and no beat in
+// the middle of it. Humpbacks come up the coast past Sydney Heads every
+// winter and the ferries slow down for them. So: once per passage, in the
+// gap (quayHeadsK over 0.5, under way), one comes up forty metres off the
+// beam — the whole animal, nose first, over on its back, and the fall is a
+// sheet of white water, a boom you feel in the hull, the world at half
+// speed and the lens from the deck with the whale in the frame. Then it is
+// gone, and the passage is still the passage. Built once, parked under the
+// sea, animated over quayWHALE_T seconds; nothing collides with it.
+const quayWHALE_T = 3.2;               // s, from the first sight to the last of the splash
+const quayWHALE_OFF = 30;              // m off the beam
+const quayWHALE_L = 13;                // m, nose to flukes
+let quayWhaleGroup = null, quayWhaleT = -1, quayWhaleX = 0, quayWhaleZ = 0, quayWhaleYaw = 0, quayWhaleSplashed = false;
+let quayWhaleSeen = false;             // this passage; reset at the cast-off
+function quayBuildWhale(root) {
+  const M = quayMerger();
+  const dark = 0x2c3540, pale = 0xd8dde2;
+  // the body, nose at +z, in eight slabs tapering to the tail
+  for (let i = 0; i < 8; i++) {
+    const t = i / 7;
+    const w = 3.2 * (1 - 0.75 * t * t) * (t < 0.15 ? 0.6 + t * 2.6 : 1);
+    const h = 2.6 * (1 - 0.8 * t * t) * (t < 0.15 ? 0.6 + t * 2.6 : 1);
+    const z = quayWHALE_L * 0.5 - 0.2 - t * (quayWHALE_L - 2.4);
+    M.box(0, 0, z, w, h, quayWHALE_L / 8 + 0.2, dark);
+    M.box(0, -h * 0.32, z, w * 0.82, h * 0.42, quayWHALE_L / 8 + 0.22, pale);   // the white throat and belly
+  }
+  // the flukes, and the long pectorals a humpback is named by
+  M.box(0, 0.1, -quayWHALE_L * 0.5 - 0.6, 5.2, 0.28, 1.6, dark, 0, 0, 0);
+  for (let s = -1; s <= 1; s += 2) {
+    M.box(s * 2.6, -0.5, 1.4, 4.4, 0.22, 1.1, pale, 0, 0, s * 0.35);
+  }
+  M.box(0, 1.35, -1.2, 0.5, 0.7, 1.4, dark);        // the dorsal hump
+  const m = new THREE.Mesh(M.build(), quayVC());
+  m.castShadow = true;
+  m.scale.set(1.25, 1.25, 1.25);
+  quayWhaleGroup = new THREE.Group();
+  quayWhaleGroup.add(m);
+  quayWhaleGroup.position.set(0, -30, 0);
+  quayWhaleGroup.visible = false;
+  root.add(quayWhaleGroup);
+}
+function quayUpdateWhale(game, dt) {
+  if (!quayWhaleGroup) return;
+  // the sighting: in the gap, under way, once a passage
+  if (quayWhaleT < 0) {
+    if (!quayWhaleSeen && quayHelmOn && quayHeadsK > 0.5 && Math.abs(quayBoatSpeed) > 3) {
+      quayWhaleSeen = true;
+      quayWhaleT = 0; quayWhaleSplashed = false;
+      const cs = Math.cos(quayBoatYaw), sn = Math.sin(quayBoatYaw);
+      // off the starboard beam, and facing the boat, so the breach is toward you
+      quayWhaleX = quayBoatX + cs * quayWHALE_OFF;
+      quayWhaleZ = quayBoatZ - sn * quayWHALE_OFF;
+      quayWhaleYaw = Math.atan2(quayBoatX - quayWhaleX, quayBoatZ - quayWhaleZ);
+      quayWhaleGroup.visible = true;
+      const cp = game.capy && game.capy.position;
+      if (typeof game.slowmo === 'function') game.slowmo(0.5, 2.0);
+      if (typeof game.frameShot === 'function' && cp) {
+        game.frameShot({ yaw: Math.atan2(cp.x - quayWhaleX, cp.z - quayWhaleZ), dist: 22, pitch: 4 * Math.PI / 180, raise: 3.0, hold: 3.4, over: true });
+      }
+      if (typeof game.sfx === 'function') game.sfx('gasp', { volume: 0.7, pitch: 0.35, at: { x: quayWhaleX, y: 0, z: quayWhaleZ }, near: 20, far: 200, force: true });
+      if (game.music && typeof game.music.swell === 'function') game.music.swell(0.7);
+      if (typeof game.toast === 'function') game.toast('A HUMPBACK. off the starboard beam — the whole of it.');
+    }
+    return;
+  }
+  quayWhaleT += dt;
+  const u = clamp(quayWhaleT / quayWHALE_T, 0, 1);
+  // up nose-first to a length clear of the water, over on to the back, and down
+  const up = Math.sin(Math.PI * Math.min(1, u / 0.82));
+  const y = quayWATER_Y - 9 + 15.5 * up;
+  const pitch = lerp(-1.25, 0.55, u / 0.82 < 1 ? (u / 0.82) : 1);
+  const roll = u > 0.42 ? (u - 0.42) / 0.4 * 1.1 : 0;
+  quayWhaleGroup.position.set(quayWhaleX, y, quayWhaleZ);
+  quayWhaleGroup.rotation.set(pitch, quayWhaleYaw, Math.min(roll, 1.1), 'YXZ');
+  if (!quayWhaleSplashed && u > 0.66) {
+    quayWhaleSplashed = true;
+    if (typeof game.sparks === 'function') {
+      game.sparks(quayWhaleX, quayWATER_Y + 0.5, quayWhaleZ, 60, { spd: 7.5, up: 4.5, grav: 9, drag: 0.5, life: 1.6, size: 0.6, rgb: [1.3, 1.5, 1.7] });
+      game.sparks(quayWhaleX, quayWATER_Y + 0.3, quayWhaleZ, 30, { spd: 4, up: 6, grav: 9, drag: 0.4, life: 1.4, size: 0.45, rgb: [1.4, 1.55, 1.7] });
+    }
+    if (typeof game.sfx === 'function') {
+      game.sfx('splash', { volume: 1.0, pitch: 0.45, at: { x: quayWhaleX, y: 0, z: quayWhaleZ }, near: 20, far: 300, force: true });
+      game.sfx('thud', { volume: 0.8, pitch: 0.4, at: { x: quayWhaleX, y: 0, z: quayWhaleZ }, near: 20, far: 300, force: true });
+    }
+    if (typeof game.punch === 'function') game.punch(0.16);
+    quayBigRoll = Math.max(quayBigRoll, 7);       // the wash reaches the hull
+  }
+  if (u >= 1) { quayWhaleT = -1; quayWhaleGroup.visible = false; quayWhaleGroup.position.y = -30; }
+}
+
 /** The three things worth turning the wheel for, and the arrival. */
 function quayCheckVoyage(game, dt) {
+  quayUpdateWhale(game, dt);
   if (quayRunT >= 0 && !quayVoyaged) {
     quayRunT += dt;
     // ---- THE PASSAGE, ON THE PAPER, WHILE IT IS BEING MADE (v32) ----------
@@ -5495,6 +5588,7 @@ function quayCheckVoyage(game, dt) {
 
   if (!quayCastOff && quayHelmOn && quayBoatZ < quayAPRON_Z - 26) {
     quayCastOff = true;
+    quayWhaleSeen = false;                       // one humpback a passage (L5)
     // AND SOMEBODY WATCHES YOU GO. The deckhand has stood on that apron with
     // three lines about the wheel being unlocked since the chapter was written
     // and has never once reacted to the wheel being taken — which made him a
@@ -5673,6 +5767,9 @@ function quayCheckVoyage(game, dt) {
         game.sfx('chime', { volume: 0.9, at: at, near: 10, far: 120 });
       }
       if (typeof game.toast === 'function') game.toast('Manly. all ashore that’s going ashore.');
+      // ...and the wharf is pleased to see her (L5)
+      if (typeof game.sfx === 'function') game.sfx('cheer', { volume: 0.5, pitch: 1.1, at: { x: quayMANLY.x, y: quayWATER_Y + 2, z: quayMANLY.z + 6 }, near: 20, far: 160, force: true });
+      if (typeof game.slowmo === 'function') game.slowmo(0.6, 1.0);
       // ...AND SOMEBODY TAKES THE LINE.
       // Seventy seconds of open water ended in a line of text. A ferry
       // arriving is a rope thrown across the gap and a person on the wharf who
@@ -5709,6 +5806,7 @@ function quayBuild(game) {
   quayBuildShores(game, quayRoot);
   quayBuildBush(quayRoot);
   quayBuildPines(game, quayRoot);
+  quayBuildWhale(quayRoot);                      // the humpback in the Heads (L5)
   quayBuildCockatoos(quayRoot);
   quayBuildApronDress(game, quayRoot);
   quayBuildMoorings(game, quayRoot);
@@ -6310,6 +6408,10 @@ export function createQuay(game) {
     headsK() { return quayHeadsK; },
     /** The harness's window on the passage: put her somewhere. Test hook. */
     boatDebugTo(x, z) { quayBoatX = x; quayBoatZ = z; },
+    /** THE HUMPBACK, for the harness (L5). */
+    whaleAudit() { return { t: +quayWhaleT.toFixed(2), seen: quayWhaleSeen, y: quayWhaleGroup ? +quayWhaleGroup.position.y.toFixed(2) : null, visible: !!(quayWhaleGroup && quayWhaleGroup.visible), splashed: quayWhaleSplashed, helm: quayHelmOn, speed: +quayBoatSpeed.toFixed(2), heads: +quayHeadsK.toFixed(2) }; },
+    /** ...and the helm, taken from outside (the harness). */
+    helmDebug(on) { if (on && !quayHelmOn) quayTakeHelm(); else if (!on && quayHelmOn) quayLeaveHelm(); return quayHelmOn; },
 
     update(dt) {
       if (!quayBuilt) return;

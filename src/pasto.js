@@ -2500,11 +2500,60 @@ const pastoNaveAt = { x: 0, y: 6, z: 42 };
 // arrangement goreme.js already runs between three-winds and on-the-trailer.
 let pastoRideTop = 0;          // m/s — the fastest this ride has gone
 let pastoRideWas = false;      // mounted last frame, for the edge
+// ---- THE DIVE, MARKED, AND THE PLUME (L5) -----------------------------------
+// The tuck is the one skill the flight teaches and nothing marked it: the
+// bird went to 28 m/s and the frame did not change. THE DIVE: the first
+// frame of a ride over pastoDIVE_V and coming down faster than pastoDIVE_VY
+// gets the wind (a hiss placed on the bird), the world at 0.7x for a beat, the
+// lens swung to the flank with over: true, and the speed said; re-armed once
+// the bird is back under pastoDIVE_RESET, so a ride of three dives is three.
+// THE PLUME: Galeras is drawn coughing and nothing ever went through it.
+// Inside pastoPLUME_R of the crater axis, between eight and fifty metres over
+// the rim, the volcano answers — embers off the animal, a rumble from the
+// vent, the wings clapping — once per ride. Both on the ride's own line.
+const pastoDIVE_V = 19.5, pastoDIVE_VY = -4, pastoDIVE_RESET = 16.5;
+const pastoPLUME_R = 9, pastoPLUME_H0 = 8, pastoPLUME_H1 = 50;
+let pastoDiveOn = false, pastoDives = 0, pastoPlumed = false, pastoRideT = 0;
+function pastoRideBeats(game, b, s, dt) {
+  const v = b.velocity;
+  pastoRideT += dt;
+  const p = game.capy && game.capy.position;
+  // the dive
+  if (!pastoDiveOn && s > pastoDIVE_V && v.y < pastoDIVE_VY && pastoRideT > 2) {
+    pastoDiveOn = true; pastoDives++;
+    const heading = Math.atan2(v.x, v.z);
+    if (typeof game.sfx === 'function') game.sfx('hiss', { volume: 0.55, pitch: 0.55, at: { x: b.position.x, y: b.position.y, z: b.position.z }, near: 6, far: 80, force: true });
+    if (typeof game.slowmo === 'function') game.slowmo(0.7, 0.7);
+    if (typeof game.frameShot === 'function') game.frameShot({ yaw: heading + Math.PI * 0.5, dist: 16, pitch: 6 * Math.PI / 180, raise: 1.5, hold: 1.8, over: true });
+    if (typeof game.punch === 'function') game.punch(0.06);
+    if (game.music && typeof game.music.swell === 'function') game.music.swell(0.6);
+    if (typeof game.toast === 'function') game.toast(pastoDives === 1 ? 'THE DIVE. ' + s.toFixed(0) + ' m/s — hold the tuck, nose down, for more.' : 'the dive again · ' + s.toFixed(0) + ' m/s');
+  } else if (pastoDiveOn && s < pastoDIVE_RESET) {
+    pastoDiveOn = false;
+  }
+  // the plume
+  if (!pastoPlumed && p) {
+    const dx = p.x - pastoGAL_X, dz = p.z - pastoGAL_Z;
+    const rimY = pastoHeight(pastoGAL_X + pastoCRATER_R, pastoGAL_Z);
+    if (dx * dx + dz * dz < pastoPLUME_R * pastoPLUME_R && p.y > rimY + pastoPLUME_H0 && p.y < rimY + pastoPLUME_H1) {
+      pastoPlumed = true;
+      if (typeof game.sparks === 'function') game.sparks(p.x, p.y, p.z, 36, { spd: 4, up: 1.5, grav: 2, drag: 1.2, life: 1.6, size: 0.3, rgb: [1.6, 0.9, 0.5] });
+      if (typeof game.sfx === 'function') {
+        game.sfx('thud', { volume: 0.6, pitch: 0.45, at: { x: pastoGAL_X, y: rimY, z: pastoGAL_Z }, near: 20, far: 200, force: true });
+        game.sfx('hiss', { volume: 0.4, pitch: 0.7, force: true });
+      }
+      if (typeof game.wingburst === 'function') game.wingburst(b.position.x, b.position.y, b.position.z, { key: 'pasto:plume', near: 8, far: 60, n: 6, volume: 0.8, pitch: 0.8 });
+      if (typeof game.punch === 'function') game.punch(0.10);
+      if (game.music && typeof game.music.swell === 'function') game.music.swell(0.8);
+      if (typeof game.toast === 'function') game.toast('THROUGH THE PLUME. the volcano coughed on you.');
+    }
+  }
+}
 function pastoRideFile(game) {
   if (pastoRideTop > 5 && typeof game.record === 'function') game.record('condor-ride', pastoRideTop);
   pastoRideTop = 0;
 }
-function pastoUpdateCondorRide(game) {
+function pastoUpdateCondorRide(game, dt) {
   const c = game.condor;
   const mounted = !!(c && c.mounted);
   if (mounted) {
@@ -2512,6 +2561,8 @@ function pastoUpdateCondorRide(game) {
     const v = b && b.velocity;
     const s = v ? Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z) : 0;
     if (s === s && s > pastoRideTop) pastoRideTop = s;
+    if (!pastoRideWas) { pastoDiveOn = false; pastoDives = 0; pastoPlumed = false; pastoRideT = 0; }
+    if (b && s === s) pastoRideBeats(game, b, s, dt || 0.016);
     if (typeof game.recordLive === 'function') {
       game.recordLive('condor-ride', pastoRideTop > 5 ? pastoRideTop : undefined);
     }
@@ -3183,6 +3234,11 @@ export function createPasto(game) {
       const k = Math.max(0, 1 - d / pastoGAL_R);
       return 0.45 + 0.55 * k * k;
     },
+    /** THE RIDE, for the harness (L5): dives this ride, the plume, the top. */
+    rideAudit: function () {
+      return { dives: pastoDives, diveOn: pastoDiveOn, plumed: pastoPlumed, top: +pastoRideTop.toFixed(1), t: +pastoRideT.toFixed(1),
+               rimY: +pastoHeight(pastoGAL_X + pastoCRATER_R, pastoGAL_Z).toFixed(1) };
+    },
     condorShot: function () {
       if (typeof game.frameShot !== 'function' || !game.capy) return false;
       const p = game.capy.position;
@@ -3263,7 +3319,7 @@ export function createPasto(game) {
       pastoUpdateBell(dt);
       pastoUpdateStalls();
       pastoUpdateCarroza(game, dt);
-      pastoUpdateCondorRide(game);
+      pastoUpdateCondorRide(game, dt);
       pastoUpdateTalc(game, dt);
       pastoUpdateSwifts(game, dt);
       pastoUpdateVoices(game, dt);

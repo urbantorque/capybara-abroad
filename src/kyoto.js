@@ -3792,6 +3792,18 @@ const kyoMILL_STAND = { x: 54, y: 0, z: 148 };
 const kyoRUN_OUT = 1.5;             // s out of the water before the run lapses
 const kyoRUN_END_R = 13;            // m of the mill pond that counts as arrival
 const kyoRUN_MIN = 5;               // s below which a "run" is an accident, not a run
+// ---- THE GATES ARE SECONDS (L5) ---------------------------------------------
+// The three boats were a chime and a line in the toast. They are the fast
+// line made visible, and a fast line should be worth time: every boat you go
+// through takes kyoGATE_BONUS off the clock — said on the paper the moment
+// it happens, filed in the number at the mill — and the river gives you a
+// nudge down its own thread through it. A run that reads the river is a
+// faster run twice over. THE FINISH is a moment now: the wheel spun up for
+// six seconds under the spray, the world at half speed, the chime and the
+// birds off the mill pond.
+const kyoGATE_BONUS = 2.0;          // s off the run per boat
+let kyoGateBonusT = 0;              // s of "−2 s" flashed on the paper
+let kyoMillFast = 0;                // s of the wheel spinning up after a finish
 
 function kyoUpdateRun(game, dt) {
   if (!kyoRX) return;
@@ -3835,7 +3847,19 @@ function kyoUpdateRun(game, dt) {
       gt.prev = d;
       if (crossed && lat < 2.8 && !gt.through) {
         gt.through = true;
-        if (typeof game.sfx === 'function') game.sfx('chime', { volume: 0.5, pitch: 1.5 });
+        let n = 0;
+        for (let k = 0; k < kyoGates.length; k++) if (kyoGates[k].through) n++;
+        if (typeof game.sfx === 'function') game.sfx('chime', { volume: 0.55, pitch: 1.3 + n * 0.2 });
+        // THE GATE IS SECONDS (L5): off the clock, said, and a nudge down the thread
+        if (kyoRunT >= 0) {
+          kyoGateBonusT = 1.6;
+          if (typeof game.sparks === 'function') game.sparks(gt.x, kyoRIVER_Y + 0.4, gt.z, 18, { spd: 3, up: 2.5, grav: 9, drag: 0.6, life: 0.9, size: 0.22, rgb: [1.2, 1.45, 1.7] });
+          if (capy && typeof capy.launch === 'function' && capy.velocity) {
+            const v = capy.velocity;
+            capy.launch(v.x + gt.tx * 1.6, Math.max(0, v.y), v.z + gt.tz * 1.6);
+          }
+          if (typeof game.toast === 'function' && n === 1 && !kyoRunDone) game.toast('through the boat — two seconds off. the river agrees with you.');
+        }
       }
     }
   }
@@ -3899,8 +3923,9 @@ function kyoUpdateRun(game, dt) {
     let gates = 0;
     for (let i = 0; kyoGates && i < kyoGates.length; i++) if (kyoGates[i].through) gates++;
     const left = Math.max(0, kyoRiverLen - nr.s);
+    if (kyoGateBonusT > 0) kyoGateBonusT -= dt;
     game.wowLive((kyoChuteAir > 0 ? 'AIR · ' : 'in the river · ') + Math.round(left) + ' m to the mill · ' +
-                 gates + ' of 3 boats · ' + kyoRunT.toFixed(1) + ' s',
+                 gates + ' of 3 boats' + (kyoGateBonusT > 0 ? ' · −2 s' : '') + ' · ' + Math.max(0, kyoRunT - gates * kyoGATE_BONUS).toFixed(1) + ' s',
                  clamp((nr.s - kyoRunFromS) / Math.max(1, kyoRiverLen - kyoRunFromS), 0, 1));
   }
 
@@ -3909,8 +3934,13 @@ function kyoUpdateRun(game, dt) {
   // already maintained above, so this is two lines and no new state. Every
   // other way out of the run — the mill, the bank, the border — leaves the
   // clock negative on the next frame and closes the line here.
-  if (kyoRunT >= 0) { if (game.recordLive) game.recordLive('uji-run', kyoRunT); }
-  else if (game.recordEnd) game.recordEnd('uji-run');
+  if (kyoRunT >= 0) {
+    if (game.recordLive) {
+      let gates = 0;
+      for (let i = 0; kyoGates && i < kyoGates.length; i++) if (kyoGates[i].through) gates++;
+      game.recordLive('uji-run', Math.max(0, kyoRunT - gates * kyoGATE_BONUS));
+    }
+  } else if (game.recordEnd) game.recordEnd('uji-run');
 
   // --- the finish ---
   // ...AND ONLY FROM THE HOOK (W1). The gorge's outbound reach passes eleven
@@ -3935,6 +3965,8 @@ function kyoUpdateRun(game, dt) {
     if (t <= kyoRUN_MIN) return;
     let gates = 0;
     for (let i = 0; kyoGates && i < kyoGates.length; i++) if (kyoGates[i].through) gates++;
+    // the boats come off the clock (L5)
+    const tRun = Math.max(kyoRUN_MIN + 0.1, t - gates * kyoGATE_BONUS);
     if (!kyoRunDone) {
       kyoRunDone = true;
       kyoTask('uji-run');
@@ -3943,9 +3975,17 @@ function kyoUpdateRun(game, dt) {
                               : 'two hundred metres of river, and no paddle');
       }
     } else if (typeof game.toast === 'function') {
-      game.toast(t.toFixed(1) + ' s' + (gates === 3 ? '  ·  all three boats' : ''));
+      game.toast(tRun.toFixed(1) + ' s' + (gates > 0 ? '  ·  ' + gates + (gates === 3 ? ' boats, all of them' : ' of the boats') + ', ' + (gates * kyoGATE_BONUS).toFixed(0) + ' s off' : ''));
     }
-    if (typeof game.record === 'function') game.record('uji-run', t);
+    if (typeof game.record === 'function') game.record('uji-run', +tRun.toFixed(1));
+    // ---- THE FINISH IS A MOMENT (L5) ------------------------------------
+    kyoMillFast = 6;
+    if (typeof game.slowmo === 'function') game.slowmo(0.5, 1.1);
+    if (typeof game.sparks === 'function' && kyoMillWheel) {
+      const wp = kyoMillWheel.position;
+      game.sparks(wp.x, wp.y + 1.5, wp.z, 40, { spd: 4.5, up: 3, grav: 9, drag: 0.5, life: 1.3, size: 0.28, rgb: [1.2, 1.45, 1.7] });
+    }
+    if (typeof game.punch === 'function') game.punch(0.10);
     // ---- AUDIBLE. Both of these were mono, and they are the loudest thing in
     // the chapter: every cue around this payout was mono while all six
     // stepping-stone notes forty metres away were already positional. The toy
@@ -3967,12 +4007,14 @@ function kyoUpdateRun(game, dt) {
         dist: 17, pitch: 18 * Math.PI / 180, raise: 3.0, hold: 2.6
       });
     }
-    if (kyoRunBest === 0 || t < kyoRunBest) kyoRunBest = t;
+    if (kyoRunBest === 0 || tRun < kyoRunBest) kyoRunBest = tRun;
   }
 
-  // the wheel turns as long as there is water going under it
+  // the wheel turns as long as there is water going under it — and quicker
+  // for a while after a run comes down (L5)
   if (kyoMillWheel) {
-    kyoMillSpin += dt * 0.85;
+    if (kyoMillFast > 0) kyoMillFast -= dt;
+    kyoMillSpin += dt * (0.85 + (kyoMillFast > 0 ? 2.2 * Math.min(1, kyoMillFast / 1.5) : 0));
     kyoMillWheel.rotation.x = kyoMillSpin;
   }
 }
@@ -4718,6 +4760,13 @@ export function createKyoto(game) {
      */
     runFlow() { return kyoRunFlow > 0 ? kyoRunFlow : 0; },
     runTime() { return kyoRunT; },
+    /** THE GATES AND THE FINISH, for the harness (L5). */
+    runAudit() {
+      const gates = (kyoGates || []).map(function (g) { return { x: +g.x.toFixed(1), z: +g.z.toFixed(1), through: g.through }; });
+      let n = 0; for (let i = 0; i < gates.length; i++) if (gates[i].through) n++;
+      return { t: +kyoRunT.toFixed(2), gates: gates, through: n, bonusT: +kyoGateBonusT.toFixed(2), millFast: +kyoMillFast.toFixed(2),
+               mill: kyoMillWheel ? { x: +kyoMillWheel.position.x.toFixed(1), z: +kyoMillWheel.position.z.toFixed(1) } : null, len: +kyoRiverLen.toFixed(1), done: kyoRunDone };
+    },
     runBest() { return kyoRunBest; },
     runLength() { return kyoRiverLen - kyoRunFromS; },
     riverLength() { return kyoRiverLen; },

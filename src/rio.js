@@ -61,31 +61,95 @@ const rioCORCOVADO = { x: -96, z: 78, r: 72, h: 84 };  // and the Redentor on to
 // cable car — which is what the row says you did NOT take — cheers from its
 // cabin. Latched per mount, so circling the rock does not repeat it.
 let rioFlyLoaf = false, rioFlyChrist = false, rioFlyWas = false;
+// ---- THE LANDMARK CHAIN (L5) -------------------------------------------------
+// The frigatebird was the condor in a different city: the same flight law,
+// the same top-speed row, two toasts. What Rio has that Pasto does not is
+// three things you can name from anywhere on the beach, and a bird that can
+// get to all of them in one flight. THE CHAIN: the Sugarloaf's top, the
+// Redentor at his own height, and a low pass over the Arcos da Lapa — in ONE
+// mount, without landing — each a link (a chime a third higher than the
+// last, the score up a step, sparks off the landmark), and the third the
+// payoff: half speed, the lens on the flank, the wings clapping, the whole
+// city cheering from the beach. The row is the chain now: 'fragata-ride' is
+// how many of the three you linked in one flight (gen 2), and the live line
+// says which is next.
+const rioARCH_H = 13;                  // the aqueduct's arch height, from rioBuildLapa
+let rioFlyLapa = false, rioChain = 0, rioChainBest = 0, rioChainDone = false;
+let rioFlyT = 0, rioFlyHigh = 0;       // seconds mounted, and the highest the ride has been
+function rioChainLink(game, name, x, y, z) {
+  rioChain++;
+  if (typeof game.sfx === 'function') game.sfx('chime', { volume: 0.7, pitch: 0.9 + rioChain * 0.3 });
+  if (typeof game.sparks === 'function') game.sparks(x, y, z, 26, { spd: 5, up: 2, grav: 4, drag: 0.8, life: 1.6, size: 1.1, rgb: [2.2, 1.6, 0.8] });
+  if (game.music && typeof game.music.swell === 'function') game.music.swell(0.3 + 0.25 * rioChain);
+  if (typeof game.recordLive === 'function') game.recordLive('fragata-ride', rioChain);
+  if (rioChain >= 3 && !rioChainDone) {
+    rioChainDone = true;
+    const p = game.capy && game.capy.position;
+    const c = game.condor, b = c && c.body, v = b && b.velocity;
+    const heading = v ? Math.atan2(v.x, v.z) : 0;
+    if (typeof game.slowmo === 'function') game.slowmo(0.5, 1.4);
+    if (typeof game.frameShot === 'function') game.frameShot({ yaw: heading + Math.PI * 0.5, dist: 18, pitch: 8 * Math.PI / 180, raise: 2, hold: 2.6, over: true });
+    if (typeof game.wingburst === 'function' && b) game.wingburst(b.position.x, b.position.y, b.position.z, { key: 'rio:chain', near: 8, far: 60, n: 8, volume: 1, pitch: 0.9 });
+    if (typeof game.sfx === 'function') game.sfx('cheer', { volume: 0.8, pitch: 1.0, at: { x: 0, y: 2, z: -10 }, near: 40, far: 400, force: true });
+    if (typeof game.punch === 'function') game.punch(0.12);
+    if (p && typeof game.sparks === 'function') game.sparks(p.x, p.y, p.z, 40, { spd: 5, up: 1, grav: 3, drag: 0.8, life: 1.8, size: 1.2, rgb: [2.4, 1.4, 0.8] });
+    if (typeof game.toast === 'function') game.toast('THE CHAIN. the loaf, the Christ and the arches — one flight, no landing. the beach saw it.');
+  } else if (typeof game.toast === 'function') {
+    const next = !rioFlyLoaf ? 'the Sugarloaf' : !rioFlyChrist ? 'the Redentor' : 'the arches at Lapa';
+    game.toast(name + ' · ' + rioChain + ' of 3 · next, ' + next + ' — without landing');
+  }
+}
+function rioChainFile(game) {
+  if (rioChain > rioChainBest) rioChainBest = rioChain;
+  if (rioChain > 0 && typeof game.record === 'function') game.record('fragata-ride', rioChain);
+  if (typeof game.recordEnd === 'function') game.recordEnd('fragata-ride');
+}
 function rioUpdateFlyover(game, dt) {
   const c = game.condor;
   const mounted = !!(c && c.mounted && c.hosted && c.hosted());
-  if (mounted !== rioFlyWas) { rioFlyWas = mounted; rioFlyLoaf = false; rioFlyChrist = false; }
+  if (mounted !== rioFlyWas) {
+    if (!mounted) rioChainFile(game);
+    rioFlyWas = mounted; rioFlyLoaf = false; rioFlyChrist = false; rioFlyLapa = false; rioChain = 0; rioChainDone = false;
+    rioFlyT = 0; rioFlyHigh = 0;
+  }
   if (!mounted) return;
   const p = game.capy && game.capy.position;
   if (!p) return;
+  rioFlyT += dt;
+  if (p.y > rioFlyHigh) rioFlyHigh = p.y;
+  if (typeof game.wowLive === 'function' && !rioChainDone) {
+    const next = !rioFlyLoaf ? 'the Sugarloaf' : !rioFlyChrist ? 'the Redentor' : 'low over the arches';
+    game.wowLive('on the frigatebird · ' + rioChain + ' of 3 · ' + next, rioChain / 3);
+  }
   if (!rioFlyLoaf) {
     const dx = p.x - rioSUGAR.x, dz = p.z - rioSUGAR.z;
     if (dx * dx + dz * dz < rioSUGAR.r * rioSUGAR.r * 1.3 && p.y > rioSUGAR.h * 0.85) {
       rioFlyLoaf = true;
-      if (typeof game.toast === 'function') game.toast('over the top of the Sugarloaf. the cable car is waving');
       if (typeof game.sfx === 'function') {
         game.sfx('cheer', { volume: 0.55, pitch: 1.05, at: { x: rioSUGAR.x, y: rioSUGAR.h, z: rioSUGAR.z }, near: 30, far: 260, force: true });
       }
       if (typeof game.punch === 'function') game.punch(0.08);
+      rioChainLink(game, 'over the top of the Sugarloaf. the cable car is waving', rioSUGAR.x, rioSUGAR.h + 4, rioSUGAR.z);
     }
   }
   if (!rioFlyChrist) {
     const dx = p.x - rioCORCOVADO.x, dz = p.z - rioCORCOVADO.z;
     if (dx * dx + dz * dz < 40 * 40 && p.y > rioCORCOVADO.h * 0.9) {
       rioFlyChrist = true;
-      if (typeof game.toast === 'function') game.toast('eye to eye with the Redentor');
-      if (typeof game.sfx === 'function') game.sfx('chime', { volume: 0.7, pitch: 0.9 });
       if (typeof game.punch === 'function') game.punch(0.08);
+      rioChainLink(game, 'eye to eye with the Redentor', rioCORCOVADO.x, rioCORCOVADO.h + 6, rioCORCOVADO.z);
+    }
+  }
+  if (!rioFlyLapa) {
+    const dx = p.x - rioLAPA.x, dz = p.z - rioLAPA.z;
+    const base = rioTerrain(rioLAPA.x, rioLAPA.z);
+    // ...a PASS, not a mount beside them: eight seconds in the air and down
+    // from fifty metres over the arches, so a bird that happened to come down
+    // at Lapa is not a link
+    if (dx * dx + dz * dz < 34 * 34 && p.y < base + rioARCH_H + 42 && p.y > base + 2 && rioFlyT > 8 && rioFlyHigh > base + rioARCH_H + 50) {
+      rioFlyLapa = true;
+      if (typeof game.punch === 'function') game.punch(0.08);
+      rioChainLink(game, 'low over the arches at Lapa. the tram rang its bell', rioLAPA.x, base + rioARCH_H + 3, rioLAPA.z);
     }
   }
 }
@@ -3497,10 +3561,12 @@ let rioCalcLastX = 0;                  // where she was last seen ON it, for onE
 let rioRideTop = 0;                    // m/s — the fastest this ride has gone
 let rioRideWas = false;                // mounted last frame, for the edge
 function rioRideFile(game) {
-  if (rioRideTop > 5 && typeof game.record === 'function') game.record('fragata-ride', rioRideTop);
   rioRideTop = 0;
+  rioChainFile(game);
 }
 function rioUpdateFragataRide(game) {
+  // (L5) the row is the landmark chain now — see rioUpdateFlyover; the top
+  // speed is still tracked for the harness and the flyover's own toasts
   const c = game.condor;
   const mounted = !!(c && c.mounted);
   if (mounted) {
@@ -3508,11 +3574,8 @@ function rioUpdateFragataRide(game) {
     const v = b && b.velocity;
     const s = v ? Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z) : 0;
     if (s === s && s > rioRideTop) rioRideTop = s;
-    if (typeof game.recordLive === 'function') {
-      game.recordLive('fragata-ride', rioRideTop > 5 ? rioRideTop : undefined);
-    }
   } else if (rioRideWas) {
-    rioRideFile(game);
+    rioRideTop = 0;
   }
   rioRideWas = mounted;
 }
@@ -4507,6 +4570,8 @@ export function createRio(game) {
      * surface goes to black. That is a straight swap of roles rather than a new
      * model, and it is why the plumage is six numbers and not a mesh.
      */
+    /** THE CHAIN, for the harness (L5). */
+    chainAudit: function () { return { chain: rioChain, loaf: rioFlyLoaf, christ: rioFlyChrist, lapa: rioFlyLapa, done: rioChainDone, best: rioChainBest, top: +rioRideTop.toFixed(1) }; },
     flier: {
       name: 'fragata',
       // Rio's own lines. `peak` is deliberately absent: that task is "ride a

@@ -3874,7 +3874,9 @@ export const FINDS = [
 /** Every find id, for the audit and the save. */
 
 export const RECORDS = {
-  'uji-run':       { label: 'the river in', unit: ' s', better: 'lower', dp: 1 },
+  // ...with a par since L5: the fisherman says the river does it in forty,
+  // and the three boats are two seconds each off the clock (kyoGATE_BONUS).
+  'uji-run':       { label: 'the river in', unit: ' s', better: 'lower', dp: 1, par: 42 },
   // ---- KYOTO HAD ONE NUMBER IN IT (v51) ---------------------------------
   // Eleven tasks and a single record, which made it the thinnest chapter in the
   // game to come back to — and it had TWO set pieces sitting there with a clock
@@ -4056,7 +4058,11 @@ export const RECORDS = {
   // condorVMAX (28), which is 22.96 m/s held level, and a dive goes past it
   // to the 28 m/s cap. Twenty-two is a tuck held long enough to get there.
   'condor-ride':   { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1, par: 22 },
-  'fragata-ride':  { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1, par: 22 },
+  // ...and Rio's is not the speed any more (L5): THE CHAIN — the Sugarloaf's
+  // top, the Redentor at his height and a low pass over the arches at Lapa,
+  // in one flight without landing. Three is the whole city; the par is the
+  // whole city. gen 2 drops a saved speed.
+  'fragata-ride':  { label: 'chained', unit: ' of the three, one flight', better: 'higher', dp: 0, par: 3, gen: 2 },
   // Chapter 5. Seven cables over 465 m and the tally only counts if you are
   // still on the roof at the top — cali.js's own rule for the toast, kept for
   // the record. Seven clean is the ceiling and the band's line; six is a ride
