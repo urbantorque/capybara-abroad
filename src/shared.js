@@ -2631,6 +2631,18 @@ export const TASKS = [
   // offshore; this one comes past you, twice a minute, ringing.
   { id: 'whippy-run',    text: 'Do the promenade from the van roof',        chapter: 1,
     act: 3, mini: 'MR WHIPPY' },
+  // ---- THE SECOND ASK (L6, F2 / design 2.1, 2.2, 2.3, 2.5) --------------
+  // The game teaches nine skills, ten costumes, a hide, a perch, a herd and
+  // a dive, and 234 rows asked for none of them (measured: `capySkill` had no
+  // reader outside capybara.js; no row had a `needs`). One row per chapter
+  // now carries `needs:` — the skill or system its tick reads, '+'-joined
+  // when it reads two — and qa/verbs.mjs refuses a `needs` whose teaching
+  // chapter is later than the row's. `carry:` names a prop type: the tick
+  // wants it in the mouth and then let go inside the zone (2.3). `clock`
+  // rows are THE WINDOW (2.5): a chapter with no event you can be late for
+  // gets one, on a mover it already had, with the countdown on the live
+  // line — so a RECORDS row keyed by the task id, the api-key rule below.
+  { id: 'ibis-parade',   text: 'March the ibis onto the podium',           chapter: 1, act: 2, needs: 'herd' },
 
   // ---- Chapter 2: Pasto, Nariño — the Galeras volcano ----
   // 'to-pasto' ticks itself the moment you arrive, so the window the player
@@ -2650,6 +2662,8 @@ export const TASKS = [
   // never said so; the plaza also never moved.
   { id: 'carroza',       text: 'Join the carnival, on the float',                chapter: 2,
     mini: 'EL CARNAVAL' },
+  // THE CARRY (L6, F2): the errand loop the locals run, turned round.
+  { id: 'empanada-float', text: 'Take an empanada up onto the float',       chapter: 2, act: 2, needs: 'carry', carry: 'empanada' },
 
   // ---- Chapter 3: Sydney Harbour — Circular Quay to Manly ----
   // A chapter is somewhere you have to travel to, and this is the only one you
@@ -2667,6 +2681,9 @@ export const TASKS = [
   // water that had nothing else moving on it.
   { id: 'ferry-salute',  text: 'Trade horns with the Manly ferry',               chapter: 3, act: 2,
     mini: 'THE FRESHWATER' },
+  // The costume the marquee hands over, asked for once (L6, F2): the cap is
+  // yours after Manly, and the return passage is the row.
+  { id: 'cap-at-the-helm', text: 'Take her out again, in the captain’s cap', chapter: 3, act: 3, needs: 'worn', worn: 'ferrycap' },
 
   // ---- Chapter 4: Kyoto & Uji ----
   // The quietest place in the game, which is the joke: every line on this list
@@ -2714,6 +2731,11 @@ export const TASKS = [
   // and a metre of daylight under the rim of it.
   { id: 'the-bell',      text: 'Be inside the bell when it goes',                chapter: 4, act: 2,
     mini: 'THE BONSHO' },
+  // THE WINDOW (L6, F2 / design 2.5). Kyoto had no event a player could be
+  // late for. The heron has stood in the shallows since the chapter was built
+  // and goes up on its own rest clock (kyoHERON_REST) whatever you do; the
+  // clock is on the live line now, and being under it when it goes is a row.
+  { id: 'heron-lift',    text: 'Call up under the heron as it goes',        chapter: 4, act: 2, needs: 'clock' },
 
   // ---- Chapter 5: Cali, Valle del Cauca ----
   // The salsa capital of the world, and the only chapter whose centrepiece is
@@ -2739,6 +2761,11 @@ export const TASKS = [
   // has something at the far end that returns you. Cali did not.
   { id: 'cart-run',      text: 'Run the fruit barrow off the ridge',             chapter: 5, act: 3,
     mini: 'LA CARRETILLA' },
+  // THE WINDOW (L6, F2). The five cometas over San Antonio have flown on
+  // beating sines since v14 and never all dropped at once; a gust comes
+  // through on a clock now (caliGUST_PER) and they go down together for four
+  // seconds. A hop under the strings while they are down is the row.
+  { id: 'kite-dive',     text: 'Hop through the kites when the gust drops them', chapter: 5, act: 2, needs: 'clock' },
 
   // ---- Chapter 6: Rio de Janeiro ----
   // The second chapter built on a beat, and deliberately NOT a second salsa
@@ -2809,6 +2836,10 @@ export const TASKS = [
   { id: 'fragata',       text: 'Call down a fragata',                            chapter: 6, act: 3 },
   { id: 'fragata-ride',  text: 'Hang from the frigatebird over Sugarloaf',       chapter: 6, act: 3,
     wow: 'THE FRIGATEBIRD' },
+  // G is on the front of the title card and no row read `capy.sliding`
+  // (L6, F2 / design 2.2). Selarón's flight is the one stair in the game
+  // that is long enough to be taken lying down.
+  { id: 'selaron-belly', text: 'Take Selarón’s steps on your belly',         chapter: 6, act: 2, needs: 'G' },
 
   // ---- Chapter 7: Iceland — Reykjavik, the geysers and the glacier ----
   // The first chapter that happens at NIGHT, and the first one whose centrepiece
@@ -2835,6 +2866,10 @@ export const TASKS = [
   { id: 'the-whale',     text: 'Be on the pier when the whale comes up',         chapter: 7,
     mini: 'THE BAY' },
   { id: 'aurora',         text: 'Wait in the hot spring for the lights, then call', chapter: 7, act: 3, wow: 'THE AURORA' },
+  // The herd, asked for outside the Pantanal (L6, F2): the moor flock has
+  // offered to follow since it was built, and nothing needed it anywhere.
+  // Fourteen sheep, sixty-four metres from the pool — three holds' walk.
+  { id: 'sheep-to-the-spring', text: 'Walk two sheep to the hot spring',    chapter: 7, act: 3, needs: 'herd' },
 
   // ---- Chapter 8: Marrakech & the Erg ----
   // The densest place in the game immediately followed by the emptiest, which
@@ -2862,6 +2897,13 @@ export const TASKS = [
   // everything else carries you or leans on you. This throws you.
   { id: 'acrobats',      text: 'Let the acrobats throw you',                     chapter: 8,
     mini: 'JEMAA EL-FNAA' },
+  // The vault, the chapter that teaches it, and the first thing that asks
+  // for it (L6, F2): a wall-kick inside the souk while they are after you.
+  { id: 'souk-wall',     text: 'Out of the souk off a wall, with them behind you', chapter: 8, act: 2, needs: 'vault' },
+  // THE DECOY (L6, F1 / design 2.4): hide, wheek, and the animal you carried
+  // in from another chapter runs out; whoever is coming for you reaches a
+  // bird instead. The one row in the game that asks for the hide.
+  { id: 'souk-decoy',    text: 'Lose them with somebody else’s bird',       chapter: 8, act: 2 },
 
   // ---- Chapter 9: the Drift ----
   // The first chapter with nobody in it. Eight places in a row where the list
@@ -2893,6 +2935,9 @@ export const TASKS = [
   // The mini, and the only thing up here you have to CATCH.
   { id: 'driftseed',     text: 'Cross the void on a seed',                       chapter: 9, act: 2,
     mini: 'THE SEED' },
+  // ...and the seed the mini teaches, examined (L6, F2): the same twenty
+  // metres, held on the hop key the whole way down and without the puff.
+  { id: 'seed-gap',      text: 'The long gap, without the puff',              chapter: 9, act: 2, needs: 'seed' },
 
   // ---- Chapter 10: Venice ----
   // The first chapter whose OBSTACLE is the floor. Ten places in a row have
@@ -2930,6 +2975,12 @@ export const TASKS = [
   // from above; the rig for the Volo has been up since Carnevale.
   { id: 'volo',          text: 'Take the angel’s flight off the campanile',      chapter: 10,
     mini: 'IL VOLO' },
+  // The perch, asked for (L6, F2 / design 2.4): a hundred and eighty pigeons
+  // that climb on when you sit down, and a boat that asks you to stand.
+  { id: 'pigeon-passenger', text: 'Cross on the traghetto with a pigeon aboard', chapter: 10, act: 2, needs: 'perch' },
+  // THE COMPANION (L6, F1 / design 2.4): not a Venetian pigeon — the animal
+  // you carried in from somewhere else, on the back, across the canal.
+  { id: 'trag-two',      text: 'Bring your companion across on the traghetto', chapter: 10, act: 2 },
 
   // ---- Chapter 11: Hong Kong ----
   // Eleven chapters of moving about on a plane, and this is the one that asks
@@ -2968,6 +3019,9 @@ export const TASKS = [
   // gives it something HAPPENING on it, on a clock, whether you turn up or not.
   { id: 'choi-cheng',    text: 'Be on the lion when it takes the lettuce',       chapter: 11,
     mini: 'THE LION' },
+  // Marrakech's wall-kick, three chapters on (L6, F2): the scaffold is the
+  // tallest climbable thing in the game and a wall is a thing to push off.
+  { id: 'scaffold-kick', text: 'Kick off the bamboo in mid-air',              chapter: 11, act: 2, needs: 'vault' },
 
   // CHAPTER 12 — PALAWAN. Twelve chapters in which water was a wall, a floor or
   // a road, and none in which it was a ROOM. Every line here is under it except
@@ -3009,6 +3063,9 @@ export const TASKS = [
   // capy.wet has existed since Sydney — it darkens the coat and it drips — and
   // it has never once been a mechanic.
   { id: 'beach-fire',   text: 'Put the beach fire out',                 chapter: 12 },
+  // The snorkel is a third more breath and the card never asked for it
+  // (L6, F2): the room with the hole in the roof, again, wearing it.
+  { id: 'snorkel-cathedral', text: 'The cathedral again, in the snorkel',    chapter: 12, act: 3, needs: 'worn+dive', worn: 'snorkel' },
 
   // CHAPTER 13 — CAPPADOCIA. The opposite chapter, deliberately: dry, cold,
   // upward, and the one place in the game where the player cannot steer.
@@ -3029,6 +3086,10 @@ export const TASKS = [
   // katpatuka, the land of beautiful horses, and there were none.
   { id: 'the-herd',      text: 'Pick the mare the others follow',                chapter: 13,
     mini: 'KATPATUKA' },
+  // Two systems at once (L6, F2 / design 2.4): the cap the sunrise hands
+  // over, and one of the field's cats on your back when the sun clears the
+  // rim. The dawn comes round every gorCYCLE, so the row re-arms itself.
+  { id: 'cap-at-the-rim', text: 'Meet the sun in the cap, with a cat aboard', chapter: 13, act: 3, needs: 'worn+perch', worn: 'flycap' },
 
   // ---- Chapter 14: Manly ----
   // The third Sydney chapter, and the argument for it is one sentence: the
@@ -3058,6 +3119,10 @@ export const TASKS = [
   // one way out through the break that is not swimming.
   { id: 'the-surfboat',  text: 'Go out through the break in the surfboat', chapter: 14, act: 2,
     mini: 'THE SURFBOAT' },
+  // The perch, in the water (L6, F2): a silver gull climbs on when you sit,
+  // and stays on through a swim — it is the dive, the slide and the climb
+  // that put it off. Out past the break with one aboard is the row.
+  { id: 'gull-out-back', text: 'Out the back with a gull on your back',      chapter: 14, act: 2, needs: 'perch' },
 
   // ---- Chapter 15: The Pantanal ----
   // Fifteen places and the animal has never once been anywhere it is actually
@@ -3085,6 +3150,10 @@ export const TASKS = [
   // The marquee, with a boss in it (X4): O Grandão comes up behind the line
   // and takes three wheeks to see off.
   { id: 'the-crossing',  text: 'Lead the herd across the river, past O Grandão', chapter: 15, act: 2, wow: 'THE HERD CROSSING' },
+  // THE WINDOW (L6, F2 / design 2.5). The jabiru has flown a circuit every
+  // twenty-four seconds since v20 and come back to its own feet; the
+  // landing is a moment you can be late for now, with the clock on the line.
+  { id: 'jabiru-home',   text: 'Be there when the jabiru comes down',        chapter: 15, act: 2, needs: 'clock' },
 
   // ---- Chapter 16: Sơn Đoòng ----
   // Sixteen chapters and the game had never once turned the lights off. The
@@ -3140,6 +3209,10 @@ export const TASKS = [
   // The second mini. There is a river in here and things come down it.
   { id: 'the-log',       text: 'Go downstream on whatever floats past',  chapter: 16,
     mini: 'THE DRIFTWOOD' },
+  // THE WINDOW (L6, F2). Twenty-six drips on their own random periods, and
+  // now a burst every cavBURST_PER when the whole roof lets go at once —
+  // one of them, the big one by the mouth, is where to be when it does.
+  { id: 'the-big-drip',  text: 'Be under the big one when the roof lets go', chapter: 16, act: 2, needs: 'clock' },
 
   // ---- Chapter 17: the Antarctic Peninsula ----
   // The first list in the game that is mostly a LIST OF PASSAGES. Sixteen
@@ -3171,6 +3244,10 @@ export const TASKS = [
   { id: 'floe-drift',      text: 'Let a floe take you north',             chapter: 17, act: 2,
     mini: 'THE FLOE' },
   { id: 'orca-ride',       text: 'Drive the boat into the orca pod and keep up', chapter: 17, act: 3, wow: 'THE ORCA POD' },
+  // THE WINDOW (L6, F2). The face has calved every 38–62 s since v20, two
+  // sounds and a wave, and nothing asked you to be there for it. From the
+  // boat, inside seventy metres, when it goes.
+  { id: 'the-calving',     text: 'See the face come off, from the boat',     chapter: 17, act: 2, needs: 'clock' },
 
   // ---- Chapter 18: Monte Carlo -------------------------------------------
   // A HEIST, IN THREE MOVEMENTS, and the acts are geography: the water, the
@@ -3208,6 +3285,12 @@ export const TASKS = [
   // lap of the circuit against the pack, through the tunnel.
   { id: 'the-tunnel',   text: 'Drive the red car one lap and pass the pack', chapter: 18, act: 3,
     wow: 'THE GRAND PRIX' },
+  // The seed, nine chapters on, and then the dive (L6, F2 / design 2.4):
+  // off the sun deck on the hop key, and go under when you land.
+  { id: 'seed-and-under', text: 'Off the sun deck like a seed, then under',  chapter: 18, act: 2, needs: 'seed+dive' },
+  // THE COMPANION at the podium (L6, F1 / design 2.4): it gets in when you
+  // take the wheel (THE SEAT), and a lap won is won by both of you.
+  { id: 'podium-two',    text: 'The two of you at the podium',              chapter: 18, act: 3 },
 
   // ---- Chapter 19: Hanoi --------------------------------------------------
   // THE THIRTY-SIX STREETS, THE LAKE, AND THE LINE — and the three acts are
@@ -3241,6 +3324,10 @@ export const TASKS = [
   { id: 'fold-the-street', text: 'Be there when the street folds up',   chapter: 19, act: 3 },
   { id: 'long-bien',    text: 'Walk out onto the old bridge',           chapter: 19, act: 3 },
   { id: 'the-train',    text: 'Stand in the alley as the train squeezes through', chapter: 19, act: 3 },
+  // The last skill the journey hands over, and the only one nothing ever
+  // read (L6, F2): `capy.committed` is right of way, and a crossing held on
+  // it the whole way over is the row.
+  { id: 'right-of-way', text: 'Cross the big one on right of way, no flinch', chapter: 19, act: 2, needs: 'committed' },
 ];
 
 
@@ -4328,6 +4415,22 @@ export const RECORDS = {
   // step off the very top lands the full height; twenty-five is the top,
   // give or take the metre you lose stepping off.
   'the-column':    { label: 'dropped', unit: ' m', better: 'higher', dp: 0, par: 25 },
+  // ---- THE WINDOWS (L6, F2 / design 2.5) ----------------------------------
+  // Five clocks on five movers, and the countdown IS the live line: the
+  // chapter hands `recordLive(id, secondsToGo)` over every frame while you are
+  // near the thing, so "the heron goes in 14 s" sits on the paper where a
+  // clock counting up would. The figure filed on the tick is the SAME
+  // quantity — how long it went in after you were in place — so the best
+  // under the countdown reads as one number and not two: 'best 3 s' is a
+  // player who turned up with three seconds to spare. `better: 'lower'` is
+  // cutting it fine, which is the only skill a window has. No par: nothing
+  // in the source to derive one from, and a window's par is the clock.
+  // Same api-key rule as R7: every key is the TASK id.
+  'heron-lift':    { label: 'the heron goes in', unit: ' s', better: 'lower', dp: 0 },
+  'kite-dive':     { label: 'the gust comes in', unit: ' s', better: 'lower', dp: 0 },
+  'jabiru-home':   { label: 'it comes down in', unit: ' s', better: 'lower', dp: 0 },
+  'the-big-drip':  { label: 'the roof goes in', unit: ' s', better: 'lower', dp: 0 },
+  'the-calving':   { label: 'the face goes in', unit: ' s', better: 'lower', dp: 0 },
 };
 
 

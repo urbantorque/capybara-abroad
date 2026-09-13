@@ -3993,6 +3993,25 @@ const caliKITE_N = 5;
 const caliKITE = { x: -6, z: caliSTREET_Z + 26 };   // anchored over the hill, downwind
 let caliKiteMesh = null, caliKiteLineMesh = null, caliKiteSeed = null;
 let caliKiteT = 0;
+// ---- THE WINDOW (L6, F2 / design 2.5) -------------------------------------
+// Cali had no event a player could be late for. The five kites dove on
+// their own beating sines and never together; a GUST comes through every
+// caliGUST_PER now and puts all five down for caliGUST_DUR seconds, the
+// clock is on the live line inside forty-five metres, and `kite-dive` is a
+// hop under the strings while they are down. `caliKiteWait` is seconds
+// stood in the field before it came — the figure the record files (see the
+// WINDOWS block in shared.js RECORDS).
+const caliGUST_PER = 70, caliGUST_DUR = 4.0;
+const caliKITE_HX = 22, caliKITE_HZ = 16;            // the field under the strings
+let caliGustT = caliGUST_PER - 24;                   // first gust ~24 s in
+let caliKiteWait = 0, caliKiteDiveDone = false;
+/** 0..1 how far down the gust has the kites this frame. */
+function caliGustDown() {
+  const left = caliGUST_PER - caliGustT;
+  if (left > caliGUST_DUR) return 0;
+  const u = 1 - left / caliGUST_DUR;                  // 0 at the onset, 1 at the end
+  return Math.sin(u * Math.PI);                       // down, and back up
+}
 
 // ============================================================ THE PARAKEETS ==
 /**
@@ -4159,6 +4178,28 @@ function caliBuildKites(root) {
 function caliUpdateKites(dt) {
   if (!caliKiteMesh) return;
   caliKiteT += dt;
+  // ---- THE WINDOW (L6, F2): the gust clock, the line, and the row --------
+  caliGustT += dt;
+  if (caliGustT >= caliGUST_PER) caliGustT -= caliGUST_PER;
+  const down = caliGustDown();
+  {
+    const capy = caliGame && caliGame.capy;
+    const p = capy && capy.position;
+    const inField = !!p && Math.abs(p.x - caliKITE.x) < caliKITE_HX && Math.abs(p.z - caliKITE.z) < caliKITE_HZ;
+    const far = p ? Math.hypot(p.x - caliKITE.x, p.z - caliKITE.z) : 999;
+    caliKiteWait = inField && down < 0.5 ? caliKiteWait + dt : (inField ? caliKiteWait : 0);
+    if (far < 45 && caliGame.recordLive) caliGame.recordLive('kite-dive', Math.max(0, caliGUST_PER - caliGUST_DUR - caliGustT));
+    // the row: airborne and RISING under the strings while they are down — a
+    // hop, not a fall off the hill
+    if (!caliKiteDiveDone && inField && down > 0.5 && capy && !capy.grounded &&
+        capy.velocity && capy.velocity.y > 0.8) {
+      caliKiteDiveDone = true;
+      caliTask('kite-dive');
+      if (typeof caliGame.record === 'function') caliGame.record('kite-dive', Math.round(caliKiteWait));
+      if (typeof caliGame.recordEnd === 'function') caliGame.recordEnd('kite-dive');
+      if (caliGame.toast) caliGame.toast('five kites came down and a capybara went up. the hill has seen nothing like it.');
+    }
+  }
   for (let i = 0; i < caliKITE_N; i++) {
     const s = caliKiteSeed[i];
     const gy = caliTerrain(s.ax, s.az);
@@ -4167,10 +4208,12 @@ function caliUpdateKites(dt) {
     // interesting part: about once every twenty seconds it loses the wind, the
     // lean goes to nearly horizontal and the height falls, and then it catches
     // and climbs. Two sines beating gives that for free and never repeats.
+    // ...and on the gust (F2) all five go to the horizontal together and
+    // the strings shorten, which is a kite losing its wind.
     const gust = Math.sin(caliKiteT * s.w + s.b) * Math.sin(caliKiteT * 0.17 + s.b * 2);
-    const lean = 0.55 + gust * 0.40;                 // rad off vertical
+    const lean = Math.min(1.45, 0.55 + gust * 0.40 + down * 0.95);   // rad off vertical
     const round = s.b + caliKiteT * 0.11 + Math.sin(caliKiteT * 0.23 + s.b) * 0.5;
-    const len = s.len * (0.82 + gust * 0.16);
+    const len = s.len * (0.82 + gust * 0.16) * (1 - down * 0.35);
     const x = s.ax + Math.sin(round) * Math.sin(lean) * len;
     const z = s.az + Math.cos(round) * Math.sin(lean) * len;
     const y = gy + 2.0 + Math.cos(lean) * len;
@@ -4661,6 +4704,9 @@ export function createCali(game) {
     inCart() { return !!(caliGame && caliGame.capy && caliInCart(caliGame.capy.position)); },
     floor: caliFLOOR,
     cristo: caliCRISTO,
+    /** THE WINDOW (L6, F2): the field under the strings, and seconds to the gust (-1 while they are down). */
+    kites: caliKITE,
+    gustIn() { const t = caliGUST_PER - caliGUST_DUR - caliGustT; return t > 0 ? t : -1; },
     cane: { x: (caliCANE.x0 + caliCANE.x1) * 0.5, z: (caliCANE.z0 + caliCANE.z1) * 0.5 },
     mirador: caliMIRADOR,
     /** For the HUD: how the dance is going, 0..1. */

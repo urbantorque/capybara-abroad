@@ -3512,24 +3512,40 @@ export function createNPCs(game) {
   const npcAUTH_SPAWN_R = 26;   // m: nearer than this, they put you at the spawn
   const npcAUTH_ESC_V  = 2.2;   // m/s, carrying
   const npcHIDE_LOSE   = 2.6;   // s hidden before a marcher gives up
+  // ---- ...AND THE AUTHORITY HAS SEEN THE COMPANION (L6, F1) ---------------
+  // `when:` entries, the line pools' own third form: true while there is one
+  // with you (systems.js's game.companion()). An authority setting off past
+  // a heron says so; one carrying you out mentions the other one; one who
+  // reached a bird instead of you says what it was.
+  function npcWithComp() {
+    return !!(typeof game.companion === 'function' && game.companion());
+  }
   const npcLOC_AUTH_GO = ['Right. That is enough.',
                           'Stop there. I mean it.',
                           'You. Yes, you. Here.',
-                          'I have been told about you.'];
+                          'I have been told about you.',
+                          { t: 'Is that yours?', when: npcWithComp },
+                          { t: 'And what is THAT. Both of you. Here.', when: npcWithComp }];
   const npcLOC_AUTH_CARRY = ['Out. Out you go.',
                              'No. Not today.',
                              'I have a whole square to look after.',
-                             'You weigh more than you look.'];
+                             'You weigh more than you look.',
+                             { t: 'The other one can walk.', when: npcWithComp }];
   const npcLOC_AUTH_DROP = ['And stay there.',
                             'Off you go.',
                             'That is where you started. Start again.',
-                            'Somebody will be along to see you do not.'];
+                            'Somebody will be along to see you do not.',
+                            { t: 'And take your friend.', when: npcWithComp }];
   const npcLOC_MARCH_LOST = ['Where did it go.',
                              '...it was just here.',
                              'I am not looking under there.',
-                             'Fine. Fine.'];
+                             'Fine. Fine.',
+                             { t: 'It is a bird. I have been chasing a bird.', when: npcWithComp },
+                             { t: 'That is not the one I wanted.', when: npcWithComp }];
   let marWho = null;           // the one marcher, or null. ONE, ever.
   let marLost = 0;             // s the marcher has not been able to see you
+  let marDecoyed = false;      // ...and whether the companion was ever what they walked to (L6, F1)
+  const npcDECOY_TAKE = 3.2;   // m at which a marcher sees the decoy for the bird it is
   let marSeenX = 0, marSeenZ = 0;  // where you were, the last time they could
   let marT = 0;                // s spent marching
   let marSayT = 0;             // s until the next thing they say
@@ -5125,12 +5141,27 @@ export function createNPCs(game) {
     // ---- THE HIDE (L3, F1): a marcher who cannot see you walks to where
     // you were, and gives up after a while of that. See THE AUTHORITY.
     const hid = typeof game.hidden === 'function' ? game.hidden() : 0;
+    // ---- ...AND THE DECOY (L6, F1): while the companion is out, what the
+    // marcher heard is where it IS. systems.js publishes game.decoyAt() for
+    // four seconds after a hidden wheek; the marcher walks to that instead of
+    // to where you were, the lost clock holds while there is something to
+    // walk to, and reaching a bird is the end of it — 'lost you', flagged,
+    // so the row that asks for exactly this can tick.
+    const dc = hid > 0.5 && typeof game.decoyAt === 'function' ? game.decoyAt() : null;
+    if (dc) { marSeenX = dc.x; marSeenZ = dc.z; marDecoyed = true; }
     if (hid > 0.5) {
-      marLost += dt;
-      if (marLost > npcHIDE_LOSE) {
+      if (!dc) marLost += dt;
+      // A bird is seen for what it is from further off than a capybara is
+      // grabbed: npcDECOY_TAKE, not npcMAR_TAKE. Measured (qa/l6-companion.js):
+      // an authority set off from 13 m got to 4.3 m of the pigeon inside the
+      // decoy's four seconds and never to 1.7.
+      const dd = dc ? Math.hypot(dc.x - r.x, dc.z - r.z) : 1e9;
+      if (marLost > npcHIDE_LOSE || dd < npcDECOY_TAKE) {
         marWhy = 'lost you';
         if (r.cd <= 0) { r.cd = r.cool * rand(0.8, 1.4); localReactLine(r, npcLOC_MARCH_LOST); }
-        emit('npc:lost', { x: r.x, z: r.z });
+        // `decoy`: this march was walked to the companion at some point, so
+        // it was lost BY the decoy whether the clock or the bird ended it.
+        emit('npc:lost', { x: r.x, z: r.z, decoy: marDecoyed });
         marEnd(r, false, false); return;
       }
     } else { marLost = 0; marSeenX = cp.x; marSeenZ = cp.z; }
@@ -5213,7 +5244,7 @@ export function createNPCs(game) {
   const marOwed = { t: 0, x: 0, z: 0, n: 0 };
   function marGo(best, n) {
     marWho = best; marT = 0; marSayT = 0; marBlocked = 0; marWhy = "marching"; marOwed.t = 0;
-    marLost = 0;
+    marLost = 0; marDecoyed = false;
     const cp0 = game.capy && game.capy.position;
     if (cp0) { marSeenX = cp0.x; marSeenZ = cp0.z; }
     if (best.authority && best.cd <= 0) { best.cd = best.cool * rand(0.5, 0.9); localReactLine(best, npcLOC_AUTH_GO); }
@@ -13820,29 +13851,12 @@ export function createNPCs(game) {
           r.perch = 0.25;              // re-asked every frame — see stepIbis
           r.group.position.y = y;
         },
-        // ---- ...AND ONE OF THEM MAY LEAVE THE GARDENS (N3) --------------
-        // See THE STOWAWAY in systems.js. An ibis is four InstancedMeshes
-        // driven by four node matrices, and none of them is drawn once Sydney
-        // detaches — so this is the same four geometries at their REST offsets,
-        // which is `buildIbis`'s own table and the pose a bird being carried is
-        // in anyway. Geometries and materials shared, never cloned.
-        stow: function (n) {
-          const r = ibises[n];
-          const g = new THREE_.Group();
-          const mk = function (geo, im, x, y, z) {
-            const m = new THREE_.Mesh(geo, im.material);
-            m.position.set(x, y, z);
-            m.castShadow = true;
-            g.add(m);
-            return m;
-          };
-          mk(gIbisBody, iIbisB, 0, 0.32, 0);
-          mk(gIbisNeck, iIbisN, 0, 0.40, 0.09);
-          mk(gIbisLeg, iIbisLA, -0.06, 0.32, 0);
-          mk(gIbisLeg, iIbisLB, 0.06, 0.32, 0);
-          g.scale.setScalar(r && r.group ? r.group.scale.x : 1);
-          return g;
-        },
+        // ---- ...AND ONE OF THEM MAY LEAVE THE GARDENS (N3 → L6, F1) -----
+        // See THE COMPANION in systems.js, which draws its own ibis: an ibis
+        // here is four InstancedMeshes driven by four node matrices, and the
+        // drawable this used to hand over shared their materials by reference
+        // with a chapter that is detached on the far side.
+        travels: true,
       });
     }
 

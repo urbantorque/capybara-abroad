@@ -143,6 +143,7 @@ const gorV3b = new THREE.Vector3();
 // the same object twice. Caught by a QA probe that printed the two side by side
 // and got the same three numbers.
 const gorV3c = new THREE.Vector3();
+const gorV3cat = new THREE.Vector3();   // catAt()'s own, for the reason above (F2)
 const gorQ = new THREE.Quaternion();
 const gorEu = new THREE.Euler();
 const gorSc = new THREE.Vector3();
@@ -221,6 +222,7 @@ let gorDecorData = null;
 
 let gorChimDone = false, gorDoveDone = false, gorTetherDone = false;
 let gorAboardDone = false, gorWindsDone = false, gorSunDone = false, gorLandDone = false;
+let gorCapRimDone = false;           // THE SECOND ASK (L6, F2)
 let gorTruck = null, gorTruckX = 20, gorTruckZ = 10, gorTruckYaw = 0;
 // THE TRAILER IS A FLOOR NOW. See gorUpdateTruck and gorTrailerRide.
 let gorTrailerBody = null;             // kinematic, the bed you stand on
@@ -1452,19 +1454,11 @@ function gorUpdateCats(game, dt) {
           c.py = y;
           c.st = 'flop'; c.t = 6;             // a cat that has got up there stays
         },
-        // ---- ...AND ONE OF THEM MAY LEAVE THE VALLEY (N3) ----------------
-        // See THE STOWAWAY in systems.js. One mesh off the instanced cat's own
-        // geometry and material, shared and never cloned. It travels SITTING —
-        // the flop is a cat that has decided to stay where it is, and a cat
-        // being carried to Antarctica is a cat paying attention.
-        stow: function (i) {
-          if (!gorCatMesh) return null;
-          const c = gorCats[i];
-          const m = new THREE.Mesh(gorCatMesh.geometry, gorCatMesh.material);
-          m.castShadow = true;
-          m.scale.setScalar(c ? c.sc : 1);
-          return m;
-        },
+        // ---- ...AND ONE OF THEM MAY LEAVE THE VALLEY (N3 → L6, F1) -------
+        // See THE COMPANION in systems.js, which draws its own sitting cat:
+        // the one this handed over shared the instanced cat's material by
+        // reference with a chapter that is detached on the far side.
+        travels: true,
       });
     }
   }
@@ -4726,6 +4720,16 @@ function gorUpdateBalloon(game, dt) {
       gorSunNagged = true;
       gorCall('chief', 'topup', 'Top up! Everybody is burning — get in it!', 999);
     }
+    // ---- THE SECOND ASK (L6, F2): `cap-at-the-rim` reads capy.worn and
+    // perchCount() — the same window, the cap the marquee handed over, and a
+    // field cat on the back (the perch survives a carrier; it is the hop that
+    // puts one off, and a basket is not hopped in). Re-arms with the dawn.
+    if (gorSunWin && gorSunBurned && !gorCapRimDone && game.capy && game.capy.worn === 'flycap' &&
+        typeof game.perchCount === 'function' && game.perchCount() >= 1) {
+      gorCapRimDone = true;
+      gorTask('cap-at-the-rim');
+      if (typeof game.toast === 'function') game.toast('the sun, the cap, and a cat that has decided this is normal.');
+    }
     if (gorSunWin && gorSunBurned && !gorSunDone) {
       gorSunDone = true;
       gorTask('sunrise');
@@ -5731,6 +5735,19 @@ export function createGoreme(game) {
     /** Both of these MOVE. Ask; never cache. */
     // the herd. It MOVES — ask, never cache.
     mare() { return gorHerdPos; },
+    /** The nearest field cat, for `cap-at-the-rim` (L6, F2). It MOVES — ask, never cache. */
+    catAt() {
+      const cp = gorGame && gorGame.capy && gorGame.capy.position;
+      let best = null, bd = Infinity;
+      for (let i = 0; i < gorCats.length; i++) {
+        const c = gorCats[i];
+        const d = cp ? (c.x - cp.x) * (c.x - cp.x) + (c.z - cp.z) * (c.z - cp.z) : 0;
+        if (d < bd) { bd = d; best = c; }
+      }
+      if (!best) return null;
+      gorV3cat.set(best.x, gorTerrain ? gorTerrain(best.x, best.z) : 0, best.z);
+      return gorV3cat;
+    },
     mareRunning() { return gorHerdWait <= 0; },
     onMare() { return !!(gorGame && gorGame.capy && gorOnMare(gorGame.capy.position)); },
     balloon() { gorV3b.set(gorBalX, gorBalY, gorBalZ); return gorV3b; },

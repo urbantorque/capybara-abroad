@@ -24,14 +24,12 @@ async page => {
   // own keepsake teleport (950, 12, 950 reaching 90 m/s) was the source of
   // every clamp it reported — so it is read as a DELTA over the eight
   // seconds of input, and the teleport's own clamps are a separate column.
-  await page.goto('http://localhost:5188/index.html');
+  await page.goto('http://localhost:5190/');
   await page.waitForTimeout(6000);
   await page.keyboard.press('Enter');
   await page.waitForTimeout(3000);
   const started = await page.evaluate(() => !!(window.__capy && window.__capy.state.started));
-  const names = ['sydney', 'pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland',
-                 'sahara', 'drift', 'venice', 'kowloon', 'palawan', 'goreme',
-                 'manly', 'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi'];
+  const names = ['sydney', 'pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland', 'sahara', 'drift', 'venice', 'kowloon', 'palawan', 'goreme', 'manly', 'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi'];
   const res = {};
   for (const n of names) {
     res[n] = await page.evaluate(async (name) => {
@@ -239,18 +237,11 @@ async page => {
     // own clamps kept apart in `keepSaves`; a non-zero delta is a body being
     // clamped every frame — Monaco's hidden camera, falling for ever under
     // the world, read +107 here and the column had stopped meaning "clean".
-    // ...AND ONE IS NOT EVERY FRAME (L6-4). Eight seconds of random keys kick
-    // props, and a crate knocked into a wall can be clamped ONCE; measured
-    // across five runs on the finished L6 tree the delta was +1 or +2 in one
-    // to three chapters, a different chapter each time, with lastError null.
-    // Every frame is 480 in eight seconds; the gate is at five, which a
-    // falling body reaches in a twelfth of a second.
-    const sysFUZZ_SAVES_MAX = 5;
-    if (r.solverSaves > sysFUZZ_SAVES_MAX) fail.push(n + ': solverSaves +' + r.solverSaves + ' (a body is being clamped every frame)');
+    if (r.solverSaves) fail.push(n + ': solverSaves +' + r.solverSaves + ' (a body is being clamped every frame)');
     if (r.lastError) fail.push(n + ': lastError ' + String(r.lastError).slice(0, 120));
   }
   await page.evaluate(async (o) => {
-    await fetch('/shot?name=fuzz.json', { method: 'POST',
+    await fetch('/shot?name=l6-f3-fuzz.json', { method: 'POST',
       body: btoa(unescape(encodeURIComponent(JSON.stringify(o, null, 1)))) });
   }, { started, fail, pass: fail.length === 0, res });
   if (fail.length) throw new Error('fuzz FAILED (' + fail.length + '):\n  ' + fail.join('\n  '));

@@ -289,6 +289,15 @@ let antSealSurf = 0, antSealTold = false, antSealBr = 0;
 let antWeddell = null;
 
 let antCalveT = 16, antCalveBits = null, antCalveData = null, antCalveLive = 0;
+// ---- THE WINDOW (L6, F2 / design 2.5) -------------------------------------
+// The Peninsula had no event a player could be late for, and it had one all
+// along: the face calves on antCalveT and nothing asked you to be there.
+// `the-calving` is the tiller inside antCALVE_SEE_R of the block that comes
+// off; the countdown is the live line inside 140 m of the face; the wait is
+// seconds held at the helm inside the ring before it went — the figure the
+// record files (shared.js RECORDS, WINDOWS).
+const antCALVE_SEE_R = 70;
+let antCalveWait = 0, antCalvingDone = false;
 let antCrackT = -1, antCrackV = 0;   // the rumble that follows the crack
 let antGateDone = false;
 let antScrapeT = 0, antToldFloe = false;   // leaning on a pan. See antStepBoat
@@ -4699,17 +4708,10 @@ function antUpdatePenguins(game, dt) {
           antPengPerch[i] = 0.25;      // re-asked every frame — see antUpdatePeng
           antPengPerchY[i] = y;
         },
-        // ---- ...AND ONE OF THEM MAY LEAVE THE CONTINENT (N3) -------------
-        // See THE STOWAWAY in systems.js. One mesh off the colony's own
-        // geometry and material, shared and never cloned. A gentoo in Venice
-        // is the best sentence this mechanic can produce and it costs one
-        // instanced geometry it already owns.
-        stow: function () {
-          if (!antPengMesh) return null;
-          const m = new THREE.Mesh(antPengMesh.geometry, antPengMesh.material);
-          m.castShadow = true;
-          return m;
-        },
+        // ---- ...AND ONE OF THEM MAY LEAVE THE CONTINENT (N3 → L6, F1) ----
+        // See THE COMPANION in systems.js, which draws its own gentoo. A
+        // gentoo in Venice is the best sentence this mechanic can produce.
+        travels: true,
       });
     }
   }
@@ -5455,6 +5457,13 @@ function antUpdateSeal(game, dt) {
  */
 function antUpdateCalving(game, dt) {
   antCalveT -= dt;
+  // ---- THE WINDOW (L6, F2): the wait, and the countdown on the line ------
+  {
+    const cp = game.capy && game.capy.position;
+    const df = cp ? Math.hypot(cp.x - antGLAC.xToe, cp.z - antCALVE.z) : 999;
+    antCalveWait = antHelmOn && df < antCALVE_SEE_R + 20 ? antCalveWait + dt : 0;
+    if (df < 140 && game.recordLive) game.recordLive('the-calving', Math.max(0, antCalveT));
+  }
   if (antCalveT <= 0) {
     antCalveT = rand(38, 62);
     antCalveLive = 6.0;
@@ -5494,6 +5503,15 @@ function antUpdateCalving(game, dt) {
     const v = clamp(0.46 - far * 0.0011, 0.05, 0.46);
     antSfx('thud', { volume: v, pitch: 0.62 });
     antCrackT = 0.55 + far * 0.0018;
+    // ---- THE WINDOW (L6, F2): `the-calving` — at the tiller, inside the
+    // ring of the block that came off, on the frame it comes off.
+    if (!antCalvingDone && antHelmOn && far < antCALVE_SEE_R) {
+      antCalvingDone = true;
+      antTask('the-calving');
+      if (typeof game.record === 'function') game.record('the-calving', Math.round(antCalveWait));
+      if (typeof game.recordEnd === 'function') game.recordEnd('the-calving');
+      if (game.toast) game.toast('a million tonnes, from seventy metres. hold on: the wave is next.');
+    }
     antCrackV = v * 0.85;
     // the ice cloud off the face, which is what you actually see first
     for (let i = 0; i < 10; i++) {
@@ -6058,6 +6076,8 @@ export function createAntarctic(game) {
       antPodState = 'escort'; antPodStateT = 0; antPodRide = 0; antSlowT = 0;
       return antPodState;
     },
+    /** The harness (L6, F2): put the tender at (x, z) now — the calving window is 140 m from the berth. */
+    boatForce(x, z) { antBoatX = x; antBoatZ = z; antBoatSpeed = 0; return [antBoatX, antBoatZ]; },
     podDebug() {
       return { st: antPodState, stateT: Math.round(antPodStateT * 10) / 10,
                gap: Math.round(Math.hypot(antBoatX - antPodCX, antBoatZ - antPodCZ) * 10) / 10,
@@ -6130,6 +6150,9 @@ export function createAntarctic(game) {
     berg: { x: antBERG.x, z: antBERG.z },
     gate: { x: 0, z: antGATE_Z },
     blueIce: { x: antBLUE.xIn - 44, z: (antBLUE.z0 + antBLUE.z1) / 2 },
+    /** THE WINDOW (L6, F2): the serac face the blocks come off, and seconds until the next one. */
+    calveFace: { x: antGLAC.xToe + 6, z: antCALVE.z },
+    calveIn() { return Math.max(0, antCalveT); },
     glacierToe: { x: antGLAC.xToe - 6, z: (antBLUE.z0 + antBLUE.z1) / 2 },
     /** These MOVE — ask, never cache. */
     mug() {

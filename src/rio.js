@@ -239,6 +239,9 @@ let rioArpoadorDone = false;
 // rather than on every frame she stands on the rock. See the Arpoador block.
 let rioArpoadorUp = false;
 let rioSelaronT = -1;               // >= 0 while the climb is being timed
+// THE SECOND ASK (L6, F2): G, on the front of the title card and asked for
+// by no row. Seconds of `capy.sliding` on the flight, going DOWN it.
+let rioSelaronSlideT = 0, rioSelaronBellyDone = false;
 let rioRiding = false;
 let rioSalute = 0;                  // s of the bateria facing the capybara
 let rioConfetti = 0;                // s of the float throwing paper
@@ -4166,6 +4169,21 @@ function rioUpdateTasks(game, dt) {
   // are once-only, because only they are about the task.
   {
     const foot = rioSelaronFoot(), head = rioSelaronHead();
+    // ---- THE SECOND ASK (L6, F2): `selaron-belly` reads capy.sliding -----
+    // On the flight (between the foot and the head along z, within three
+    // metres of its axis), sliding, and going down: a second and a half of
+    // it is the whole flight taken on the belly. Ascending on G does not
+    // count, and neither does a slide that stops on the second step.
+    if (!rioSelaronBellyDone) {
+      const onFlight = Math.abs(p.x - foot.x) < 3 && p.z > foot.z + 1 && p.z < head.z - 1;
+      const downhill = capy.velocity && capy.velocity.z < -0.6;
+      rioSelaronSlideT = capy.sliding && onFlight && downhill ? rioSelaronSlideT + dt : 0;
+      if (rioSelaronSlideT > 1.5) {
+        rioSelaronBellyDone = true;
+        rioTask('selaron-belly');
+        if (typeof game.toast === 'function') game.toast('two hundred and fifteen steps, on your stomach. Selarón would have put THAT on a tile.');
+      }
+    }
     const df = (p.x - foot.x) * (p.x - foot.x) + (p.z - foot.z) * (p.z - foot.z);
     const dh = (p.x - head.x) * (p.x - head.x) + (p.z - head.z) * (p.z - head.z);
     if (df < 5 * 5) {
@@ -4671,6 +4689,8 @@ export function createRio(game) {
     sugarloaf: rioSUGAR,
     station: rioSTATION,
     selaron: rioSELARON,
+    /** The top of the flight, for `selaron-belly` (L6, F2): the slide starts there. */
+    selaronHead: rioSelaronHead,
     lapa: rioLAPA,
     corcovado: rioCORCOVADO,
     /** The desfile is a moving target, so the beacon has to ask where it is. */

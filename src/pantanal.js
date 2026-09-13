@@ -232,6 +232,17 @@ let panJabiru = null, panJabT = 0, panJabState = 'nest';
 let panJabNote = 0, panMacawNote = 0;
 let panJabStep = 0, panJabTx = 0, panJabTz = 0;
 const panJabFrom = { x: 0, z: 0, a: 0 };
+// ---- THE WINDOW (L6, F2 / design 2.5) -------------------------------------
+// The Pantanal had no event a player could be late for. The stork's circuit
+// is one: twenty-four seconds on the ground, eight and a half round, and it
+// lands on its own feet (panJabFrom). `jabiru-home` is being inside
+// panJAB_HOME_R of that spot on the landing frame; the countdown is on the
+// live line inside forty metres; `panJabWait` is how long you stood there
+// first, which is the figure the record files (shared.js RECORDS, WINDOWS).
+const panJAB_HOME_R = 8;
+const panJAB_GROUND = 24, panJAB_FLIGHT = 8.5;       // the two halves of the circuit, as coded below
+let panJabWait = 0, panJabHomeDone = false;
+const panV3jab = new THREE.Vector3();               // jabiruHome()'s own scratch
 let panMacaws = null, panMacawT = 0;
 let panOtterMesh = null, panOtterT = 0, panOtterUp = 0;
 // ...and the telling-off, which is a volley and not a metronome. See panUpdateOtters.
@@ -4095,6 +4106,15 @@ function panUpdateJabiru(game, dt) {
   }
   const near = capy ? panJabiru.position.distanceTo(capy.position) : 99;
   const groundY = panBedH(panJabiru.position.x, panJabiru.position.z);
+  // ---- THE WINDOW (L6, F2): the wait, and the countdown on the line ------
+  {
+    const hx = panJabState === 'up' ? panJabFrom.x : panJabiru.position.x;
+    const hz = panJabState === 'up' ? panJabFrom.z : panJabiru.position.z;
+    const dh = capy ? Math.hypot(capy.position.x - hx, capy.position.z - hz) : 999;
+    panJabWait = dh < panJAB_HOME_R ? panJabWait + dt : 0;
+    const left = panJabState === 'up' ? panJAB_FLIGHT - panJabT : panJAB_GROUND - panJabT + panJAB_FLIGHT;
+    if (dh < 40 && game.recordLive) game.recordLive('jabiru-home', Math.max(0, left));
+  }
   if (panJabState === 'nest') {
     // IT STALKS. It had "it stalks, one step at a time" written on it and it
     // did not move: the whole ground state was a yaw and a damped y, so a
@@ -4167,7 +4187,19 @@ function panUpdateJabiru(game, dt) {
     panJabiru.rotation.x = 0;
     panJabiru.rotation.y = a + Math.PI * 0.5;
     panJabiru.rotation.z = Math.sin(panJabT * 2.2) * 0.16;
-    if (t >= 1) { panJabState = 'nest'; panJabT = 0; panJabStep = 0.4; }
+    if (t >= 1) {
+      panJabState = 'nest'; panJabT = 0; panJabStep = 0.4;
+      // ---- THE WINDOW (L6, F2): `jabiru-home` — the landing frame, you
+      // inside the ring where it comes down. The wait is the figure.
+      if (!panJabHomeDone && capy &&
+          Math.hypot(capy.position.x - panJabFrom.x, capy.position.z - panJabFrom.z) < panJAB_HOME_R) {
+        panJabHomeDone = true;
+        panTask(game, 'jabiru-home');
+        if (typeof game.record === 'function') game.record('jabiru-home', Math.round(panJabWait));
+        if (typeof game.recordEnd === 'function') game.recordEnd('jabiru-home');
+        game.toast('a metre and a half of stork came down next to you and did not mind. that is the Pantanal.');
+      }
+    }
     // ONE NOTE, RATIONED AND SCALED BY DISTANCE. A jabiru has no syrinx and
     // cannot call at all — the only noise it makes is its bill.
     //
@@ -5744,6 +5776,17 @@ export function createPantanal(game) {
     },
     matCount() { return panMats.length; },
     nest: { x: panNEST.x, z: panNEST.z },
+    /** THE WINDOW (L6, F2): where the stork will come down, and seconds until it does. */
+    jabiruHome() {
+      if (!panJabiru) return null;
+      const up = panJabState === 'up';
+      panV3jab.set(up ? panJabFrom.x : panJabiru.position.x, panJabiru.position.y, up ? panJabFrom.z : panJabiru.position.z);
+      return panV3jab;
+    },
+    jabiruIn() {
+      if (!panJabiru) return -1;
+      return Math.max(0, panJabState === 'up' ? panJAB_FLIGHT - panJabT : panJAB_GROUND - panJabT + panJAB_FLIGHT);
+    },
     palm: { x: panPALM.x, z: panPALM.z },
     otters: { x: panOTTERS.x, z: panOTTERS.z },
     bridge: { x: panRoadX(panBRIDGES[1].z), z: panBRIDGES[1].z },

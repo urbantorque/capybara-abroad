@@ -2189,6 +2189,10 @@ let pastoCarPZ = pastoCAR_Z0;
 let pastoCarRideM = 0;        // metres of plaza covered on this one ride
 let pastoCarRideT = 0;
 let pastoCarRode = false;
+// THE CARRY (L6, F2): armed by an empanada in the mouth ON the deck, paid
+// out on the frame it is let go there. Arm by prop, never disarm — the
+// same deferral rule as physTask's carry rows in props.js.
+let pastoCarEmpArm = false, pastoCarEmpDone = false;
 let pastoCarCheerT = 0;
 let pastoCarBandT = 2.0;      // the band on the deck — see pastoUpdateCarroza
 let pastoCarWaiting = false;  // held for a capybara standing in the lane
@@ -2405,6 +2409,16 @@ function pastoUpdateCarroza(game, dt) {
 
   const capy = game.capy;
   const aboard = !!(capy && pastoCarAboard(capy.position));
+  // ---- THE CARRY (L6, F2): `empanada-float` reads capy.heldProp ---------
+  if (!pastoCarEmpDone && capy) {
+    const held = capy.heldProp;
+    if (aboard && held && held.type === 'empanada' && !held.spilled) pastoCarEmpArm = true;
+    else if (aboard && pastoCarEmpArm && !held) {
+      pastoCarEmpDone = true;
+      if (game.completeTask) game.completeTask('empanada-float');
+      if (game.toast) game.toast('an empanada, on the carnival float. the band has seen worse.');
+    } else if (!aboard) pastoCarEmpArm = false;
+  }
   // The plaza notices. A cheer every few seconds while somebody is up there is
   // the whole difference between riding a float and standing on a trailer.
   pastoCarCheerT -= dt;

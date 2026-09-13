@@ -260,6 +260,9 @@ let hkBakeryGroup = null, hkTankGroup = null;
 let hkFishMesh = null, hkFishData = null, hkFishOut = 0;
 
 let hkClimbBest = 0, hkClimbTold = false;
+// THE SECOND ASK (L6, F2): Marrakech's vault, read on an edge of the counter
+// capybara.js publishes, inside the scaffold's own footprint.
+let hkVaultSeen = -1, hkScaffoldKickDone = false;
 // The height ladder. Metres, and the last entry is a sentinel above the roof so
 // the index can never run off the end. See THE WAY UP PAYS AS YOU GO.
 const hkCLIMB_RUNGS = [8, 15, 22, 30, 36, 1e9];
@@ -5278,6 +5281,21 @@ function hkUpdateTasks(game, dt) {
   // the climb rate is several hundred of them, through the one verb this
   // chapter exists for. Bank the peak; file it when the animal lets go. Same
   // shape as gorFlushPeak in Cappadocia and palFlushDive in Palawan.
+  // ---- THE SECOND ASK (L6, F2): `scaffold-kick` reads capy.vaultN ---------
+  // A wall-kick off the bamboo: the counter goes up by one on the frame the
+  // kick lands, and the frame is inside the scaffold's footprint (its face
+  // plus the standoff, the width of the street it serves).
+  {
+    const vn = typeof capy.vaultN === 'number' ? capy.vaultN : 0;
+    if (hkVaultSeen < 0) hkVaultSeen = vn;
+    const atScaf = Math.abs(p.x - hkSCAF.x) < hkSCAF.out + 4.5 && p.z > hkSCAF.z0 - 3 && p.z < hkSCAF.z1 + 3;
+    if (!hkScaffoldKickDone && vn > hkVaultSeen && atScaf) {
+      hkScaffoldKickDone = true;
+      hkTask('scaffold-kick');
+      hkToast('off the bamboo and back into the air. the souk taught that. the souk is eleven thousand kilometres away.');
+    }
+    hkVaultSeen = vn;
+  }
   if (capy.climbing) {
     if (p.y > hkClimbBest) hkClimbBest = p.y;
     // ...AND HOW HIGH YOU ARE, WHILE YOU ARE UP THERE (v36). The one verb this

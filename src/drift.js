@@ -268,6 +268,10 @@ let driShelter = 1;                  // 1 in open air, 0.2 inside a column
 let driPuffReady = true, driPuffT = 0, driAirT = 0;
 let driWasGrounded = true;
 let driFlightX = 0, driFlightZ = 0, driFlightOn = false;
+// THE SECOND ASK (L6, F2): the seed, examined on the same gap. `capy.seedT`
+// is cumulative, so the flight remembers where it stood at take-off; the
+// puff sets a flag the landing reads.
+let driFlightSeed0 = 0, driFlightPuffed = false, driSeedGapDone = false;
 let driInCloud = 0;                  // s continuously in the cloud
 // ---- AND THE CLOUD ANSWERS THE WHEEK ------------------------------------
 // The wheek does four things in this chapter — it wakes a lampfly, it flushes
@@ -4208,6 +4212,7 @@ function driUpdatePuff(game, dt) {
       input && input.honkPressed && !capy.carriedBy) {
     driPuffReady = false;
     driPuffT = 0.45;
+    driFlightPuffed = true;          // `seed-gap` wants a crossing without one (F2)
     if (body.velocity.y < driPUFF_V) body.velocity.y = driPUFF_V;
     else body.velocity.y += driPUFF_V * 0.35;
     // a shove along the stick, so a puff can also be a course correction
@@ -4628,6 +4633,16 @@ function driUpdateFlight(game, dt) {
           driToast(d.toFixed(1) + ' metres of nothing, and you are still here.');
           driSfx('cheer', { volume: 0.5, pitch: 1.25 });
         }
+        // ---- THE SECOND ASK (L6, F2): `seed-gap` reads capy.seedT --------
+        // The same crossing, a second and a half of it on the hop key (the
+        // seed's own drift), and the puff never used. The wind is still the
+        // puzzle; this is the answer the Drift taught.
+        const seeded = (typeof capy.seedT === 'number' ? capy.seedT : 0) - driFlightSeed0;
+        if (!driSeedGapDone && seeded >= 1.5 && !driFlightPuffed) {
+          driSeedGapDone = true;
+          driTask('seed-gap');
+          driToast('no puff. you came down like one of those, and it was enough.');
+        }
         driRecord('long-gap', d);
         // ---- AND THE TWO POSTS SAY SO -------------------------------------
         // The hardest thing in the chapter — twenty-five metres of nothing that
@@ -4643,6 +4658,8 @@ function driUpdateFlight(game, dt) {
     }
     driFlightX = p.x; driFlightZ = p.z;
     driFlightOn = true;
+    driFlightSeed0 = typeof capy.seedT === 'number' ? capy.seedT : 0;   // (F2)
+    driFlightPuffed = false;
   } else if (inCloud) {
     driFlightOn = false;      // a fall is not a crossing
   } else if (driFlightOn) {

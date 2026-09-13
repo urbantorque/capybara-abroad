@@ -315,6 +315,9 @@ function monPodium(game) {
     setTimeout(function () { try { if (game.biome && game.biome.current === 'monaco') game.firework((monPORT.x0 + monPORT.x1) * 0.5 + 14, 38, (monPORT.z0 + monPORT.z1) * 0.5 - 8, { n: 48, size: 1.5, rgb: [2.2, 2.2, 1.4] }); } catch (e) { /* the sky is a gift */ } }, 650);
   }
   monToast('P1 — the podium. champagne off the pit wall, and the harbour lit for it.');
+  // ...and said as an event (L6, F1): systems.js ticks "the two of you at
+  // the podium" off this when the companion is with you.
+  if (game.events) game.events.emit('monaco:podium', { podiums: monPodiums });
 }
 let monMeTX = 0, monMeTY = 0, monMeTZ = 0;
 let monRaceOn = false;            // at the wheel
@@ -4452,8 +4455,25 @@ function monUpdateYacht(game, dt) {
     }
     // the highest point you have been at, for the dive
     monDiveTop = Math.max(monDiveTop, p.y);
+    monSeed0 = typeof capy.seedT === 'number' ? capy.seedT : 0;    // (F2)
   } else {
     monAboardT = 0;
+  }
+  // ---- THE SECOND ASK (L6, F2): `seed-and-under` reads capy.seedT and
+  // capy.depth — off the deck on the hop key (a second of the seed's drift
+  // in the fall), then under inside four seconds of the water.
+  if (!monSeedUnderDone) {
+    if (monSeedArm > 0) {
+      monSeedArm -= dt;
+      if ((capy.depth || 0) > 1.2) {
+        monSeedUnderDone = true; monSeedArm = 0;
+        monTask('seed-and-under');
+        monToast('down like a seed, and then under like what you are. the harbour master has written it down.');
+      }
+    } else if (monDiveTop > monWATER + 4 && !aboard && p.y < monWATER + 0.5 &&
+               (typeof capy.seedT === 'number' ? capy.seedT : 0) - monSeed0 >= 1.0) {
+      monSeedArm = 4.0;
+    }
   }
   // the dive: you left something high and you are now in the water
   if (monDiveTop > monWATER + 4 && !aboard) {
@@ -4844,6 +4864,10 @@ function monWheek(game) {
 
 // ============================================================ THE ARRIVAL ====
 let monDiveTop = 0;
+// THE SECOND ASK (L6, F2): the seed and then the dive. `capy.seedT` is
+// cumulative, so the deck remembers where it stood; a fall with a second of
+// drift in it arms a four-second window for the dive that follows.
+let monSeed0 = 0, monSeedArm = 0, monSeedUnderDone = false;
 let monRockT = 0, monRockDone = false;
 let monSpawned = false;
 

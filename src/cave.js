@@ -100,6 +100,20 @@ let cavWormDim = 0;
 // the drips, which is the sound and the sight of a cave and there were none
 const cavDRIP_N = 26;
 const cavDRIP_HIT = 1.15;   // m of the column that counts as under it — see soaking()
+// ---- THE WINDOW (L6, F2 / design 2.5) -------------------------------------
+// Sơn Đoòng had no event a player could be late for. The twenty-six drips
+// fall on their own random periods; every cavBURST_PER the roof lets go at
+// once for cavBURST_DUR — a landed drip re-arms in a third of a second
+// instead of its period — and drip 0 is THE BIG ONE, at a fixed spot on the
+// dry floor between the mouth and the Hand so the arrow has somewhere to
+// point (the other twenty-five are placed at random on build). `the-big-drip`
+// is being under it while the burst is on; the countdown is the live line
+// inside thirty metres; `cavBurstWait` is how long you stood there first —
+// the figure the record files (shared.js RECORDS, WINDOWS).
+const cavBURST_PER = 75, cavBURST_DUR = 5;
+const cavBIG_DRIP = { x: 0, z: 12 };
+let cavBurstT = cavBURST_PER - 30;                    // the first one thirty seconds in
+let cavBurstWait = 0, cavBurstUnder = 0, cavBigDripDone = false;
 const cavSOAK_T   = 4.0;    // s under a drip to get as damp as a drip can make you
 const cavSOAK_MAX = 0.62;   // ...and that is damp, never the 1.0 the river gives
 let   cavSoakT    = 0;
@@ -2971,6 +2985,7 @@ function cavBuildDrips(root) {
     const o = i * 5;
     let x, z, tries = 0;
     do { x = rand(-52, 52); z = rand(-172, 40); } while (cavHole(x, z) > 0.2 && ++tries < 20);
+    if (i === 0) { x = cavBIG_DRIP.x; z = cavBIG_DRIP.z; }   // the big one (F2)
     cavDripData[o] = x;
     cavDripData[o + 1] = z;
     cavDripData[o + 2] = cavRoofH(x, z) - rand(2, 10);
@@ -4328,10 +4343,27 @@ function cavUpdateDrips(game, dt) {
   const capy = game.capy;
   const px = capy && capy.position ? capy.position.x : 0;
   const pz = capy && capy.position ? capy.position.z : 0;
+  // ---- THE WINDOW (L6, F2): the burst clock, the line, and the row ------
+  cavBurstT += dt;
+  if (cavBurstT >= cavBURST_PER) cavBurstT -= cavBURST_PER;
+  const burst = cavBurstT > cavBURST_PER - cavBURST_DUR;
+  {
+    const bd = Math.hypot(px - cavBIG_DRIP.x, pz - cavBIG_DRIP.z);
+    cavBurstWait = bd < cavDRIP_HIT * 1.4 ? cavBurstWait + dt : 0;
+    if (bd < 30 && game.recordLive) game.recordLive('the-big-drip', Math.max(0, cavBURST_PER - cavBURST_DUR - cavBurstT));
+    cavBurstUnder = burst && bd < cavDRIP_HIT * 1.4 ? cavBurstUnder + dt : 0;
+    if (!cavBigDripDone && cavBurstUnder > 0.6) {
+      cavBigDripDone = true;
+      cavTask(game, 'the-big-drip');
+      if (typeof game.record === 'function') game.record('the-big-drip', Math.round(cavBurstWait));
+      if (typeof game.recordEnd === 'function') game.recordEnd('the-big-drip');
+      if (game.toast) game.toast('forty metres of roof, all of it at once, and you stood there. the cave has noticed.');
+    }
+  }
   for (let i = 0; i < cavDRIP_N; i++) {
     const o = i * 5;
     cavDripData[o + 3] += dt;
-    const per = cavDripData[o + 4];
+    const per = burst ? 0.3 : cavDripData[o + 4];    // the whole roof, on the burst (F2)
     const floor = cavTerrain(cavDripData[o], cavDripData[o + 1]);
     const top = cavDripData[o + 2];
     // s = ut + gt^2/2 with u = 0. A drop from forty metres takes 2.9 s and is
@@ -4962,6 +4994,9 @@ export function createCave(game) {
     mouth: { x: 0, z: cavMOUTH_Z - 4 },
     river: { x: cavRIVER_X, z: 20 },
     hand: { x: cavHAND.x, z: cavHAND.z },
+    /** THE WINDOW (L6, F2): the big drip's spot, and seconds until the roof lets go (-1 while it is). */
+    bigDrip: { x: cavBIG_DRIP.x, z: cavBIG_DRIP.z },
+    burstIn() { const t = cavBURST_PER - cavBURST_DUR - cavBurstT; return t > 0 ? t : -1; },
     doline: { x: cavDOLINE.x, z: cavDOLINE.z },
     // D4.10. Its own landmark, because the hint arrow for the marquee should
     // point at the thing you climb and not at the middle of a fifty-two metre

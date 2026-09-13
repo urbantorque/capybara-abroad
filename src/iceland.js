@@ -257,6 +257,7 @@ const iceAUR_STAY = 240;            // s at full before it starts to come down
 const iceAUR_FADE = 0.011;          // per second, down to the call floor
 let iceAurRun = 0, iceAurRunBest = 0, iceAurSince = 99, iceAurBurst = 0, iceAurUpT = 0, iceAurFading = false, iceAurBursts = 0;
 let iceSoak = 0, iceSoakShown = false;
+let iceSheepSpringT = 0, iceSheepSpringDone = false;   // THE SECOND ASK (L6, F2)
 let iceSoakMark = 0;
 // The marks for the overstay. See THE LONG SIT in iceUpdateSpring: the last
 // one is at four minutes because somebody will, and when they do the game
@@ -4147,6 +4148,21 @@ function iceUpdateSpring(game, dt) {
   const still = !capy.velocity || (capy.velocity.x * capy.velocity.x +
                                    capy.velocity.z * capy.velocity.z) < 1.6;
 
+  // ---- THE SECOND ASK (L6, F2): `sheep-to-the-spring` reads herdCount() --
+  // Two led sheep inside iceCALL_R of the pool with you, held a second. The
+  // herd is the skill the bin teaches in Sydney and the Pantanal asks for;
+  // nothing between them ever did.
+  if (!iceSheepSpringDone) {
+    const nearPool = dx * dx + dz * dz < iceCALL_R * iceCALL_R;
+    const led = nearPool && typeof game.herdCount === 'function' ? game.herdCount() : 0;
+    iceSheepSpringT = led >= 2 ? iceSheepSpringT + dt : 0;
+    if (iceSheepSpringT > 1.0) {
+      iceSheepSpringDone = true;
+      iceTask('sheep-to-the-spring');
+      iceToast('two sheep at a hot spring, at night, following a capybara. nobody in Reykjavík will believe the farmer.');
+    }
+  }
+
   if (inPool && still) {
     if (iceSoak === 0 && !iceSoakShown) {
       iceSoakShown = true;
@@ -4803,6 +4819,10 @@ export function createIceland(game) {
     church: iceCHURCH,
     strokkur: iceSTROKKUR,
     spring: iceSPRING,
+    /** The flock, for `sheep-to-the-spring` (L6, F2): iceFLOCKS[0] — the other two
+     *  are authored below the lagoon's waterline and the build skips them (measured:
+     *  herdDebug lists one kind, n 14, first at (-47, 56)). Sixty-four metres to the pool. */
+    sheepMoor: { x: iceFLOCKS[0].x, z: iceFLOCKS[0].z },
     cliff: icePUFFIN,
     pier: { x: icePIER.x, z: icePIER.head - 3 },
     // the humpback. She MOVES — ask, never cache.

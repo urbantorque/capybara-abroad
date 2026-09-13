@@ -3944,6 +3944,7 @@ const sysSAVE_SHAPE = {
   scn: 'object', pho: 'object', fed: 'object', pas: 'object', lin: 'object', err: 'object',
   pal: 'object', eve: 'object', rep: 'object',
   nb: 'object',   // the traveller's notebook (L6, F4)
+  stow: 'object', // the companion, { kind, from } (L6, F1); null when alone
   ms: 'number', biome: 'string',
 };
 const sysSAVE_DEBOUNCE = 700;      // ms — a streak of ticks writes once
@@ -4462,11 +4463,55 @@ const sysMUS_SLEEP_UP   = 0.12;  // the upbeat's velocity
 const sysMUS_LAYER_PULSE = 0.5;  // chapter progress the pulse starts at
 const sysMUS_PULSE_GAP   = 2.4;  // s between strokes at the gate, closing to 1.6 by the end
 const sysMUS_PULSE_VEL   = 0.07; // ...and how hard. Soft: a heartbeat, not a chase.
-// ...and the gate the ostinato opens at. THE HOOK ONLY: F3 builds the tune
-// (sysMUS_THEME, the fixed intervals) and reads this where the pulse reads
-// sysMUS_LAYER_PULSE; until then musAudit().layers[3] says whether a chapter
-// has earned it and nothing plays on it.
+// ...and the gate the ostinato opens at: a chapter with every task done
+// gets the tune under everything, on its lead, until the next arrival
+// resets musProg. Read where the pulse reads sysMUS_LAYER_PULSE.
 const sysMUS_LAYER_OSTINATO = 1.0;
+// ---- THE TUNE (L6, F3) ------------------------------------------------------
+// There was a rhythm and not a theme. The arrival phrase was four chord
+// DEGREES (0 1 2 1) re-fitted to whatever chord was sounding, and
+// hud.phraseAudit over the twenty-one palettes found ten different interval
+// sequences: Sydney said +4 +3 −3, Kyoto +7 −7 +7, Venice +3 −8 +8. A player
+// hums intervals, not degrees, so nothing in the score could be carried from
+// Kyoto to Venice. This is eight notes in SCALE degrees (0 = the tonic, 7 =
+// its octave) over a per-palette `scale` tag, transposed to the palette's
+// tonic (roots[0]) and NOT re-fitted to the chord — the third goes flat where
+// the scale is minor, and that is the only thing that moves.
+//
+//   do  sol  do'  sol  |  fa  mi  re  do
+//    0   4    7    4   |   3   2   1   0        long-short-short-long, twice
+//
+// Five of the eight notes are the tonic or the fifth, which is what lets a
+// fixed tune sit on twenty-one different opening chords: the instrument
+// asked for six of eight in the sounding chord in every palette, and the
+// three that are not (the fourth, the third, the second) are the ones a
+// chord without a third — the Drift's fourths, Antarctica's fifths, Hanoi's
+// sus — can spare. Measured against every palette's chord 0 before it was
+// written: 21/21 at six or more (Sydney 7, Kyoto 6, Sơn Đoòng 6).
+const sysMUS_THEME     = [0, 4, 7, 4, 3, 2, 1, 0];
+const sysMUS_THEME_DUR = [2, 1, 1, 3, 2, 1, 1, 3];   // × the phrase gap; the arrival's own rhythm
+// The three shapes. `pent` is the minor pentatonic with every diatonic degree
+// snapped to its nearest tone — the second and the third both land on the
+// flat third, the sixth and seventh on the flat seventh — and it is what the
+// two quartal palettes want: Sơn Đoòng's D G C F and Hanoi's C G C F G have
+// no fifth-of-the-tonic in them and the tune's fifth would otherwise be the
+// wrong note twice in eight. Those two are the two palettes (of 21) whose
+// interval sequence phraseAudit reports as its own.
+const sysMUS_SCALES = {
+  major: [0, 2, 4, 5, 7, 9, 11],
+  minor: [0, 2, 3, 5, 7, 8, 10],
+  pent:  [0, 3, 3, 5, 7, 10, 10],
+};
+// The ostinato (layers[3]): the tune once through on the lead, an octave up
+// and under the plucks, then a rest as long as the tune, and again. Quieter
+// than a pluck — it is a layer, and the melody's walk goes on over it.
+const sysMUS_OST_VEL  = 0.040;
+const sysMUS_OST_REST = 1.0;    // rest, as a multiple of the tune's own length
+// The lift figure ends on the tune (F3): after its own n notes, the last two
+// of the theme — re, do — in the figure's register, so every marquee closes
+// on the sentence the arrival opened with. Two notes, not eight: a five-note
+// bowed arch at 620 ms cannot carry a whole verse on the end of it.
+const sysMUS_LIFT_TAIL = 2;
 // ---- THE SCORE'S ROOM, PER CHAPTER (v41; see musRoomLoad) -----------------
 // secs = A + B * sysROOMS[x].size, so Manly's beach is 3.45 s and the cave is
 // 6.5. The old fixed value was 3.6, which is roughly where Sydney lands.
@@ -5204,12 +5249,14 @@ const sysMUS_PHRASE = [
 // it would put the pad under its own fundamental. Son Doong has no sky at all,
 // which is the entire argument of the chapter.
 const sysMUS_SKYCUT = { 7: 60, 16: 0 };
+// `scale` (L6, F3) is the tune's colour here — one of sysMUS_SCALES — and
+// roots[0] is its tonic. Nothing else about a row reads either.
 const sysMUS_PAL = [
   // 0 — Sydney. Felt mallets over a wide, slow pad: a hot afternoon in a public
   // garden where nothing is in a hurry.
   { chords: sysMUS_CHORDS, roots: sysMUS_ROOTS, next: sysMUS_NEXT,
     dwellA: 9, dwellB: 15, pluckA: 1.2, pluckB: 3.8, cut: 620, bus: sysMUS_BUS, bass: 0.26,
-    lead: 'mallet', xfade: sysMUS_XFADE, rhythm: null,
+    lead: 'mallet', xfade: sysMUS_XFADE, rhythm: null, scale: 'major',
     // Taking the stage. The plain ascent, on the mallets — this is the first
     // marquee most players ever hear and it is the one the other twelve are
     // heard AGAINST, so it is deliberately the unadorned version of the gesture.
@@ -5219,7 +5266,7 @@ const sysMUS_PAL = [
     // hides a change under a 15 s harbour pad would still be moving when the next
     // chord arrived here, and the pad would sit in a permanent smear.
     dwellA: 4.4, dwellB: 6.7, pluckA: 2.2, pluckB: 5.2, cut: 700, bus: 0.085, bass: 0.30,
-    lead: 'quena', xfade: 1.3, rhythm: sysMUS_RHY,
+    lead: 'quena', xfade: 1.3, rhythm: sysMUS_RHY, scale: 'minor',
     // Hanging off a condor over Galeras. 'soar' is the whole point: the gaps
     // LENGTHEN as the figure climbs, which is what a bird that has stopped
     // flapping and found the thermal actually does. Seven notes on the quena,
@@ -5231,7 +5278,7 @@ const sysMUS_PAL = [
   // up. Six of its seven notes are chapter 1's, so the crossfade is legal.
   { chords: sysMUS_CHORDS2, roots: sysMUS_ROOTS2, next: sysMUS_NEXT2,
     dwellA: 6, dwellB: 10, pluckA: 1.0, pluckB: 3.0, cut: 780, bus: 0.16, bass: 0.26,
-    lead: 'mallet', xfade: 3.2, rhythm: null, buoy: true,
+    lead: 'mallet', xfade: 3.2, rhythm: null, buoy: true, scale: 'major',
     // No marquee is scored on this palette — chapter 3's lands under way — but a
     // wow can be earnt alongside (the ferry, the busker) and it should still
     // sound like the quay: the gardens' figure, brighter and a tone up.
@@ -5239,7 +5286,7 @@ const sysMUS_PAL = [
   // 3 — under way to Manly.
   { chords: sysMUS_CHORDS4, roots: sysMUS_ROOTS4, next: sysMUS_NEXT4,
     dwellA: 6.5, dwellB: 9.5, pluckA: 0.9, pluckB: 2.4, cut: 1150, bus: 0.205, bass: 0.23,
-    lead: 'pluck', xfade: 3.0, rhythm: null,
+    lead: 'pluck', xfade: 3.0, rhythm: null, scale: 'major',
     // Seven hundred metres of open water, and then the wharf. 'fan' opens
     // outward from the middle in both directions at once, hard-panned — the
     // only figure here that arrives from both sides, which is what coming
@@ -5249,7 +5296,7 @@ const sysMUS_PAL = [
   // for a quarter of a minute, plucks four seconds apart, filter almost shut.
   { chords: sysMUS_CHORDS5, roots: sysMUS_ROOTS5, next: sysMUS_NEXT5,
     dwellA: 13, dwellB: 21, pluckA: 2.6, pluckB: 6.0, cut: 520, bus: 0.145, bass: 0.22,
-    lead: 'koto', xfade: 5.0, rhythm: null, shaku: true,
+    lead: 'koto', xfade: 5.0, rhythm: null, shaku: true, scale: 'minor',
     // The river down to the mill. The ONE figure in the game that mostly
     // descends: a koto run pouring downstream and a single note left ringing
     // above where it started. Every other place celebrates by going up; the
@@ -5263,7 +5310,7 @@ const sysMUS_PAL = [
   // 100 bpm is 4.8 s and exactly one full clave cycle.
   { chords: sysMUS_CHORDS6, roots: sysMUS_ROOTS6, next: sysMUS_NEXT6,
     dwellA: 4.8, dwellB: 4.8, pluckA: 99, pluckB: 99, cut: 950, bus: 0.055, bass: 0.10,
-    lead: 'none', xfade: 0.9, rhythm: null, band: 'salsa',
+    lead: 'none', xfade: 0.9, rhythm: null, band: 'salsa', scale: 'minor',
     eighth: sysMUS_SALSA_EIGHTH, barEighths: sysMUS_SALSA_BAR,
     // The chiva grinding up to the mirador with you on the roof. The palette's
     // lead is 'none' because the band IS the lead, so the lift names its own
@@ -5279,7 +5326,7 @@ const sysMUS_PAL = [
   // about twice as fast as salsa, and slowing it down to match would drag.
   { chords: sysMUS_CHORDS7, roots: sysMUS_ROOTS7, next: sysMUS_NEXT7,
     dwellA: 1.818, dwellB: 1.818, pluckA: 99, pluckB: 99, cut: 1050, bus: 0.05, bass: 0.10,
-    lead: 'none', xfade: 0.7, rhythm: null, band: 'samba',
+    lead: 'none', xfade: 0.7, rhythm: null, band: 'samba', scale: 'minor',
     sixteenth: sysMUS_SAMBA_16, barSixteenths: sysMUS_SAMBA_BAR,
     // Sambaing down the avenue on the two. The fastest lift in the game and the
     // only one that ACCELERATES — 'swell' shortens the gap as it climbs, which
@@ -5295,7 +5342,7 @@ const sysMUS_PAL = [
   // is silent until the sky is not.
   { chords: sysMUS_CHORDS8, roots: sysMUS_ROOTS8, next: sysMUS_NEXT8,
     dwellA: 11, dwellB: 18, pluckA: 3.0, pluckB: 7.0, cut: 470, bus: 0.155, bass: 0.245,
-    lead: 'bow', xfade: 5.5, rhythm: null, choir: true,
+    lead: 'bow', xfade: 5.5, rhythm: null, choir: true, scale: 'minor',
     // Bringing the sky down. Five bowed notes over three seconds — by a distance
     // the SLOWEST lift here, and it has to be: iceland.js holds
     // game.music.swell() for the twelve seconds the aurora is climbing, so this
@@ -5310,7 +5357,7 @@ const sysMUS_PAL = [
   // of the time it is the same one again.
   { chords: sysMUS_CHORDS9, roots: sysMUS_ROOTS9, next: sysMUS_NEXT9,
     dwellA: 6.8, dwellB: 6.8, pluckA: 99, pluckB: 99, cut: 900, bus: 0.05, bass: 0.09,
-    lead: 'none', xfade: 0.8, rhythm: null, band: 'gnawa',
+    lead: 'none', xfade: 0.8, rhythm: null, band: 'gnawa', scale: 'minor',
     pulse: sysMUS_GNAWA_PULSE, cellPulses: sysMUS_GNAWA_CELL,
     // Coming down the great dune. The second descending figure in the game and
     // the only other one that earns it: this set piece is a HUNDRED METRES OF
@@ -5326,7 +5373,7 @@ const sysMUS_PAL = [
   // this dwell there is nothing for it to collide with.
   { chords: sysMUS_CHORDS10, roots: sysMUS_ROOTS10, next: sysMUS_NEXT10,
     dwellA: 15, dwellB: 26, pluckA: 3.4, pluckB: 8.5, cut: 1250, bus: 0.15, bass: 0.20,
-    lead: 'glass', xfade: 7.0, rhythm: null,
+    lead: 'glass', xfade: 7.0, rhythm: null, scale: 'major',
     // Lighting the lantern at the top of the world. Six glass notes, each of
     // which rings for ten seconds, so by the fourth one they are a chord and by
     // the sixth they are a room. The longest bloom and the longest decay in the
@@ -5340,7 +5387,7 @@ const sysMUS_PAL = [
   // instrument and shutting it down to Kyoto's 520 would leave it as a thud.
   { chords: sysMUS_CHORDS11, roots: sysMUS_ROOTS11, next: sysMUS_NEXT11,
     dwellA: 2.5, dwellB: 2.5, pluckA: 1.6, pluckB: 3.4, cut: 860, bus: 0.062, bass: 0.10,
-    lead: 'violin', xfade: 0.9, rhythm: null, band: 'baroque',
+    lead: 'violin', xfade: 0.9, rhythm: null, band: 'baroque', scale: 'minor',
     quaver: sysMUS_BAR_Q, barQuavers: sysMUS_BAR_QN,
     // San Marco going under. 'arch' because this is the one palette in the game
     // with real cadences in it, and a figure that climbs and does not come back
@@ -5355,7 +5402,7 @@ const sysMUS_PAL = [
   // nothing about this place is soft.
   { chords: sysMUS_CHORDS12, roots: sysMUS_ROOTS12, next: sysMUS_NEXT12,
     dwellA: 2.143, dwellB: 2.143, pluckA: 99, pluckB: 99, cut: 1320, bus: 0.045, bass: 0.09,
-    lead: 'none', xfade: 0.6, rhythm: null, band: 'hk',
+    lead: 'none', xfade: 0.6, rhythm: null, band: 'hk', scale: 'minor',
     sixteenth: sysMUS_HK_16, barSixteenths: sysMUS_HK_BAR,
     // Being on the roof when the lights come on. The towers come up one per
     // beat and they come up on BOTH SIDES of the harbour, so the figure opens
@@ -5380,7 +5427,7 @@ const sysMUS_PAL = [
     // one does not. Palawan's lift is deliberately not the palette's own
     // instrument — see the note under it — and that argument has nothing to do
     // with the one being fixed here.
-    lead: 'kulintang', xfade: 4.6, rhythm: null,
+    lead: 'kulintang', xfade: 4.6, rhythm: null, scale: 'major',
     // Being under when the water lights up. Glass rather than the palette's own
     // mallet, and quiet: bioluminescence does not announce itself, it is ALREADY
     // THERE when you notice it. Eighteen notes is the densest figure in the game
@@ -5398,7 +5445,7 @@ const sysMUS_PAL = [
     // pointed at an Andean one since the row was authored. The bendir is the
     // other half of the correction: a frame drum with a gut snare, sparse
     // enough that it never becomes a pulse.
-    lead: 'ney', xfade: 5.2, rhythm: null, bendir: true,
+    lead: 'ney', xfade: 5.2, rhythm: null, bendir: true, scale: 'major',
     // The sun clearing the rim. Six flute notes, opening out — the same 'soar'
     // as the condor, two hundred degrees of longitude and eleven chapters away,
     // and deliberately so: those are the only two moments in this game that are
@@ -5412,7 +5459,7 @@ const sysMUS_PAL = [
   // and it is the one sound both chapters can hear.
   { chords: sysMUS_CHORDS15, roots: sysMUS_ROOTS15, next: sysMUS_NEXT15,
     dwellA: 5.2, dwellB: 8.4, pluckA: 1.1, pluckB: 3.2, cut: 900, bus: 0.14, bass: 0.26,
-    lead: 'mallet', xfade: 2.6, rhythm: null, buoy: true,
+    lead: 'mallet', xfade: 2.6, rhythm: null, buoy: true, scale: 'major',
     // Taking the wave of the set the whole way in. Ten mallet notes CLOSING UP
     // — 'swell', not 'soar' — because a ride is the one moment in this game
     // that gets faster as it goes: the wave stands you up out the back and
@@ -5427,7 +5474,7 @@ const sysMUS_PAL = [
     // PLUCKED — which is the whole of the error being corrected — and the row's
     // major sevenths, its 820 cut and its five-second crossfade were all asking
     // for something warm and sustained rather than for something bowed.
-    lead: 'caipira', xfade: 5.0, rhythm: null,
+    lead: 'caipira', xfade: 5.0, rhythm: null, scale: 'major',
     // The whole herd going over at sundown. Seven notes opening out on the
     // bowed voice — the 'soar' shape again, and deliberately: this and the
     // condor are the two moments in the game where the animal is not doing
@@ -5447,7 +5494,7 @@ const sysMUS_PAL = [
   // loudest bass under it. The room stays 6.5 s; the size is not the level.
   { chords: sysMUS_CHORDS17, roots: sysMUS_ROOTS17, next: sysMUS_NEXT17,
     dwellA: 14.0, dwellB: 22.0, pluckA: 5.0, pluckB: 11.0, cut: 560, bus: 0.14, bass: 0.28,
-    lead: 'glass', xfade: 7.0, rhythm: null,
+    lead: 'glass', xfade: 7.0, rhythm: null, scale: 'pent',
     // Standing in the shaft. Eight glass notes, wide apart, two octaves up —
     // the only bright thing in the chapter, arriving in the only bright place
     // in it. cave.js holds the swell for the whole walk into the light, so
@@ -5462,7 +5509,7 @@ const sysMUS_PAL = [
   // which is roughly how often anything happens down there.
   { chords: sysMUS_CHORDS18, roots: sysMUS_ROOTS18, next: sysMUS_NEXT18,
     dwellA: 12.0, dwellB: 19.0, pluckA: 4.5, pluckB: 10.0, cut: 900, bus: 0.26, bass: 0.28,
-    lead: 'glass', xfade: 6.0, rhythm: null,
+    lead: 'glass', xfade: 6.0, rhythm: null, scale: 'major',
     // Six orcas on the quarters at twelve metres a second. 'soar' again, and
     // for the third time in this table it is the shape used for the same
     // idea: the animal is not doing anything clever, it is being carried
@@ -5474,7 +5521,7 @@ const sysMUS_PAL = [
   // the index — appended, so not one chapter's `pal` moved.
   { chords: sysMUS_CHORDS_T, roots: sysMUS_ROOTS_T, next: sysMUS_NEXT_T,
     dwellA: 13.0, dwellB: 21.0, pluckA: 3.0, pluckB: 7.5, cut: 540, bus: 0.135, bass: 0.20,
-    lead: 'mallet', xfade: 5.5, rhythm: null,
+    lead: 'mallet', xfade: 5.5, rhythm: null, scale: 'major',
     // A menu never earns a marquee, but a table cannot be missing a rung: if
     // one is ever fired from here it should be the gardens' plain ascent,
     // because that is what this palette is a quieter version of.
@@ -5485,7 +5532,7 @@ const sysMUS_PAL = [
   // a chord at 132 in 4/4 is 3.64 s.
   { chords: sysMUS_CHORDS19, roots: sysMUS_ROOTS19, next: sysMUS_NEXT19,
     dwellA: 3.636, dwellB: 3.636, pluckA: 99, pluckB: 99, cut: 1080, bus: 0.055, bass: 0.09,
-    lead: 'none', xfade: 0.75, rhythm: null, band: 'bond',
+    lead: 'none', xfade: 0.75, rhythm: null, band: 'bond', scale: 'minor',
     sixteenth: sysMUS_BOND_16, barSixteenths: sysMUS_BOND_BAR,
     // A hundred and eleven metres of concrete at twenty-six metres a second,
     // and then the whole port at once. 'swell' — the gaps CLOSE UP as it
@@ -5501,7 +5548,7 @@ const sysMUS_PAL = [
   // a monochord on it. See sysMUS_CHORDS20 for why it is this quiet.
   { chords: sysMUS_CHORDS20, roots: sysMUS_ROOTS20, next: sysMUS_NEXT20,
     dwellA: 9.0, dwellB: 15.0, pluckA: 2.4, pluckB: 5.6, cut: 640, bus: 0.135, bass: 0.26,
-    lead: 'danbau', xfade: 4.4, rhythm: null, tranh: true,
+    lead: 'danbau', xfade: 4.4, rhythm: null, tranh: true, scale: 'pent',
     // A train, forty-five centimetres away, at eleven metres a second, while
     // you stand still. 'arch' — up and back down — because the whole of that
     // moment is a thing ARRIVING and then being gone, and a figure that climbs
@@ -16988,6 +17035,25 @@ export function createSystems(game) {
       default:       musPluck(when, midi, pan, vel); return;
     }
   }
+  // ---- THE TUNE, IN THIS KEY (L6, F3) --------------------------------------
+  // Semitones from the tonic of theme note `i`, in the scale `pal` carries.
+  function musThemeOff(i, pal) {
+    const p = pal || musPal;
+    const sc = sysMUS_SCALES[p && p.scale] || sysMUS_SCALES.major;
+    const d = sysMUS_THEME[((i % sysMUS_THEME.length) + sysMUS_THEME.length) % sysMUS_THEME.length];
+    return sc[((d % 7) + 7) % 7] + 12 * Math.floor(d / 7);
+  }
+  // The MIDI note the tune starts on: the palette's tonic, two octaves over
+  // the bass root plus `oct`, folded ONCE — the whole tune moves by the same
+  // octave, because folding each note on its own breaks the contour at the
+  // roof (a note at 97 drops to 85 while its neighbour at 95 stays, and the
+  // step becomes a leap). The tune spans an octave, so the base's roof is a
+  // twelfth under the lift's.
+  function musThemeBase(oct, pal) {
+    const p = pal || musPal;
+    const tonic = (p && p.roots && p.roots.length) ? p.roots[0] : 38;
+    return musFold(tonic + 24 + (oct || 0), sysMUS_LIFT_LO, sysMUS_LIFT_HI - 12);
+  }
 
   // The default character, for a palette that has not been given one. Nothing
   // in sysMUS_PAL is missing a `lift` — a table cannot be missing a rung — but
@@ -17041,10 +17107,29 @@ export function createSystems(game) {
     //
     // `dur` is the only new idea in this table and it is a multiplier on the
     // gap rather than a second clock.
+    //
+    // ...AND THEN IT BECAME A TUNE (L6, F3). The rhythm survived the key
+    // change; the contour did not — re-fitted to each chord it was ten
+    // different interval sequences across the twenty-one palettes, and a
+    // player hums intervals. `deg` here is no longer read for 'arrive':
+    // musSting plays sysMUS_THEME, in SCALE degrees over the palette's
+    // `scale`, from its tonic. The gap, the accent table (sysMUS_PHRASE) and
+    // the pan are the same; the rhythm is the theme's own, which is this one
+    // twice. Kept as a row so `gap`/`vel`/`pan` still live in the one table.
     arrive: { deg: [0, 1, 2, 1], dur: [2, 1, 1, 3],
-              gap: 0.19, oct: 0, vel: 0.70, pan: 0.18 },
+              gap: 0.19, oct: 0, vel: 0.70, pan: 0.18, theme: true },
   };
   let musStingAt = 0;
+  // THE TUNE'S COUNTERS (L6, F3), for musAudit: arrivals that said it,
+  // cells that quoted it, lift figures that ended on it, ostinato notes,
+  // choir notes. Nothing in src reads them; the harness does.
+  let musThemeSaid = 0, musThemeCells = 0, musLiftTails = 0;
+  // ...the ostinato's clock and cursor (see the pulse block in musTickBody)
+  let musOstAt = 0, musOstI = 0, musOstN = 0;
+  // ...and the choir's: a fifth part that sings the tune under the aurora,
+  // built beside the four in musChoirV and NOT in musVoices, so this block
+  // is the one writer of its pitch. See the choir writer in update().
+  let musChoirLead = null, musChoirTuneAt = 0, musChoirTuneI = 0, musChoirTuneN = 0;
   // ---- ...AND THE WORLD HEARS IT (L4, E2 / audio #5) ---------------------
   // Set to 1 by musSting, ×0.55 per 0.3 s block: an envelope the WORLD bus
   // reads, so the stings are events against a world that steps back rather
@@ -17080,7 +17165,7 @@ export function createSystems(game) {
   // Bands (lead 'none') are untouched: their tune is the arrangement.
   // =========================================================================
   const sysMUS_CELLS = [
-    { deg: [0, 1, 2, 1],  dur: [2, 1, 1, 3] },      // the arrival, quoted
+    { deg: [0, 1, 2, 1],  dur: [2, 1, 1, 3], theme: true },  // the arrival, quoted — since F3 the TUNE itself, from the tonic (deg unused)
     { deg: [0, 1, 2, 4],  dur: [1, 1, 1, 2.5] },    // a rise
     { deg: [4, 2, 1, 0],  dur: [1, 1, 1, 2.5] },    // and the fall
     { deg: [2, 3, 2, 0],  dur: [1, 0.5, 0.5, 2.5] },// a turn
@@ -17122,6 +17207,30 @@ export function createSystems(game) {
     // glass notes into the 6.5 s room, −15 dBFS on the score bus for three
     // seconds — louder than the chapter's marquee. Half, on those two.
     const longK = (inst === 'glass' || inst === 'bow') ? 0.5 : 1;
+    // THE TUNE, QUOTED (L6, F3). Cell 0 is the theme from the palette's own
+    // tonic rather than a contour from where the walk is — the doorbell the
+    // arrival rang, said again in the middle of the chapter. The walk then
+    // resumes from the chord degree nearest the tune's last note, so the
+    // pluck after it is a step and not a jump.
+    if (c.theme) {
+      const base = musThemeBase(ph && ph.oct ? ph.oct : 0);
+      const vel = musVel(0.10 * longK * (ph && ph.vel > 0 ? ph.vel : 1) * (0.8 + musIntensity * 0.4));
+      let endMidi = base;
+      for (let i = 0; i < sysMUS_THEME.length; i++) {
+        const step = gap * sysMUS_THEME_DUR[i];
+        endMidi = base + musThemeOff(i);
+        musLiftNote(inst, when + t, endMidi, pan * (i % 2 ? 0.6 : 1), vel, step);
+        t += step;
+      }
+      let bestD = musMelDeg, bestE = 1e9;
+      for (let d = 0; d <= hi; d++) {
+        const e = Math.abs(ch[d % L] + 12 * Math.floor(d / L) - endMidi);
+        if (e < bestE) { bestE = e; bestD = d; }
+      }
+      musMelDeg = bestD;
+      musMelCells++; musThemeCells++;
+      return t;
+    }
     for (let i = 0; i < c.deg.length; i++) {
       let d = base + c.deg[i];
       if (d > hi) d -= L;
@@ -17212,6 +17321,19 @@ export function createSystems(game) {
     let g = clamp(typeof k === 'number' ? k : 1, 0, 2);
     if (ph && ph.vel > 0) g *= ph.vel;
     let t = 0;
+    // THE TUNE (L6, F3): the arrival says the theme, whole, from the tonic —
+    // not the chord's degrees. Same voice, same gap table, same pan.
+    if (s.theme) {
+      const base = musThemeBase(s.oct + (ph && ph.oct ? ph.oct : 0));
+      const gap = s.gap * (ph && ph.gap > 0 ? ph.gap : 1);
+      for (let i = 0; i < sysMUS_THEME.length; i++) {
+        const step = gap * sysMUS_THEME_DUR[i];
+        musLiftNote(inst, when + t, base + musThemeOff(i), (i % 2 ? s.pan : -s.pan), 0.115 * s.vel * g, step);
+        t += step;
+      }
+      musThemeSaid++;
+      return sysMUS_THEME.length;
+    }
     for (let i = 0; i < s.deg.length; i++) {
       const d = s.deg[i];
       const idx = ((d % chord.length) + chord.length) % chord.length;
@@ -17332,6 +17454,32 @@ export function createSystems(game) {
       } else {
         t += sysMusLiftGap(shape, gap, i, n);
       }
+    }
+    // ---- ...AND IT ENDS ON THE TUNE (L6, F3) ------------------------------
+    // The last sysMUS_LIFT_TAIL notes of the theme — re, do — on the tonic
+    // nearest the figure's own last note, at the figure's closing gap and
+    // then twice it, so the six shapes all close on the same two notes the
+    // arrival closed on. The velocity is the figure's END, not its start:
+    // a cadence after a fall-away that came back to full would be a second
+    // figure. On 'swell' the end IS the loudest, and it stays so.
+    {
+      const lastMidi = musFold(chord[((sysMusLiftDeg(shape, n - 1, n) % chord.length) + chord.length) % chord.length] +
+                               12 * Math.floor(sysMusLiftDeg(shape, n - 1, n) / chord.length) + 12 + (ch.oct || 0),
+                               sysMUS_LIFT_LO, sysMUS_LIFT_HI);
+      const tonicPc = ((musPal && musPal.roots ? musPal.roots[0] : 38) % 12 + 12) % 12;
+      let tonic = lastMidi - (((lastMidi - tonicPc) % 12) + 12) % 12;   // the tonic at or under it
+      if (lastMidi - tonic > 6) tonic += 12;                             // ...or the one just over
+      tonic = musFold(tonic, sysMUS_LIFT_LO, sysMUS_LIFT_HI - 3);
+      const endFall = shape === 'swell' ? -0.42 : 0.52;   // the loop's own `fall`, at i = n - 1
+      const endVel = 0.115 * sysMUS_LIFT_K * (ch.vel || 1) * (1 - endFall) * (0.55 + s * 0.45);
+      const g0 = sysMusLiftGap(shape, gap, n - 1, n);
+      for (let j = 0; j < sysMUS_LIFT_TAIL; j++) {
+        const i = sysMUS_THEME.length - sysMUS_LIFT_TAIL + j;
+        const g = g0 * (j === sysMUS_LIFT_TAIL - 1 ? 2 : 1);
+        musLiftNote(inst, when + t, tonic + musThemeOff(i), (j % 2 ? -pan : pan), endVel, g);
+        t += g;
+      }
+      musLiftTails++;
     }
     // The pad leans in underneath it too — wider and brighter — but that is NOT
     // written here. musPad.gain and musFilt.frequency have exactly one writer,
@@ -19794,6 +19942,39 @@ export function createSystems(game) {
         musPulseAt += gap;
       }
     }
+    // ---- THE OSTINATO (L6, F3): the fourth layer ------------------------
+    // A chapter with every task done gets the tune, an octave up on its
+    // lead, once through and then a rest as long as itself, for as long as
+    // the player stays — under the plucks, at less than a pluck. Not on the
+    // five band palettes (their lead is 'none', and a mallet playing a verse
+    // over a bateria is a fourteenth percussionist); never asleep, never on
+    // the breath's floor. musProg resets on arrival, which is what stops it.
+    {
+      const oInst = (musPal.lead && musPal.lead !== 'none') ? musPal.lead : null;
+      if (oInst && musProg >= sysMUS_LAYER_OSTINATO && musSleep < 0.5 && musBreath > 0.6) {
+        const oph = sysMUS_PHRASE[musPalN];
+        const ogap = sysMUS_STING.arrive.gap * (oph && oph.gap > 0 ? oph.gap : 1);
+        if (musOstAt < now - 1) { musOstAt = musSnap(now + 0.2); musOstI = 0; }
+        const obase = musThemeBase(12 + (oph && oph.oct ? oph.oct : 0));
+        let og = 0;
+        while (musOstAt < horizon && og++ < 4) {
+          const i = musOstI % sysMUS_THEME.length;
+          const step = ogap * sysMUS_THEME_DUR[i];
+          musLiftNote(oInst, musOstAt, obase + musThemeOff(i), (i % 2 ? -0.3 : 0.3),
+                      musVel(sysMUS_OST_VEL * (oph && oph.vel > 0 ? oph.vel : 1)), step);
+          musOstN++;
+          musOstAt += step;
+          musOstI++;
+          if (musOstI >= sysMUS_THEME.length) {
+            // the rest: the tune's own length again
+            let len = 0;
+            for (let j = 0; j < sysMUS_THEME_DUR.length; j++) len += sysMUS_THEME_DUR[j];
+            musOstAt += ogap * len * sysMUS_OST_REST;
+            musOstI = 0;
+          }
+        }
+      }
+    }
     guard = 0;
     const lead = musPal.lead;
     // THE BREATH, on the scheduler side. The pad only ducks; what actually
@@ -20498,6 +20679,15 @@ export function createSystems(game) {
       musChoirV.push(v);
       musVoices.push(v);
     }
+    // ...AND THE FIFTH PART SINGS THE TUNE (L6, F3). Same throat, same
+    // formants, the same detune, a step above the top part — and NOT in
+    // musVoices, because musSetChord would voice-lead it onto a chord tone
+    // at the next change and the tune would lose a note. Its pitch has one
+    // writer (the choir block in update()) and its own gain is up only while
+    // a note of the tune is being sung; musChoirGain gates the lot on the sky.
+    musChoirLead = musMakeVoice(sysMUS_CHOIR_C[3] + 3, sysMUS_CHOIR_L[2], 'sawtooth', sysMUS_SPREAD, musChoirIn);
+    for (let b = 0; b < 2; b++) lg3.connect(musChoirLead.banks[b].oscs[0].detune);
+    musChoirLead.banks[0].g.gain.value = 0.0001;
 
     // ---- THE LIFT --------------------------------------------------------
     // Built exactly like the shimmer and for the same reason: routed AROUND the
@@ -23500,7 +23690,10 @@ export function createSystems(game) {
   const sysPHOTO_ROLL_V = 0.6;
   const sysPHOTO_ROLL_MAX = 0.35;
   const sysPHOTO_LOOKS = ['as it is', 'golden', 'kodachrome'];
-  const sysPHOTO_POSES = ['as it is', 'look here', 'loaf', 'wheek'];
+  // ...and a fifth, 'with the companion' (L6, F1): only offered while there is
+  // one, and it is pose 1's own head-turn aimed at the animal instead of the
+  // lens, with the companion stood at the flank (compBeside).
+  const sysPHOTO_POSES = ['as it is', 'look here', 'loaf', 'wheek', 'with the companion'];
   let photoYaw = 0, photoPitch = 0.22, photoDist = 8, photoRoll = 0;
   let photoFocal = 1, photoFocusM = -1, photoPose = 0, photoLook = 0;
   let photoDragId = -1, photoDragX = 0, photoDragY = 0, photoDragMoved = 0;
@@ -23546,7 +23739,9 @@ export function createSystems(game) {
       return true;
     }
     if (c === 'KeyQ') {
-      photoPose = (photoPose + 1) % sysPHOTO_POSES.length; photoHintText();
+      photoPose = (photoPose + 1) % sysPHOTO_POSES.length;
+      if (photoPose === 4 && !game.companion()) photoPose = 0;   // nobody to pose with
+      photoHintText();
       sfx('tick', { volume: 0.3, pitch: 1.1, ui: true, force: true });
       return true;
     }
@@ -23608,8 +23803,13 @@ export function createSystems(game) {
     if (photoRoll !== 0) camera.rotateZ(photoRoll * lens);
     // ...and the animal's pose, on the model alone. capybara.js owns what
     // each one looks like; this owns when.
+    // WITH THE COMPANION (L6, F1): pose 4 is pose 1 with the companion where
+    // the lens was — the head turns to it — and the companion at the flank,
+    // turned to the lens. No companion, and it is 'as it is'.
     if (game.capy && typeof game.capy.photoPose === 'function') {
-      try { game.capy.photoPose(photoPose, camera.position, lens); } catch (e) { /* older capybara.js */ }
+      const withComp = photoPose === 4 && compBeside(camera.position);
+      const mode = photoPose === 4 ? (withComp ? 1 : 0) : photoPose;
+      try { game.capy.photoPose(mode, withComp ? compAt : camera.position, lens); } catch (e) { /* older capybara.js */ }
     }
   }
 
@@ -23869,7 +24069,10 @@ export function createSystems(game) {
     wowShotT -= rdt;
     if (wowShotT > 0) return;
     // Draw, then read — the same turn, for the reason photoShoot gives.
+    // ...WITH THE COMPANION IN IT (L6, F1): a following one is stood at the
+    // flank for the frame. The follow moves it back next tick.
     try {
+      compBeside(camera.position);
       if (game.post && game.post.enabled) game.post.render();
       else renderer.render(scene, camera);
       albAdd(wowShotPlace, wowShotName, 2);
@@ -27636,6 +27839,19 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.env && game.env.van && game.env.van()); } },
     'ferry-ride':   { clue: 'get aboard before she sails',
                     where: function () { return hintObj(game.env && game.env.ferry); } },
+    // ---- THE SECOND ASK (L6, F2): nineteen rows whose clue is the skill's
+    // own line (sysSKILLS.line, or the system's), because the row's job is to
+    // examine a thing the game already taught and not to teach a new one.
+    'ibis-parade':  { clue: function () {
+                      const n = typeof game.herdCount === 'function' ? game.herdCount() : 0;
+                      if (n >= 2) return 'two behind you. up onto the red, and they come too';
+                      return 'wheek at anything small. keep wheeking, or they wander off  ·  ' + n + ' of 2';
+                    },
+                    where: function () {
+                      const n = typeof game.herdCount === 'function' ? game.herdCount() : 0;
+                      return n >= 2 ? hintZone('operaStage')
+                                    : hintNpc(function (r) { return r.kind === 'ibis'; }) || hintZone('operaStage');
+                    } },
     // ---- Sydney Harbour ----------------------------------------------------
     'to-quay':        { clue: 'take her out past the wharf',
                     where: function () { return hintObj(game.quay && game.quay.boat && game.quay.boat.position); } },
@@ -27655,6 +27871,14 @@ export function createSystems(game) {
                     where: function () { return hintXZ(118, -544); } },
     'ferry-salute': { clue: 'get inside eighty metres of her, then blow the horn',
                     where: function () { return hintObj(game.quay && game.quay.freshwater && game.quay.freshwater()); } },
+    'cap-at-the-helm': { clue: function () {
+                      const q = game.quay;
+                      const worn = game.capy && game.capy.worn;
+                      if (worn !== 'ferrycap') return 'the cap is yours after Manly. bring her across first';
+                      if (!q || !q.boat || !q.boat.atHelm) return 'in the cap: the wheel again, press E';
+                      return 'hold her at speed. it takes a while at the helm to count';
+                    },
+                    where: function () { return hintObj(game.quay && game.quay.boat && game.quay.boat.helm); } },
     'manly-pine':     { clue: 'ashore, up the Corso, red awning',
                     // The counter, not a literal beside it: the written (118, -586)
                     // was 5.9 m from quayCHIPS and the trigger is 2.1 m, so the
@@ -27698,6 +27922,16 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.kyoto && game.kyoto.bellRinging && game.kyoto.bellRinging() ? game.kyoto.bell : (game.kyoto && game.kyoto.bellRope && game.kyoto.bellRope())); } },
     'whisk-spin':     { clue: 'run laps of the rim until it froths',
                     where: function () { return hintObj(game.kyoto && game.kyoto.bowl); } },
+    // THE WINDOW (L6, F2): the countdown is on the live line; the clue says
+    // what to do with it.
+    'heron-lift':     { clue: function () {
+                      const k = game.kyoto;
+                      const t = k && typeof k.heronIn === 'function' ? k.heronIn() : -1;
+                      if (t < 0) return 'it is up. it comes back down and stands again';
+                      if (t < 4) return 'NOW — under it, and Q as it goes';
+                      return 'stand off it, about ten metres. it goes in ' + Math.ceil(t) + ' s — Q as it lifts';
+                    },
+                    where: function () { return hintObj(game.kyoto && game.kyoto.heron && game.kyoto.heron()); } },
     // ---- Pasto ------------------------------------------------------------
     // 'sail to Manly, then wheek three times' — which was the only route out of
     // Sydney when it was written, and is a two-chapter detour now that the
@@ -27736,6 +27970,15 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.pasto && game.pasto.carroza && game.pasto.carroza()); } },
     'coffee-scatter': { clue: 'throw a sack down hard',
                     where: function () { return hintProp('coffeesack') || hintObj(game.pasto && game.pasto.coffeePatio); } },
+    // THE CARRY (L6, F2): the prop first, the float once it is in your mouth.
+    'empanada-float': { clue: function () {
+                      if (!hintHolding('empanada')) return 'grab one off a stall with E, and keep it';
+                      return 'up the tow hitch at the back with it. on the deck, E to put it down';
+                    },
+                    where: function () {
+                      return hintHolding('empanada') ? hintObj(game.pasto && game.pasto.carroza && game.pasto.carroza())
+                                                     : hintProp('empanada');
+                    } },
     // ---- Cali --------------------------------------------------------------
     'to-cali':        { clue: 'the crossing is somebody else’s problem',
                     where: function () { return null; } },
@@ -27778,6 +28021,14 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.cali && game.cali.cart && game.cali.cart()); } },
     'cristo-rey':     { clue: 'up the ridge, west — you can see him from here',
                     where: function () { return hintObj(game.cali && game.cali.cristo); } },
+    // THE WINDOW (L6, F2): the gust is on a clock and the clock is the line.
+    'kite-dive':      { clue: function () {
+                      const c = game.cali;
+                      const t = c && typeof c.gustIn === 'function' ? c.gustIn() : -1;
+                      if (t < 0) return 'they are DOWN. Space, under the strings';
+                      return 'under the strings on the hill. the gust comes in ' + Math.ceil(t) + ' s — Space when they drop';
+                    },
+                    where: function () { return hintObj(game.cali && game.cali.kites); } },
     // ---- Rio ---------------------------------------------------------------
     'to-rio':         { clue: 'somebody else is steering',
                     where: function () { return null; } },
@@ -27813,6 +28064,12 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.rio && game.rio.waveAt && game.rio.waveAt()); } },
     'arpoador':       { clue: 'the rock at the far end of the sand, at sunset',
                     where: function () { return hintObj(game.rio && game.rio.arpoadorRock); } },
+    // G, asked for (L6, F2): the top of the flight, not the foot.
+    'selaron-belly':  { clue: function () {
+                      if (game.capy && game.capy.sliding) return 'stay down. all the way to the bottom';
+                      return 'from the TOP, at a run, then hold G. do not get up till the foot';
+                    },
+                    where: function () { return hintObj(game.rio && game.rio.selaronHead && game.rio.selaronHead()); } },
     // ---- Iceland -----------------------------------------------------------
     'to-iceland':     { clue: 'somebody else is steering',
                     where: function () { return null; } },
@@ -27857,6 +28114,18 @@ export function createSystems(game) {
                       return 'in the hot pool, let go of the stick for seven seconds';
                     },
                     where: function () { return hintObj(game.iceland && game.iceland.spring); } },
+    // The herd, asked for (L6, F2): the moor flock first, the pool once two
+    // are behind you.
+    'sheep-to-the-spring': { clue: function () {
+                      const n = typeof game.herdCount === 'function' ? game.herdCount() : 0;
+                      if (n >= 2) return 'two. walk them to the hot pool — keep wheeking, or they wander off';
+                      return 'wheek at anything small. keep wheeking, or they wander off  ·  ' + n + ' of 2';
+                    },
+                    where: function () {
+                      const n = typeof game.herdCount === 'function' ? game.herdCount() : 0;
+                      return n >= 2 ? hintObj(game.iceland && game.iceland.spring)
+                                    : hintObj(game.iceland && game.iceland.sheepMoor);
+                    } },
     // ---- Marrakech ---------------------------------------------------------
     'to-sahara':      { clue: 'somebody else is steering',
                     where: function () { return null; } },
@@ -27909,6 +28178,26 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.sahara && game.sahara.acrobatMat && game.sahara.acrobatMat()); } },
     'fire-circle':    { clue: 'press E at the fire',
                     where: function () { return hintObj(game.sahara && game.sahara.camp); } },
+    // The vault, examined in the chapter that teaches it (L6, F2).
+    'souk-wall':      { clue: function () {
+                      const sa = game.sahara;
+                      if (game.capy && typeof game.capy.can === 'function' && !game.capy.can('vault')) return 'the acrobats first. they teach the kick';
+                      if (sa && sa.chasing()) return 'a wall is a thing to push off. hop again while you are on one';
+                      return 'rob the cart, run into the souk, and hop off a wall with them behind you';
+                    },
+                    where: function () { return hintObj(game.sahara && game.sahara.souk); } },
+    // THE DECOY (L6, F1). Three states, and the first is the one most players
+    // will be in: no companion. It is carried in from another chapter's perch.
+    'souk-decoy':     { clue: function () {
+                      const c = typeof game.companion === 'function' ? game.companion() : null;
+                      if (!c) return 'carry something in first: sit still by an animal elsewhere till it climbs on, then travel';
+                      if (typeof game.hidden === 'function' && game.hidden() > 0.8) return 'now Q. it runs out and they follow it';
+                      return 'get somebody after you, then hide — behind the cart, in the gateway — and wheek';
+                    },
+                    where: function () {
+                      const c = typeof game.companion === 'function' ? game.companion() : null;
+                      return c ? hintObj(game.sahara && game.sahara.cart) : null;
+                    } },
     // ---- the Drift ---------------------------------------------------------
     'to-drift':       { clue: 'somebody else is steering',
                     where: function () { return null; } },
@@ -27956,6 +28245,12 @@ export function createSystems(game) {
                       return 'six. up to the plinth, then E at the lantern';
                     },
                     where: function () { return hintObj(game.drift && game.drift.crown); } },
+    // The seed, examined (L6, F2): the same gap, and the seed's own line.
+    'seed-gap':       { clue: function () {
+                      if (game.capy && typeof game.capy.can === 'function' && !game.capy.can('seed')) return 'catch a seed first. it teaches the fall';
+                      return 'hold the hop key on the way down. you come down like one of those — and no Q';
+                    },
+                    where: function () { return hintObj(game.drift && game.drift.arch); } },
     // ---- Venice. Every clue that can be is written against the TIDE, because
     // that is the one thing in this chapter a player has to learn to read.
     'to-venice':      { clue: 'somebody else is steering',
@@ -28001,6 +28296,28 @@ export function createSystems(game) {
                       return 'end to end. it is deep enough now.';
                     },
                     where: function () { return hintObj(game.venice && game.venice.piazza); } },
+    // The perch, asked for (L6, F2): a pigeon first, the pontoon once it is on.
+    'pigeon-passenger': { clue: function () {
+                      const n = typeof game.perchCount === 'function' ? game.perchCount() : 0;
+                      if (n >= 1) return 'one aboard. to a pontoon, onto the boat, and stand the whole way over';
+                      if (game.capy && typeof game.capy.can === 'function' && !game.capy.can('herd')) return 'something small has to follow you first. the ibis at home taught that';
+                      return 'wheek at a pigeon till it follows, then sit down. it climbs on';
+                    },
+                    where: function () {
+                      const n = typeof game.perchCount === 'function' ? game.perchCount() : 0;
+                      return n >= 1 ? hintObj(game.venice && game.venice.traghetto && game.venice.traghetto())
+                                    : hintObj(game.venice && game.venice.piazza);
+                    } },
+    // THE COMPANION on the traghetto (L6, F1). Not a local pigeon: the one
+    // you carried in. It climbs on when you sit beside it, and on a floor
+    // that moves it climbs on by itself.
+    'trag-two':       { clue: function () {
+                      const c = typeof game.companion === 'function' ? game.companion() : null;
+                      if (!c) return 'you need a companion: sit still by an animal elsewhere till it climbs on, then travel here';
+                      if (c.on) return 'with it on your back: get on at a pontoon and ride to the far bank';
+                      return 'sit still beside it till it climbs on, then the pontoon';
+                    },
+                    where: function () { return hintObj(game.venice && game.venice.traghetto && game.venice.traghetto()); } },
     // ---- Hong Kong. The first two clues teach the verb, because a verb
     // nobody has ever pressed before does not teach itself.
     'to-kowloon':     { clue: 'somebody else is steering',
@@ -28049,6 +28366,12 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.kowloon && game.kowloon.pier); } },
     'star-ferry':     { clue: 'get aboard, and stay aboard the whole way across',
                     where: function () { return hintObj(game.kowloon && game.kowloon.ferry()); } },
+    // Marrakech's kick, three chapters on (L6, F2). The foot of the scaffold.
+    'scaffold-kick':  { clue: function () {
+                      if (game.capy && typeof game.capy.can === 'function' && !game.capy.can('vault')) return 'the acrobats in Marrakech teach the kick. it travels';
+                      return 'a wall is a thing to push off. hop at the bamboo, and hop AGAIN while you are on it';
+                    },
+                    where: function () { return hintObj(game.kowloon && (game.kowloon.scaffoldFoot || game.kowloon.scaffold)); } },
 
     'o-bonde':        { clue: function () {
                       const r = game.rio;
@@ -28142,6 +28465,12 @@ export function createSystems(game) {
                       return 'the water goes cloudy first. then get under it.';
                     },
                     where: function () { return hintObj(game.palawan && game.palawan.lagoon); } },
+    // The snorkel, asked for (L6, F2): the first dive hands it over.
+    'snorkel-cathedral': { clue: function () {
+                      if (game.capy && game.capy.worn !== 'snorkel') return 'the snorkel is yours after the first dive. it is a longer breath';
+                      return 'in the snorkel: past the lagoon, under, into the room with the hole in the roof';
+                    },
+                    where: function () { return hintObj(game.palawan && game.palawan.cathedral); } },
 
     // ---- Cappadocia. Three of these are the same sentence said three ways,
     // because the mechanic is one sentence and it is not an obvious one.
@@ -28185,6 +28514,22 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.goreme && game.goreme.mare && game.goreme.mare()); } },
     'on-the-trailer': { clue: 'the truck is following you. come down where it can be.',
                     where: function () { return hintObj(game.goreme && game.goreme.truck()); } },
+    // The cap and a cat, at the rim (L6, F2): two systems in one basket.
+    'cap-at-the-rim': { clue: function () {
+                      const g = game.goreme;
+                      if (game.capy && game.capy.worn !== 'flycap') return 'the cap is yours after the sunrise. it comes round again';
+                      const n = typeof game.perchCount === 'function' ? game.perchCount() : 0;
+                      if (n < 1) return 'in the cap: two wheeks at a field cat, sit down, and it climbs on';
+                      if (g && typeof g.aboard === 'function' && !g.aboard()) return 'with it on your back: into the basket, and hold E';
+                      return 'above 55 m with the burner on when the sun clears the rim. do not hop';
+                    },
+                    where: function () {
+                      const g = game.goreme;
+                      if (!g) return null;
+                      const n = typeof game.perchCount === 'function' ? game.perchCount() : 0;
+                      if (n < 1 && typeof g.catAt === 'function') return hintObj(g.catAt());
+                      return hintObj(g.aboard && g.aboard() ? g.valley : g.balloon());
+                    } },
 
     // ---- Manly. Half of these are the same sentence — WHERE IS THE WHITE —
     // said from four different distances, because that is the whole chapter.
@@ -28232,6 +28577,19 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.manly && game.manly.shelly); } },
     'the-surfboat':   { clue: 'get in the hull before it goes, and stay in it',
                     where: function () { return hintObj(game.manly && game.manly.boat()); } },
+    // The perch, in the water (L6, F2): a gull first, the break once it is on.
+    'gull-out-back':  { clue: function () {
+                      const n = typeof game.perchCount === 'function' ? game.perchCount() : 0;
+                      if (n >= 1) return 'it is on. walk in, and swim out past the white — no dive';
+                      if (game.capy && typeof game.capy.can === 'function' && !game.capy.can('herd')) return 'something small has to follow you first. the ibis at home taught that';
+                      return 'two wheeks at a silver gull on the sand, then sit down. it climbs on';
+                    },
+                    where: function () {
+                      const n = typeof game.perchCount === 'function' ? game.perchCount() : 0;
+                      const m = game.manly;
+                      if (!m) return null;
+                      return n >= 1 ? hintObj(m.rip) : hintObj(typeof m.gullAt === 'function' ? m.gullAt() : m.castle);
+                    } },
 
     // ---- The Pantanal. Nothing here is startled by you, so none of these
     // clues is about sneaking. They are all about being ALLOWED.
@@ -28274,6 +28632,14 @@ export function createSystems(game) {
                       return 'straight across. the big one comes up behind the line — Q at it, three times';
                     },
                     where: function () { return hintObj(game.pantanal && game.pantanal.bank); } },
+    // THE WINDOW (L6, F2): the stork's circuit is a clock, and it is the line.
+    'jabiru-home':    { clue: function () {
+                      const g = game.pantanal;
+                      const t = g && typeof g.jabiruIn === 'function' ? g.jabiruIn() : -1;
+                      if (t < 0) return 'by the dead tree, in the shallows. it goes up, round, and comes back to its own feet';
+                      return 'stand where it took off from. it comes down in ' + Math.ceil(t) + ' s';
+                    },
+                    where: function () { return hintObj(game.pantanal && game.pantanal.jabiruHome && game.pantanal.jabiruHome()); } },
 
     // ---- Sơn Đoòng. The first four are one lesson and it is the only lesson
     // in the chapter: THE NOISE IS THE TORCH.
@@ -28321,6 +28687,14 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.cave && game.cave.phyto); } },
     'the-log':        { clue: 'something came down the river. get on it.',
                     where: function () { return hintObj(game.cave && game.cave.log()); } },
+    // THE WINDOW (L6, F2): the burst is on a clock, and the clock is the line.
+    'the-big-drip':   { clue: function () {
+                      const c = game.cave;
+                      const t = c && typeof c.burstIn === 'function' ? c.burstIn() : -1;
+                      if (t < 0) return 'IT IS GOING. stand under the big one';
+                      return 'the big drip by the mouth. stand under it — the roof goes in ' + Math.ceil(t) + ' s';
+                    },
+                    where: function () { return hintObj(game.cave && game.cave.bigDrip); } },
 
     // ---- chapter 17 ----
     'to-antarctic':   { clue: 'somewhere with nothing in it at all',
@@ -28361,6 +28735,15 @@ export function createSystems(game) {
                       return 'W/S · A/D. find the blows, press Q, keep above 5.5 m/s with them';
                     },
                     where: function () { return hintObj(game.antarctic && game.antarctic.pod()); } },
+    // THE WINDOW (L6, F2): the face has its own clock, and it is the line.
+    'the-calving':    { clue: function () {
+                      const a = game.antarctic;
+                      const helm = a && typeof a.atHelm === 'function' ? a.atHelm() : false;
+                      const t = a && typeof a.calveIn === 'function' ? a.calveIn() : -1;
+                      if (!helm) return 'the orange tender: press E at the tiller, and take her to the glacier face';
+                      return 'inside seventy metres of the face, at the tiller. it goes in ' + Math.ceil(Math.max(0, t)) + ' s';
+                    },
+                    where: function () { return hintObj(game.antarctic && game.antarctic.calveFace); } },
 
     // ---- chapter 18 ----
     'to-monaco':      { clue: 'somewhere that will mind you being there',
@@ -28397,6 +28780,20 @@ export function createSystems(game) {
                       if (r && r.on && r.t < 0) return 'wait for the lights';
                       if (r && r.on) return 'W to go · S to brake · A/D round the pack. one lap';
                       return 'the red car on the grid by the harbour stand: press E at its door';
+                    },
+                    where: function () { return hintObj(game.monaco && game.monaco.gridCar && game.monaco.gridCar()); } },
+    // The seed and then the dive (L6, F2): the sun deck, and the seed's line.
+    'seed-and-under': { clue: function () {
+                      if (game.capy && typeof game.capy.can === 'function' && !game.capy.can('seed')) return 'the Drift teaches the fall. it travels';
+                      if (game.capy && game.capy.swimming) return 'now hold E and go under';
+                      return 'off the sun deck: hold the hop key on the way down, you come down like a seed. then hold E under';
+                    },
+                    where: function () { return hintObj(game.monaco && game.monaco.sunDeck); } },
+    // THE COMPANION at the podium (L6, F1): it gets into the car with you.
+    'podium-two':     { clue: function () {
+                      const c = typeof game.companion === 'function' ? game.companion() : null;
+                      if (!c) return 'bring a companion: sit still by an animal elsewhere till it climbs on, then travel here';
+                      return 'the red car on the grid. it gets in when you do — win the lap with it aboard';
                     },
                     where: function () { return hintObj(game.monaco && game.monaco.gridCar && game.monaco.gridCar()); } },
 
@@ -28444,6 +28841,13 @@ export function createSystems(game) {
                     } },
     'the-train':      { clue: 'stand in the rail alley, off the rails. wait for the horn, then hold still',
                     where: function () { return hintObj(game.hanoi && game.hanoi.rails); } },
+    // Right of way, examined (L6, F2): the skill's own line, on the crossing.
+    'right-of-way':   { clue: function () {
+                      if (game.capy && typeof game.capy.can === 'function' && !game.capy.can('flow')) return 'cross the first road. it teaches the line';
+                      if (game.capy && game.capy.committed) return 'that is it. hold it to the far kerb';
+                      return 'hold your line and the world opens. walk, straight, and do not turn your head';
+                    },
+                    where: function () { return hintObj(game.hanoi && game.hanoi.crossing()); } },
   };
   function hintHoldingBall() { return hintHolding('ball') ? 'carry it into the harbour' : 'grab the ball with E'; }
 
@@ -29936,6 +30340,10 @@ export function createSystems(game) {
         // no version bump; a file written before it existed reads as a
         // traveller who has not written anything down yet.
         nb: jrNb,
+        // ...and THE COMPANION (L6, F1): { kind, from }, or nothing. Additive,
+        // no version bump; a file written before it existed reads as a
+        // traveller who arrived alone, which they did. See compSave.
+        stow: compSave(),
         biome: (game.biome && game.biome.current) || 'sydney',
         // Additive, exactly like `chapms` and `finds` above, and the version
         // does not move for it. `fin` means the closing beat on the lawn has
@@ -32658,12 +33066,32 @@ export function createSystems(game) {
   const sysFIN_CODA_RAISE = 0.5;
   let sysFinCodaT = -1, sysFinCodaYaw = 0, sysFinCodaN = 0;
   let sysFinOpen = Math.PI;             // the horseshoe's mouth, world atan2(z, x)
+  // THE CODA PLAYS THE TUNE (L6, F3). Nineteen notes, one per chapter on its
+  // palette's lead, were nineteen chord tones climbing. They are now the
+  // theme, once, complete, in the live palette's key: the tune's rhythm laid
+  // across the nineteen so each long note is a note handed between places —
+  // three leads say `do`, four say the second `sol`, five close on the tonic.
+  // `sysFinCodaTune` is the note indices as played, for codaAudit.
+  const sysFinCodaTune = [];
+  function sysFinCodaIdx(k, n) {
+    let total = 0;
+    for (let j = 0; j < sysMUS_THEME_DUR.length; j++) total += sysMUS_THEME_DUR[j];
+    const pos = (k - 0.5) / Math.max(1, n) * total;
+    let cum = 0;
+    for (let j = 0; j < sysMUS_THEME_DUR.length; j++) {
+      cum += sysMUS_THEME_DUR[j];
+      if (pos < cum) return j;
+    }
+    return sysMUS_THEME.length - 1;
+  }
   function sysFinaleCoda() {
     let t = 0.4;
     const chord = musCurChord;
     const now = ac ? ac.currentTime : 0;
     const ph = game.physics;
     sysFinCodaN = 0;
+    sysFinCodaTune.length = 0;
+    const base = musThemeBase(0);
     for (let k = 1; k <= chapMax; k++) {
       const def = chapterDef(k);
       if (!def) continue;
@@ -32672,9 +33100,9 @@ export function createSystems(game) {
       const ll = sysROUTE_LL[def.biome];
       const pan = ll ? clamp(ll[0] / 180, -1, 1) * 0.8 : 0;
       if (ac && chord && chord.length && musVol && !musMuted) {
-        const idx = (k - 1) % chord.length;
-        const midi = musFold(chord[idx] + 12 * Math.floor((k - 1) / chord.length), sysMUS_LIFT_LO, sysMUS_LIFT_HI);
-        try { musLiftNote(inst, musSnap(now + t), midi, pan, 0.14, sysFIN_NOTE_GAP * 1.6); sysFinCodaN++; } catch (e) { /* one voice missing */ }
+        const ti = sysFinCodaIdx(k, chapMax);
+        const midi = base + musThemeOff(ti);
+        try { musLiftNote(inst, musSnap(now + t), midi, pan, 0.14, sysFIN_NOTE_GAP * 1.6); sysFinCodaN++; sysFinCodaTune.push(ti); } catch (e) { /* one voice missing */ }
       }
       (function (biome, delay, name, keep) {
         setTimeout(function () {
@@ -33276,6 +33704,9 @@ export function createSystems(game) {
         for (const q in p.f) if (typeof p.f[q] === 'number' && p.f[q] === p.f[q]) f[q] = p.f[q];
         jrNb[n] = { d: typeof p.d === 'string' ? p.d : '', f: f };
       }
+      // ...and THE COMPANION (L6, F1), checked and then BUILT LATER: the
+      // drawable wants the scene and the first started frame, not this one.
+      compRestoreFrom(jrFile.stow);
       const pl = jrFile.pal || {};
       for (const k in pl) {
         if (typeof pl[k] !== 'number') continue;
@@ -36992,13 +37423,20 @@ export function createSystems(game) {
       // the shimmer (continuous), the second voice (from sysMUS_2ND_AT, when
       // the palette has one), the pulse (from sysMUS_LAYER_PULSE, pad
       // palettes). Monotone in chapProg by construction. `pulseN` counts.
-      // The fourth slot is the ostinato's gate (sysMUS_LAYER_OSTINATO): the
-      // gate is here, the tune is F3's — nothing plays on it yet.
+      // The fourth slot is the ostinato's gate (sysMUS_LAYER_OSTINATO), and
+      // since F3 the tune plays on it: `ostN` counts its notes.
       layers: [+(musProg * 0.85).toFixed(3),
                sysMUS_2ND[musPalN] ? +clamp((musProg - sysMUS_2ND_AT) / (1 - sysMUS_2ND_AT), 0, 1).toFixed(3) : 0,
                (musPal && musPal.band) ? 0 : +clamp((musProg - sysMUS_LAYER_PULSE) / (1 - sysMUS_LAYER_PULSE), 0, 1).toFixed(3),
-               musProg >= sysMUS_LAYER_OSTINATO ? 1 : 0],
+               (musProg >= sysMUS_LAYER_OSTINATO && musPal && musPal.lead && musPal.lead !== 'none') ? 1 : 0],
       pulseN: musPulseN,
+      // THE TUNE (L6, F3): where it has been said, and by what
+      ostN: musOstN, themeSaid: musThemeSaid, themeCells: musThemeCells, liftTails: musLiftTails,
+      choirTuneN: musChoirTuneN, choirTuneOn: musChoirTuneAt > 0,
+      choir: musChoirGain ? v(musChoirGain.gain) : null,
+      choirLead: musChoirLead ? v(musChoirLead.banks[0].g.gain) : null,
+      choirLeadHz: musChoirLead ? +musChoirLead.banks[0].oscs[0].frequency.value.toFixed(1) : null,
+      scale: (musPal && musPal.scale) || 'major', tonic: musPal && musPal.roots ? musPal.roots[0] : null,
       // THE SLEEP (L6, E3): 0 awake, 1 gone; and the edges counted
       sleep: +musSleep.toFixed(3), sleepN: musSleepN, wakeN: musWakeN,
       // THE MELODY (L3, F2): where the walk is, and how many cells have played
@@ -37624,11 +38062,12 @@ export function createSystems(game) {
       pitch: o.pitch || 1,
       count: o.count, at: o.at, put: o.put,
       lift: typeof o.lift === 'function' ? o.lift : null,
-      // ...and a THIRD, for THE STOWAWAY (N3): a standalone drawable of animal
-      // `i`, owned by the caller, in nobody's scene. Omit it and this animal
-      // cannot cross a border, which is the right answer for anything the
-      // chapter cannot cheaply draw one of on its own.
-      stow: typeof o.stow === 'function' ? o.stow : null,
+      // ...and a THIRD, for THE COMPANION (N3 → L6, F1): `travels: true` says
+      // this animal may cross a border. It is drawn on the far side by
+      // systems.js's own neutral builder for the kind (compBUILD), so a kind
+      // with no builder cannot travel whatever the offer says. An older
+      // offer's `stow:` function is read as the same yes.
+      travels: !!(o.travels || typeof o.stow === 'function') && !!compBUILD[o.kind || 'animal'],
       span: clamp(Math.round(o.span || 1), 1, 3),
       st: [],
     };
@@ -38127,12 +38566,13 @@ export function createSystems(game) {
       perchAllOff(off);
       perchLoafT = 0;
       if (off !== 'quiet') perchGapT = perchGAP;
-      // THE STOWAWAY GOES ON THE SAME FIVE REASONS. It is not a passenger for
-      // counting, and it is one for physics: a hop that puts three pigeons on
-      // the paving may not leave a Venetian pigeon floating over a glacier.
+      // THE COMPANION GETS DOWN ON THE SAME FIVE REASONS. It is not a passenger
+      // for counting, and it is one for physics: a hop that puts three pigeons
+      // on the paving may not leave a Venetian pigeon floating over a glacier.
+      // It does not LEAVE, though (L6, F1): it follows from where it landed.
       // 'quiet' is the exception — that is the chapter change itself, which is
       // the one event this animal exists to survive.
-      if (off !== 'quiet') stowRelease(capy);
+      if (off !== 'quiet') compDismount(capy);
     }
     // ---- rule 3: you have to be still ------------------------------------
     const sat = !!(capy && capy.loaf >= perchLOAF);
@@ -38143,11 +38583,11 @@ export function createSystems(game) {
     if (!seats) return;
     const taken = perchTaken;
     for (let i = 0; i < taken.length; i++) taken[i] = false;
-    // ...AND A STOWAWAY IS SITTING IN ONE OF THEM. It does not count, and it
-    // does take up room — otherwise the Venetian pigeon you carried in and the
-    // first gentoo that climbs on are drawn in the same place.
-    if (stowObj && stowGo <= 0) {
-      for (let q = 0; q < stowSpan && q < taken.length; q++) taken[q] = true;
+    // ...AND THE COMPANION IS SITTING IN ONE OF THEM. It does not count, and
+    // it does take up room — otherwise the Venetian pigeon you carried in and
+    // the first gentoo that climbs on are drawn in the same place.
+    if (compMounted()) {
+      for (let q = 0; q < compSpan && q < taken.length; q++) taken[q] = true;
     }
     let onN = 0;
     for (let k = 0; k < herdKinds.length; k++) {
@@ -38285,7 +38725,7 @@ export function createSystems(game) {
     perchAirT = 0; perchLeapt = false; perchShake = false;
   });
   // =========================================================================
-  // THE STOWAWAY (N3) — one animal crosses a border.
+  // THE COMPANION (L6, F1) — the stowaway grown up: one animal stays.
   // =========================================================================
   // THE HERD'S OWN RULE IS THAT NOTHING TRAVELS, and it is a good rule: it was
   // written about fourteen Venetian pigeons following a capybara through a
@@ -38295,36 +38735,205 @@ export function createSystems(game) {
   // exists — one pigeon on your head in Antarctica is a gag, and fourteen on
   // the ice is a second chapter's worth of actors somebody has to own.
   //
+  // N3 BUILT THIS AS A GAG: a chapter's `stow()` drawable rode across ONE
+  // border on the back and walked off on the first Space press. The design
+  // review (F1, 2.4) measured what that left: it did not follow, could not be
+  // re-mounted, was not saved, and the six drawables shared their chapter's
+  // materials by reference. THE COMPANION keeps the animal:
+  //
+  //   FOLLOWS   Space — or any of the perch's dismounts — puts it down and it
+  //             walks the trail behind you (herdTrailAt, the herd's own line;
+  //             y from sysGroundY). Over water a bird flies compFLY_H above
+  //             the surface, a gentoo swims, and a walker (the cat) stops at
+  //             the last dry point and calls.
+  //   CLIMBS    back on when you loaf perchWAIT beside it — the perch's own
+  //             arc, its own `mt`, and it is taken[0] as it always was.
+  //   THE SEAT  at a helm, carried, or standing on a floor that moves (the
+  //             capybara's own capy.frameVX/VZ: the traghetto, the ferry, the
+  //             chiva, the balloon) it re-mounts by itself, so every carrier
+  //             in the game carries two.
+  //   STAYS     across every border until you take it home (`to === compFrom`,
+  //             N3's branch), leave it (> compFAR m for compFAR_T s), or tell
+  //             it (hold Q compTELL_T s beside it: "off you go").
+  //   SAVED     `stow: { kind, from }` on the file (saveWrite), rebuilt lazily
+  //             from the neutral builder on the first started frame.
+  //   DECOY     while game.hidden() > 0.8 a wheek sends it out — to the aim
+  //             ring if one is up, else compDECOY_D m ahead — and npc.js's
+  //             march reads game.decoyAt() as where you were last seen.
+  //   PORTRAIT  photo pose 'with the companion' (the camera block), and it is
+  //             stood in the tag-2 frame (wowShotTick).
+  //
   // WHO DRAWS IT. Not the chapter it came from: that module is detached, its
-  // meshes are hidden and it is not in the update list. So a chapter that wants
-  // its animal to be able to travel hands over a STANDALONE DRAWABLE — a third
-  // optional function on the herd offer —
+  // meshes are hidden and it is not in the update list. Six BIOME-NEUTRAL
+  // BUILDERS below, one per kind that can travel, on PALETTE colours through
+  // mat() — nothing shares a detached chapter's material by reference any
+  // more. (mat() caches by colour, so a fade would still tint every mesh of
+  // that colour in the live world; the walk-off stays a shrink.) A chapter
+  // says its animal may travel with `travels: true` on the herd offer. The
+  // drawable is added LOOSE (the physSceneAddLoose idiom: main.js claims
+  // everything added while a capture tag is up, and a companion captured into
+  // the chapter it is standing in would vanish the next time you left) and
+  // never disposed — one per kind, cached for the session.
   //
-  //   stow: function (i) { return <THREE.Object3D>; }
-  //
-  // built from the chapter's own geometry and materials, owned by the caller,
-  // in nobody's scene. systems.js adds it LOOSE (the physSceneAddLoose idiom:
-  // main.js claims everything added while a capture tag is up, and a stowaway
-  // captured into the chapter it is standing in would vanish the next time you
-  // left) and never disposes it — one per kind, cached for the session, so
-  // carrying six pigeons over six borders allocates one pigeon.
-  //
-  // WHEN IT IS ASKED. `biome:leave`, which N3 added to main.js because there
+  // WHEN IT IS TAKEN. `biome:leave`, which N3 added to main.js because there
   // had never been a "before" event: `biome:enter` fires on the far side, by
-  // which time the only module that could build this is asleep.
+  // which time the only module that knows which seat was taken is asleep.
   //
   // IT IS NOT A PASSENGER, AND THAT IS NOT PEDANTRY. `perchCount()` is what the
   // finds and the ledger leaf read, and a place's number is a claim about that
   // place — carry one pigeon round the world and every leaf in the game would
   // say "carried a passenger" without a single local animal ever having
   // climbed on. It takes a seat and it is drawn on the back; it counts for
-  // nothing but its own find and its own line.
-  const stowLEAVE = 2.4;      // s of getting down and going, once it is over
-  const stowWALK  = 1.6;      // m/s it wanders off at
-  const stowCache = Object.create(null);   // 'venice:pigeon' -> Object3D, once
-  const stowAt = { x: 0, y: 0, z: 0 };
-  let stowObj = null, stowKind = '', stowFrom = '', stowSpan = 1;
-  let stowGo = 0, stowGoX = 0, stowGoZ = 0, stowNews = '', stowErr = '';
+  // nothing but its own find, its own line and its own three rows.
+  const compFLY_H    = 1.2;    // m a bird follows above water
+  const compSWIM_D   = 0.12;   // m a gentoo sits below the waterline
+  const compSPEED    = 9.0;    // m/s it may close at — herdSPEED, for the one animal
+  const compREST     = 0.20;   // m short of the trail point it stops
+  const compFAR      = 60;     // m away, for compFAR_T s, and it goes
+  const compFAR_T    = 40;
+  const compTELL_T   = 1.2;    // s of held Q beside it: "off you go"
+  const compBESIDE   = 2.6;    // m "beside it", for the telling and the loaf
+  const compCALL_T   = 3.0;    // s between a stranded walker's calls
+  const compCALL_D   = 4.0;    // m away you have to be before it bothers
+  const compDECOY_D  = 8.0;    // m ahead the decoy runs when no aim ring is up
+  const compDECOY_T  = 4.0;    // s the march reads it for
+  const compRISE_MAX = 2.5;    // s the climb may take from far off (the seat)
+  const compSEAT_V   = 0.5;    // m/s of floor under you that counts as a carrier...
+  const compSEAT_T   = 0.5;    // ...once it has kept that up for this long
+  const compLEAVE    = 2.4;    // s of getting down and going, once it is over
+  const compWALK     = 1.6;    // m/s it wanders off at
+  const compLAMBDA_Y = 9;      // how fast its height follows the ground
+  const compPORTRAIT = 30;     // m within which it is stood in a picture
+  // ---- what each kind is: how it crosses water, what it says, how big ----
+  // `span` is the herd offer's, restated here for a restore, which has no
+  // offer to read it from (the chapter is not loaded).
+  const compTRAITS = {
+    'pigeon':      { fly: true,  swim: false, voice: 'pop',  pitch: 1.70, span: 1 },
+    'cat':         { fly: false, swim: false, voice: 'pop',  pitch: 1.25, span: 1 },
+    'silver gull': { fly: true,  swim: false, voice: 'gull', pitch: 1.15, span: 1 },
+    'gentoo':      { fly: false, swim: true,  voice: 'gull', pitch: 1.35, span: 2 },
+    'heron':       { fly: true,  swim: false, voice: 'gull', pitch: 0.62, span: 2 },
+    'ibis':        { fly: true,  swim: false, voice: 'gull', pitch: 0.80, span: 1 },
+  };
+  /** One part of a builder: a primitive on a PALETTE colour, casting. */
+  function compPart(g, geo, colour, x, y, z) {
+    const m = new THREE.Mesh(geo, mat(colour));
+    m.position.set(x, y, z);
+    m.castShadow = true;
+    g.add(m);
+    return m;
+  }
+  /** Two legs, a colour, a radius, a height, and how far apart. */
+  function compLegs(g, colour, r, h, apart, z) {
+    const geo = new THREE.CylinderGeometry(r, r, h, 5);
+    compPart(g, geo, colour, -apart, h * 0.5, z || 0);
+    compPart(g, geo, colour, apart, h * 0.5, z || 0);
+  }
+  // ---- THE SIX, feet at the origin, facing +z, ~15 lines each -------------
+  // The sizes are the chapters' own (a pigeon 30 cm, a gentoo 75, a heron a
+  // metre) so a companion on the back sits where the local one did.
+  const compBUILD = {
+    'pigeon': function () {
+      const g = new THREE.Group();
+      const body = compPart(g, new THREE.SphereGeometry(0.11, 8, 6), PALETTE.hair5, 0, 0.14, 0);
+      body.scale.set(1, 0.85, 1.5);
+      compPart(g, new THREE.SphereGeometry(0.06, 7, 5), PALETTE.cloth7, 0, 0.26, 0.13);
+      const bill = compPart(g, new THREE.ConeGeometry(0.018, 0.06, 5), PALETTE.capyAmber, 0, 0.25, 0.21);
+      bill.rotation.x = Math.PI / 2;
+      compPart(g, new THREE.BoxGeometry(0.09, 0.02, 0.14), PALETTE.ibisHead, 0, 0.12, -0.20);
+      compLegs(g, PALETTE.binRed, 0.010, 0.06, 0.035, 0.02);
+      return g;
+    },
+    'cat': function () {
+      const g = new THREE.Group();
+      // sitting: a cat being carried is a cat that has decided to stay
+      const body = compPart(g, new THREE.SphereGeometry(0.15, 8, 6), PALETTE.caliGato, 0, 0.18, -0.06);
+      body.scale.set(0.8, 1.1, 1.2);
+      compPart(g, new THREE.SphereGeometry(0.095, 8, 6), PALETTE.caliGato, 0, 0.40, 0.10);
+      const earL = compPart(g, new THREE.ConeGeometry(0.03, 0.07, 4), PALETTE.caliGatoDark, -0.055, 0.49, 0.09);
+      const earR = compPart(g, new THREE.ConeGeometry(0.03, 0.07, 4), PALETTE.caliGatoDark, 0.055, 0.49, 0.09);
+      earL.rotation.z = 0.25; earR.rotation.z = -0.25;
+      compPart(g, new THREE.SphereGeometry(0.014, 5, 4), PALETTE.petalYellow, -0.035, 0.42, 0.185);
+      compPart(g, new THREE.SphereGeometry(0.014, 5, 4), PALETTE.petalYellow, 0.035, 0.42, 0.185);
+      compPart(g, new THREE.SphereGeometry(0.012, 5, 4), PALETTE.capyNose, 0, 0.385, 0.20);
+      const tail = compPart(g, new THREE.CylinderGeometry(0.018, 0.022, 0.30, 5), PALETTE.caliGatoDark, 0.10, 0.03, -0.14);
+      tail.rotation.x = Math.PI / 2; tail.rotation.z = 0.6;
+      compLegs(g, PALETTE.caliGato, 0.028, 0.20, 0.06, 0.08);
+      return g;
+    },
+    'silver gull': function () {
+      const g = new THREE.Group();
+      const body = compPart(g, new THREE.SphereGeometry(0.12, 8, 6), PALETTE.icePuffin, 0, 0.21, 0);
+      body.scale.set(1, 0.8, 1.6);
+      compPart(g, new THREE.BoxGeometry(0.13, 0.02, 0.24), PALETTE.hair5, -0.10, 0.26, -0.02);
+      compPart(g, new THREE.BoxGeometry(0.13, 0.02, 0.24), PALETTE.hair5, 0.10, 0.26, -0.02);
+      compPart(g, new THREE.SphereGeometry(0.07, 7, 5), PALETTE.icePuffin, 0, 0.32, 0.17);
+      const bill = compPart(g, new THREE.ConeGeometry(0.02, 0.08, 5), PALETTE.binRed, 0, 0.31, 0.25);
+      bill.rotation.x = Math.PI / 2;
+      compPart(g, new THREE.BoxGeometry(0.08, 0.015, 0.12), PALETTE.ibisHead, 0, 0.22, -0.24);
+      compLegs(g, PALETTE.binRed, 0.012, 0.12, 0.04, 0.0);
+      return g;
+    },
+    'gentoo': function () {
+      const g = new THREE.Group();
+      const body = compPart(g, new THREE.SphereGeometry(0.16, 9, 7), PALETTE.icePuffinDk, 0, 0.42, 0);
+      body.scale.set(1, 1.9, 0.9);
+      const belly = compPart(g, new THREE.SphereGeometry(0.14, 8, 6), PALETTE.icePuffin, 0, 0.40, 0.06);
+      belly.scale.set(0.85, 1.75, 0.6);
+      compPart(g, new THREE.SphereGeometry(0.10, 8, 6), PALETTE.icePuffinDk, 0, 0.72, 0.02);
+      compPart(g, new THREE.SphereGeometry(0.03, 5, 4), PALETTE.icePuffin, -0.07, 0.76, 0.05);
+      compPart(g, new THREE.SphereGeometry(0.03, 5, 4), PALETTE.icePuffin, 0.07, 0.76, 0.05);
+      const bill = compPart(g, new THREE.ConeGeometry(0.025, 0.09, 5), PALETTE.icePuffinBk, 0, 0.71, 0.14);
+      bill.rotation.x = Math.PI / 2;
+      const flL = compPart(g, new THREE.BoxGeometry(0.03, 0.30, 0.08), PALETTE.icePuffinDk, -0.17, 0.42, 0);
+      const flR = compPart(g, new THREE.BoxGeometry(0.03, 0.30, 0.08), PALETTE.icePuffinDk, 0.17, 0.42, 0);
+      flL.rotation.z = -0.22; flR.rotation.z = 0.22;
+      compPart(g, new THREE.BoxGeometry(0.08, 0.03, 0.12), PALETTE.icePuffinBk, -0.06, 0.015, 0.04);
+      compPart(g, new THREE.BoxGeometry(0.08, 0.03, 0.12), PALETTE.icePuffinBk, 0.06, 0.015, 0.04);
+      return g;
+    },
+    'heron': function () {
+      const g = new THREE.Group();
+      const body = compPart(g, new THREE.SphereGeometry(0.16, 9, 7), PALETTE.hair5, 0, 0.64, 0);
+      body.scale.set(1, 0.9, 1.7);
+      const neck = compPart(g, new THREE.CylinderGeometry(0.035, 0.045, 0.44, 6), PALETTE.icePuffin, 0, 0.90, 0.20);
+      neck.rotation.x = -0.38;
+      compPart(g, new THREE.SphereGeometry(0.06, 7, 5), PALETTE.icePuffin, 0, 1.10, 0.30);
+      compPart(g, new THREE.BoxGeometry(0.03, 0.02, 0.12), PALETTE.ibisHead, 0, 1.15, 0.24);
+      const bill = compPart(g, new THREE.ConeGeometry(0.02, 0.17, 5), PALETTE.petalYellow, 0, 1.09, 0.42);
+      bill.rotation.x = Math.PI / 2;
+      compPart(g, new THREE.BoxGeometry(0.10, 0.02, 0.14), PALETTE.ibisHead, 0, 0.64, -0.30);
+      compLegs(g, PALETTE.petalYellow, 0.015, 0.50, 0.06, 0.0);
+      return g;
+    },
+    'ibis': function () {
+      const g = new THREE.Group();
+      const body = compPart(g, new THREE.SphereGeometry(0.14, 8, 6), PALETTE.ibis, 0, 0.40, 0);
+      body.scale.set(1, 0.85, 1.6);
+      compPart(g, new THREE.BoxGeometry(0.10, 0.03, 0.10), PALETTE.ibisHead, 0, 0.40, -0.25);
+      const neck = compPart(g, new THREE.CylinderGeometry(0.03, 0.04, 0.30, 6), PALETTE.ibis, 0, 0.58, 0.16);
+      neck.rotation.x = -0.42;
+      compPart(g, new THREE.SphereGeometry(0.055, 7, 5), PALETTE.ibisHead, 0, 0.72, 0.25);
+      const bill = compPart(g, new THREE.ConeGeometry(0.016, 0.17, 5), PALETTE.ibisHead, 0, 0.66, 0.34);
+      bill.rotation.x = Math.PI / 2 + 0.55;
+      compLegs(g, PALETTE.ibisHead, 0.012, 0.34, 0.05, 0.0);
+      return g;
+    },
+  };
+  const compCache = Object.create(null);   // kind -> Object3D, once a session
+  const compAt = { x: 0, y: 0, z: 0 };     // where it is drawn
+  const compPt = { x: 0, z: 0 };           // scratch: the trail point
+  const compSeatV = { x: 0, y: 0, z: 0 };  // scratch: the seat
+  const compSfx = { at: compAt, force: true, volume: 0.3, pitch: 1 };
+  let compObj = null, compKind = '', compFrom = '', compSpan = 1, compTr = null;
+  let compState = '';        // '' | 'on' | 'climb' | 'follow' | 'decoy' | 'go'
+  let compYaw = 0, compMt = 0, compRise = perchRISE, compFx = 0, compFy = 0, compFz = 0;
+  let compGo = 0, compGoX = 0, compGoZ = 0, compNews = '', compErr = '';
+  let compFarT = 0, compTellT = 0, compCallT = 0, compDecoyT = 0, compWaiting = false, compSeatT = 0;
+  let compDecoyX = 0, compDecoyZ = 0;
+  let compSaved = null;      // { kind, from } off the file, until the first started frame
+  let compWhy = '';          // why the last one left, for the harness
+  let compTold = false;      // "sit beside it and it climbs back on" — said once
   /** 'a pigeon', 'an ibis'. The article is the only grammar this needs. */
   function stowName(k) {
     return (/^[aeiou]/i.test(k) ? 'an ' : 'a ') + k;
@@ -38338,31 +38947,170 @@ export function createSystems(game) {
    * reading it, so the next arrival gets the rumour back.
    */
   function stowHeadline() {
-    const s = stowNews;
-    stowNews = '';
+    const s = compNews;
+    compNews = '';
     return s || '';
   }
-  /** Put it back down and let it go. Never disposes: see stowCache. */
-  function stowRelease(capy) {
-    if (!stowObj || stowGo > 0) return;
-    stowGo = stowLEAVE;
+  /** Is it on the back (or on its way up)? The perch's taken[0] reads this. */
+  function compMounted() {
+    return !!compObj && (compState === 'on' || compState === 'climb');
+  }
+  /** The drawable for a kind, built once, loose in the scene, never disposed. */
+  function compBuild(kind) {
+    let obj = compCache[kind];
+    if (obj !== undefined) return obj;
+    obj = null;
+    const build = compBUILD[kind];
+    if (build) {
+      try { obj = build() || null; } catch (err) { obj = null; compErr = (err && err.message) || String(err); }
+    }
+    compCache[kind] = obj;
+    if (obj) {
+      obj.visible = false;
+      obj.__stowTag = true;
+      THREE.Object3D.prototype.add.call(scene, obj);
+      registerShadowTarget(obj);
+    }
+    return obj;
+  }
+  /** Take one: `kind` from `from`, on the back. False if nothing can draw it. */
+  function compTake(kind, from, span) {
+    const tr = compTRAITS[kind];
+    if (!tr) return false;
+    const obj = compBuild(kind);
+    if (!obj) return false;
+    compObj = obj; compKind = kind; compFrom = from; compTr = tr;
+    compSpan = clamp(Math.round(span || tr.span), 1, 3);
+    compState = 'on'; compMt = 1; compGo = 0;
+    compFarT = 0; compTellT = 0; compCallT = 0; compDecoyT = 0; compWaiting = false;
+    obj.scale.setScalar(1);
+    saveSoon();          // it is on the file from the moment it is taken
+    return true;
+  }
+  /** The waterline at a point when there is water over the ground there, else -Infinity. */
+  function compWetY(x, z) {
+    const wy = sysWaterY(x, z);
+    return wy > sysGroundY(x, z) + 0.05 ? wy : -Infinity;
+  }
+  /** The height this kind stands at a point: ground, or over/in the water. */
+  function compStandY(x, z) {
+    const gy = sysGroundY(x, z);
+    const wy = compWetY(x, z);
+    if (wy === -Infinity) return gy;
+    if (compTr && compTr.fly) return wy + compFLY_H;
+    if (compTr && compTr.swim) return wy - compSWIM_D;
+    return gy;
+  }
+  /**
+   * GET DOWN. The perch's five reasons call this where N3 called stowRelease:
+   * the animal is put on the ground where it was sitting and follows from
+   * there. 'quiet' (the chapter change) never reaches here — that is the one
+   * event this animal exists to survive.
+   */
+  function compDismount(capy) {
+    if (!compMounted()) return;
+    compState = 'follow';
+    compMt = 0; compFarT = 0; compTellT = 0; compWaiting = false;
+    // ...AND THE GAME SAYS HOW TO GET IT BACK, once ever: the climb is the
+    // perch's and the perch was taught by a toast the same way (N2).
+    if (!compTold) { compTold = true; toast('sit still beside it and it climbs back on', 'note'); }
+  }
+  /** The climb, from wherever it is standing: the perch's arc, timed by distance. */
+  function compClimb(p) {
+    if (!compObj || compMounted() || compState === 'go') return;
+    compFx = compAt.x; compFy = compAt.y; compFz = compAt.z;
+    const d = p ? Math.hypot(p.x - compAt.x, p.z - compAt.z) : 0;
+    compRise = clamp(d / compSPEED, perchRISE, compRISE_MAX);
+    compMt = 0; compState = 'climb'; compDecoyT = 0; compWaiting = false;
+    perchGapT = perchGAP;
+    if (compTr && compTr.voice) {
+      compSfx.volume = 0.26 + Math.random() * 0.10;
+      compSfx.pitch = compTr.pitch * (0.98 + Math.random() * 0.10);
+      sfx(compTr.voice, compSfx);
+    }
+  }
+  /** Put it down and let it go: N3's walk-off, across the frame and a shrink. */
+  function compLeave(capy, why) {
+    if (!compObj || compState === 'go') return;
+    compWhy = why || '';
     const p = capy && capy.position;
     const yaw = (capy && capy.group && capy.group.rotation) ? capy.group.rotation.y : 0;
-    // away from the animal, and across it rather than along it, so it walks
-    // out of the frame the camera is holding rather than up the middle of it
-    stowGoX = Math.cos(yaw); stowGoZ = -Math.sin(yaw);
-    if (p) { stowAt.x = p.x + stowGoX * 0.6; stowAt.z = p.z + stowGoZ * 0.6; }
+    if (compMounted() && p) {
+      // away from the animal, and across it rather than along it, so it walks
+      // out of the frame the camera is holding rather than up the middle of it
+      compGoX = Math.cos(yaw); compGoZ = -Math.sin(yaw);
+      compAt.x = p.x + compGoX * 0.6; compAt.z = p.z + compGoZ * 0.6;
+    } else if (p) {
+      // from where it stands: away from you
+      const dx = compAt.x - p.x, dz = compAt.z - p.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 0.05) { compGoX = dx / d; compGoZ = dz / d; }
+      else { compGoX = Math.cos(yaw); compGoZ = -Math.sin(yaw); }
+    } else { compGoX = 1; compGoZ = 0; }
+    compState = 'go'; compGo = compLEAVE; compDecoyT = 0;
+    if (why === 'told') toast('off you go.');
+    saveSoon();
+  }
+  /** Gone. Never disposes: see compCache. */
+  function compClear() {
+    if (compObj) { compObj.visible = false; compObj.scale.setScalar(1); }
+    compObj = null; compKind = ''; compFrom = ''; compTr = null; compState = '';
+    compSaved = null; compGo = 0; compDecoyT = 0;
+  }
+  /** What the file keeps: two fields, or nothing. See saveWrite. */
+  function compSave() {
+    if (!compObj || compState === 'go') return null;
+    return { kind: compKind, from: compFrom };
+  }
+  /** ...and what it hands back, checked field by field, built on the first started frame. */
+  function compRestoreFrom(sf) {
+    if (!sf || typeof sf !== 'object') return;
+    if (typeof sf.kind !== 'string' || !compTRAITS[sf.kind]) return;
+    if (typeof sf.from !== 'string' || !sf.from) return;
+    compSaved = { kind: sf.kind, from: sf.from };
+  }
+  /**
+   * STAND IT IN THE PICTURE. The photo pose and the marquee's own photograph
+   * both call this: a following companion within compPORTRAIT m is put at the
+   * animal's flank on the camera's side and turned to the lens. True when it
+   * was. A mounted one is already in the frame and is left alone.
+   */
+  function compBeside(camPos) {
+    if (!compObj || compState !== 'follow' && compState !== 'decoy') return false;
+    const capy = game.capy, p = capy && capy.position;
+    if (!p || !camPos) return false;
+    if (Math.hypot(compAt.x - p.x, compAt.z - p.z) > compPORTRAIT) return false;
+    let dx = camPos.x - p.x, dz = camPos.z - p.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 0.01) { dx = 0; dz = 1; } else { dx /= d; dz /= d; }
+    // the camera's left of the animal, a little toward the lens
+    const side = 0.9 + compSpan * 0.25;
+    compAt.x = p.x - dz * side + dx * 0.3;
+    compAt.z = p.z + dx * side + dz * 0.3;
+    compAt.y = compStandY(compAt.x, compAt.z);
+    compYaw = Math.atan2(camPos.x - compAt.x, camPos.z - compAt.z);
+    compObj.position.set(compAt.x, compAt.y, compAt.z);
+    compObj.rotation.y = compYaw;
+    compObj.visible = true;
+    return true;
   }
   game.events.on('biome:leave', function (e) {
-    if (stowObj) return;                       // one at a time, and one only
     const live = (e && e.name) || (game.biome && game.biome.current);
     const capy = game.capy;
+    // ---- ONE ALREADY: it comes too ---------------------------------------
+    // A following companion hops on for the crossing (the white covers the
+    // climb) and arrives on the back, which is the picture N3 built and the
+    // one the arrival line is about. A leaving one is left to leave.
+    if (compObj) {
+      if (compState === 'follow' || compState === 'decoy') { compState = 'on'; compMt = 1; compDecoyT = 0; }
+      return;
+    }
     if (!capy || typeof capy.can !== 'function' || !capy.can('herd')) return;
     // the FRONT seat's passenger, because there may be three and only one goes
     let best = null;
     for (let k = 0; k < herdKinds.length; k++) {
       const rec = herdKinds[k];
-      if (rec.biome !== live || typeof rec.stow !== 'function') continue;
+      if (rec.biome !== live || !rec.travels) continue;
       for (let i = 0; i < rec.st.length; i++) {
         const s = rec.st[i];
         if (!s || !s.on || s.mt < 1) continue;
@@ -38370,24 +39118,10 @@ export function createSystems(game) {
       }
     }
     if (!best) return;
-    const key = live + ':' + best.rec.kind;
-    let obj = stowCache[key];
-    if (obj === undefined) {
-      obj = null;
-      try { obj = best.rec.stow(best.i) || null; } catch (err) { obj = null; stowErr = (err && err.message) || String(err); }
-      stowCache[key] = obj;
-      if (obj) {
-        obj.visible = false;
-        THREE.Object3D.prototype.add.call(scene, obj);
-        registerShadowTarget(obj);
-      }
-    }
-    if (!obj) return;
-    stowObj = obj; stowKind = best.rec.kind; stowFrom = live;
-    stowSpan = best.rec.span; stowGo = 0;
+    compTake(best.rec.kind, live, best.rec.span);
   });
   game.events.on('biome:enter', function (e) {
-    if (!stowObj) return;
+    if (!compObj) return;
     const to = (e && e.name) || (game.biome && game.biome.current);
     // ---- IT IS HOME (or the crossing was rolled back) -------------------
     // Both cases arrive here as "the place I have landed in is the place this
@@ -38396,14 +39130,15 @@ export function createSystems(game) {
     // back to San Marco walking off into its own square is the right end to
     // that story, and main.js's failed-build rollback (`biome:enter` with the
     // chapter you never left) reads as one too.
-    if (to === stowFrom) {
-      stowObj.visible = true;
-      stowRelease(game.capy);
+    if (to === compFrom) {
+      compObj.visible = true;
+      compLeave(game.capy, 'home');
       return;
     }
-    stowObj.visible = true;
+    if (compState === 'go') return;
+    compObj.visible = true;
     const def = chapterDef(chapterOf(to));
-    stowNews = 'you have brought ' + stowName(stowKind) + ' to ' + (def ? def.name : to);
+    compNews = 'you have brought ' + stowName(compKind) + ' to ' + (def ? def.name : to);
     foundFind('stowaway');
     // ...and somebody says so, which is the whole joke: the place notices the
     // passenger before it notices the capybara.
@@ -38413,7 +39148,7 @@ export function createSystems(game) {
     // behind a sheet of paper is a line nobody hears.
     const cp = game.capy && game.capy.position;
     if (cp && typeof game.sayNear === 'function') {
-      const pool = ['There is ' + stowName(stowKind) + ' on that.',
+      const pool = ['There is ' + stowName(compKind) + ' on that.',
                     'That is not from here.',
                     'How did that get here?'];
       const line = pool[(Math.random() * pool.length) | 0];
@@ -38435,35 +39170,189 @@ export function createSystems(game) {
       }, 2200);
     }
   });
+  /** A heading eased toward another the short way round (dampAngle's idea, local). */
+  function compTurn(cur, target, k) {
+    let d = target - cur;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    return cur + d * k;
+  }
+  // ---- THE DECOY (L6, F1): a wheek while hidden sends it out ---------------
+  // The event, not the key: a touch honk and a pad honk are wheeks too, and
+  // the wheek is what the marcher would have heard. To the aim ring if one is
+  // up (a charged throw: the one thing in the game that points at a spot),
+  // else compDECOY_D m ahead of the animal's nose. Hidden means still, so the
+  // nose is the only pointer a hidden capybara has.
+  game.events.on('capy:wheek', function () {
+    if (!compObj || compState !== 'follow' || sysHideNow <= 0.8) return;
+    const capy = game.capy, p = capy && capy.position;
+    if (!p) return;
+    const am = capy.aim;
+    if (am && am.x === am.x) { compDecoyX = am.x; compDecoyZ = am.z; }
+    else {
+      const yaw = (capy.group && capy.group.rotation) ? capy.group.rotation.y : 0;
+      compDecoyX = p.x + Math.sin(yaw) * compDECOY_D;
+      compDecoyZ = p.z + Math.cos(yaw) * compDECOY_D;
+    }
+    compState = 'decoy'; compDecoyT = compDECOY_T; compCallT = 0.4;
+  });
+  /** Where the march should think you are: the companion, while it is out. Null otherwise. */
+  game.decoyAt = function () {
+    if (!compObj || compState !== 'decoy' || compDecoyT <= 0) return null;
+    return compAt;
+  };
+  // ---- ...AND THE ROWS IT PAYS (L6, F1) ------------------------------------
+  // completeTask gates every one of these on the row's own chapter, so the
+  // three listeners need no biome test of their own.
+  game.events.on('npc:lost', function (e) {
+    // npc.js's emit() wraps every payload as { npc: payload } — see the note
+    // on capyHeardFrom in capybara.js, which found the same wrapper.
+    const d = e && (e.npc || e);
+    if (d && d.decoy && compObj) completeTask('souk-decoy');
+  });
+  game.events.on('venice:traghetto', function () {
+    if (compMounted()) completeTask('trag-two');
+  });
+  game.events.on('monaco:podium', function () {
+    if (compObj && compState !== 'go') completeTask('podium-two');
+  });
   function stowUpdate(dt) {
-    if (!stowObj) return;
+    // ---- THE RESTORE, LAZILY: the first started frame with one on the file
+    // The file does not say whether it was on the back, and it does not need
+    // to: it is put on the ground beside you, following, and a loaf is the
+    // way back up. Restored into its own chapter (a save taken mid-visit
+    // home is impossible, but a hand-edited file is not) it simply goes.
+    if (compSaved && !compObj && started) {
+      const sv = compSaved; compSaved = null;
+      const capy0 = game.capy, p0 = capy0 && capy0.position;
+      if (p0 && compTake(sv.kind, sv.from, 0)) {
+        compState = 'follow'; compMt = 0;
+        compAt.x = p0.x + 1.0; compAt.z = p0.z; compAt.y = compStandY(compAt.x, compAt.z);
+        compObj.visible = true;
+        if (game.biome && game.biome.current === sv.from) compLeave(capy0, 'home');
+      }
+    }
+    if (!compObj) return;
     const capy = game.capy;
     if (!capy || !capy.position) return;
-    if (stowGo > 0) {
+    const p = capy.position;
+    const yaw = (capy.group && capy.group.rotation) ? capy.group.rotation.y : 0;
+    if (compState === 'go') {
       // ---- getting down, and going ---------------------------------------
-      // No fade: the materials are the chapter's own and shared, and turning
-      // one transparent for this would turn every mesh in Venice made of the
-      // same colour transparent with it. A shrink is free and touches nothing.
-      stowGo -= dt;
-      const u = clamp(stowGo / stowLEAVE, 0, 1);
-      stowAt.x += stowGoX * stowWALK * dt;
-      stowAt.z += stowGoZ * stowWALK * dt;
-      const gy = sysGroundY(stowAt.x, stowAt.z);
+      // A shrink, not a fade: mat() caches by colour, so the material a
+      // builder gets is the one every mesh of that colour in the live world
+      // has, and turning it transparent would turn all of them. A bird goes
+      // up as it goes, which is what a bird does.
+      compGo -= dt;
+      const u = clamp(compGo / compLEAVE, 0, 1);
+      compAt.x += compGoX * compWALK * dt;
+      compAt.z += compGoZ * compWALK * dt;
+      const gy = sysGroundY(compAt.x, compAt.z) + (compTr && compTr.fly ? (1 - u) * 1.6 : 0);
       const sc = u > 0.3 ? 1 : clamp(u / 0.3, 0, 1);
-      stowObj.position.set(stowAt.x, gy, stowAt.z);
-      stowObj.rotation.y = Math.atan2(stowGoX, stowGoZ);
-      stowObj.scale.setScalar(sc);
-      if (stowGo <= 0) {
-        stowObj.visible = false;
-        stowObj.scale.setScalar(1);
-        stowObj = null; stowKind = ''; stowFrom = '';
-      }
+      compObj.position.set(compAt.x, gy, compAt.z);
+      compObj.rotation.y = Math.atan2(compGoX, compGoZ);
+      compObj.scale.setScalar(sc);
+      if (compGo <= 0) compClear();
       return;
     }
-    capy.back((stowSpan - 1) * 0.5, stowAt);
-    stowObj.position.set(stowAt.x, stowAt.y, stowAt.z);
-    stowObj.rotation.y = ((capy.group && capy.group.rotation) ? capy.group.rotation.y : 0) + 0.18;
+    if (compState === 'on' || compState === 'climb') {
+      // ---- on the back, or on the way up: the perch's own arc -------------
+      capy.back((compSpan - 1) * 0.5, compSeatV);
+      let x = compSeatV.x, y = compSeatV.y, z = compSeatV.z;
+      if (compState === 'climb') {
+        compMt = Math.min(1, compMt + dt / compRise);
+        const t = compMt * compMt * (3 - 2 * compMt);
+        x = compFx + (x - compFx) * t;
+        z = compFz + (z - compFz) * t;
+        y = compFy + (y - compFy) * t + Math.sin(t * Math.PI) * (0.22 + compRise * 0.3);
+        if (compMt >= 1) compState = 'on';
+      }
+      compAt.x = x; compAt.y = y; compAt.z = z;
+      compYaw = yaw + 0.18;
+      compObj.position.set(x, y, z);
+      compObj.rotation.y = compYaw;
+      compObj.visible = true;
+      return;
+    }
+    // ---- following, or out as the decoy ---------------------------------
+    const dCapy = Math.hypot(p.x - compAt.x, p.z - compAt.z);
+    // THE SEAT: a carrier under you is a reason to get on. The frame velocity
+    // is the capybara's own reading of the floor (capy.frameVX/VZ), which is
+    // what the traghetto, the ferry and the chiva all publish through; a
+    // helm and a carry are the other two ways to be on something. Grounded,
+    // because the air's shove rides the same two numbers.
+    // ...FOR HALF A SECOND. A knocked crate sliding under your feet is a floor
+    // moving at 0.69 m/s for a few frames (measured in Mong Kok, qa/l6-
+    // companion.js) and it is not a boat; a boat keeps going.
+    const fvx = capy.frameVX || 0, fvz = capy.frameVZ || 0;
+    const floorMoves = capy.grounded && fvx * fvx + fvz * fvz > compSEAT_V * compSEAT_V;
+    compSeatT = floorMoves ? compSeatT + dt : 0;
+    const carrier = !!(capy.atHelm || capy.carriedBy || compSeatT >= compSEAT_T);
+    if (carrier) { compClimb(p); return; }
+    // THE TELLING: Q held beside it. Hidden, Q is the decoy instead. Read
+    // before the loaf, because telling it means standing still beside it,
+    // which is also what the loaf is — and the one with a key down wins.
+    const telling = compState === 'follow' && !!(input && input.honk) && dCapy <= compBESIDE && sysHideNow <= 0.8;
+    if (telling) {
+      compTellT += dt;
+      if (compTellT >= compTELL_T) { compLeave(capy, 'told'); return; }
+    } else compTellT = 0;
+    // THE LOAF: the perch's own timer, beside it
+    if (compState === 'follow' && !telling && perchLoafT >= perchWAIT && dCapy <= compBESIDE) { compClimb(p); return; }
+    // LEFT BEHIND: far, for long
+    if (dCapy > compFAR) { compFarT += dt; if (compFarT >= compFAR_T) { compLeave(capy, 'far'); return; } }
+    else compFarT = 0;
+    // ---- where it wants to be ---------------------------------------------
+    let tx = compAt.x, tz = compAt.z;
+    if (compState === 'decoy') {
+      compDecoyT -= dt;
+      if (compDecoyT <= 0) compState = 'follow';
+      else { tx = compDecoyX; tz = compDecoyZ; }
+    }
+    if (compState === 'follow') {
+      // the herd's own point behind you, on the trail you actually walked
+      const back = herdGAP + (compSpan - 1) * 0.4;
+      if (herdTrailAt(back, compPt)) { tx = compPt.x; tz = compPt.z; }
+      else { tx = p.x - Math.sin(yaw) * back; tz = p.z - Math.cos(yaw) * back; }
+    }
+    // ---- and the step toward it -------------------------------------------
+    const dx = tx - compAt.x, dz = tz - compAt.z;
+    const d = Math.hypot(dx, dz);
+    let moving = false;
+    if (d > compREST) {
+      const step = Math.min(d - compREST * 0.5, compSPEED * dt);
+      const nx = compAt.x + dx / d * step, nz = compAt.z + dz / d * step;
+      // A WALKER STOPS AT THE WATER. The STEP is tested, not the target: a
+      // cat on the near bank of a canal stays on it however far the trail
+      // goes, and comes on again the moment the next step is dry.
+      const wet = compTr && !compTr.fly && !compTr.swim && compWetY(nx, nz) !== -Infinity;
+      if (wet) compWaiting = true;
+      else {
+        compAt.x = nx; compAt.z = nz; compWaiting = false; moving = true;
+        compYaw = compTurn(compYaw, Math.atan2(dx, dz), Math.min(1, 12 * dt));
+      }
+    } else compWaiting = false;
+    // standing, it looks at you
+    if (!moving) compYaw = compTurn(compYaw, Math.atan2(p.x - compAt.x, p.z - compAt.z), Math.min(1, 4 * dt));
+    // ...AND CALLS — stranded at the bank, or out as the decoy — once you are away
+    compCallT -= dt;
+    if ((compWaiting || compState === 'decoy') && dCapy > compCALL_D && compCallT <= 0 && compTr && compTr.voice) {
+      compCallT = compCALL_T * (0.8 + Math.random() * 0.5);
+      compSfx.volume = 0.30; compSfx.pitch = compTr.pitch * (0.96 + Math.random() * 0.08);
+      sfx(compTr.voice, compSfx);
+    }
+    // ---- height: the ground, or over or in the water ----------------------
+    const ty = compStandY(compAt.x, compAt.z);
+    compAt.y = Math.abs(compAt.y - ty) > 3 ? ty : damp(compAt.y, ty, compLAMBDA_Y, dt);
+    compObj.position.set(compAt.x, compAt.y, compAt.z);
+    compObj.rotation.y = compYaw;
+    compObj.visible = true;
   }
+  /** Who is with you: kind, state and where, or null. The lines and the hints ask. */
+  game.companion = function () {
+    if (!compObj || compState === 'go') return null;
+    return { kind: compKind, from: compFrom, state: compState, on: compMounted(),
+             x: compAt.x, y: compAt.y, z: compAt.z, waiting: compWaiting };
+  };
   /** Is anything riding across borders, and what. The harness asks. */
   game.stowDebug = function () {
     const live = game.biome && game.biome.current;
@@ -38471,20 +39360,24 @@ export function createSystems(game) {
     for (let k = 0; k < herdKinds.length; k++) {
       const rec = herdKinds[k];
       if (rec.biome !== live) continue;
-      if (typeof rec.stow === 'function') canStow++;
+      if (rec.travels) canStow++;
       for (let i = 0; i < rec.st.length; i++) {
         const s = rec.st[i];
         if (s && s.on) { onNow++; if (s.mt >= 1) climbed++; }
       }
     }
-    return { kind: stowObj ? stowKind : null, from: stowFrom || null,
-             going: +Math.max(0, stowGo).toFixed(2),
-             built: Object.keys(stowCache).length,
+    return { kind: compObj ? compKind : null, from: compFrom || null,
+             state: compState, going: +Math.max(0, compGo).toFixed(2),
+             built: Object.keys(compCache).length,
+             x: +compAt.x.toFixed(2), y: +compAt.y.toFixed(2), z: +compAt.z.toFixed(2),
+             mt: +compMt.toFixed(2), farT: +compFarT.toFixed(1), tellT: +compTellT.toFixed(2),
+             decoyT: +Math.max(0, compDecoyT).toFixed(2), waiting: compWaiting,
+             why: compWhy, saved: compSaved ? compSaved.kind : null,
              // WHY IT DID NOT TAKE ONE. Three separate reasons — the chapter
-             // offers no drawable, nothing is on the back, or something is on
-             // the back but still climbing — and from outside all three look
-             // like a stowaway that does not work.
-             canStow: canStow, on: onNow, seated: climbed, err: stowErr || null };
+             // offers nothing that travels, nothing is on the back, or something
+             // is on the back but still climbing — and from outside all three
+             // look like a stowaway that does not work.
+             canStow: canStow, on: onNow, seated: climbed, err: compErr || null };
   };
   // =========================================================================
   // SLEEP ON IT (N5) — the photograph nobody took, and the line on the way out
@@ -38815,20 +39708,31 @@ export function createSystems(game) {
       const pcs = {};
       for (let i = 0; i < ch.length; i++) pcs[((ch[i] % 12) + 12) % 12] = 1;
       const notes = [];
-      let ok = true;
-      for (let i = 0; i < sh.deg.length; i++) {
-        const d = sh.deg[i];
-        const idx = ((d % ch.length) + ch.length) % ch.length;
-        const midi = musFold(ch[idx] + 12 * Math.floor(d / ch.length) +
-                             sh.oct + (ph && ph.oct ? ph.oct : 0),
-                             sysMUS_LIFT_LO, sysMUS_LIFT_HI);
+      // THE TUNE (L6, F3). The phrase is the theme from the tonic now, so
+      // "in key" is no longer "every note a chord tone" — the tune has three
+      // notes that are not, by design. `inChord` counts, and `ok` is the
+      // instrument's own line: six of eight, in register. `iv` is the
+      // interval sequence as played; `shape` is the same with the palette's
+      // third snapped to major — the thing that must read the same in every
+      // place — so a sweep can count how many palettes say one tune.
+      const base = musThemeBase(sh.oct + (ph && ph.oct ? ph.oct : 0));
+      const tonicPc = ((musPal.roots[0] % 12) + 12) % 12;
+      const iv = [], shape = [], norm = [];
+      let inChord = 0, ok = true;
+      for (let i = 0; i < sysMUS_THEME.length; i++) {
+        const midi = base + musThemeOff(i);
         notes.push(midi);
         // A FOLD MAY CHANGE THE OCTAVE AND MAY NEVER CHANGE THE NOTE, so the
         // test is on pitch class. Anything else would be testing musFold.
-        if (!pcs[((midi % 12) + 12) % 12]) ok = false;
+        if (pcs[((midi % 12) + 12) % 12]) inChord++;
         if (midi < sysMUS_LIFT_LO || midi > sysMUS_LIFT_HI) ok = false;
+        const rel = (((midi - tonicPc) % 12) + 12) % 12;
+        norm.push(rel === 3 ? midi + 1 : midi);   // a minor third heard as the major one
+        if (i > 0) { iv.push(notes[i] - notes[i - 1]); shape.push(norm[i] - norm[i - 1]); }
       }
-      return { pal: musPalN, chord: ch.slice(), notes: notes, ok: ok,
+      if (inChord < 6) ok = false;
+      return { pal: musPalN, chord: ch.slice(), notes: notes, ok: ok, inChord: inChord,
+               iv: iv, shape: shape.join(','), scale: musPal.scale || 'major', tonic: musPal.roots[0],
                inst: (ph && ph.inst) ? ph.inst
                      : ((musPal.lead && musPal.lead !== 'none') ? musPal.lead : 'pluck'),
                second: sysMUS_2ND[musPalN] ? sysMUS_2ND[musPalN].inst : null };
@@ -39094,8 +39998,16 @@ export function createSystems(game) {
                momentHeld: !!sysMomentDefer, whyLast: sysWhyTxt, heardLast: sysHeardTxt };
     },
     leaveAudit: function () { return { busy: leaveBusy, n: leaveN, said: game.state.leaveSaid || 0 }; },
-    codaAudit: function () { return { notes: sysFinCodaN, hushed: sysFinHushed, running: sysFinCodaT >= 0, yaw: +sysFinCodaYaw.toFixed(2),
-                                       music: musVol ? +musVol.gain.value.toFixed(4) : null, closing: sysFinClosing, done: sysFinDone }; },
+    codaAudit: function () {
+      // the tune, complete (L6, F3): every one of the eight indices played
+      const seen = {};
+      for (let i = 0; i < sysFinCodaTune.length; i++) seen[sysFinCodaTune[i]] = 1;
+      let hit = 0;
+      for (let i = 0; i < sysMUS_THEME.length; i++) if (seen[i]) hit++;
+      return { notes: sysFinCodaN, hushed: sysFinHushed, running: sysFinCodaT >= 0, yaw: +sysFinCodaYaw.toFixed(2),
+               music: musVol ? +musVol.gain.value.toFixed(4) : null, closing: sysFinClosing, done: sysFinDone,
+               tune: sysFinCodaTune.slice(), tuneHit: hit, tuneComplete: hit === sysMUS_THEME.length };
+    },
     finaleClose: function () { sysFinaleClose(); },
     moveAudit: function () { return { earned: mvEarned, at: Object.assign({}, mvAt), air: +mvAir.toFixed(2), clings: mvClings,
                                        rep: sysREP_MOVE.map(function (r) { return r.id + ':' + (jrRep[r.id] || 0); }) }; },
@@ -41910,10 +42822,11 @@ export function createSystems(game) {
     // ninety-second promise is a wall-clock promise, and a marquee that puts
     // the world at 0.45x must not make the album wait three minutes.
     napUpdate(game.state.rawDt || dt);
-    // ...and THE STOWAWAY, which is drawn by nobody else — the chapter that
-    // owns this animal is detached. Outside perchUpdate because that function
-    // returns early on every frame with nothing on the back, and a stowaway is
-    // precisely the passenger that is not counted.
+    // ...and THE COMPANION (L6, F1), which is drawn by nobody else — the
+    // chapter that owns this animal is detached. Outside perchUpdate because
+    // that function returns early on every frame with nothing on the back,
+    // and a companion is precisely the passenger that is not counted; after
+    // it because the loaf timer it reads is perchUpdate's.
     stowUpdate(dt);
     // ...and the birds, which is a different mechanic on the same contract.
     flockStep(dt);
@@ -44524,6 +45437,45 @@ export function createSystems(game) {
       if (musChoirGain) {
         const want = inIce ? auroraT * auroraT * 0.62 : 0;
         sysAudioSet(musChoirGain.gain, 0.0001 + want, nowA, 2.5);
+        // ...AND IT SINGS THE TUNE (L6, F3). Past a third of the sky, the
+        // fifth part steps through the theme at the palette's own phrase
+        // gap (Iceland's is the slowest: 0.19 × 2.2, so the verse is six
+        // seconds), rests as long again, and goes round while the aurora
+        // holds. Pitch by setTargetAtTime — a sung portamento, not a key
+        // press — on bank 0 only; its gain rides up for the note and down
+        // for the rest so it is a line and not a fifth drone. Scheduled a
+        // block ahead, and the cursor is dropped when the sky is not there.
+        if (musChoirLead) {
+          const lv = musChoirLead.banks[0];
+          if (inIce && auroraT > 0.33 && musPal && musPal.choir) {
+            const cph = sysMUS_PHRASE[musPalN];
+            const cgap = sysMUS_STING.arrive.gap * (cph && cph.gap > 0 ? cph.gap : 1);
+            const cbase = musThemeBase(0);
+            if (musChoirTuneAt < nowA - 1) { musChoirTuneAt = nowA + 0.1; musChoirTuneI = 0; }
+            let cg = 0;
+            while (musChoirTuneAt < nowA + 0.45 && cg++ < 3) {
+              const i = musChoirTuneI % sysMUS_THEME.length;
+              const hz = sysMidiHz(cbase + musThemeOff(i));
+              const step = cgap * sysMUS_THEME_DUR[i];
+              for (let k = 0; k < lv.oscs.length; k++) lv.oscs[k].frequency.setTargetAtTime(hz, musChoirTuneAt, 0.05);
+              lv.g.gain.setTargetAtTime(musChoirLead.level, musChoirTuneAt, 0.12);
+              musChoirTuneN++;
+              musChoirTuneAt += step;
+              musChoirTuneI++;
+              if (musChoirTuneI >= sysMUS_THEME.length) {
+                // breathe: the verse's own length of rest, the line let go
+                let len = 0;
+                for (let j = 0; j < sysMUS_THEME_DUR.length; j++) len += sysMUS_THEME_DUR[j];
+                lv.g.gain.setTargetAtTime(0.0001, musChoirTuneAt, 0.4);
+                musChoirTuneAt += cgap * len;
+                musChoirTuneI = 0;
+              }
+            }
+          } else if (musChoirTuneAt > 0) {
+            lv.g.gain.setTargetAtTime(0.0001, nowA, 0.4);
+            musChoirTuneAt = 0;
+          }
+        }
       }
       // ---- AND THE LIFT ------------------------------------------------
       // Written here rather than in musSwell so that ONE gain node is ever

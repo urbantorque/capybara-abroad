@@ -44,6 +44,9 @@ let envAsleep = false;   // true once Sydney's update has parked itself for Past
 // 0..1, how long the animal has been on the Opera House podium. The grade layer
 // reads it through api.stageGlow(). Zeroed on the way out — see envUpdate.
 let envStageT = 0;
+// THE SECOND ASK (L6, F2): two led ibis on the podium with you, held a
+// second so a bird trailing through the zone on its way past does not tick.
+let envIbisParadeT = 0, envIbisParadeDone = false;
 // ---- THE CONCERT (W1) -------------------------------------------------------
 // The marquee was "stand on the podium for five seconds". It is now: get up
 // on the podium and WHEEK, and the forecourt comes. Each wheek from the stage
@@ -3643,6 +3646,19 @@ export function createEnvironment(game) {
                     capy.position.y > 0.9);
       envStageT += (( on ? 1 : 0) - envStageT) * (1 - Math.exp(-2.4 * dt));
       envStagePulse *= Math.exp(-1.6 * dt);
+      // ---- THE SECOND ASK (L6, F2): `ibis-parade` reads game.herdCount() —
+      // the herd skill the bin teaches, consumed here for the first time.
+      // The led birds walk the trail behind the animal, so "on the podium
+      // with you" is the animal on the red and two of them led, held 1 s.
+      if (!envIbisParadeDone) {
+        const led = on && typeof game.herdCount === 'function' ? game.herdCount() : 0;
+        envIbisParadeT = led >= 2 ? envIbisParadeT + dt : 0;
+        if (envIbisParadeT > 1.0) {
+          envIbisParadeDone = true;
+          if (typeof game.completeTask === 'function') game.completeTask('ibis-parade');
+          if (typeof game.toast === 'function') game.toast('two ibis on the steps of the Opera House. nobody minds. nobody ever minds the ibis.');
+        }
+      }
       // ---- the concert's clock (W1). See stageNote above. -------------------
       if (envConcertOn) {
         envConcertOff = on ? 0 : envConcertOff + dt;

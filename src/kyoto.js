@@ -1285,6 +1285,17 @@ let kyoHeronCrit = null;                   // the calm-aware radius. See THE CAL
 let kyoHeronT = 0;
 let kyoHeronAt = 0;                        // 0 at A, 1 at B
 let kyoHeronStalk = 0;
+// ---- THE WINDOW (L6, F2 / design 2.5) -------------------------------------
+// Kyoto had no event a player could be late for. The heron's rest clock is
+// one: it goes up on kyoHERON_REST whatever you do, and `heron-lift` is a
+// wheek under it as it lifts — inside kyoHERON_LIFT_R of where it stood,
+// during the climb or the first breath of the circuit. `kyoHeronWait` is
+// how long you have stood inside that ring waiting, which is the figure the
+// record files (see the WINDOWS block in shared.js RECORDS); `kyoWheekT` is
+// the last wheek, from the chapter's own `capy:wheek` listener, gated on the
+// live biome like every other chapter's (see hanWheek's note).
+const kyoHERON_LIFT_R = 14;
+let kyoHeronWait = 0, kyoHeronLiftDone = false, kyoWheekT = 0;
 
 function kyoBuildHeron(root) {
   const M = kyoMerger();
@@ -1345,6 +1356,7 @@ function kyoWrapY(a) {
 function kyoUpdateHeron(game, dt) {
   if (!kyoHeronGroup) return;
   kyoHeronT += dt;
+  if (kyoWheekT > 0) kyoWheekT -= dt;      // the window's wheek memory (F2)
   const capy = game.capy;
   const cp = capy && capy.position;
   const from = kyoHeronAt ? kyoHERON_B : kyoHERON_A;
@@ -1450,25 +1462,11 @@ function kyoUpdateHeron(game, dt) {
             kyoHeronPerchY = y;
             if (kyoHeronGroup) kyoHeronGroup.position.y = y;
           },
-          // ---- ...AND IT MAY LEAVE THE GARDEN (N3) ----------------------
-          // See THE STOWAWAY in systems.js. `Object3D.clone` shares materials
-          // by reference, which is the ONLY safe way to copy anything in this
-          // game — a cloned material loses the rim (see the nose pad in
-          // capybara.js and the five flat seas before it). The wings go: this
-          // bird is standing on something, not flying, and kyoHeronWing is
-          // hidden for exactly that reason while it wades.
-          stow: function () {
-            if (!kyoHeronGroup) return null;
-            const g = kyoHeronGroup.clone(true);
-            g.position.set(0, 0, 0);
-            g.rotation.set(0, 0, 0);
-            // NOTHING IN THIS GARDEN IS NAMED, so the wing is found by index:
-            // `clone(true)` copies children in order, so the wing's child index
-            // in the original is its child index in the copy.
-            const idx = kyoHeronWing ? kyoHeronGroup.children.indexOf(kyoHeronWing) : -1;
-            if (idx >= 0 && g.children[idx]) g.children[idx].visible = false;
-            return g;
-          },
+          // ---- ...AND IT MAY LEAVE THE GARDEN (N3 → L6, F1) -------------
+          // See THE COMPANION in systems.js, which draws its own heron. The
+          // clone this handed over shared the garden's materials by reference
+          // with a chapter that is detached on the far side.
+          travels: true,
         });
       }
     }
@@ -1500,6 +1498,14 @@ function kyoUpdateHeron(game, dt) {
     // because the herd's own hold is 21 s and the clock resumes the instant the
     // bird stops following.
     if (kyoHeronHeld > 0) { kyoHeronHeld = Math.max(0, kyoHeronHeld - dt); near = false; kyoHeronT = 0; }
+    // ---- THE WINDOW (L6, F2): the countdown on the live line, and the wait.
+    // Handed over only inside forty metres, so the pond's clock does not sit
+    // on the paper while the player is at Uji.
+    {
+      const dw = cp ? Math.hypot(cp.x - kyoHeronWadeX, cp.z - kyoHeronWadeZ) : 999;
+      kyoHeronWait = dw < kyoHERON_LIFT_R ? kyoHeronWait + dt : 0;
+      if (dw < 40 && game.recordLive) game.recordLive('heron-lift', Math.max(0, kyoHERON_REST - kyoHeronT));
+    }
     if (near || kyoHeronT > kyoHERON_REST) {
       kyoHeronPhase = 1; kyoHeronT = 0;
       // A heron's alarm call is a single harsh bark and it is genuinely the
@@ -1528,6 +1534,18 @@ function kyoUpdateHeron(game, dt) {
     if (game.sfx) game.sfx('gull', { volume: 0.8, pitch: 0.40 });
   }
 
+  // ---- THE WINDOW (L6, F2): `heron-lift` — a wheek inside the ring while
+  // it is climbing, or in the first second and a half of the circuit. The
+  // wait it took is the figure; the record row is keyed by the task id.
+  if (!kyoHeronLiftDone && kyoWheekT > 0 && cp &&
+      (kyoHeronPhase === 1 || (kyoHeronPhase === 2 && kyoHeronT < 1.5)) &&
+      Math.hypot(cp.x - from.x, cp.z - from.z) < kyoHERON_LIFT_R) {
+    kyoHeronLiftDone = true; kyoWheekT = 0;
+    kyoTask('heron-lift');
+    if (typeof game.record === 'function') game.record('heron-lift', Math.round(kyoHeronWait));
+    if (typeof game.recordEnd === 'function') game.recordEnd('heron-lift');
+    if (game.toast) game.toast('it barked. you barked back. that is the whole of the conversation.');
+  }
   // ---- where it is on the way over ---------------------------------------
   let x, y, z, yaw, flap;
   if (kyoHeronPhase === 1) {
@@ -4558,6 +4576,18 @@ function kyoWaterHeightAt(x, z) {
 export function createKyoto(game) {
   kyoGame = game;
 
+  // THE WINDOW (L6, F2): the one wheek listener this garden has. THE GATE —
+  // on the global 'capy:wheek' and never removed, so it answers only while
+  // Kyoto is the live biome (see hanWheek's note on the shared coordinate
+  // space). It remembers the press for a third of a second; kyoUpdateHeron
+  // reads it against the lift.
+  if (game.events && typeof game.events.on === 'function') {
+    game.events.on('capy:wheek', function () {
+      if (!game.biome || !game.biome.isActive('kyoto')) return;
+      kyoWheekT = 0.35;
+    });
+  }
+
   game.biome.register('kyoto', {
     ensureBuilt() { kyoBuild(game); },
     // A run in progress is state that can hold the player — the camera rig and
@@ -4721,6 +4751,8 @@ export function createKyoto(game) {
                          kyoHeronGroup ? kyoHeronGroup.position.y : 0,
                          kyoHeronGroup ? kyoHeronGroup.position.z : 0); return kyoV3h; },
     heronStanding() { return !!kyoHeronGroup && kyoHeronPhase === 0; },
+    /** THE WINDOW (L6, F2): seconds until the rest clock puts it up; -1 while it is flying. */
+    heronIn() { return kyoHeronPhase === 0 ? Math.max(0, kyoHERON_REST - kyoHeronT) : -1; },
     /** True while a dry crossing of the stepping stones is alive. See kyoDrySpook. */
     dryCrossing: kyoDryCrossing,
     /** The near end of the stepping stones, for the beacon. */

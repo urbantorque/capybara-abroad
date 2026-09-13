@@ -151,6 +151,7 @@ let palPalmMesh = null;
 
 let palDiveDone = false, palCrackDone = false, palTurtleDone = false;
 let palClamDone = false, palCathDone = false, palBloomDone = false;
+let palSnorkelCathDone = false;      // THE SECOND ASK (L6, F2)
 let palRideDone = false;
 // THE PEAK OF THE DIVE THE ANIMAL IS ON, not the deepest of the session: a
 // record is filed once, when it surfaces. See palFlushDive.
@@ -4556,6 +4557,14 @@ function palUpdateTasks(game, dt) {
     if (!palToldBreath && under && palBreathIn > 3) {
       palToldBreath = true;
       palToast('the bar is your breath now. it comes back the moment you surface.');
+    }
+    // ---- THE SECOND ASK (L6, F2): `snorkel-cathedral` reads capy.worn and
+    // the breath — three seconds under in the room, in the snorkel the first
+    // dive handed over, which is a third more breath and was never asked for.
+    if (!palSnorkelCathDone && under && palBreathIn > 3 && capy.worn === 'snorkel') {
+      palSnorkelCathDone = true;
+      palTask('snorkel-cathedral');
+      palToast('a longer breath, in the biggest room in the sea. that is what it was for.');
     }
   } else palFlushBreath(game);
 

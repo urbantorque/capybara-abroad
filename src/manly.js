@@ -231,6 +231,7 @@ const manCARVE_V    = 3.4;  // m/s of lateral at full lock on a full face
 const manCARVE_GAIN = 0.55; // ...and the shoreward bonus for being angled
 const manCARVE_L    = 3.2;  // how fast the demand follows the stick
 let manRipT = -1, manRipDone = false;
+let manGullBackT = 0, manGullBackDone = false;   // THE SECOND ASK (L6, F2)
 let manTookOff = false, manTakeTop = 0;
 // ...AND THE SAME FOR THE FULL RIDE. See the payout: the condition it tested was
 // true of every qualifying ride, so the ceremony ran on all of them.
@@ -255,6 +256,7 @@ let manRideEndT = 0;                 // s of the tail after a ride that made the
 // scratch (contract: zero allocation in update)
 const manV3 = new THREE.Vector3();
 const manV3b = new THREE.Vector3();
+const manV3gull = new THREE.Vector3();   // gullAt()'s own — two getters, two vectors (F2)
 const manQ = new THREE.Quaternion();
 const manE = new THREE.Euler();
 const manSc = new THREE.Vector3();
@@ -2789,17 +2791,11 @@ function manUpdateGulls(game, dt) {
           manGullPerch[i] = 0.25;      // re-asked every frame — see manUpdateGulls
           manGullData[q + 1] = y;
         },
-        // ---- ...AND ONE OF THEM MAY LEAVE THE BEACH (N3) -----------------
-        // See THE STOWAWAY in systems.js. One mesh off the flock's own
-        // geometry and material, shared and never cloned. A silver gull that
-        // has worked out it can be carried is the most in-character thing any
-        // animal in this game does.
-        stow: function () {
-          if (!manGullMesh) return null;
-          const m = new THREE.Mesh(manGullMesh.geometry, manGullMesh.material);
-          m.castShadow = true;
-          return m;
-        },
+        // ---- ...AND ONE OF THEM MAY LEAVE THE BEACH (N3 → L6, F1) --------
+        // See THE COMPANION in systems.js, which draws its own gull. A silver
+        // gull that has worked out it can be carried is the most in-character
+        // thing any animal in this game does.
+        travels: true,
       });
     }
     // ---- ...AND THIS IS THE CHAPTER WITH THE CHIP SHOP IN IT -------------
@@ -4423,6 +4419,19 @@ function manUpdateSurfTasks(game, dt) {
     manToldRip = true;
     game.toast('this bit is going the other way. do not fight it.');
   }
+  // ---- THE SECOND ASK (L6, F2): `gull-out-back` reads perchCount() --------
+  // Swimming beyond the bank with a bird on. The perch survives a swim (it
+  // is the dive that puts one off, see the perch's own list in systems.js),
+  // so the whole row is: keep it on through the white, and do not go under.
+  if (!manGullBackDone && swimming && p.z < manBankZ(p.x) - 6 &&
+      typeof game.perchCount === 'function' && game.perchCount() >= 1) {
+    manGullBackT += dt;
+    if (manGullBackT > 1.0) {
+      manGullBackDone = true;
+      manTask(game, 'gull-out-back');
+      game.toast('out the back, with a gull on. it has been out the back before. it is unimpressed.');
+    }
+  } else manGullBackT = 0;
 
   // ---- under it, not over it -------------------------------------------
   if (capy.diving && manWave.foam > 0.30 && (capy.depth || 0) > 0.8) {
@@ -4815,6 +4824,20 @@ export function createManly(game) {
     club: { x: 24, z: 47 },
     rip: { x: manRIP_X, z: 6 },
     bank() { manV3b.set(0, 0, manBankZ(0)); return manV3b; },
+    /** The nearest silver gull, for `gull-out-back` (L6, F2). Its own scratch vector. */
+    gullAt() {
+      const cp = manGame && manGame.capy && manGame.capy.position;
+      if (!manGullData) return null;
+      let bq = -1, bd = Infinity;
+      for (let i = 0; i < manGULL_N; i++) {
+        const q = i * 7;
+        const d = cp ? (manGullData[q] - cp.x) * (manGullData[q] - cp.x) + (manGullData[q + 2] - cp.z) * (manGullData[q + 2] - cp.z) : 0;
+        if (d < bd) { bd = d; bq = q; }
+      }
+      if (bq < 0) return null;
+      manV3gull.set(manGullData[bq], manGullData[bq + 1], manGullData[bq + 2]);
+      return manV3gull;
+    },
     bommie: { x: manBOMMIE.x, z: manBOMMIE.z },
     pool: { x: (manPOOL.x0 + manPOOL.x1) * 0.5, z: (manPOOL.z0 + manPOOL.z1) * 0.5 },
     shelly: { x: manSHELLY.x, z: manSHELLY.z },

@@ -240,6 +240,9 @@ let quayDolphinT = 0, quayDolphinOn = 0;
 
 let quayVoyaged = false, quayCastOff = false, quayBridged = false, quayWalled = false;
 let quayRunT = -1;                  // s since she came off the wall; -1 = not away
+// THE SECOND ASK (L6, F2): the cap the passage hands over, worn back at the
+// wheel under way. Seconds at the helm above four metres a second, in it.
+let quayCapHelmT = 0, quayCapHelmDone = false;
 
 // --- the new furniture of the chapter, all of it declared in one place -------
 let quayCatMesh = null, quayCatData = null;          // wind on the water
@@ -5565,6 +5568,21 @@ function quayUpdateWhale(game, dt) {
 /** The three things worth turning the wheel for, and the arrival. */
 function quayCheckVoyage(game, dt) {
   quayUpdateWhale(game, dt);
+  // ---- THE SECOND ASK (L6, F2): `cap-at-the-helm` reads capy.worn ---------
+  // The costume is granted by the marquee and applied by systems.js in this
+  // chapter, so the row is the passage done again with the cap on: eight
+  // seconds at the wheel above four metres a second (measured: full ahead
+  // from the berth is 10.4 m/s inside two seconds, and the first wall is
+  // about eleven seconds out — twelve was a passage nobody could make).
+  if (!quayCapHelmDone && game.capy) {
+    const inCap = game.capy.atHelm && game.capy.worn === 'ferrycap' && Math.abs(quayBoatSpeed) > 4.0;
+    quayCapHelmT = inCap ? quayCapHelmT + dt : 0;
+    if (quayCapHelmT > 8) {
+      quayCapHelmDone = true;
+      if (game.completeTask) game.completeTask('cap-at-the-helm');
+      if (game.toast) game.toast('the cap fits. the skipper has stopped pretending it does not.');
+    }
+  }
   if (quayRunT >= 0 && !quayVoyaged) {
     quayRunT += dt;
     // ---- THE PASSAGE, ON THE PAPER, WHILE IT IS BEING MADE (v32) ----------

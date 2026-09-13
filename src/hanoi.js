@@ -199,6 +199,9 @@ let hanBumpT = 0;
 let hanHornT = 0;
 let hanCrossFrom = 0;             // which side of the lane the crossing started on
 let hanCrossLane = -1;
+// THE SECOND ASK (L6, F2): right of way, the last skill the journey hands
+// over and the one nothing read. Seconds of `capy.committed` in the crossing.
+let hanCommitT = 0, hanRightOfWayDone = false;
 let hanCrossOk = false;
 let hanCrossDone = false;
 let hanYawWas = 0, hanDither = 0;
@@ -2198,12 +2201,18 @@ function hanUpdateCrossing(game, dt) {
       // have been completed. The question is whether you change your mind
       // DURING the crossing.
       hanDither = 0;
+      hanCommitT = 0;                                              // (F2)
       if (hanBikeData) for (let i = 0; i < hanBikeN; i++) hanBikeData[i * hanBIKE_STRIDE + 9] = 0;
     }
     return;
   }
   if (hanLaneI !== hanCrossLane) { hanCrossLane = -1; return; }
   if (sp < hanHOLD_V * 0.6 || hanDither > hanTURN_MAX) hanCrossOk = false;
+  // ---- THE SECOND ASK (L6, F2): `right-of-way` reads capy.committed ------
+  // The skill is the walk above hanFLOW_V with no dither, made portable; on
+  // the crossing it is the same walk, and the row is a crossing that lands
+  // with a second and a half of it held (the widest street is about three).
+  if (capy.committed) hanCommitT += dt;
   // ---- HOW MANY HAVE GONE ROUND YOU, WHILE THEY ARE DOING IT (v36) -------
   // The best question in the game — not how fast you crossed, HOW MANY OF THEM
   // HAD TO GO ROUND YOU — and it was answered on the far kerb, after the only
@@ -2229,6 +2238,11 @@ function hanUpdateCrossing(game, dt) {
         hanTask('cross-the-road');
         if (typeof game.punch === 'function') game.punch(0.22);
         hanToast('not one of them stopped. that is how it is done.');
+      }
+      if (!hanRightOfWayDone && hanCommitT >= 1.5) {
+        hanRightOfWayDone = true;
+        hanTask('right-of-way');
+        hanToast('you did not look. they did. that is right of way, and it is yours now.');
       }
     }
     hanCrossLane = -1;

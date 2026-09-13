@@ -2987,30 +2987,13 @@ function venUpdatePigeons(game, dt) {
           // stored as an offset over whatever paving is under the animal now.
           venPigeonData[q + 5] = y - venTerrain(venPigeonData[q], venPigeonData[q + 1]) - 0.16;
         },
-        // ---- ...AND ONE OF THEM MAY LEAVE THE CITY (N3) -------------------
-        // See THE STOWAWAY in systems.js. The flock is three InstancedMeshes
-        // and none of them is drawn once Venice detaches, so this is a plain
-        // pair of meshes off the SAME geometry and the SAME material — shared,
-        // never cloned, because a cloned material loses the rim (see the note
-        // on the nose pad in capybara.js) and a cloned geometry would be a
-        // second copy of a bird that is already in the file.
-        //
-        // The wings are left off rather than scaled to nothing: a stowaway is
-        // sitting still, and the two boards are only ever out when it flies.
-        // Its colour is the authored pale morph — `instanceColor` is what makes
-        // a third of the square darker and a plain Mesh cannot read one.
-        stow: function () {
-          if (!venPigeonMesh) return null;
-          const g = new THREE.Group();
-          const PS = 0.88;
-          const b = new THREE.Mesh(venPigeonMesh.body.geometry, venPigeonMesh.body.material);
-          const h = new THREE.Mesh(venPigeonMesh.head.geometry, venPigeonMesh.head.material);
-          h.position.set(0, 0.15, 0.15);
-          b.castShadow = true; h.castShadow = true;
-          g.add(b); g.add(h);
-          g.scale.setScalar(PS);
-          return g;
-        },
+        // ---- ...AND ONE OF THEM MAY LEAVE THE CITY (N3 → L6, F1) ---------
+        // See THE COMPANION in systems.js. It used to hand over a drawable off
+        // the flock's own geometry and material; the flock is three
+        // InstancedMeshes and none of them is drawn once Venice detaches, and
+        // a mesh sharing a detached chapter's material by reference was the
+        // review's objection. systems.js draws its own pigeon now.
+        travels: true,
       });
     }
     // ---- ...AND THEY WILL COME FOR A DROPPED ANYTHING (see THE FLOCK) ----
@@ -3709,13 +3692,23 @@ function venUpdateTraghetto(game, dt) {
 /** She is alongside. Did anybody stay up for the whole crossing? */
 function venTragArrive(game) {
   if (game && game.sfx) game.sfx('thud', { volume: 0.35, pitch: 0.9 });
-  if (venTragDone) return;
   if (!venTragAboard) { venTragFrom = venTragU; return; }
   // Only counts as a crossing if they were aboard at the far bank AND this
   // arrival is not the one they got on at.
   if (venTragFrom !== venTragU) {
-    venTragDone = true;
-    venTask('traghetto');
+    // ...EVERY crossing is said, not only the first (L6, F1): systems.js
+    // ticks "bring it across on the traghetto" off this when the companion
+    // is on the back, and that is a later crossing than the first one.
+    if (game && game.events) game.events.emit('venice:traghetto', { u: venTragU });
+    if (!venTragDone) { venTragDone = true; venTask('traghetto'); }
+    // ---- THE SECOND ASK (L6, F2): `pigeon-passenger` reads perchCount() --
+    // The perch survives a carrier (it is the dive, the slide and the climb
+    // that put a bird off), so a pigeon that climbed on in the piazza is
+    // still on at the far bank. Not once-only: the row is ticked by
+    // completeTask, which already ignores a second tick.
+    if (game && typeof game.perchCount === 'function' && game.perchCount() >= 1) {
+      venTask('pigeon-passenger');
+    }
   }
   venTragFrom = venTragU;
 }

@@ -262,6 +262,10 @@ const sahHalqaBeat = [0, 0, 0];
 
 let sahChase = 0;                  // 0 idle, 1 running, 2 cooling down
 let sahChaseT = 0, sahLoseT = 0, sahRearm = 0, sahChaseDelay = 0;
+// THE SECOND ASK (L6, F2): the vault, in the chapter that teaches it. The
+// counter capybara.js publishes, read on an EDGE — a kick that lands inside
+// the souk grid while the chase is running is the row.
+let sahVaultSeen = -1, sahSoukWallDone = false;
 let sahStormPhase = 0, sahStormT = 0, sahStorm = 0, sahErgT = 0, sahStormStood = 0;
 let sahDuskOn = false;              // the evening, once it has come, does not go
 
@@ -2324,6 +2328,7 @@ function sahStartChase(game) {
   // walk past the end of your alley in silence and neither line is ever said
   // again for the life of the page.
   sahMissN = 0;
+  sahVaultSeen = -1;                 // the vault edge is read per chase (F2)
   // ...and M2's counter with them, for the reason the paragraph above gives.
   sahPurTold = 0; sahTellPairs = 0; sahTellNear = 0; sahTellLos = 0;
   for (let i = 0; i < sahPURSUER_N; i++) { sahPurMiss[i] = 0; sahPurTellSeen[i] = 0; }
@@ -2371,6 +2376,19 @@ function sahUpdateChase(game, dt) {
   // is `better: 'lower'`, so the live figure climbing toward the standing best
   // is a pressure gauge rather than a score — which is what a chase is.
   if (game.recordLive) game.recordLive('souk-escape', sahChaseT);
+  // ---- THE SECOND ASK (L6, F2): `souk-wall` reads capy.vaultN -----------
+  {
+    const vn = typeof capy.vaultN === 'number' ? capy.vaultN : 0;
+    const inSouk = p.x > sahSOUK_X0 && p.x < sahSOUK_X0 + sahSOUK_NX * sahSOUK_CELL &&
+                   p.z > sahSOUK_Z0 && p.z < sahSOUK_Z0 + sahSOUK_NZ * sahSOUK_CELL;
+    if (sahVaultSeen < 0) sahVaultSeen = vn;
+    if (!sahSoukWallDone && vn > sahVaultSeen && inSouk) {
+      sahSoukWallDone = true;
+      sahTask('souk-wall');
+      if (typeof game.toast === 'function') game.toast('off the dyers’ wall and gone. they are still looking at the wall.');
+    }
+    sahVaultSeen = vn;
+  }
   // the beat before it starts: they are looking at you, and they have not moved
   if (sahChaseDelay > 0) {
     sahChaseDelay -= dt;
