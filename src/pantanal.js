@@ -65,6 +65,7 @@ const panLAST_BRIDGE = { z: -96 };
 const panBAIA = { x: -55, z: 6, r: 40 };
 const panRIVER = { z0: -80, z1: -56, bed: -4.2 };
 let panRiverBed = null;              // M13
+let panMarshBed = null;              // ...and the wetland itself, at the animal (L6, E3)
 const panSANDBAR = { x: 34, z: -68, r: 13 };
 const panFAZENDA = { x: 36, z: 76, r: 24 };
 // the corral, in one place: panBuildFazenda draws it and panUpdateCattle has
@@ -5474,7 +5475,7 @@ function panUpdateTasks(game, dt) {
       ['They are all across. You can stop now.']);
     panSaysNow('guide',
       ['Thirteen egrets up in a line off the snags. That is the photograph.',
-       'I have brought people here for eleven years for exactly that and never got it.',
+       'I have brought people here every dry season for exactly that and never got it.',
        'Capybara, one, leading. I do not have a column for leading.'],
       ['Quietly. It is nearly dark and everything is settling.']);
     panSfx.volume = 0.42; panSfx.pitch = rand(1.0, 1.2);
@@ -5849,6 +5850,10 @@ export function createPantanal(game) {
         panRiverBed.at(pp2.x, panWATER + 0.2,
                        clamp(pp2.z, panRIVER.z0, panRIVER.z1));
         panRiverBed.set(0.48);
+        // The marsh, which is everywhere here (L6, E3): frogs and insects at
+        // the animal, so the calm's rise is its whole dynamic.
+        if (!panMarshBed && game.sfxMover) panMarshBed = game.sfxMover('marsh', { key: 'pan:marsh', near: 24, far: 110 });
+        if (panMarshBed) { panMarshBed.at(pp2.x, pp2.y + 1, pp2.z); panMarshBed.set(1); }
       }
       panTime += dt;
       panUpdateMats(game, dt);

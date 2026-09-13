@@ -398,7 +398,10 @@ function hanVC() {
  *  Flat, because the ground is horizontal and wants no vertical shear. */
 function hanVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.24, amount: 0.09, warp: 0, near: 0.56, nearPale: 0.55, nearScale: 14, contact: 1, broad: 0.08, broadM: 16 });
+               { scale: 0.24, amount: 0.09, warp: 0, near: 0.56, nearPale: 0.55, nearScale: 14, contact: 1, broad: 0.08, broadM: 16,
+                 // the mid octave (L6, E6): dust settled on the pavement in
+                 // eight-metre patches, drifting toward hanDust where it is
+                 mid: 0.05, midM: 8, midColor: PALETTE.hanDust, midBase: PALETTE.hanConcrete });
 }
 function hanVCF() {
   return grain(mat(0xffffff, { vertexColors: true }), { scale: 0.08, amount: 0.055, warp: 1.0 });
@@ -803,8 +806,21 @@ function hanBuildLake(root) {
   pos.needsUpdate = true;
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   g.computeVertexNormals();
+  // ...AND IT IS WATER, WHICH UNTIL L6 IT WAS NOT (E6 / art #6). Every other
+  // sea in the game took the sparkle and the Fresnel term two passes ago and
+  // this one was left as a Lambert disc — qa/l6r-art-hanoi-walk.png, where
+  // eighty metres of Hoan Kiem read as a lawn. The Pantanal's river is the
+  // model, not the Quay's harbour: sparse, slow, warm and low-cut, because
+  // this is still water under a hazy sky and a harbour's glitter on it would
+  // be the swimming pool the header above forbids. The Fresnel is what puts
+  // the far shore's sky on it. NOT grainOwn and NOT .clone(): the mesh is
+  // animated by its positions (hanUpdateLake), never by its material, and a
+  // clone after grain() drops the hook (capy3-clone-eats-the-shader).
   const m = new THREE.Mesh(g, grain(mat(0xffffff, { vertexColors: true }),
-                                    { scale: 0.05, amount: 0.05, warp: 1.1 }));
+                                    { scale: 0.05, amount: 0.05, warp: 1.1,
+                                      sparkle: 0.34, sparkleScale: 2.0, sparkleSpeed: 0.14,
+                                      sparkleCut: 0.70, sparkleBand: 0.08, sparkleColor: PALETTE.hanTrim,
+                                      fresnel: 0.55 }));
   m.receiveShadow = true; m.castShadow = false;
   m.frustumCulled = false;
   hanLakeMesh = m;
@@ -3995,10 +4011,10 @@ function hanBuildLocals(game) {
     lines: ['Lotus in the morning, chrysanthemum after. Nothing after four.',
             'The whole shop is on the bicycle. It has to be.',
             'Do not lean on it. Please do not lean on it.',
-            { t: 'It is balanced. It took me eleven years to learn how balanced.', before: 'flower-bike' },
+            { t: 'It is balanced. It took me two bicycles to learn how balanced.', before: 'flower-bike' },
             { t: 'You unloaded it. I did not ask you to unload it.', after: 'flower-bike' },
             { t: 'There is coffee on a balcony somewhere that is not where it was.', after: 'egg-coffee' }],
-    wheek: ['Everything on that bicycle is somebody’s Tuesday.'],
+    wheek: ['Everything on that bicycle is somebody’s wedding.'],
   });
   hanLocBarber = put(hanBARBER.x + 2.6, hanBARBER.z + 1.2, {
     figure: { shirt: PALETTE.hanShirtW }, face: -1.6, near: 7,
@@ -4192,7 +4208,7 @@ function hanUpdateTasks(game, dt) {
       if (hanFlowerProps[i] && hanFlowerProps[i].held) {
         hanFlowerDone = true;
         hanTask('flower-bike');
-        hanToast('that was somebody’s whole Tuesday.');
+        hanToast('that was somebody’s whole morning.');
         break;
       }
     }

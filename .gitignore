@@ -26,3 +26,8 @@ dp-top.png
 # checkout it renders nineteen broken images. Same call as `dp-top.png`: a
 # scratch viewer on the author's disk, referenced by nothing in the tree.
 qa/sheet.html
+
+# The soak's staged copies of the three probes it runs (qa/soak.mjs rewrites
+# their port and dist/ path per run). The history it appends to,
+# qa/soak-history.jsonl, IS tracked: one line per run is the point of it.
+qa/.soak/

@@ -5221,7 +5221,7 @@ function caliBuild(game) {
         game.addExchange({ biome: 'cali', a: caliLocTeach, b: caliLocBar, lines: [
           ['Turn the trumpet down.', 'The trumpet is a man. Tell the man.'],
           ['Who let the animal in?', 'It is not drinking. It is fine.'],
-          ['Four couples. On a Tuesday.', 'It is Thursday.'],
+          ['Four couples. Before nine.', 'It is half past ten.'],
           ['One more and then I am going home.', 'You said that at ten.'],
           ['That floor needs waxing.', 'That floor needs a new roof. Wax is further down.'],
         ] });

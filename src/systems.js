@@ -250,6 +250,64 @@ const sysSHADOW_RES   = 2048;
 let   sysShadowRes    = sysSHADOW_RES;
 const sysTEXEL_X      = (sysSHADOW_HALF * 2) / sysSHADOW_RES;
 const sysTEXEL_Y      = (sysSHADOW_TOP + sysSHADOW_HALF) / sysSHADOW_RES;
+// ---------------------------------------------------------------------------
+// THE FAR CASCADE (L6, E1 / art #1).
+//
+// One box, +-22 m about the animal, was the whole of the sun's reach, and the
+// walking lens pitches 19 degrees with the horizon a fifth of the way down
+// the frame — so ground from twenty-two metres to the fog is in every daylight
+// frame and none of it has ever had a cast shadow on it. The far trees, the
+// picnic tables, the crowd past the steps all stood on lit lawn. The comment
+// on sysDEPTH.pantanal said it in so many words.
+//
+// The key is now TWO directional lights on one axis. NEAR keeps today's box
+// and sysFAR_SHARE of the intensity goes to FAR: a 140 m box at the same 2048
+// (6.8 cm texels against 2.15), softer (radius 2), refreshed every other frame
+// on its own parity, and cast by nothing under sysFAR_MIN_R of bounding
+// radius — a bollard's shadow is a texel there and the contact patch already
+// paints it. Inside the near box both shade and the sum is what it was; past
+// it 40 % of the key still goes dark, which is what shade in the middle
+// distance IS.
+//
+// Everything that writes sun.intensity keeps writing ONE number: the split
+// happens at the very end of the light section, after sysKEY has held the lit
+// value and after the dome, the leaf and the clouds have read it, so no
+// exposure row moves and the key's arithmetic is unchanged. Next frame
+// atmosApply rewrites the total from its constants.
+//
+// THE CULL IS BY LAYER, AND THE LAYER IS THE MAIN CAMERA'S. three's shadow
+// pass tests `object.layers` against the RENDER camera, not the shadow
+// camera, so the far pass is a second call into the shadow renderer with the
+// main camera's mask swapped to sysFAR_LAYER for its duration (sysShadowPass).
+// The big-caster sweep that sets the bit is the same three-second sweep that
+// already turns small casters off (sysShadowCull).
+//
+// PRETTY TIER ONLY. From the governor's first step down the far light is
+// PARKED rather than removed: its intensity and its shadow.intensity go to
+// zero, its share goes back to NEAR, its map stops refreshing and its frustum
+// is folded so every fragment fails the frustum test before a single tap.
+// It stays a shadow-casting light because NUM_DIR_LIGHT_SHADOWS is baked into
+// every program in the chapter, and dropping it would recompile the whole
+// scene on exactly the machine that is struggling.
+const sysFAR_SHARE  = 0.40;    // of the sun's intensity carried by the far light
+const sysFAR_HALF   = 70;      // m — a 140 m box
+const sysFAR_TOP    = sysFAR_HALF + 22;
+const sysFAR_RES    = 2048;
+const sysFAR_RAD    = 2.0;     // shadow.radius — the light size, see THE PENUMBRA
+const sysFAR_BIAS   = -0.00025;
+const sysFAR_NB     = 0.09;    // normalBias — 6.8 cm texels want three times the near one
+const sysFAR_DEPTH  = 60;      // m added to the near box's depth each way
+// The roadmap said "casters under 1.2 m" and ALSO "far people must have
+// shadows": a walker is built from parts, and a torso is a 0.45 m sphere.
+// Radius 0.45 is a 0.9 m thing across — torsos, legs, tables and anything
+// bigger cast; cups, hats, hands, feet and heads do not.
+const sysFAR_MIN_R  = 0.45;    // m of world bounding radius under which a mesh does not cast into it
+const sysFAR_LAYER  = 7;       // the layer big casters carry as well as 0
+const sysFAR_TEXEL_X = (sysFAR_HALF * 2) / sysFAR_RES;
+const sysFAR_TEXEL_Y = (sysFAR_TOP + sysFAR_HALF) / sysFAR_RES;
+let   sysFarOn = true;         // rung 0 only; sysPerfSet writes it
+let   sysFarOdd = false;       // the far pass's own parity
+let   sysFarDirty = true;      // a refit or a chapter cross: draw it this frame
 // ...and the box GROWS with altitude. From the condor's talons at 50 m the player
 // sees half the valley, but a 44-unit box centred on the animal lights only the
 // paddock directly beneath it — everything else in frame would be flat-lit and the
@@ -639,7 +697,15 @@ const sysREST_SKY    = 2.0;   // what skyT follows the rest voice at
 // is what lets the look-back beat in capybara.js (THE LOOK BACK) read as a
 // face rather than the back of a head. Always the same side, so the second
 // rest in a chapter composes like the first.
-const sysREST_FLANK  = 20 * Math.PI / 180;
+//
+// 20 -> 60 DEGREES (L6, E2 / art #4). Twenty was a three-quarter REAR view,
+// and measured at the resting lens the face was "a two-tone wedge, two ear
+// nubs, no eye, no mouth": the expression rig was three pixels from behind.
+// Sixty round the flank is a three-quarter FRONT — the eye, the muzzle and
+// the ear on the near side, which is the view every animal photograph is
+// taken at. It rides the same crane scalar (skyRestT / sysREST_W), so it
+// opens with the wide shot and is gone the frame the player touches a key.
+const sysREST_FLANK  = 60 * Math.PI / 180;
 // ---- ...AND THE RESTING FRAME IS ALLOWED TO BREATHE ----------------------
 // Once the rig opens out and the player stops, NOTHING in the frame moves that
 // the camera is responsible for: the eye is a damped spring that has converged,
@@ -1241,10 +1307,35 @@ const sysROOM_DEF   = { size: 1.5, decay: 2.6, wet: 0.07 };
 // the total climbs from 0.35·wet at the feet to 1.0·wet at sixty metres out,
 // and its dry path gives back a quarter so the sum does not grow. Measured
 // before: the cave's far/near tail ratio was 1.0 by construction.
-const sysSEND_NEAR  = 0.35;   // share of the room a sound inside `near` gets
+//
+// ---- ...AND THE NEAR SHARE IS THE ROOM'S (L6, E3 / audio #3) ---------------
+// Measured on a wheek (qa/l6r-audio-theme.js, before): the room returned 38 dB
+// under the sound in it in Sydney, 34 in Kyoto, 27 in Venice, 28 in Hanoi and
+// 26 in the cave — whose whole argument is its echo. Nineteen rooms were
+// authored and none was audible. Two causes, two fixes, no redesign: the near
+// share is 0.5 now, and 0.7 in the four rooms with a ceiling (the salon, the
+// basilica, the cave and its deep end — `near` on the sysROOMS row); and the
+// convolver's own normalisation is made up for at build (sysRoomMakeup). The
+// distance send and the dry give-back are untouched; the far field still
+// gets the rest of the row.
+const sysSEND_NEAR  = 0.5;    // share of the room a sound inside `near` gets, outdoors (was 0.35)
 const sysSEND_SPAN  = 60;     // m past `near` over which the send reaches the full row
 const sysSEND_DRY   = 0.25;   // ...and how much dry the far send takes back
 function sysSendK(dist, near) { return clamp((dist - (near > 0 ? near : sysSFX_NEAR)) / sysSEND_SPAN, 0, 1); }
+// ---- THE MAKE-UP (L6, E3 / audio #3) ---------------------------------------
+// A ConvolverNode with `normalize` scales its impulse to a fixed per-sample RMS
+// of −58 dB (0.00125 at 44.1 k), which is the right default for a plug-in with
+// a wet knob and the wrong one for a room whose send is a fraction of `wet`:
+// what comes back is the send × the energy of the impulse's HEAD, and after
+// that scaling the head of every room in this table holds about −11 dB. The
+// make-up puts the head of each room's impulse at sysROOM_E_REF instead,
+// computed from the built buffer rather than assumed from its length — a
+// long, slow room and a short, hard one land within a decibel of each other
+// under the normaliser, and only the measurement says so. Capped, so a
+// pathological impulse cannot become a gain stage.
+const sysROOM_HEAD       = 0.3;    // s of the impulse that a transient's return is made of
+const sysROOM_E_REF      = 0.80;   // the head's energy (one channel) the make-up aims for
+const sysROOM_MAKEUP_MAX = 6;      // ×; +15.6 dB
 // ---- WHAT AN IMPULSE RESPONSE IS MADE OF (v41; see musIR) -----------------
 const sysIR_PRE_MAX  = 0.042;   // s. Longest pre-delay any room in the game gets.
 const sysIR_LP0      = 0.62;    // the one-pole at the head of the tail (~3.6 kHz)
@@ -1314,7 +1405,7 @@ const sysROOMS = {
   pantanal:  { size: 1.6, decay: 2.6, wet: 0.06 },
   // AND THE WHOLE REASON THIS EXISTS. Five and a half seconds, and the send is
   // twice the next loudest room in the game.
-  cave:      { size: 5.5, decay: 1.6, wet: 0.42 },
+  cave:      { size: 5.5, decay: 1.6, wet: 0.42, near: 0.7 },   // `near`: see sysSEND_NEAR (L6, E3)
   // Ice is hard and the air is thin. Bright and long and not very loud.
   antarctic: { size: 2.2, decay: 2.0, wet: 0.09 },
   // Two rooms in one chapter, and this is the OUTSIDE one: a harbour with a
@@ -1342,9 +1433,11 @@ const sysROOMS = {
   // anywhere, because a casino is built so nobody hears the next table. The
   // deep cave is the cave, further in: past the doline the daylight and the
   // vegetation stop and it is bare rock in every direction.
-  basilica:  { size: 4.2, decay: 1.8, wet: 0.34 },
-  salon:     { size: 0.9, decay: 3.8, wet: 0.03 },
-  deepcave:  { size: 7.0, decay: 1.4, wet: 0.52 },
+  // ...and the four rooms with a ceiling carry `near` 0.7 (L6, E3): inside,
+  // the room a sound at your feet is in is most of the room. See sysSEND_NEAR.
+  basilica:  { size: 4.2, decay: 1.8, wet: 0.34, near: 0.7 },
+  salon:     { size: 0.9, decay: 3.8, wet: 0.03, near: 0.7 },
+  deepcave:  { size: 7.0, decay: 1.4, wet: 0.52, near: 0.7 },
 };
 
 // --- AND THE AMBIENCE HAS TO COME FROM SOMEWHERE -----------------------------
@@ -1975,6 +2068,64 @@ const sysCLOUD_SKY_BASE = 0.66;
 // ...and a little between one puff and the next, or a cluster is one silhouette
 // rather than three lumps. Small: this is shape, not colour.
 const sysCLOUD_SKY_VARY = 0.08;
+// ---- ...AND THE EDGE, AND THE SUN (L6, E6 / art #5) -----------------------
+// The layer above drew a cumulus as three unlit ellipsoids with a vertical
+// ramp baked in, and the art review photographed exactly that: hard-edged
+// low-poly discs (qa/l6r-art-rio-rest.png, the luma step across a cloud's
+// silhouette was over 60 in four pixels) with no lit rim toward the sun, in
+// a sky whose top band had a sd of 16–30 against 44–54 for the ground under
+// it. Three things, and they are the three the review asked for:
+//
+//   1. THE PUFF IS LIT BY THE SUN, PER FRAGMENT. `0.5 + 0.5·dot(n, sun)` on
+//      the view-space normal, mixing the BASE colour toward the TOP colour;
+//      the sun's bearing is what the whole dome already paints its lobe on
+//      (sysAxDir), pushed into view space once a frame the way leafTick does
+//      it. The vertical ramp stays in the vertex colour but it is now the
+//      lesser term (a fifth of the range) — a cloud's shape is where the sun
+//      is, not which way is up.
+//   2. THE SILHOUETTE FADES ON ITS OWN RIM. The alpha is a smoothstep on
+//      dot(n, toEye): where the ellipsoid turns away from the lens it goes to
+//      nothing over the last part of its radius, and a 7-by-5 sphere stops
+//      reading as an octagon. Custom blending rather than `transparent` — a
+//      transparent material goes to three's second list, which is drawn
+//      AFTER the world, and with depthTest off that is a cloud painted over
+//      a mountain. Custom src-alpha blending on an opaque-listed material
+//      keeps property 1 above (drawn after the dome, before everything).
+//   3. TWO SOFT CARDS OVER EACH PUFF. Billboards at the puff's own matrix
+//      (one at the head, one shouldered up and aside), a radial alpha in the
+//      fragment, the same lit term on a hemisphere normal faked from the
+//      card's uv — so the soft body and the hard body are lit by the same sun
+//      and cannot disagree. One InstancedMesh, a child of the puff mesh: it
+//      inherits the wind, the ride and the hide. +1 draw call.
+//
+// AND A HORIZON STRIP (the review's "one 2° strip on the dome"): the dome's
+// rings are ten degrees apart, so a two-degree band cannot be a vertex
+// colour on it. A 64-segment ribbon just inside the dome, three rows across
+// −1°..3°, painted in sysSkyPaint from the same inputs: the sun's colour on
+// the sun's side, the air (the fog colour, which is the horizon's own hue
+// without the band's white lift) opposite. Its outer rows are the dome's
+// colour at that elevation, so there is no seam. +1 draw call, and only in
+// the chapters that draw the shared dome at all.
+const sysCLOUD_SKY_RIM_LO = 0.36; // dot(n, toEye) at which a puff has faded to nothing — outside any silhouette vertex
+const sysCLOUD_SKY_RIM_HI = 0.78; // ...and from which it is solid: the outer quarter of the radius is the fade
+const sysCLOUD_SKY_RAMP  = 0.20;  // how much of the range the baked vertical ramp still carries
+const sysCLOUD_SKY_SHADE = 2.2;   // the base takes this many times the top's pull toward the horizon
+const sysCLOUD_SKY_CARD_A = 0.72; // peak alpha of a soft card at its centre
+const sysCLOUD_SKY_CARD_R = 0.32; // ...and the radius (of one) at which it is still full
+const sysSKY_STRIP_LO   = -1 * Math.PI / 180;   // the ribbon's rows: below the horizon...
+const sysSKY_STRIP_MID  =  1 * Math.PI / 180;   // ...the painted row...
+const sysSKY_STRIP_HI   =  3 * Math.PI / 180;   // ...and where it has rejoined the dome
+const sysSKY_STRIP_SUN  = 0.34;   // fraction of the way to the sun's colour, at the sun's bearing
+const sysSKY_STRIP_AIR  = 0.55;   // ...and to the air colour, at the anti-sun
+const sysSKY_STRIP_SEG  = 64;
+const sysSKY_STRIP_YS   = [Math.sin(sysSKY_STRIP_LO), Math.sin(sysSKY_STRIP_MID), Math.sin(sysSKY_STRIP_HI)];
+let   sysCloudSkyCards  = null;
+let   sysSkyStrip       = null;
+let   sysSkyStripCol    = null;
+let   sysSkyStripD      = null;   // per-vertex unit x, z round the ribbon
+const sysCloudSunV      = { value: new THREE.Vector3(0, 1, 0) };   // sun, in VIEW space
+const sysCloudTopU      = { value: new THREE.Color(1, 1, 1) };
+const sysCloudBaseU     = { value: new THREE.Color(0.66, 0.66, 0.66) };
 let   sysCloudSkyMesh   = null;
 let   sysCloudSkyN      = 0;     // clusters currently placed
 const sysCloudSkyBody   = new THREE.Color();
@@ -3626,6 +3777,18 @@ const sysSAVE_KEY = 'capy3.journey.v1';
 // by hand. Bytes we cannot read are moved here, once, and never written over;
 // the journey key is then free to be cleared by whatever the player does next.
 const sysSAVE_BAD_KEY = 'capy3.journey.broken.v1';
+// One shape per key the writer emits; a PRESENT key in another shape is a
+// broken file and goes to quarantine (L6, E8). See saveShapeOk. Up here and
+// not beside it because saveRead is called from the title card, above the
+// save block, where a `const` declared there would still be in its TDZ.
+const sysSAVE_SHAPE = {
+  tasks: 'array', seen: 'array', finds: 'array',
+  recs: 'object', recg: 'object', chapms: 'object', foundAt: 'object', inc: 'object',
+  scn: 'object', pho: 'object', fed: 'object', pas: 'object', lin: 'object', err: 'object',
+  pal: 'object', eve: 'object', rep: 'object',
+  nb: 'object',   // the traveller's notebook (L6, F4)
+  ms: 'number', biome: 'string',
+};
 const sysSAVE_DEBOUNCE = 700;      // ms — a streak of ticks writes once
 // ---- THE TWO WAYS STORAGE LETS A PLAYER DOWN, BOTH SILENT UNTIL R3 ---------
 // `sysSaveOff`: localStorage threw. A private window, a browser with site data
@@ -3858,7 +4021,8 @@ sysPrefsRead();
 
 // --- BIOME TRANSITION -------------------------------------------------------
 const sysFADE_OUT   = 820;   // ms of white coming up  (CSS transition is .8s)
-const sysFADE_HOLD  = 460;   // ms of held white — the swap happens in here
+const sysFADE_HOLD  = 460;   // ms of held white — the swap happens in here; the MINIMUM (L6, E8)
+const sysFADE_HOLD_MAX = 10000; // ms — past this the white lifts whatever the shaders say
 const sysFADE_CARD  = 3600;  // ms the place card stays up
 // ms after the white STARTS LEAVING before the place card is asked to rise.
 // It used to be shown at the top of the hold — 460 ms before the white even
@@ -4012,24 +4176,43 @@ const sysMUS_ENS_TRIM = 0.84;
 // bands (bus 0.045–0.062, bass 0.09–0.10) were already voiced against their
 // own drums and keep their bass; only the pad palettes take the cut.
 const sysMUS_VOICE = {
-  cutK:  1.35,    // the pad filter, pad palettes: Iceland 470 -> 635, Sydney 620 -> 840
+  // ---- THE STEMS, FINISHED (L6, E3 / audio #9) ------------------------------
+  // The L4 round left the score under 120 Hz: share at or above 500 Hz ≥ 25 %
+  // in 1 of 19 palettes (median 8.1 %), the pad's centroid 136–427 Hz, the
+  // loudest bin under 71 Hz in 12 of 19, the pluck stem −36…−46 dBFS under a
+  // pad at −27…−33 everywhere (qa/l6r-audio-spectrum.js, before). Four more
+  // turns on the same four writers and a second shelf; nothing structural.
+  cutK:  1.6,     // the pad filter, pad palettes: Sydney 620 -> 992 (was 1.35: 840)
+  // ...and a FLOOR under the opened cut. Iceland's 470 and the Pantanal's 540
+  // were authored dark on purpose and stay the darkest — but 470 × 1.6 is 752,
+  // which on a laptop is still a hum with no note in it. 900 is the lowest a
+  // pad palette now opens to at rest; the calm and the breath still close it
+  // from there. The Drift (1250) and Antarctica (1320) are untouched by it.
+  cutFloor: 900,
   // The review proposed -4 dB on the sine and +3 dB on the plucks. Measured at
   // the stems after exactly that (round one, qa/l4-audio-spectrum.js): Sydney's
   // bass still the loudest single element at musVol, 2 dB over the whole wet
   // return and 10 dB over the melody; the laptop metric met in 7 of 19. So the
   // sine takes -6, the plucks +4.4, and the pad palettes' bus +1.6 dB.
-  bassK: 0.50,    // the sine, pad palettes: -6 dB (Sydney 0.26 -> 0.13)
-  bass2: 0.22,    // the second-harmonic partial: a triangle an octave up, against the sine's 0.5
+  // E3: the sine another −3 dB and the octave partial +5, so the partial is
+  // what carries the note — on a laptop the sine is the part you cannot hear.
+  bassK: 0.35,    // the sine, pad palettes: -9 dB (Sydney 0.26 -> 0.09); was 0.50
+  bass2: 0.40,    // the second-harmonic partial: a triangle an octave up; was 0.22
   bassLp: 320,    // the bass lowpass, was 210: the partial has to get through it
   padQ:  0.5,     // the pad lowpass Q, was 0.6: less of a bump at the cut
   padBusK: 1.2,   // the pad palettes' pad bus, +1.6 dB
-  pluckDry: 0.70, // musPluckDry, was 0.42: the melody's dry path, +4.4 dB
+  pluckDry: 0.99, // musPluckDry, was 0.70 (E2) and 0.42 before that: +3 dB more (E3)
   ksPos: 0.20,    // Karplus–Strong pluck position (centre of the ±0.08 spread), was 0.28
   // THE ONE SHARED TERM: a tilt after musVol — a low shelf and a high shelf,
   // fixed, no AudioParam writer — so everything the score does, wet and dry,
   // leans the same way.
   tiltHiHz: 1200, tiltHiDb: 3.0,
   tiltLoHz: 120,  tiltLoDb: -2.0,
+  // ...and a SECOND high shelf at 2.4 kHz (E3): the first one at 1.2 k lifts
+  // the pad's upper partials as much as the plucks' attack; this one is above
+  // the pad's whole range in every palette, so it is the struck notes and the
+  // string's brightness only. Still an octave under the S2 ceiling at 5 k.
+  tilt2Hz: 2400,  tilt2Db: 2.0,
   // THE LOUDNESS ORDER (the reviewer's note to the room). Standing still, the
   // four band chapters measured the QUIETEST places in the game (Cali −29.1,
   // Monaco −29.9) and the hush chapters the loudest (the cave −20.2, Pasto
@@ -4054,6 +4237,63 @@ const sysMUS_VOICE = {
 // block is already asking for less. 0.38 with a 0.10 s attack bottoms near
 // 0.64 (−3.9 dB); the 0.6 s release has it within a decibel by 1.4 s.
 const sysMUS_WORLD = { sting: 0.38, lift: 0.20, card: 0.35, floor: 0.30, attack: 0.10, release: 0.6 };
+// ---- ...AND SO DOES THE PAD (L6, E3 / audio #5) ----------------------------
+// The world ducked for a sting and the pad did not: measured with the world
+// muted (qa/l6r-audio-theme.js, Sydney), the bed at −23.9 dBFS and `record` —
+// the game's "you did better" — at −25.4, INSIDE it; `arrive` +1.4, `act`
+// +1.8. A sting reads by contrast, not by level, so this is a term on the pad
+// and the filter in the one writer rather than a louder figure: 45 % off the
+// pad and 300 Hz off the filter at the top of the envelope, with the world's
+// own attack and release (0.15 s in, 0.8 s out). No sting gets louder.
+const sysMUS_STING_PAD = 0.45;
+const sysMUS_STING_CUT = 300;
+const sysMUS_STING_IN  = 0.15;
+const sysMUS_STING_OUT = 0.8;
+// ---- THE RANGE (L6, E3 / audio #2) -----------------------------------------
+// Across still / walking / chase / marquee the score moved under 3 dB in four
+// of five chapters (qa/l6r-audio-states.js): chase − still +0.4, +1.4, 0.0,
+// +3.0, −2.6 dB; marquee − still +0.7…+3.0. The pulse scheduled 28–32 hits a
+// window at vel 0.09–0.11 and landed ten decibels under the pad. Wider terms,
+// same structure: the pulse ×2.5, the marquee's lift on the pad 0.32 → 0.9,
+// and the calm lean allowed to take the pad DOWN — it only ever lifted it,
+// which is why the still state was as loud as the chase.
+// The review asked ×2.5 on the pulse; measured (states probe, after) that put
+// the pulse stem AT the pad (Sydney −1.2 dB under, the cave +0.9 over) and a
+// bendir stroke's own transient at −11 dBFS, so the chase peaks went to −5.
+// ×2.0 is −4…−8 under, which is what "−6, not −10" meant.
+const sysMUS_CHASE_VEL = 2.0;   // the chase pulse's velocity, on every stroke
+const sysMUS_LIFT_PAD  = 0.9;   // what a full lift adds to the pad (was 0.32)
+const sysMUS_LIFT_BAND = 2.4;   // ...and on a band, whose pad bus is 0.05 and whose drums duck for the lift
+const sysMUS_PAD_STACK = 2.0;   // ceiling on chase × lift together: measured ×3 put Sydney's marquee at −4.5 dBFS
+const sysMUS_INT_PAD   = 0.8;   // what full intensity takes off it outside a chase (was 0.3)
+const sysMUS_INT_BAND  = 0.5;   // ...and what it ADDS on a band palette, which has no chase layer
+const sysMUS_CALM_PAD  = 0.37;  // what a full calm takes off it: −4 dB. It used to ADD 30 %.
+// ---- THE SLEEP (L6, E3 / audio #8) -----------------------------------------
+// Nothing was ever silent, including the nap: `capy.nap` reached this file as
+// sysNapNow and drove the camera and not one music term. Silence is the
+// loudest thing a score can do and the nap is the one place the game asks for
+// it. While the animal is asleep (nap > 0.6) the pad and the bass go to nothing
+// over ten seconds — a term in the one writer, like everything else — the
+// plucks stop being scheduled, the beds come up 3 dB, and the purr is the only
+// voice. On waking the next chord is the first thing back, with one note on
+// the lead as an upbeat in front of it.
+const sysMUS_SLEEP_ON   = 0.6;   // capy.nap above which the score goes
+const sysMUS_SLEEP_OFF  = 0.4;   // ...and below which it is a wake (hysteresis)
+const sysMUS_SLEEP_IN   = 10;    // s to nothing
+const sysMUS_SLEEP_OUT  = 1.2;   // s back: "≥ −30 dBFS within 4 s of waking"
+const sysMUS_SLEEP_BEDS = 0.41;  // +3 dB on the beds while asleep
+const sysMUS_SLEEP_UP   = 0.12;  // the upbeat's velocity
+// ---- THE PROGRESS LAYERS (L6, E3 / audio #8; L4-F3's plan, finished) -------
+// The shimmer (0 → 1, continuous) and the second voice (from sysMUS_2ND_AT)
+// existed; the pulse, the counter-line and the ostinato were planned and not
+// built, and the second voice's gate at a third of a chapter meant a naive
+// first hour never heard it (secondN 0 in 25 of 25 windows, chapProg 0.17).
+// Three gates, published as musAudit().layers: [shimmer, second, pulse]. The
+// pulse is a slow hand drum on the pad palettes past half a chapter — one soft
+// dum every other chord beat — and the ostinato at 1.0 is F3's (the tune).
+const sysMUS_LAYER_PULSE = 0.5;  // chapter progress the pulse starts at
+const sysMUS_PULSE_GAP   = 2.4;  // s between strokes at the gate, closing to 1.6 by the end
+const sysMUS_PULSE_VEL   = 0.07; // ...and how hard. Soft: a heartbeat, not a chase.
 // ---- THE SCORE'S ROOM, PER CHAPTER (v41; see musRoomLoad) -----------------
 // secs = A + B * sysROOMS[x].size, so Manly's beach is 3.45 s and the cave is
 // 6.5. The old fixed value was 3.6, which is roughly where Sydney lands.
@@ -4110,7 +4350,8 @@ const sysMUS_SKY_VEL = 0.08;  // and the velocity a struck note loses to cloud
 // It is deliberately an ANSWER and not a harmony. Two voices together are a
 // thicker pad; a voice that replies is a second musician, and the difference
 // between those two is the whole of what this is for.
-const sysMUS_2ND_AT   = 0.33;  // chapter progress the answer starts at
+// 0.33 until L6 (E3): a naive hour reached chapProg 0.17 and never heard it.
+const sysMUS_2ND_AT   = 0.15;  // chapter progress the answer starts at
 const sysMUS_2ND_GAIN = 0.62;  // its velocity against the pluck it answers
 const sysMUS_2ND_TIGHT = 0.20; // how far progress shortens the pluck spacing  // ...and how far the room opens, as a fraction
 // ---- THE FEEL (v41; see musFeel). Milliseconds, and they are small. -------
@@ -6822,9 +7063,14 @@ function sysShadowCull(scene) {
     const sz = e[8] * e[8] + e[9] * e[9] + e[10] * e[10];
     let s = Math.sqrt(Math.max(sx, sy, sz));
     if (n.isInstancedMesh) s *= sysInstMaxScale(n);
-    const small = geo.boundingSphere.radius * s < sysSHADOW_MIN_R;
+    const wr = geo.boundingSphere.radius * s;
+    const small = wr < sysSHADOW_MIN_R;
     if (small && n.castShadow) { n.castShadow = false; n.userData.sysSmallCast = true; }
     else if (!small && !n.castShadow && ud && ud.sysSmallCast) { n.castShadow = true; ud.sysSmallCast = false; }
+    // ...and the far cascade's roll (THE FAR CASCADE): the bit the far pass
+    // renders by. A mesh that grows or shrinks across the line gets it or
+    // loses it on the next sweep, same as the small-caster flag above.
+    if (wr >= sysFAR_MIN_R) n.layers.enable(sysFAR_LAYER); else n.layers.disable(sysFAR_LAYER);
   });
 }
 // A JOURNEY IS HOURS LONG AND THIS ONLY EVER COUNTED MINUTES. Seventeen
@@ -6940,6 +7186,11 @@ const sysMAP_ROSE = 4;              // ticks on the compass rose (N E S W)
 // The pseudo-task id the door is pinned under. Two underscores so it can never
 // collide with a row in TASKS, which are all lower-case-and-hyphens.
 const sysWAY_ID = '__way';
+// ...and the traveller's, on the same terms (L6, F4): a pseudo-row the
+// notebook pins the arrow on. Its id is the sysHINTS key, so the hint tick
+// resolves it exactly as it resolves a task, and game.hintTarget('traveller')
+// answers from outside.
+const sysTRAV_ID = 'traveller';
 const sysMAP_WORLDS = {
   // Sydney publishes zones rather than landmarks, so these come from the world
   // layout table in the contract.
@@ -7571,7 +7822,9 @@ function sysBuildCSS() {
 '.capyui-jrkey{position:absolute;left:1px;top:1px;z-index:1;',
   'min-width:12px;height:12px;padding:0 2px;border-radius:' + rSm + ';',
   'display:flex;align-items:center;justify-content:center;',
-  'background:' + sysRgba(PALETTE.stoneDark, 0.84) + ';color:' + paper + ';',
+  // stoneDark at .84 measured 2.1:1 against the paper (L6, E4 / writing W8);
+  // the ink is what every other chip on this HUD is printed in.
+  'background:' + sysRgba(PALETTE.ibisHead, 0.92) + ';color:' + paper + ';',
   // 9px, and it stays 9px: this is the chapter NUMBER inside a 12px chip on
   // the corner of a 56x35 thumbnail, and 11px does not fit in a 12px box. It is
   // an index, duplicated in full by the chapter name beside it, so nothing is
@@ -7644,6 +7897,34 @@ function sysBuildCSS() {
    a column of ones. */
 '.capyui-repn{margin-left:auto;padding-left:4px;font-size:' + tXs + ';',
   'color:' + accentInk + ';font-variant-numeric:tabular-nums;}',
+/* ---------- THE NOTEBOOK (L6, F4) ----------
+   The traveller's page: one entry per place, and the only surface on this
+   HUD written in somebody's hand rather than the game's. The date and the
+   place are the label caps every other chip uses; the entry is italic at the
+   lead size, because it is the one thing on the journal that is prose. A
+   chapter stood in and not yet left is a ruled blank line under its date.
+   Same fold as the repertoire, for the reason given there. */
+'.capyui-nb{padding:2px 4px 0;}',
+'.capyui-nbe{padding:7px 0 9px;border-bottom:1px solid ' + inkFaint + ';}',
+'.capyui-nbe:last-child{border-bottom:0;}',
+'.capyui-nbd{font-size:' + tSm + ';color:' + accentInk + ';font-weight:700;',
+  'letter-spacing:.2em;text-transform:uppercase;display:flex;gap:9px;align-items:baseline;',
+  'font-variant-numeric:tabular-nums;}',
+'.capyui-nbd span{color:' + inkSoft + ';letter-spacing:.12em;}',
+'.capyui-nbt{margin-top:3px;font-size:' + tLg + ';line-height:1.45;color:' + ink + ';',
+  'font-style:italic;text-wrap:pretty;}',
+/* the blank line: a rule to write on, and nothing written on it */
+'.capyui-nbt.blank{height:1.45em;width:62%;border-bottom:1px dashed ' + inkFaint + ';}',
+/* the pointer at the one who keeps turning up. A button in the chapter you
+   are standing in (it pins the arrow), a line everywhere else. */
+'.capyui-nbgo{display:inline-block;margin-top:6px;border:1px solid ' + rule + ';',
+  'border-radius:' + rSm + ';padding:3px 8px;background:none;font:inherit;',
+  'font-size:' + tSm + ';color:' + inkSoft + ';font-weight:700;letter-spacing:.12em;',
+  'text-transform:uppercase;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}',
+'button.capyui-nbgo{cursor:pointer;}',
+'@media (hover:hover){button.capyui-nbgo:hover{background:' + veil2 + ';color:' + ink + ';}}',
+'.capyui-nbgo:focus{outline:none;}',
+'.capyui-nbgo:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
 
 /* ---------- title card ---------- */
 /* align-items:flex-start, not center: a centred flex child that is TALLER than
@@ -8165,7 +8446,18 @@ function sysBuildCSS() {
    takes what the card's own chrome does not need: at 760 this is three rows
    of tiles rather than two and a half, and the footer stays above the fold. */
 '@media (max-height:900px){.capyui-picks{max-height:clamp(140px,50vh,600px);}}',
-'@media (max-height:770px){.capyui-picks{max-height:clamp(130px,46vh,420px);}}',
+/* MEASURED at 1280 x 760 (L6, E4 / play): the card was 875 px tall with the
+   shelf at 344 — 46vh — and NOTHING scrolled, so the third row of tiles sat
+   at y 701..807 under the window's edge, cut through the middle. The shelf's
+   budget is the window minus the card's own chrome above and below it (505
+   px at this width: header, hero, chart, footer, padding), so the shelf is
+   the one thing that gives and it gives exactly as much as it has to. */
+'@media (max-height:770px){.capyui-picks{max-height:clamp(130px,calc(100vh - 522px),420px);}',
+  /* ...and the chart gives a third of its height on the same window: 154 ->
+     ~100 px, which is still every label legible (they are 11 px and do not
+     scale with it), and it is the difference between the shelf showing two
+     rows and one and a half. */
+  '.capyui-route{height:clamp(96px,14.5vh,112px);}}',
 /* ---- the hero: chapter one, out of the grid and across the card ---- */
 /* ---- MIN-HEIGHT, NOT HEIGHT. THIS IS THE LINE THAT ATE 'SYDNEY'. ----------
    The hero used to be `height:clamp(84px,13.5vh,124px)` with `overflow:hidden`,
@@ -8528,6 +8820,17 @@ function sysBuildCSS() {
 '.capyui-photo{position:absolute;inset:0;z-index:44;pointer-events:none;',
   'opacity:0;transition:opacity ' + dMed + ' ease;}',
 '.capyui-photo.show{opacity:1;}',
+/* THE CODA READS THE JOURNEY (L6, E5). One small line, low in the frame,
+   that names each keepsake as its note sounds and its box flashes on the
+   lawn — the nineteen objects had never been named, touched or looked at
+   in the ending that is about them. Not a toast: nineteen toasts in six
+   seconds is a queue, and this is a caption. */
+'.capyui-coda{position:absolute;left:0;right:0;top:13%;z-index:58;text-align:center;',
+  'pointer-events:none;font-size:' + tSm + ';letter-spacing:.16em;text-transform:uppercase;',
+  'color:' + ink + ';opacity:0;transition:opacity .22s ease;}',
+'.capyui-coda.show{opacity:1;}',
+'.capyui-coda i{display:block;font-style:italic;text-transform:none;letter-spacing:0;',
+  'font-size:' + tLg + ';margin-top:4px;color:' + inkSoft + ';}',
 /* the bars. 3:2, which is the shape a postcard actually is, held with vh so a
    letterbox on a tall phone is not the whole screen. */
 '.capyui-pbar{position:absolute;left:0;right:0;height:9vh;max-height:88px;',
@@ -8612,7 +8915,24 @@ function sysBuildCSS() {
 '.capyui-todo .capyui-tab .capyui-txt{overflow:hidden;text-overflow:ellipsis;min-width:0;}',
 '.capyui-todo.away{width:clamp(150px,26vw,240px);padding:7px 12px 8px;transform:rotate(-1.2deg) scale(.96);}',
 '.capyui-todo.away .capyui-tab{display:flex;}',
-'.capyui-todo.away > :not(.capyui-tab){display:none;}',
+'.capyui-todo.away > :not(.capyui-tab):not(.capyui-tabsub){display:none;}',
+/* ...AND THE REMARKS GO WITH IT (L6, E4 / writing W8). The paper measured
+   291 x 449 px at 1280 x 760 on the Hanoi arrival — 59 % of the height — and
+   two of its lines were remarks rather than list: the marquee's WHERE line
+   ("the pho stall's scooter, on Hang Ngang · 110 m") and the finds' count
+   ("two secrets hidden here · none found yet"). They fold off the full sheet
+   and ride under the tucked tab instead, one at a time (todoTuckTick), which
+   is where a player who is walking reads them. The where-line stays on the
+   sheet only while it carries a CLOCK (.when) — a countdown is not a remark. */
+'.capyui-todo:not(.away) .capyui-finds{display:none;}',
+'.capyui-todo:not(.away) .capyui-marq:not(.when) .capyui-marqsay{display:none;}',
+/* ...and while the where-line IS a clock, it stands in for the sentence: the
+   name says what, the where-line says where and when. Measured in Venice:
+   the two together were four lines of the nineteen on the arrival sheet. */
+'.capyui-marq.when:not(.live) .capyui-marqtxt{display:none;}',
+'.capyui-tabsub{display:none;font-size:' + tSm + ';font-style:italic;color:' + inkSoft + ';',
+  'margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+'.capyui-todo.away > .capyui-tabsub.on{display:block;}',
 /* ...AND THE MARQUEE'S OWN STATE (L4, E4 / design #4). While the big one is
    running — wowLive fresh, or the animal at a helm — the paper is the
    signpost and nothing else: the star, the name, the live line and the bar.
@@ -8700,7 +9020,10 @@ function sysBuildCSS() {
    the where) — and hides it when the row IS the top row, where the clue is
    already printed under it. Refreshed on the hint tick; the state-aware
    clues change as you get closer. */
-'.capyui-marqhow{display:none;grid-column:1 / -1;grid-row:4;font-size:clamp(8.5px,1.4vw,11px);',
+/* 11 -> 12.5 px at 1280 (L6, E4 / writing W8): the marquee instruction was
+   the smallest colour text on the sheet, and it is the line the fresh player
+   needed at the podium. */
+'.capyui-marqhow{display:none;grid-column:1 / -1;grid-row:4;font-size:clamp(10.5px,1.7vw,12.5px);',
   'line-height:1.28;color:' + accentInk + ';margin-top:2px;',
   'min-width:0;overflow-wrap:break-word;text-wrap:pretty;}',
 '.capyui-marq.how .capyui-marqhow{display:block;}',
@@ -8778,6 +9101,15 @@ function sysBuildCSS() {
 /* the wrapper the strike is measured against, and the words inside it */
 '.capyui-tw{position:relative;display:inline-block;}',
 '.capyui-txt{display:inline;}',
+/* ARMED, NOT FINISHED (L6, E4 / design 2.6b, play 4). A theft ticks on the
+   getaway (props.js, THE GETAWAY), so for four to twelve seconds the hat is
+   in the mouth and the row is unchanged — forty seconds, for the player who
+   stood still. This is the row's own state line, under its words, in the
+   accent: the row is live, and here is what finishes it. Written on the hint
+   tick from the physics audit; gone the frame the row ticks. */
+'.capyui-armed{display:none;font-size:' + tSm + ';line-height:1.2;color:' + accentInk + ';',
+  'font-weight:700;letter-spacing:.06em;margin-top:1px;}',
+'.capyui-armed.on{display:block;}',
 /* ANCHORED IN EM FROM THE TOP, NOT AT A PERCENTAGE OF THE WRAPPER. A task
    row wraps to two lines on a phone, and the bar this replaces was at
    `top:52%` of a box that is then two lines tall — which put it in the GAP
@@ -8909,6 +9241,17 @@ function sysBuildCSS() {
    pill in the game that is allowed to be the biggest thing on screen. */
 '.capyui-toast.last{font-style:italic;font-size:clamp(13px,3vw,19px);padding:9px 24px;',
   'box-shadow:' + shLg + ';}',
+/* Overheard (L6, E4 / writing W4): somebody else's words, quoted and signed,
+   in ROMAN — the italic is the narrator's, and this is not the narrator. */
+'.capyui-toast.heard{font-style:normal;font-weight:600;color:' + sysRgba(PALETTE.ibisHead, 0.9) + ';}',
+/* The marquee's line on the place-card slot (L6, E4 / writing W3): the
+   sentence alone on the wash, at a name's weight rather than a pill's, with
+   the title and the rule gone. */
+'.capyui-placeline{font-size:clamp(15px,2.7vw,23px);font-style:italic;font-weight:700;',
+  'color:' + ink + ';line-height:1.25;max-width:min(84vw,620px);text-wrap:balance;',
+  'transform:rotate(-.8deg);}',
+'.capyui-placeline[hidden]{display:none;}',
+'.capyui-place.line h2,.capyui-place.line .capyui-placerule,.capyui-place.line .capyui-placesub{display:none;}',
 
 /* ---------- the moment card (a `mini` task) ---------- */
 /* THE MIDDLE RUNG. A toast is a rounded pill at the bottom of the screen and a
@@ -9147,6 +9490,8 @@ function sysBuildCSS() {
 '.capyui-setcalm input:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
 '.capyui-setnote{font-size:clamp(9.5px,1.7vw,10.5px);color:' + inkSoft + ';font-style:italic;',
   'margin-top:7px;line-height:1.4;}',
+/* ...directly under a row (the performance row's cost line, L6 E8) */
+'.capyui-setnote.under{margin-top:0;margin-bottom:7px;}',
 '.capyui-pausefoot{margin-top:clamp(9px,1.8vw,13px);text-align:center;',
   'font-size:clamp(9.5px,1.8vw,10.5px);letter-spacing:.14em;text-transform:uppercase;',
   'color:' + inkSoft + ';font-weight:700;}',
@@ -9256,9 +9601,12 @@ function sysBuildCSS() {
    more of those would have been a fourth label rather than a line to read. */
 '.capyui-donenote{font-size:clamp(12px,2.4vw,15px);color:' + inkSoft + ';font-style:italic;',
   'line-height:1.4;margin:7px auto 0;max-width:min(78vw,30em);text-wrap:balance;}',
-'.capyui-donelines{font-size:clamp(10.5px,2vw,12.5px);letter-spacing:.14em;text-transform:uppercase;',
-  'color:' + sysRgba(PALETTE.ibisHead, 0.86) + ';font-weight:700;line-height:1.6;margin:6px auto 0;',
-  'max-width:min(80vw,34em);white-space:pre-line;}',
+/* One sentence in the note's voice (L6, E4 / writing W6): italic, reading
+   size a step under the note, no tracking and no caps — it is the second
+   sentence of the same paragraph, not a third label. Two lines at 1280. */
+'.capyui-donelines{font-size:clamp(11px,2.1vw,13px);letter-spacing:0;text-transform:none;',
+  'font-style:italic;color:' + sysRgba(PALETTE.ibisHead, 0.72) + ';font-weight:500;line-height:1.45;margin:5px auto 0;',
+  'max-width:min(78vw,34em);text-wrap:pretty;}',
 '.capyui-donerule{height:2px;background:' + rule + ';border-radius:' + rSm + ';margin:8px auto 7px;',
   'width:min(30vw,140px);transform:rotate(.5deg);}',
 '.capyui-donesub{font-size:clamp(9.5px,2vw,12px);letter-spacing:.16em;font-weight:700;',
@@ -9426,8 +9774,15 @@ function sysBuildCSS() {
 
    The name under it rises HALF as far and a beat later, which is the only
    thing that stops the two reading as one lump sliding up the screen. */
+/* ...ON ITS OWN LAYER (L6, E8). Both properties are compositor-only, and
+   `will-change` is what makes the browser promote the card BEFORE the rise
+   begins rather than on its first frame: the main thread is busy for most of
+   the hold (the build, then the programs linking), and a transition that
+   lives on the compositor keeps moving through it. The name's colour was a
+   main-thread property and rose on it; it is the same rise on opacity now. */
 '.capyui-fade.trip .capyui-fademark{display:block;width:min(58vw,520px);',
   'aspect-ratio:64 / 40;opacity:.02;transform:translateY(4vh) scale(.965);',
+  'will-change:opacity,transform;',
   'transition:opacity 1.05s ease-out,transform 1.15s ' + mGlide + ';}',
 '.capyui-fade.trip.rise .capyui-fademark{opacity:.085;transform:none;}',
 '@supports not (aspect-ratio:1/1){.capyui-fade.trip .capyui-fademark{',
@@ -9435,10 +9790,10 @@ function sysBuildCSS() {
 '.capyui-fademark svg{display:block;width:100%;height:100%;}',
 '.capyui-fade.trip .capyui-fadename{display:block;font-size:clamp(11px,2.2vw,13px);',
   'letter-spacing:.4em;text-transform:uppercase;font-weight:700;text-align:center;',
-  'padding:0 18px;color:' + sysRgba(PALETTE.ibisHead, 0) + ';',
-  'transform:translateY(2vh);',
-  'transition:color .95s ease-out .14s,transform 1.1s ' + mGlide + ' .14s;}',
-'.capyui-fade.trip.rise .capyui-fadename{color:' + sysRgba(PALETTE.ibisHead, 0.26) + ';',
+  'padding:0 18px;color:' + sysRgba(PALETTE.ibisHead, 0.26) + ';opacity:0;',
+  'transform:translateY(2vh);will-change:opacity,transform;',
+  'transition:opacity .95s ease-out .14s,transform 1.1s ' + mGlide + ' .14s;}',
+'.capyui-fade.trip.rise .capyui-fadename{opacity:1;',
   'transform:none;}',
 /* ...AND A WASH OF PAPER BEHIND IT (L4, E3 / writing #5): full-bleed ink over
    the world was unreadable over a white wall in Venice and a white shelf in
@@ -9473,7 +9828,7 @@ function sysBuildCSS() {
   'border-radius:' + rSm + ';padding:8px 10px 9px;box-shadow:' + shMd + ';',
   'opacity:0;pointer-events:none;transition:opacity ' + dSlow + ' ease;}',
 '.capyui-fly.show{opacity:1;}',
-'.capyui-flyk{font-size:clamp(7.5px,1.15vw,9px);letter-spacing:.24em;text-transform:uppercase;',
+'.capyui-flyk{font-size:clamp(9.5px,1.3vw,10.5px);letter-spacing:.2em;text-transform:uppercase;',
   'color:' + accentInk + ';font-weight:700;}',
 '.capyui-flyv{font-size:clamp(14px,2.6vw,19px);font-weight:700;color:' + ink + ';line-height:1.15;',
   'font-variant-numeric:tabular-nums;}',
@@ -9515,7 +9870,8 @@ function sysBuildCSS() {
   'box-shadow:inset 0 0 10px ' + sysRgba(PALETTE.screenShadow, 0.30) + ',',
   'inset 0 0 0 1px ' + sysRgba(PALETTE.sail, 0.55) + ';}',
 '.capyui-mapn{position:absolute;left:50%;top:1px;transform:translateX(-50%);',
-  'font-size:8px;font-weight:700;letter-spacing:.12em;color:' + inkSoft + ';',
+  // 8 -> 10.5 (L6, E4): the one letter on the arrival frame under the floor
+  'font-size:10.5px;font-weight:700;letter-spacing:.12em;color:' + inkSoft + ';',
   'text-shadow:0 1px 0 ' + sysRgba(PALETTE.sail, 0.8) + ';}',
 /* On a phone the chart moves to the TOP right — which is exactly where a notch
    or a dynamic island is, so the offsets have to clear the inset rather than
@@ -9889,9 +10245,12 @@ function sysInstallShadowFilter(T) {
   })).concat([
     // NOTHING IN FRONT OF THIS FRAGMENT: it is lit, and it costs five taps
     // rather than sixteen to say so.
+    // (capyShadowV is NOT written here: with two cascades — THE FAR CASCADE —
+    // this function runs once per light, and a lit answer from the second may
+    // not undo a shaded answer from the first. shared.js resets it to 1.0
+    // before the lights loop; the shaded branch below takes the min.)
     '  if ( capyBN < 0.5 ) {',
     '    shadow = 1.0;',
-    '    capyShadowV = 1.0;',
     '  } else {',
     '    float capyPen = capyRec - capyBSum / capyBN;',
     '    float capyR = clamp( capyPen * shadowRadius * ' + f(sysPEN_K) + ', ' +
@@ -9903,7 +10262,7 @@ function sysInstallShadowFilter(T) {
            f(o[0]) + ', ' + f(o[1]) + ' ) * capyStep, capyRec );';
   })).concat([
     '    shadow = capyS * ( 1.0 / ' + R.length.toFixed(1) + ' );',
-    '    capyShadowV = shadow;',
+    '    capyShadowV = min( capyShadowV, shadow );',
     '  }',
   ]).join('\n') + '\n';
   // ...AND THE SUN VISIBILITY GOES SOMEWHERE THE REST OF THE SHADER CAN SEE IT.
@@ -9919,7 +10278,7 @@ function sysInstallShadowFilter(T) {
   // how many shadow-casting lights there are, and the declaration has to exist
   // whether the answer is one or none.
   T.ShaderChunk.shadowmap_pars_fragment =
-    'float capyShadowV;\n' + ch.slice(0, i) + body + ch.slice(j);
+    'float capyShadowV = 1.0;\n' + ch.slice(0, i) + body + ch.slice(j);
   sysShadowFilterDone = true;
   // Both halves of the term are armed by this one line: if we returned early
   // above, shared.js never injects the fragment that reads capyShadowV.
@@ -9957,6 +10316,69 @@ export function createSystems(game) {
   sc.updateProjectionMatrix();
   scene.add(sun);
   scene.add(sun.target);
+  // ---- THE FAR CASCADE (L6, E1). See the sysFAR_* block. ------------------
+  // Same axis, same target offset (sunFollow moves both), its own box, its own
+  // texel snap, its own parity. `intensity` is written by the split at the end
+  // of the light section and by nothing else.
+  const sunFar = new THREEx.DirectionalLight(PALETTE.sunLight, 0);
+  sunFar.castShadow = true;
+  sunFar.shadow.mapSize.set(sysFAR_RES, sysFAR_RES);
+  sunFar.shadow.bias = sysFAR_BIAS;
+  sunFar.shadow.normalBias = sysFAR_NB;
+  sunFar.shadow.radius = sysFAR_RAD;
+  sunFar.shadow.autoUpdate = false;       // sysShadowPass decides, never three
+  const scF = sunFar.shadow.camera;
+  scF.left = -sysFAR_HALF; scF.right = sysFAR_HALF;
+  scF.top = sysFAR_TOP;    scF.bottom = -sysFAR_HALF;
+  scF.near = Math.max(1, sysSUN_DIST - 30 - sysFAR_DEPTH); scF.far = sysSUN_DIST + 34 + sysFAR_DEPTH;
+  scF.updateProjectionMatrix();
+  scene.add(sunFar);
+  scene.add(sunFar.target);
+  let sysFarNearK = scF.near, sysFarFarK = scF.far;   // the live depth, kept for the un-park
+  /**
+   * Park or wake the far light. Parked: no share, no shadow, and a frustum
+   * folded to a centimetre so getShadow's frustum test fails for every
+   * fragment before its taps run — the light stays in the shader (see the
+   * sysFAR_* block for why) and costs one matrix multiply per vertex.
+   */
+  function sysFarSet(on) {
+    sysFarOn = !!on;
+    sunFar.shadow.intensity = sysFarOn ? 1 : 0;
+    if (sysFarOn) { scF.near = sysFarNearK; scF.far = sysFarFarK; }
+    else { scF.near = 1; scF.far = 1.01; }
+    scF.updateProjectionMatrix();
+    sysFarDirty = true;
+  }
+  // The pass itself. three renders every shadow-casting light in one call
+  // from inside renderer.render; this wraps that call so the far light is
+  // drawn on its own, on its own parity, with the render camera's layer mask
+  // swapped to the far layer for the duration (the cull — see sysFAR_LAYER).
+  // The near light and any other caster go through exactly as before.
+  const sysShRaw = renderer.shadowMap.render;
+  const sysShNear = [], sysShFar = [sunFar];
+  function sysShadowPass(lights, scn, cam) {
+    sysShNear.length = 0;
+    let hasFar = false;
+    for (let i = 0; i < lights.length; i++) {
+      if (lights[i] === sunFar) hasFar = true; else sysShNear.push(lights[i]);
+    }
+    const sm = renderer.shadowMap;
+    // `needsUpdate` is consumed by the first call; remember whether this
+    // frame was one three agreed to draw at all (the half-rate rung).
+    const drawing = sm.autoUpdate || sm.needsUpdate;
+    if (sysShNear.length) sysShRaw.call(sm, sysShNear, scn, cam);
+    if (!hasFar || !sysFarOn || !drawing) return;
+    sysFarOdd = !sysFarOdd;
+    if (!sysFarOdd && !sysFarDirty) return;
+    sysFarDirty = false;
+    sunFar.shadow.needsUpdate = true;
+    const mask = cam.layers.mask;
+    cam.layers.mask = 1 << sysFAR_LAYER;
+    if (!sm.autoUpdate) sm.needsUpdate = true;
+    try { sysShRaw.call(sm, sysShFar, scn, cam); }
+    finally { cam.layers.mask = mask; sunFar.shadow.needsUpdate = false; }
+  }
+  renderer.shadowMap.render = sysShadowPass;
 
   const hemi = new THREEx.HemisphereLight(PALETTE.skyLight, PALETTE.groundLight, 1.35);
   hemi.position.set(0, 40, 0);
@@ -10105,8 +10527,17 @@ export function createSystems(game) {
     sysTexelX = (sysShadowHalf * 2) / sysShadowRes;
     sysTexelY = (sysShadowTop + sysShadowHalf) / sysShadowRes;
     sc.updateProjectionMatrix();
+    game.state.shadowDirty = true;   // the half-rate pass (main.js) draws this frame
     sun.shadow.radius = sysBIO_SH_RAD[i];
     sun.shadow.normalBias = sysBIO_SH_NB[i];
+    // ...and the far box takes the same depth, opened by sysFAR_DEPTH each way:
+    // a point seventy metres out along the sun's azimuth is fifty-three metres
+    // deeper in light space at a 41-degree star (THE FAR CASCADE).
+    sysFarNearK = Math.max(1, sysSUN_DIST - sysBIO_SC_NEAR[i] - sysFAR_DEPTH);
+    sysFarFarK = sysSUN_DIST + sysBIO_SC_FAR[i] + sysFAR_DEPTH;
+    if (sysFarOn) { scF.near = sysFarNearK; scF.far = sysFarFarK; scF.updateProjectionMatrix(); }
+    sysFarDirty = true;
+    sysShadowCullT = 0.05;           // the big-caster roll for the new chapter, next frame
     // How much sky the shade keeps. Set BEFORE the first frame of the chapter
     // is drawn, which is why it is here and not in the update loop: the four
     // 1.0 rows have to be 1.0 on frame one or the cave darkens and comes back.
@@ -10159,6 +10590,7 @@ export function createSystems(game) {
     sysTexelX = (half * 2) / sysShadowRes;
     sysTexelY = (sysShadowTop + half) / sysShadowRes;
     sc.updateProjectionMatrix();
+    game.state.shadowDirty = true;   // the half-rate pass (main.js) draws this frame
   }
 
   // Three-axis atmosphere: `d` is the time-of-day drift (driven by the tally, so
@@ -10245,6 +10677,20 @@ export function createSystems(game) {
     sun.target.updateMatrixWorld();
     sun.position.copy(sysV2).add(sysLightOff);
     sun.updateMatrixWorld();
+    // ...and the far box, snapped to ITS grid (THE FAR CASCADE). Same centre,
+    // coarser texel; a box snapped to the near grid would crawl at 6.8 cm.
+    if (sysFarOn) {
+      a = Math.round(sysV1.dot(sysAxRight) / sysFAR_TEXEL_X) * sysFAR_TEXEL_X;
+      b = Math.round(sysV1.dot(sysAxUp) / sysFAR_TEXEL_Y) * sysFAR_TEXEL_Y;
+      sysV2.set(0, 0, 0)
+        .addScaledVector(sysAxRight, a)
+        .addScaledVector(sysAxUp, b)
+        .addScaledVector(sysAxDir, c);
+      sunFar.target.position.copy(sysV2);
+      sunFar.target.updateMatrixWorld();
+      sunFar.position.copy(sysV2).add(sysLightOff);
+      sunFar.updateMatrixWorld();
+    }
   }
   sunFollow(0, 0, 22);
 
@@ -10882,7 +11328,9 @@ export function createSystems(game) {
     // Seven by five is the coarsest sphere that still reads as round at the ten
     // to fourteen degrees of frame one of these subtends. Radius one: every
     // instance is scaled, and nothing here is ever read back in metres.
-    const g = new THREEx.SphereGeometry(1, 7, 5);
+    // Nine by six since E6: the silhouette is now a fade on the rim (see
+    // below) and a heptagon's rim is seven straight runs.
+    const g = new THREEx.SphereGeometry(1, 9, 6);
     // THE RAMP IS THE LIGHTING. See property 3 above: this layer takes no light
     // from the scene, so the only thing that makes a sphere read as a cloud
     // rather than as a disc is a vertical value gradient baked into it. `t` is
@@ -10903,10 +11351,58 @@ export function createSystems(game) {
     // shared.js for the sibling of this mistake that shipped once already. And
     // NOT Lambert: unlit, so eleven chapters' hemisphere lights cannot each
     // decide what a cloud looks like.
+    // THE FADE STARTS WELL INSIDE THE SILHOUETTE, AND THAT IS WHAT MAKES IT
+    // WORK. The visible edge of a nine-segment sphere is where a front face
+    // meets a culled one, and the vertex normals on that edge are still
+    // twenty-odd degrees off the view: a fade that runs 0..0.42 on the dot
+    // reaches 0.5 there and the edge is a hard step at half the cloud
+    // (measured on the first cut: a soft halo round a polygon — and drawing
+    // the back faces did not help, because the far hemisphere projects
+    // INSIDE the same polygon, not beyond it). So the alpha is zero by a dot
+    // of sysCLOUD_SKY_RIM_LO, which is outside where any silhouette vertex
+    // can sit, and the fade runs inward from there.
     const m = new THREEx.MeshBasicMaterial({ color: 0xffffff, vertexColors: true });
     m.fog = false;
     m.depthWrite = false;
     m.depthTest = false;
+    // See the block above sysCLOUD_SKY_RIM_LO: alpha through custom blending on
+    // an OPAQUE-listed material, so the layer keeps drawing before the world.
+    m.blending = THREEx.CustomBlending;
+    m.blendSrc = THREEx.SrcAlphaFactor;
+    m.blendDst = THREEx.OneMinusSrcAlphaFactor;
+    m.blendEquation = THREEx.AddEquation;
+    m.onBeforeCompile = function (shader) {
+      shader.uniforms.uCsSun = sysCloudSunV;
+      shader.uniforms.uCsTop = sysCloudTopU;
+      shader.uniforms.uCsBase = sysCloudBaseU;
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vCsN;\nvarying vec3 vCsV;')
+        // three's basic material never transforms the normal, so it is done
+        // here: the instance's own rotation and scale, then the normal matrix
+        // into view space, which is the space the sun is handed over in.
+        .replace('#include <begin_vertex>',
+                 '#include <begin_vertex>\n' +
+                 '#ifdef USE_INSTANCING\n  vCsN = normalize(normalMatrix * (mat3(instanceMatrix) * normal));\n' +
+                 '#else\n  vCsN = normalize(normalMatrix * normal);\n#endif\n' +
+                 '  vCsV = (modelViewMatrix * ' +
+                 '\n#ifdef USE_INSTANCING\n instanceMatrix *\n#endif\n vec4(transformed, 1.0)).xyz;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vCsN;\nvarying vec3 vCsV;\n' +
+                 'uniform vec3 uCsSun;\nuniform vec3 uCsTop;\nuniform vec3 uCsBase;')
+        .replace('#include <color_fragment>', '#include <color_fragment>\n{\n' +
+                 '  vec3 csn = normalize(vCsN);\n' +
+                 '  float csLit = 0.5 + 0.5 * dot(csn, uCsSun);\n' +
+                 // the vertex colour is the baked ramp (BASE..1) times the
+                 // shoulder's dulling; rescaled so it carries RAMP of the range
+                 '  float csT = (diffuseColor.r - ' + sysCLOUD_SKY_BASE.toFixed(3) + ') / ' +
+                 (1 - sysCLOUD_SKY_BASE).toFixed(3) + ';\n' +
+                 '  diffuseColor.rgb = mix(uCsBase, uCsTop, clamp(csLit * ' + (1 - sysCLOUD_SKY_RAMP).toFixed(3) +
+                 ' + csT * ' + sysCLOUD_SKY_RAMP.toFixed(3) + ', 0.0, 1.0));\n' +
+                 '  float csRim = dot(csn, normalize(-vCsV));\n' +
+                 '  diffuseColor.a = smoothstep(' + sysCLOUD_SKY_RIM_LO.toFixed(3) + ', ' + sysCLOUD_SKY_RIM_HI.toFixed(3) + ', csRim);\n' +
+                 '}');
+    };
+    m.customProgramCacheKey = function () { return 'cloudsky'; };
     const mesh = new THREEx.InstancedMesh(g, m, sysCLOUD_SKY_MAXC * sysCLOUD_SKY_PUFF);
     mesh.frustumCulled = false;
     mesh.castShadow = false;
@@ -10916,6 +11412,114 @@ export function createSystems(game) {
     mesh.visible = false;
     sysSkyMesh.add(mesh);
     sysCloudSkyMesh = mesh;
+
+    // ---- the soft cards (see the block above sysCLOUD_SKY_RIM_LO, item 3) ------
+    // A unit quad; the instance matrix carries the puff's position and size
+    // and the vertex shader throws the quad flat at the lens in view space, so
+    // the puff's own yaw (which shapes its ellipsoid) is dropped and only the
+    // column lengths survive as the card's width and height.
+    const cg = new THREEx.PlaneGeometry(2, 2);
+    // NO vertex colours: the quad carries no colour attribute, and a material
+    // that asks for one reads a disabled array as black.
+    const cm = new THREEx.MeshBasicMaterial({ color: 0xffffff });
+    cm.fog = false;
+    cm.depthWrite = false;
+    cm.depthTest = false;
+    cm.blending = THREEx.CustomBlending;
+    cm.blendSrc = THREEx.SrcAlphaFactor;
+    cm.blendDst = THREEx.OneMinusSrcAlphaFactor;
+    cm.blendEquation = THREEx.AddEquation;
+    cm.onBeforeCompile = function (shader) {
+      shader.uniforms.uCsSun = sysCloudSunV;
+      shader.uniforms.uCsTop = sysCloudTopU;
+      shader.uniforms.uCsBase = sysCloudBaseU;
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec2 vCsUv;')
+        .replace('#include <project_vertex>',
+                 '  vCsUv = uv;\n' +
+                 '  vec4 csC = modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);\n' +
+                 '  csC.xy += position.xy * vec2(length(vec3(instanceMatrix[0])), length(vec3(instanceMatrix[1])));\n' +
+                 '  vec4 mvPosition = csC;\n' +
+                 '  gl_Position = projectionMatrix * mvPosition;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec2 vCsUv;\n' +
+                 'uniform vec3 uCsSun;\nuniform vec3 uCsTop;\nuniform vec3 uCsBase;')
+        .replace('#include <color_fragment>', '#include <color_fragment>\n{\n' +
+                 '  vec2 csP = vCsUv * 2.0 - 1.0;\n' +
+                 '  float csR = length(csP);\n' +
+                 // a hemisphere's normal, faked from the card: the same sun
+                 // reads the same way on the card as on the puff under it
+                 '  vec3 csn = normalize(vec3(csP, sqrt(max(0.0, 1.0 - csR * csR))));\n' +
+                 '  float csLit = 0.5 + 0.5 * dot(csn, uCsSun);\n' +
+                 '  diffuseColor.rgb = mix(uCsBase, uCsTop, clamp(csLit * ' + (1 - sysCLOUD_SKY_RAMP).toFixed(3) +
+                 ' + vCsUv.y * ' + sysCLOUD_SKY_RAMP.toFixed(3) + ', 0.0, 1.0));\n' +
+                 '  diffuseColor.a = smoothstep(1.0, ' + sysCLOUD_SKY_CARD_R.toFixed(3) + ', csR) * ' +
+                 sysCLOUD_SKY_CARD_A.toFixed(3) + ';\n' +
+                 '}');
+    };
+    cm.customProgramCacheKey = function () { return 'cloudcard'; };
+    const cards = new THREEx.InstancedMesh(cg, cm, sysCLOUD_SKY_MAXC * sysCLOUD_SKY_PUFF * 2);
+    cards.frustumCulled = false;
+    cards.castShadow = false;
+    cards.receiveShadow = false;
+    cards.renderOrder = -18;
+    mesh.add(cards);
+    sysCloudSkyCards = cards;
+
+    // ---- the horizon strip (see the same block, last paragraph) -------------
+    {
+      const SEG = sysSKY_STRIP_SEG, R = sysSKY_R * 0.985;
+      const els = [sysSKY_STRIP_LO, sysSKY_STRIP_MID, sysSKY_STRIP_HI];
+      const n = (SEG + 1) * 3;
+      const pos = new Float32Array(n * 3);
+      sysSkyStripCol = new Float32Array(n * 3);
+      sysSkyStripD = new Float32Array(n * 2);
+      const idx = [];
+      for (let r = 0; r < 3; r++) {
+        const ce = Math.cos(els[r]), se = Math.sin(els[r]);
+        for (let i = 0; i <= SEG; i++) {
+          const a = i / SEG * Math.PI * 2, v = r * (SEG + 1) + i;
+          const dx = Math.sin(a), dz = Math.cos(a);
+          pos[v * 3] = dx * ce * R; pos[v * 3 + 1] = se * R; pos[v * 3 + 2] = dz * ce * R;
+          sysSkyStripD[v * 2] = dx; sysSkyStripD[v * 2 + 1] = dz;
+        }
+      }
+      // Wound OUTWARD, with outward normals, on a BackSide copy of the dome's
+      // own material: the dome is Lambert under the key exemption, and the
+      // first cut of this strip was an unlit Basic ribbon painted the same
+      // numbers — which drew as a pale bar a full stop brighter than the sky
+      // either side of it. A strip that must match the dome must be lit like
+      // the dome.
+      const nrm = new Float32Array(n * 3);
+      for (let v = 0; v < n; v++) {
+        const l = Math.hypot(pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]) || 1;
+        nrm[v * 3] = pos[v * 3] / l; nrm[v * 3 + 1] = pos[v * 3 + 1] / l; nrm[v * 3 + 2] = pos[v * 3 + 2] / l;
+      }
+      for (let r = 0; r < 2; r++) {
+        for (let i = 0; i < SEG; i++) {
+          const a = r * (SEG + 1) + i, b = a + 1, c = a + SEG + 1, d = c + 1;
+          idx.push(a, b, d, a, d, c);
+        }
+      }
+      const sg = new THREEx.BufferGeometry();
+      sg.setAttribute('position', new THREEx.BufferAttribute(pos, 3));
+      sg.setAttribute('normal', new THREEx.BufferAttribute(nrm, 3));
+      sg.setAttribute('color', new THREEx.BufferAttribute(sysSkyStripCol, 3));
+      sg.setIndex(idx);
+      const sm = skyDomeLit(mat(0xffffff, { vertexColors: true, side: THREEx.BackSide }).clone());
+      sm.fog = false;
+      sm.depthWrite = false;
+      sm.depthTest = false;
+      sm.flatShading = false;
+      sm.needsUpdate = true;
+      const strip = new THREEx.Mesh(sg, sm);
+      strip.frustumCulled = false;
+      strip.castShadow = false;
+      strip.receiveShadow = false;
+      strip.renderOrder = -19.5;
+      sysSkyMesh.add(strip);
+      sysSkyStrip = strip;
+    }
   }
   sysBuildCloudSky();
 
@@ -10931,7 +11535,7 @@ export function createSystems(game) {
    * before.
    */
   function sysCloudSkySeed(name) {
-    const mesh = sysCloudSkyMesh;
+    const mesh = sysCloudSkyMesh, cards = sysCloudSkyCards;
     if (!mesh) return;
     const strength = sysCLOUD[name] || 0;
     // The dome is hidden in the four chapters that own their sky, and a child of
@@ -10956,6 +11560,10 @@ export function createSystems(game) {
         for (let b = 0; b < sysCLOUD_SKY_PUFF; b++) {
           sysCloudSkyM.compose(sysCloudSkyV, sysCloudSkyQ, sysCloudSkyS);
           mesh.setMatrixAt(c * sysCLOUD_SKY_PUFF + b, sysCloudSkyM);
+          if (cards) {
+            cards.setMatrixAt((c * sysCLOUD_SKY_PUFF + b) * 2, sysCloudSkyM);
+            cards.setMatrixAt((c * sysCLOUD_SKY_PUFF + b) * 2 + 1, sysCloudSkyM);
+          }
         }
         continue;
       }
@@ -10994,10 +11602,29 @@ export function createSystems(game) {
         const v = 1 - (b === 0 ? 0 : rr(0, sysCLOUD_SKY_VARY));
         sysCloudSkyTmp.setRGB(v, v, v);
         mesh.setColorAt(c * sysCLOUD_SKY_PUFF + b, sysCloudSkyTmp);
+        // ---- and its two soft cards (see sysCLOUD_SKY_RIM_LO, item 3) --------
+        // The first sits on the puff, a little wider than the ellipsoid and
+        // taller than its flattening — that is the soft body the hard one
+        // was missing. The second is shouldered up and aside at three
+        // quarters of the size, so the union of the two is not an ellipse.
+        // The shader drops the yaw and reads only the column lengths, so the
+        // quaternion here is the puff's own and costs nothing.
+        if (cards) {
+          const k = c * sysCLOUD_SKY_PUFF + b;
+          sysCloudSkyS.set(w * f * 1.22, w * f * sysCLOUD_SKY_FLAT * 1.75, 1);
+          sysCloudSkyM.compose(sysCloudSkyV, sysCloudSkyQ, sysCloudSkyS);
+          cards.setMatrixAt(k * 2, sysCloudSkyM);
+          sysCloudSkyV.x += rr(-0.45, 0.45) * w * f;
+          sysCloudSkyV.y += rr(0.10, 0.30) * w * f * sysCLOUD_SKY_FLAT;
+          sysCloudSkyS.set(w * f * 0.86, w * f * sysCLOUD_SKY_FLAT * 1.30, 1);
+          sysCloudSkyM.compose(sysCloudSkyV, sysCloudSkyQ, sysCloudSkyS);
+          cards.setMatrixAt(k * 2 + 1, sysCloudSkyM);
+        }
       }
     }
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    if (cards) cards.instanceMatrix.needsUpdate = true;
   }
 
   /**
@@ -11025,8 +11652,12 @@ export function createSystems(game) {
     const br = hr + (1 - hr) * sysSKY_BAND_K;
     const bg = hg + (1 - hg) * sysSKY_BAND_K;
     const bb = hb + (1 - hb) * sysSKY_BAND_K;
-    for (let i = 0, n = tArr.length; i < n; i++) {
-      const y = tArr[i], o = i * 3;
+    // One vertex of the dome, into `out` at `o`. A function rather than the
+    // loop body it used to be, because the horizon strip below paints itself
+    // from the same three terms and must land on the same colour where it
+    // rejoins the dome, or there is a seam at three degrees.
+    let pr = 0, pg = 0, pb = 0;
+    const paintAt = function (y, dx, dz) {
       if (y >= 0) {
         const k = Math.pow(y, 0.62);
         let cr = hr + (tr - hr) * k;
@@ -11039,18 +11670,58 @@ export function createSystems(game) {
           cr += (br - cr) * w; cg += (bg - cg) * w; cb += (bb - cb) * w;
         }
         // ---- the lobe: toward the sun's bearing AND its altitude ------------
-        const d = dArr[i * 2] * ax + y * ay + dArr[i * 2 + 1] * az;
+        const d = dx * ax + y * ay + dz * az;
         if (d > 0) {
           const w = Math.pow(d, sysSKY_LOBE_P) * sysSKY_LOBE;
           cr += (sr - cr) * w; cg += (sg - cg) * w; cb += (sb - cb) * w;
         }
-        c[o] = cr; c[o + 1] = cg; c[o + 2] = cb;
+        pr = cr; pg = cg; pb = cb;
       } else {
         const k = 1 + y * 0.20;
-        c[o] = hr * k; c[o + 1] = hg * k; c[o + 2] = hb * k;
+        pr = hr * k; pg = hg * k; pb = hb * k;
       }
+    };
+    for (let i = 0, n = tArr.length; i < n; i++) {
+      const o = i * 3;
+      paintAt(tArr[i], dArr[i * 2], dArr[i * 2 + 1]);
+      c[o] = pr; c[o + 1] = pg; c[o + 2] = pb;
     }
     sysSkyMesh.geometry.attributes.color.needsUpdate = true;
+    // ---- the horizon strip (E6). See the block above sysCLOUD_SKY_RIM_LO. --
+    // Rows 0 and 2 are the dome's own colour at their elevation; row 1 is the
+    // dome's colour pulled toward the SUN on the sun's bearing (the warm lobe
+    // the dome cannot draw at two degrees because its rings are ten apart) and
+    // toward the AIR opposite — the fog colour, which is the horizon without
+    // the band's lift toward white and is what the far side of a clear
+    // evening actually looks like. Only the horizontal bearing counts here:
+    // the strip is at the horizon, and the sun's altitude is the lobe's job.
+    if (sysSkyStrip && sysSkyStripCol) {
+      const sc = sysSkyStripCol, sd = sysSkyStripD, SEG = sysSKY_STRIP_SEG;
+      const fog = scene.fog ? scene.fog.color : hz;
+      const fr = fog.r, fg = fog.g, fb = fog.b;
+      const al = Math.hypot(ax, az) || 1;
+      const axh = ax / al, azh = az / al;
+      const ys = sysSKY_STRIP_YS;
+      for (let r = 0; r < 3; r++) {
+        for (let i = 0; i <= SEG; i++) {
+          const v = r * (SEG + 1) + i, o = v * 3;
+          const dx = sd[v * 2], dz = sd[v * 2 + 1];
+          paintAt(ys[r], dx, dz);
+          if (r === 1) {
+            const d = dx * axh + dz * azh;
+            if (d > 0) {
+              const w = d * d * sysSKY_STRIP_SUN;
+              pr += (sr - pr) * w; pg += (sg - pg) * w; pb += (sb - pb) * w;
+            } else {
+              const w = d * d * sysSKY_STRIP_AIR;
+              pr += (fr - pr) * w; pg += (fg - pg) * w; pb += (fb - pb) * w;
+            }
+          }
+          sc[o] = pr; sc[o + 1] = pg; sc[o + 2] = pb;
+        }
+      }
+      sysSkyStrip.geometry.attributes.color.needsUpdate = true;
+    }
     sysSkyLastA.copy(hz);
     sysSkyLastB.copy(top);
     sysSkyDirty = false;
@@ -11357,6 +12028,10 @@ export function createSystems(game) {
   // crossing and never per frame.
   let acSfxIn = null, acRoomSend = null, acRoomConv = null, acRoomOut = null;
   let acRoomFor = '', acRoomWet = 0;
+  // THE ROOM'S NEAR SHARE AND ITS MAKE-UP (L6, E3): the live room's `near`
+  // (sysSEND_NEAR unless the row says otherwise), read wherever the constant
+  // was; and the gain sysRoomLoad put on acRoomOut, for roomAudit.
+  let acSendNear = sysSEND_NEAR, acRoomMakeup = 1;
   let acEarAt = -1;        // the frame the listener was last resolved on
   let acEarPrevT = -1;     // ...and the one before it, for the ear's own speed
   // FROM THE PREFERENCES FILE, NOT FROM ZERO (R4). This was a session `let`
@@ -11501,8 +12176,36 @@ export function createSystems(game) {
     if (acRoomFor === key) return;
     acRoomFor = key;
     const R = sysROOMS[key] || sysROOM_DEF;
-    try { acRoomConv.buffer = musIR(R.size, R.decay); }
-    catch (e) { acRoomConv.buffer = null; }
+    let buf = null;
+    try { buf = musIR(R.size, R.decay); } catch (e) { buf = null; }
+    acRoomConv.buffer = buf;
+    // ---- THE MAKE-UP (L6, E3): see sysROOM_E_REF -------------------------
+    // Written here and nowhere else, and only while the send is at nothing
+    // (sysRoomSet loads a room once the old one has drained to 0.006), so
+    // the step is never heard. A build with no buffer gets unity.
+    acRoomMakeup = buf ? sysRoomMakeup(buf) : 1;
+    if (acRoomOut) acRoomOut.gain.setTargetAtTime(acRoomMakeup, ac.currentTime, 0.25);
+  }
+  /**
+   * What the convolver's normaliser leaves of this impulse's head, and the
+   * gain that puts it at sysROOM_E_REF. The browser scales the buffer so its
+   * per-sample RMS across channels is 0.00125 × 44100 / rate (the Web Audio
+   * spec's GainCalibration); the head's energy after that is what a short
+   * sound's return is made of. Pure arithmetic on the buffer, once a room.
+   */
+  function sysRoomMakeup(buf) {
+    const n = buf.length, rate = buf.sampleRate, chN = buf.numberOfChannels;
+    const headN = Math.min(n, Math.floor(rate * sysROOM_HEAD));
+    let all = 0, head = 0;
+    for (let ch = 0; ch < chN; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < n; i++) { const v = d[i] * d[i]; all += v; if (i < headN) head += v; }
+    }
+    const rms = Math.sqrt(all / Math.max(1, n * chN));
+    if (!(rms > 1e-9)) return 1;
+    const s = 0.00125 * (44100 / rate) / rms;
+    const eHead = s * s * head / chN;
+    return clamp(Math.sqrt(sysROOM_E_REF / Math.max(1e-12, eHead)), 1, sysROOM_MAKEUP_MAX);
   }
 
   /**
@@ -11980,8 +12683,9 @@ export function createSystems(game) {
   const sysMUS_SPEAK_M = 14, sysMUS_SPEAK_GAP = 2.0, sysMUS_SPEAK_ANY = 7.0;
   const musSpeakAt = {};
   let musSpeakSweep = 0, musSpeakAny = -99;
-  function sfxBlip(vol, pitch, n) {
-    const t = ac.currentTime;
+  // The duck's bookkeeping, shared by the two voices a line can have (the
+  // blip and, since F5, the babble): one mark per line, whichever said it.
+  function sfxSpeakMark(t, pitch) {
     musSpeakN++;
     if (sysSfxDist <= sysMUS_SPEAK_M) {
       const key = pitch.toFixed(4);
@@ -11995,8 +12699,13 @@ export function createSystems(game) {
       if (t - musSpeakSweep > 60) {
         musSpeakSweep = t;
         for (const k in musSpeakAt) if (t - musSpeakAt[k] > 30) delete musSpeakAt[k];
+        for (const k in sfxBabLive) if (sfxBabLive[k].end < t) delete sfxBabLive[k];
       }
     }
+  }
+  function sfxBlip(vol, pitch, n) {
+    const t = ac.currentTime;
+    sfxSpeakMark(t, pitch);
     const cnt = clamp(Math.round(n || 2), 1, 4);
     const base = 640 * clamp(pitch, 0.5, 2.2);
     const lp = ac.createBiquadFilter();
@@ -12020,6 +12729,171 @@ export function createSystems(game) {
       o.connect(g); g.connect(lp);
       o.start(at); o.stop(at + 0.07);
     }
+  }
+
+  // ---- THE LOCALS SPEAK (L6, F5) -------------------------------------------
+  //
+  // Every bubble in the game was two or three sine pulses — a pager. Measured
+  // by qa/l6-babble.js on the reviewer's two-minute naive drive in Sydney: 184
+  // blips, the most frequent sound after the footstep, and every one of them
+  // the same sound at a different pitch. The whole personality of this game is
+  // in what its people say, and the ear got none of it.
+  //
+  // This is a sentence in capybarese: a larynx, a mouth and a rhythm.
+  //
+  //   THE LARYNX is a sawtooth at the person's own fundamental — sysBAB_F0
+  //   times the `vpitch` every call from npc.js already carries — through a
+  //   low-pass, which is as much of a glottal pulse as a biquad can make. An
+  //   authority (`say.low`) speaks a fifth under that: the monk and the
+  //   inspector are the low voice in the square.
+  //   THE MOUTH is two band-passes in parallel at the first two formants of a
+  //   vowel. sysBAB_VOW is FIVE vowels, and every one of them is a ratio of the
+  //   "ah" the choir sings through (sysMUS_FORMANT) — the same throat, held in
+  //   a different shape. A per-person offset (±12 %, sysBAB_OFF) scales both
+  //   formants, which is the difference between a small mouth and a large one
+  //   and is what makes the waiter and the monk two people rather than two
+  //   pitches of one. Both formants sit under 3 kHz at every offset, so the S2
+  //   ceiling (share above 5 kHz under 1 %) is kept by construction.
+  //   THE RHYTHM is 3–7 syllables from the line's word count, at 6–8 Hz (a
+  //   per-person rate) with ±20 % jitter on each, every syllable its own
+  //   envelope and its own vowel, one of them stressed. A statement's pitch
+  //   line falls to the end; a `?` lifts the last syllable. The storyteller
+  //   (`say.slow`) takes it at three-quarter pace.
+  //
+  // WHY THIS AND NOT A RECORDING: the game has no assets and forty-odd
+  // speakers; a table of clips is a table of one voice. Animal Crossing and the
+  // Sims solved the same problem the same way.
+  //
+  // THE SHAPE OF THE GRAPH is fixed per line — one oscillator, three filters,
+  // four gains — and every syllable after the first is AUTOMATION on those
+  // nodes, not a new voice: seven syllables are seven envelope segments on one
+  // gain and seven target frequencies on two filters. A line therefore costs
+  // the throttle one slot, exactly as the blip did, and sits under the same
+  // 0.18 s gap, so a square can still talk over itself the way a square does.
+  //
+  // ONE MOUTH PER PERSON. `sfxBabLive` keys the running line's envelope by the
+  // caller's pitch — the one per-person channel that reaches a synth — and a
+  // new line from the same person cuts the old one in 40 ms rather than
+  // stacking two sentences in one throat. The blip stays for the one-word
+  // line ("No."), for a line further than sysMUS_SPEAK_M (a conversation
+  // across the Gardens is scenery, and gets the pager), and for "sound as
+  // text" (sysCaptions), where the words are already on the screen and the
+  // sound under them should be the small one.
+  const sysBAB_F0 = 150;                       // Hz at vpitch 1; a cast of 0.82–1.36 spans 123–204
+  const sysBAB_OFF = 0.12;                     // ± of the formant offset per person
+  const sysBAB_LEN = 1.05;                     // s: the ceiling on a line
+  // The envelope peak at vol 1. Measured on the panner tap (qa/l6-babble.js):
+  // 0.22 here gave a 0.013–0.027 RMS peak against the blip's 0.055 — the two
+  // band-passes at Q 7–9 pass a fifth of the sawtooth — so it sits 3 dB up;
+  // still under the blip per syllable, because a sentence is longer.
+  const sysBAB_PEAK = 0.32;
+  // [F1, F2] as ratios of the choir's "ah": ah, oh, oo, eh, ee. The largest F2
+  // is ee at 2.1× (2290 Hz), which at the +12 % offset is 2565 — under 3 kHz.
+  const sysBAB_VOW = [[1, 1], [0.78, 0.77], [0.45, 0.8], [0.73, 1.7], [0.4, 2.1]];
+  const sfxBabLive = {};
+  // a deterministic 0–1 from a per-person number, so the same person keeps the
+  // same mouth across a session without a field being added to their record
+  function sfxBabHash(x, k) { const s = Math.sin(x * 12.9898 + k * 78.233) * 43758.5453; return s - Math.floor(s); }
+  function sfxBabble(vol, pitch, extra, wet, opts) {
+    const say = opts && opts.say;
+    const words = clamp(Math.round(extra || 2), 1, 40);
+    if (sysCaptions || words < 2 || ((opts && opts.at) && sysSfxDist > sysMUS_SPEAK_M)) {
+      sfxBlip(vol, pitch, words >= 6 ? 3 : 2);
+      return;
+    }
+    const t = ac.currentTime;
+    sfxSpeakMark(t, pitch);
+    // one mouth per person: cut the sentence this person is still saying
+    const key = pitch.toFixed(4);
+    const live = sfxBabLive[key];
+    if (live && live.end > t) {
+      const lg = live.g.gain;
+      lg.cancelScheduledValues(t);
+      lg.setValueAtTime(Math.max(0.0001, lg.value), t);
+      lg.exponentialRampToValueAtTime(0.0001, t + 0.04);
+    }
+    const q = !!(say && say.q) || !!(say && typeof say.line === 'string' && say.line.indexOf('?') >= 0);
+    const low = !!(say && say.low), slow = !!(say && say.slow);
+    const h1 = sfxBabHash(pitch, 1), h2 = sfxBabHash(pitch, 2);
+    const off = 1 - sysBAB_OFF + 2 * sysBAB_OFF * h1;
+    const f0 = sysBAB_F0 * clamp(pitch, 0.5, 2.2) * (low ? 2 / 3 : 1);
+    let rate = (6 + 2 * h2) * (slow || low ? 0.75 : 1);
+    // 3–7 from the word count, then no more than the ceiling lets through at
+    // this person's pace (the storyteller's seven would run 1.6 s)
+    let syl = clamp(2 + Math.ceil(words / 2), 3, 7);
+    syl = Math.min(syl, Math.max(3, Math.floor(rate * sysBAB_LEN)));
+    // ---- the graph ---------------------------------------------------------
+    const o = ac.createOscillator();
+    o.type = 'sawtooth';
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(2400, t);
+    lp.Q.setValueAtTime(0.5, t);
+    const b1 = ac.createBiquadFilter(), b2 = ac.createBiquadFilter();
+    b1.type = 'bandpass'; b2.type = 'bandpass';
+    // BROADER THAN THE CHOIR'S (7 and 5). The choir sings one vowel through
+    // four detuned banks; this is one sawtooth at 120 Hz, whose harmonics
+    // are 120 Hz apart — and a 300 Hz formant at Q 7 is 43 Hz wide, which
+    // sat between the harmonics at 240 and 360 and made "oo" a silent
+    // syllable (a 0.01 in the 5 ms envelope right after a 0.8, measured on
+    // the panner tap). Q 4.5 is 67 Hz wide at 300 and 160 at 730: a vowel is
+    // still a vowel, and no syllable can fall through the comb.
+    b1.Q.setValueAtTime(4.5, t); b2.Q.setValueAtTime(6, t);
+    const g1 = ac.createGain(), g2 = ac.createGain(), dry = ac.createGain(), g = ac.createGain();
+    // ...and a sixth of the source under the formants, for the same reason
+    g1.gain.value = 1; g2.gain.value = 0.45; dry.gain.value = 0.16;
+    o.connect(lp);
+    lp.connect(b1); b1.connect(g1); g1.connect(g);
+    lp.connect(b2); b2.connect(g2); g2.connect(g);
+    lp.connect(dry); dry.connect(g);
+    g.connect(acMaster);
+    // ---- the syllables -----------------------------------------------------
+    const peak = sysBAB_PEAK * vol;
+    const stress = 1 + Math.floor(rand(0, syl - 1));  // never the first
+    // The vowels come from the LINE, not the dice: the same words from the
+    // same mouth are the same sound every time, which is what makes "Twelve
+    // dollars for a coffee" a phrase a player can come to know rather than
+    // a noise that happens near a bubble. The timing jitter stays random.
+    const seed = words * 31 + (say && typeof say.line === 'string' ? say.line.length : 0);
+    let at = t, vow = 0, prev = -1;
+    let f1 = sysMUS_FORMANT[0] * off, f2 = sysMUS_FORMANT[1] * off;
+    g.gain.setValueAtTime(0.0001, t);
+    o.frequency.setValueAtTime(f0, t);
+    b1.frequency.setValueAtTime(f1, t);
+    b2.frequency.setValueAtTime(f2, t);
+    for (let i = 0; i < syl; i++) {
+      const d = (1 / rate) * rand(0.8, 1.2);
+      const last = i === syl - 1;
+      const u = syl > 1 ? i / (syl - 1) : 0;
+      // the line: a statement slides from +8 % to −14 %; a question climbs
+      // from −6 % to +6 % and the last syllable lifts a further fourth. The
+      // lift is on the LAST syllable's ramp, not its start — a step up reads
+      // as a second speaker, a glide up reads as a question.
+      let fi = f0 * (q ? 0.94 + 0.12 * u : 1.08 - 0.22 * u) * rand(0.97, 1.03);
+      const fEnd = fi * (q && last ? 1.35 : 0.96);
+      o.frequency.setValueAtTime(fi, at);
+      o.frequency.linearRampToValueAtTime(fEnd, at + d * 0.85);
+      // a new vowel every syllable, never the one before; the mouth glides to
+      // it over 30 ms, which is the consonant this synth does not have
+      vow = Math.floor(sfxBabHash(seed + i * 7.13, 3) * 5) % 5;
+      if (vow === prev) vow = (vow + 1) % 5;
+      prev = vow;
+      // held to the boundary, then the glide — a bare ramp would start at the
+      // previous event and smear the vowel across the whole syllable before
+      b1.frequency.setValueAtTime(f1, at); b2.frequency.setValueAtTime(f2, at);
+      f1 = sysMUS_FORMANT[0] * sysBAB_VOW[vow][0] * off;
+      f2 = sysMUS_FORMANT[1] * sysBAB_VOW[vow][1] * off;
+      b1.frequency.linearRampToValueAtTime(f1, at + 0.03);
+      b2.frequency.linearRampToValueAtTime(f2, at + 0.03);
+      const p = peak * (i === stress ? 1 : rand(0.6, 0.8)) * (last && !q ? 0.75 : 1);
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(p, at + 0.014);
+      g.gain.setValueAtTime(p, at + d * 0.5);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + d * 0.88);
+      at += d;
+    }
+    o.start(t); o.stop(at + 0.05);
+    if (live) { live.g = g; live.end = at; } else sfxBabLive[key] = { g: g, end: at };
   }
 
   function sfxPop(vol, pitch) {
@@ -14009,6 +14883,153 @@ export function createSystems(game) {
     ns.start(t); ns.stop(t + dur + 0.05);
     lfo.start(t); lfo.stop(t + dur + 0.05);
   }
+  // ---- ...AND FOUR MORE THE BODY MAKES (L6, E2 / audio #7) ----------------
+  // The animal's body had one noise and it was dry leaves: the slide, the
+  // cling, the dig, the idle ear flick AND the shake-dry all played 'rustle'.
+  // These four are the ones the review named, and every one is built so its
+  // spectral centre is at least a third of an octave from rustle's (a
+  // highpass at 2.1 kHz, so its energy sits at 3-4 kHz):
+  //
+  //   shake   7-9 puffs of noise through a 700 Hz lowpass at ~12 Hz, with drip
+  //           grains between them scaled by `wet` — a rained-on animal
+  //           patters, one out of the harbour pours. Centre ~500 Hz.
+  //   chew    a soft double click, two sine pips 70 ms apart at ~1.2 kHz,
+  //           fired by capybara.js every 0.4 s while capyChewT > 0.
+  //   snort   a 90 ms noise burst through the wheek's own bandpass at pitch
+  //           0.6 (870 Hz), on a denial. Short, hard, and down its nose.
+  //   yawn    the wheek's contour turned over — it falls where the wheek
+  //           rises — and slowed three times, on the nap's entry.
+  //
+  // `wet` is threaded to sfxShake the way the footfall reads it: sfx() puts
+  // it in the fourth argument, and it is the only voice here that reads it.
+  function sfxShake(vol, pitch, extra, wet) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const w = (wet > 0 ? wet : 0);
+    const v = rand(0.92, 1.08) * pitch;
+    const n = 7 + Math.floor(rand(0, 2.99));
+    const per = 1 / (rand(11, 13) * v);
+    const ns = noiseSrc();
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.value = 700 * v; lp.Q.value = 0.9;
+    const g = ac.createGain();
+    const gg = g.gain;
+    gg.setValueAtTime(0.0001, t);
+    for (let i = 0; i < n; i++) {
+      // the roll builds and dies: loud in the middle, soft at both ends
+      const env2 = Math.sin((i + 0.5) / n * Math.PI);
+      const at = t + i * per;
+      gg.exponentialRampToValueAtTime((0.05 + 0.22 * env2) * vol, at + per * 0.25);
+      gg.exponentialRampToValueAtTime(0.012 * vol, at + per * 0.85);
+    }
+    gg.exponentialRampToValueAtTime(0.0001, t + n * per + 0.06);
+    ns.connect(lp); lp.connect(g); g.connect(acMaster);
+    ns.start(t); ns.stop(t + n * per + 0.1);
+    // ...and the water coming off it: drip grains between the puffs, their
+    // count and level on the wetness — sfxDrip's own graph, scheduled
+    const drips = Math.round(w * rand(4, 7));
+    for (let i = 0; i < drips; i++) {
+      const at = t + rand(0.05, n * per + 0.25);
+      const dv = rand(0.8, 1.35) * v;
+      const o = ac.createOscillator(); o.type = 'sine';
+      o.frequency.setValueAtTime(1500 * dv, at);
+      o.frequency.exponentialRampToValueAtTime(430 * dv, at + 0.085);
+      const dg = ac.createGain();
+      dg.gain.setValueAtTime(0.0001, at);
+      dg.gain.exponentialRampToValueAtTime(0.05 * vol * (0.5 + 0.5 * w), at + 0.006);
+      dg.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+      o.connect(dg); dg.connect(acMaster);
+      o.start(at); o.stop(at + 0.2);
+    }
+  }
+  function sfxChew(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    for (let i = 0; i < 2; i++) {
+      const at = t + i * rand(0.06, 0.08);
+      const v = rand(0.94, 1.06) * pitch;
+      const o = ac.createOscillator(); o.type = 'sine';
+      o.frequency.setValueAtTime(1380 * v, at);
+      o.frequency.exponentialRampToValueAtTime(880 * v, at + 0.025);
+      const g = ac.createGain();
+      env(g, at, (i ? 0.028 : 0.04) * vol, 0.002, 0.03);
+      o.connect(g); g.connect(acMaster);
+      o.start(at); o.stop(at + 0.05);
+    }
+  }
+  function sfxSnort(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.94, 1.06) * pitch * 0.6;   // the wheek's band, at 0.6
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(1450 * v, t);
+    bp.frequency.exponentialRampToValueAtTime(1450 * v * 0.7, t + 0.09);
+    bp.Q.value = 1.15;
+    const g = ac.createGain();
+    const gg = g.gain;
+    gg.setValueAtTime(0.0001, t);
+    gg.exponentialRampToValueAtTime(0.30 * vol, t + 0.008);
+    gg.exponentialRampToValueAtTime(0.16 * vol, t + 0.05);
+    gg.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    ns.connect(bp); bp.connect(g); g.connect(acMaster);
+    ns.start(t); ns.stop(t + 0.12);
+  }
+  function sfxYawn(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.92, 1.08) * pitch;
+    const S = 3;                                  // the wheek's clock, x3
+    const o1 = ac.createOscillator(); o1.type = 'sawtooth';
+    const o2 = ac.createOscillator(); o2.type = 'square';
+    o2.detune.value = rand(-14, 14);
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.value = 760; bp.Q.value = 0.9;   // lower than the wheek's 1450: a yawn is an open mouth
+    const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 180;
+    const g = ac.createGain();
+    const g2 = ac.createGain(); g2.gain.value = 0.12;
+    // the wheek's five points reflected about its 400 Hz base: where it went
+    // up to 1180 this comes down to 250, and the two-tone dip becomes a lift
+    const f0 = 400 * v, f1 = 235 * v, f2 = 300 * v, f3 = 200 * v, f4 = 150 * v;
+    const fr = o1.frequency, fr2 = o2.frequency;
+    fr.setValueAtTime(f0, t);
+    fr.exponentialRampToValueAtTime(f1, t + 0.10 * S);
+    fr.exponentialRampToValueAtTime(f2, t + 0.155 * S);
+    fr.exponentialRampToValueAtTime(f1, t + 0.235 * S);
+    fr.exponentialRampToValueAtTime(f3, t + 0.36 * S);
+    fr.exponentialRampToValueAtTime(f4, t + 0.52 * S);
+    fr2.setValueAtTime(f0 * 2.01, t);
+    fr2.exponentialRampToValueAtTime(f1 * 2.01, t + 0.10 * S);
+    fr2.exponentialRampToValueAtTime(f3 * 2.01, t + 0.36 * S);
+    fr2.exponentialRampToValueAtTime(f4 * 2.01, t + 0.52 * S);
+    // the squeak's vibrato, a third as fast: a tremble rather than a squeak
+    const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = rand(5.5, 7.5);
+    const lg = ac.createGain(); lg.gain.value = 9 * v;
+    lfo.connect(lg); lg.connect(fr); lg.connect(fr2);
+    const gg = g.gain;
+    gg.setValueAtTime(0.0001, t);
+    gg.exponentialRampToValueAtTime(0.16 * vol, t + 0.018 * S);   // eased on, not snapped
+    gg.exponentialRampToValueAtTime(0.22 * vol, t + 0.16 * S);
+    gg.exponentialRampToValueAtTime(0.10 * vol, t + 0.25 * S);
+    gg.exponentialRampToValueAtTime(0.0001, t + 0.56 * S);
+    o1.connect(bp); o2.connect(g2); g2.connect(bp);
+    bp.connect(hp); hp.connect(g); g.connect(acMaster);
+    o1.start(t); o2.start(t); lfo.start(t);
+    o1.stop(t + 0.6 * S); o2.stop(t + 0.6 * S); lfo.stop(t + 0.6 * S);
+    // the breath, which on a yawn is most of it: in over the first half, out
+    // over the second
+    const ns = noiseSrc();
+    const nb = ac.createBiquadFilter(); nb.type = 'bandpass';
+    nb.frequency.value = 900; nb.Q.value = 0.7;
+    const ng = ac.createGain();
+    ng.gain.setValueAtTime(0.0001, t);
+    ng.gain.exponentialRampToValueAtTime(0.06 * vol, t + 0.25 * S);
+    ng.gain.exponentialRampToValueAtTime(0.02 * vol, t + 0.40 * S);
+    ng.gain.exponentialRampToValueAtTime(0.05 * vol, t + 0.50 * S);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.62 * S);
+    ns.connect(nb); nb.connect(ng); ng.connect(acMaster);
+    ns.start(t); ns.stop(t + 0.64 * S);
+  }
 
   function ambientStart() {
     if (!ac || acAmbGain) return;
@@ -14244,7 +15265,8 @@ export function createSystems(game) {
     // reason sfx() is: an open journal or a background tab is not weather.
     const playing = game.state.started && !game.state.paused && !document.hidden && !muted;
     const duck = 1 - clamp(musIntensity, 0, 1) * sysWX_DUCK;
-    const busy = playing ? sysWX_BED_MAX * duck : 0.0001;
+    // ...and +3 dB asleep (THE SLEEP, L6 E3): the weather is a bed too.
+    const busy = playing ? sysWX_BED_MAX * duck * (1 + sysMUS_SLEEP_BEDS * musSleep) : 0.0001;
     wxBedBus.gain.setTargetAtTime(Math.max(0.0001, busy), t, sysWX_BED_TAU * 0.5);
     wxBedRain.gain.setTargetAtTime(Math.max(0.0001, b.rain * 0.62), t, sysWX_BED_TAU);
     wxBedWind.gain.setTargetAtTime(Math.max(0.0001, b.wind * 0.50), t, sysWX_BED_TAU);
@@ -14408,7 +15430,14 @@ export function createSystems(game) {
   const sysMOVER_FLAT   = 8;        // m inside which distance takes nothing off the top
   const sysMOVER_LPSPAN = 62;       // ...and the metres over which it takes it all
   const sysMOVER_LPMIN  = 780;      // Hz it closes to. The Cali placer's own number.
-  const sysMOVER_CALM   = 0.35;     // how far a BED thins when the world settles
+  // ---- THE STILL STATE IS THE WORLD'S (L6, E3 / audio #4) ------------------
+  // Measured (qa/l6r-audio-drive.js, before): standing still in Kyoto at calm
+  // 0.9 the score sat at −26 dBFS and the whole world bus at −43 — the moment
+  // a player stops to listen to the river is the moment the river was turned
+  // down, by this constant. Inverted: a bed comes UP as the world settles
+  // (+3.5 dB at a full calm), because it IS the world and the still state is
+  // where it should be loudest. The ladder and the ring follow the same rule.
+  const sysMOVER_CALM   = 0.5;      // how far a BED comes up when the world settles (was −0.35)
   const sysMovers = [];
   let sysMoverBuilds = 0;           // graphs built this session, for the harness
 
@@ -14642,7 +15671,10 @@ export function createSystems(game) {
     // of the quay nearest you. Iceland's is the steam field — a hiss with a
     // wobble and a rumble under it, at the nearest fumarole. The cave's river
     // is the river recipe, low, from the water nearest you.
-    lap: { level: 0.08, near: 12, far: 80, bed: true,
+    // 0.08 until L6 (E3): the wettest chapter above ground had the quietest
+    // bed, and its still window measured 10 dB under the score. The same
+    // authored level the two new beds get.
+    lap: { level: 0.10, near: 12, far: 80, bed: true,
       build: function (m, out) {
         m.low = sysMoverNoise(m, out, 'bandpass', 280, 1.2, 0.55);
         m.mid = sysMoverNoise(m, out, 'bandpass', 900, 0.8, 0.18);
@@ -14653,6 +15685,67 @@ export function createSystems(game) {
       throttle: function (m, k, now) {
         sysAudioSet(m.low.g.gain, Math.max(0.0001, 0.55 * k), now, 1.2);
         sysAudioSet(m.mid.g.gain, Math.max(0.0001, 0.18 * k), now, 1.2);
+      } },
+    // ---- TWO MORE (L6, E3 / audio #4), for the two still chapters whose
+    // one bed was a distant thing. Kyoto's Uji sits at 0.04–0.09 from the
+    // path and the grove between you and it made no sound; Palawan's break
+    // is 0.34 of a surf recipe on a sheltered bay. Both at 0.10, both placed
+    // AT the animal by their chapters (the grove and the lagoon are the
+    // place, not a point in it), so `near` is a formality and the calm's
+    // rise is the whole of their dynamic.
+    // Bamboo: a high, dry band that never settles — two noise bands, the
+    // upper one's centre wandering slowly, under an AM that is the wind's
+    // period and not a rhythm.
+    // Voiced hot inside (measured at 0.55/0.30 under an AM of 0.55, Kyoto's
+    // still window came out 11 dB under the score): a band-passed noise at
+    // gain 1 is a fraction of the level a broadband one is, and `level` is
+    // meant to be what arrives.
+    leaves: { level: 0.10, near: 20, far: 90, bed: true,
+      build: function (m, out) {
+        m.am = sysMoverAM(m, out, 0.85, 0.07, 0.30, 0.19);
+        m.hi = sysMoverNoise(m, m.am.am, 'bandpass', 3200, 0.7, 0.90);
+        m.mid = sysMoverNoise(m, m.am.am, 'bandpass', 1500, 1.1, 0.50);
+        const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.23;
+        const lg = ac.createGain(); lg.gain.value = 600;
+        lfo.connect(lg); lg.connect(m.hi.f.frequency); lfo.start(); m.src.push(lfo);
+      },
+      throttle: function (m, k, now) {
+        sysAudioSet(m.hi.g.gain, Math.max(0.0001, 0.90 * k), now, 1.4);
+        sysAudioSet(m.mid.g.gain, Math.max(0.0001, 0.50 * k), now, 1.4);
+      } },
+    // A lagoon: the lap recipe an octave up and slower, because there is no
+    // quay for the water to hit — it is the whole bay breathing, with a
+    // little of the reef's fizz on top of it.
+    lagoon: { level: 0.10, near: 24, far: 120, bed: true,
+      build: function (m, out) {
+        m.low = sysMoverNoise(m, out, 'bandpass', 420, 1.0, 1.0);
+        m.hi = sysMoverNoise(m, out, 'bandpass', 2600, 0.6, 0.30);
+        const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.09;
+        const lg = ac.createGain(); lg.gain.value = 0.36;
+        lfo.connect(lg); lg.connect(m.low.g.gain); lfo.start(); m.src.push(lfo);
+      },
+      throttle: function (m, k, now) {
+        sysAudioSet(m.low.g.gain, Math.max(0.0001, 1.0 * k), now, 1.6);
+        sysAudioSet(m.hi.g.gain, Math.max(0.0001, 0.30 * k), now, 1.6);
+      } },
+    // ...and a third, which the review's target asked for by implication:
+    // the Pantanal's one bed is the river at 0.035 from the spawn and its
+    // still window measured 10–13 dB under the score. A wetland at dusk is
+    // frogs and insects — two narrow bands, each under its own slow pulse,
+    // at different rates so the chorus never lines up.
+    marsh: { level: 0.10, near: 24, far: 110, bed: true,
+      build: function (m, out) {
+        // Gains over 1 because a Q-2.5 band of noise carries a tenth of the
+        // energy the river's Q-0.6 band does at the same number; measured at
+        // 0.9 / 0.55 under Q 4 / 3 the bed sat at −41 dBFS on the bus.
+        m.am = sysMoverAM(m, out, 0.80, 0.9, 0.35, 1.37);
+        m.frog = sysMoverNoise(m, m.am.am, 'bandpass', 620, 2.5, 2.2);
+        m.am2 = sysMoverAM(m, out, 0.75, 2.3, 0.30, 0);
+        m.bug = sysMoverNoise(m, m.am2.am, 'bandpass', 3400, 2.0, 1.4);
+      },
+      throttle: function (m, k, now) {
+        sysAudioSet(m.frog.g.gain, Math.max(0.0001, 2.2 * k), now, 1.6);
+        sysAudioSet(m.bug.g.gain, Math.max(0.0001, 1.4 * k), now, 1.6);
       } },
     steam: { level: 0.07, near: 14, far: 90, bed: true,
       build: function (m, out) {
@@ -14833,10 +15926,12 @@ export function createSystems(game) {
         continue;
       }
       m.want = audioPlace(m.x, m.y, m.z, m.near, m.far) * m.level * m.amp;
-      // A bed thins as the world settles, because it IS the world; a vehicle
-      // going past does not, because a scooter does not get quieter when you
-      // sit down. (G6, and the two halves are genuinely different questions.)
-      if (m.bed) m.want *= (1 - sysMOVER_CALM * sysCalmNow);
+      // A bed comes up as the world settles, because it IS the world; a vehicle
+      // going past does not, because a scooter does not get louder when you
+      // sit down. (G6, and the two halves are genuinely different questions;
+      // L6 flipped the sign — see sysMOVER_CALM.) Asleep, the beds are the
+      // only thing left and they come up 3 dB more (THE SLEEP, E3).
+      if (m.bed) m.want *= (1 + sysMOVER_CALM * sysCalmNow) * (1 + sysMUS_SLEEP_BEDS * musSleep);
       m.wantPan = sysSfxPan; m.wantBack = sysSfxBack; m.wantUp = sysSfxUp;
       m.d = sysEarTo.length();
     }
@@ -14892,7 +15987,7 @@ export function createSystems(game) {
       // curve and the same two constants as the placed one-shot in sfx().
       if (m.send) {
         const sk = m.live && acRoomWet > 0.03 ? sysSendK(m.d, m.near) : 0;
-        sysAudioSet(m.send.gain, Math.max(0.0001, acRoomWet * (1 - sysSEND_NEAR) * sk), now, sysMOVER_TAU);
+        sysAudioSet(m.send.gain, Math.max(0.0001, acRoomWet * (1 - acSendNear) * sk), now, sysMOVER_TAU);
         sysAudioSet(m.dry.gain, 1 - sysSEND_DRY * sk, now, sysMOVER_TAU);
       }
       // Something overhead is less lateralised than the same thing on the
@@ -14945,6 +16040,7 @@ export function createSystems(game) {
     const R = sysROOMS[live] || sysROOM_DEF;
     const want = acRoomFor === live ? R.wet : 0;
     acRoomWet = damp(acRoomWet, want, sysROOM_LAM * (want > 0 ? 1 : 2.6), dt);
+    acSendNear = R.near || sysSEND_NEAR;   // the row's near share, or the outdoor one (L6, E3)
     // ...plus whatever the water is adding. Under the surface a room gets
     // LONGER and duller, which is the half of "underwater" a filter alone
     // cannot do — see sysSubSet for the other half.
@@ -14953,7 +16049,7 @@ export function createSystems(game) {
     // sfx() and the mover's own send read it — but what goes on the bus for
     // everything is sysSEND_NEAR of it: the room a sound at the feet is in.
     // The rest arrives with distance. See sysSEND_NEAR.
-    acRoomSend.gain.setTargetAtTime(Math.max(0.0001, acRoomWet * sysSEND_NEAR + audSub * sysSUB_WET),
+    acRoomSend.gain.setTargetAtTime(Math.max(0.0001, acRoomWet * acSendNear + audSub * sysSUB_WET),
                                     ac.currentTime, 0.12);
     // Down to nothing, and only then is it a different place.
     if (acRoomFor !== live && acRoomWet < 0.006) sysRoomLoad(live);
@@ -15037,10 +16133,20 @@ export function createSystems(game) {
   // LIFTED by the calm lean (1 + calmLean x sysCALM_MUS), so a chase with
   // the pad at its base still had fewer mids than a rest. The chase lifts
   // the pad a quarter, which is the lean inverted in the plain sense.
-  const sysMUS_CHASE_PAD = -0.25;   // negative: the pad RISES during a chase (see above)
+  // ...and a quarter measured as +0.4 dB in Sydney and −2.6 in the cave (L6,
+  // qa/l6r-audio-states.js): the calm lean was lifting the still state by as
+  // much. Now the calm CUTS the pad (sysMUS_CALM_PAD) and the chase lifts it
+  // by six tenths, which is the +4 dB the review asked for at the pad alone.
+  const sysMUS_CHASE_PAD = -0.6;    // negative: the pad RISES during a chase (see above)
   const sysMUS_CHASE_BASS = 0.0;
   const sysMUS_CHASE_DBL = 0.6;     // intensity over which the lead is doubled up
   let musChaseBeatAt = 0, musChaseBeatN = 0, musChaseHits = 0, musChaseDbl = 0;
+  // THE SLEEP (L6, E3): 0 awake, 1 gone. Integrated per frame from sysNapNow
+  // with the two time constants above, read by the one writer, the pluck
+  // scheduler and the beds. `musSleepOn` is the latch the wake fires from.
+  let musSleep = 0, musSleepOn = false, musSleepN = 0, musWakeN = 0;
+  // THE PROGRESS PULSE (L6, E3): the next stroke's time, and how many landed.
+  let musPulseAt = 0, musPulseN = 0;
   // P4: which costume the animal was wearing last frame, so putting one ON is
   // an event and the nineteen frames a chapter where it is unchanged are not.
   let capyWornLast = null;
@@ -15570,14 +16676,26 @@ export function createSystems(game) {
   // tail would jump. Defaults cover the case where the envelope is running
   // before anything has ever swelled (it cannot, but a default is free).
   let musLiftUp = sysMUS_LIFT_UP, musLiftDn = sysMUS_LIFT_DN;
+  let musLiftAtk = 0;    // s since the swell began; see musLiftEnv (L6, E3)
 
   function musLiftEnv() {
     if (musLiftT <= 0) return 0;
     const up = musLiftUp, dn = musLiftDn;
-    // musLiftT counts DOWN from up + dn, so the bloom is at the top of it.
-    if (musLiftT > dn) return clamp((up + dn - musLiftT) / up, 0, 1);
+    // ---- THE HOLD WAS AN ENVELOPE OF NOTHING (L6, E3) ---------------------
+    // musLiftT counts DOWN from up + dn, and the attack used to be read off
+    // it: (up + dn − musLiftT) / up. But musSwell HOLDS musLiftT at up + dn
+    // for as long as it is being called — every frame, for twelve seconds,
+    // under the aurora, the sun and the bloom — so the attack read 0 for the
+    // whole of every hold and the bed those chapters were holding for came
+    // only from wowLive's musLive. Measured (qa/l6r-audio-states.js): a
+    // swell(1) re-fired every half second lifted the pad by nothing. The
+    // attack has its own clock now (musLiftAtk, counted up beside the
+    // countdown), so a hold blooms in `up` seconds and STAYS up; the release
+    // is unchanged and starts, as before, when the calls stop.
+    const atk = clamp(musLiftAtk / up, 0, 1);
+    if (musLiftT > dn) return atk;
     const t = musLiftT / dn;
-    return t * t;                     // and it goes the way a room goes quiet
+    return atk * t * t;               // and it goes the way a room goes quiet
   }
 
   /**
@@ -15667,6 +16785,11 @@ export function createSystems(game) {
   // reads, so the stings are events against a world that steps back rather
   // than notes on top of it. See the acSfxIn writer in the block.
   let musStingEnv = 0;
+  // ...and the PAD's copy of it (L6, E3): set in the same line, released
+  // slower — ×0.69 a block is τ 0.8 s — because the pad's duck measured as
+  // a 0.3 s notch under the world's ×0.55 and the review asked for the
+  // sting's whole half-second. See sysMUS_STING_PAD.
+  let musStingPad = 0;
   let musWorldLast = 1;   // the last target written to acSfxIn.gain, for the attack/release choice
   // =========================================================================
   // THE MELODY (L3, F2) — the lead used to throw dice.
@@ -15806,6 +16929,7 @@ export function createSystems(game) {
     if (now < musStingAt) return 0;
     musStingAt = now + 0.30;
     musStingEnv = 1;   // and the world steps back for it (L4, E2): see the acSfxIn writer
+    musStingPad = 1;   // ...and so does the pad (L6, E3): see the musPad writer
     // A palette may name its own voice and its own spacing for the phrase. The
     // five band palettes carry a lead of 'none' and would otherwise all answer
     // on the same generic pluck, and a ney or a bowed cello needs about twice
@@ -18365,17 +19489,37 @@ export function createSystems(game) {
       musChordAt += dw;
     }
     // ---- THE CHASE PULSE (L4, F3) --------------------------------------
-    if (musChaseT > 0 && !musPal.band && musDrum) {
+    if (musChaseT > 0 && !musPal.band && musDrum && musSleep < 0.5) {
       const beat = 60 / sysMUS_CHASE_BPM;
       if (musChaseBeatAt < now - beat) { musChaseBeatAt = musSnap(now + 0.05); musChaseBeatN = 0; }
       let cg = 0;
       while (musChaseBeatAt < horizon && cg++ < 16) {
         const b4 = musChaseBeatN % 4, bar = Math.floor(musChaseBeatN / 4);
-        const lvl = 0.7 + musIntensity * 0.5;
+        // ×2.5 on every stroke (L6, E3): at 0.09–0.11 the pulse landed ten
+        // decibels under the pad and the chase measured as darker than rest.
+        const lvl = (0.7 + musIntensity * 0.5) * sysMUS_CHASE_VEL;
         if (b4 === 0 || b4 === 2) { musBendir(musChaseBeatAt, musVel((b4 ? 0.09 : 0.11) * lvl)); musChaseHits++; }
         else { musClap(musChaseBeatAt, musVel(0.085 * lvl)); musChaseHits++; if (bar % 2 && b4 === 3 && Math.random() < 0.5) musClap(musChaseBeatAt + beat * 0.5, musVel(0.05 * lvl)); }
         musChaseBeatAt += beat;
         musChaseBeatN++;
+      }
+    }
+    // ---- THE PROGRESS PULSE (L6, E3): the third layer -------------------
+    // Past half a chapter, on the pad palettes, a slow soft dum on the frame
+    // drum — one every 2.4 s at the gate, closing to 1.6 by the end — so a
+    // place you have done half of has a heartbeat the arrival did not. Never
+    // during a chase (that pulse is the same drum, faster and harder), never
+    // asleep, never on the breath's floor.
+    if (!musPal.band && musDrum && musChaseT <= 0 && musSleep < 0.5 &&
+        musProg >= sysMUS_LAYER_PULSE && musBreath > 0.6) {
+      const pk = clamp((musProg - sysMUS_LAYER_PULSE) / (1 - sysMUS_LAYER_PULSE), 0, 1);
+      const gap = sysMUS_PULSE_GAP - 0.8 * pk;
+      if (musPulseAt < now - gap) musPulseAt = musSnap(now + 0.1);
+      let pg = 0;
+      while (musPulseAt < horizon && pg++ < 4) {
+        musBendir(musPulseAt, musVel(sysMUS_PULSE_VEL * (0.7 + 0.3 * pk)));
+        musPulseN++;
+        musPulseAt += gap;
       }
     }
     guard = 0;
@@ -18385,8 +19529,14 @@ export function createSystems(game) {
     // rather than switched off, and thinned by a number that is already
     // gliding, so the last few plucks fall away over a couple of seconds
     // instead of the melody hitting a wall. See musBreathStep.
-    const brK = musBreath < 0.995
-      ? clamp((musBreath - sysMUS_BREATH_DIP) / (1 - sysMUS_BREATH_DIP), 0, 1) : 1;
+    // ...and THE SLEEP does the same, all the way to nothing (L6, E3): the
+    // plucks thin out over the first five seconds of the fade and stop, so
+    // the pad going away is the last thing heard rather than a melody over
+    // silence. Same shape on the way back — the wake's upbeat is scheduled
+    // by hand in the writer, so this gate opening is not the first note.
+    const brK = (musBreath < 0.995
+      ? clamp((musBreath - sysMUS_BREATH_DIP) / (1 - sysMUS_BREATH_DIP), 0, 1) : 1) *
+      (1 - clamp(musSleep * 2, 0, 1));
     while (musPluckAt < horizon && guard++ < 12) {
       // ---- THE PAN OF THE NOTE THIS PASS PLAYED, AND WHETHER IT PLAYED ONE
       //
@@ -18822,8 +19972,11 @@ export function createSystems(game) {
       tHi.type = 'highshelf'; tHi.frequency.value = sysMUS_VOICE.tiltHiHz; tHi.gain.value = sysMUS_VOICE.tiltHiDb;
       const tLo = ac.createBiquadFilter();
       tLo.type = 'lowshelf'; tLo.frequency.value = sysMUS_VOICE.tiltLoHz; tLo.gain.value = sysMUS_VOICE.tiltLoDb;
-      musVol.connect(tLo); tLo.connect(tHi);
-      musVolOut = tHi;
+      // ...and the second shelf, above the pad (L6, E3). See sysMUS_VOICE.tilt2Hz.
+      const t2 = ac.createBiquadFilter();
+      t2.type = 'highshelf'; t2.frequency.value = sysMUS_VOICE.tilt2Hz; t2.gain.value = sysMUS_VOICE.tilt2Db;
+      musVol.connect(tLo); tLo.connect(tHi); tHi.connect(t2);
+      musVolOut = t2;
     } catch (e) { musVolOut = musVol; }
     musVolOut.connect(musPlaceLP);
     if (musPlacePan) { musPlaceLP.connect(musPlacePan); musPlacePan.connect(musPlaceGain); }
@@ -19252,7 +20405,7 @@ export function createSystems(game) {
     // 0.55 of the room, as always: the bus gain behind `acRoomSend` is now
     // sysSEND_NEAR of the row's `wet` (L4, audio #6), so the organ's own
     // share is quoted against that to land where it did.
-    if (send) { const w = ac.createGain(); w.gain.value = 0.55 / (send === acRoomSend ? sysSEND_NEAR : 1); out.connect(w); w.connect(send); }
+    if (send) { const w = ac.createGain(); w.gain.value = 0.55 / (send === acRoomSend ? acSendNear : 1); out.connect(w); w.connect(send); }
   }
 
   const sfxTable = {
@@ -19287,8 +20440,12 @@ export function createSystems(game) {
     purr: sfxPurr,
     // ...and three more of its own (L3, E4). See sfxGrunt.
     grunt: sfxGrunt, click: sfxClick, chatter: sfxChatter,
+    // ...and four more the body makes (L6, E2). See sfxShake.
+    shake: sfxShake, chew: sfxChew, snort: sfxSnort, yawn: sfxYawn,
     // ...and the one every line in the game goes through. See sfxBlip.
     blip: sfxBlip,
+    // ...and the sentence it became (L6, F5). See sfxBabble.
+    babble: sfxBabble,
   };
   const sfxGap = {
     wheek: 0.16, thud: 0.05, splash: 0.12, gasp: 0.12, pop: 0.05, rustle: 0.08, whistle: 0.2,
@@ -19308,6 +20465,11 @@ export function createSystems(game) {
     // third, and Sydney's roster has its own chatter on top. 0.18 lets a pair
     // of reactions read as two people and stops six of them becoming a chord.
     blip: 0.18,
+    // The babble takes the blip's gap and not one past its own length, on
+    // purpose: two people talking at once inside a square is the walla bed
+    // the Piazzetta never had, and the per-person slot in sfxBabble is what
+    // stops ONE person from stacking.
+    babble: 0.18,
     // The same gap 'thud' has, and for the same reason: clink is the other half
     // of the impact channel, so a tumbling stack of bowls has to be allowed to
     // sound like a tumbling stack of bowls.
@@ -19342,6 +20504,10 @@ export function createSystems(game) {
     // often — the gap is there so a second caller can never stack two.
     purr: 2.4,
     grunt: 0.35, click: 0.3, chatter: 0.7,
+    // The shake and the yawn are past their own length; the chew's is under
+    // the 0.4 s the caller asks at; the snort's stops a march that catches
+    // twice from snorting twice.
+    shake: 1.2, chew: 0.3, snort: 0.5, yawn: 3.0,
   };
 
   // The voice ceiling — see the block inside sfx(). Twelve starts inside a
@@ -19589,7 +20755,7 @@ export function createSystems(game) {
         const sk = (acRoomConv && bus === acSfxIn && acRoomWet > 0.03) ? sysSendK(dist, opts.near) : 0;
         if (sk > 0) {
           const sendG = c.createGain();
-          sendG.gain.value = acRoomWet * (1 - sysSEND_NEAR) * sk;
+          sendG.gain.value = acRoomWet * (1 - acSendNear) * sk;
           tail.connect(sendG); sendG.connect(acRoomConv);
           const dry = c.createGain();
           dry.gain.value = 1 - sysSEND_DRY * sk;
@@ -19668,7 +20834,13 @@ export function createSystems(game) {
     }
     const c = game.capy && game.capy.position;
     const a = Math.random() * 6.283185;
-    const d = rand(sysAMB_R0, sysAMB_R1);
+    // ---- ...AND THE RING DRAWS IN AS YOU SETTLE (L6, E3) ------------------
+    // Past calm 0.7 the ring closes from 14–34 m to 8–24: the gain is 1
+    // either way (sysAMB_NEAR), so what changes is the air — a bird inside
+    // ten metres keeps its top end (sysSfxLpFor) — and the width of the pan.
+    // A place you have stopped in is closer than one you are walking through.
+    const drawn = clamp((sysCalmNow - 0.7) / 0.3, 0, 1);
+    const d = rand(sysAMB_R0 - 6 * drawn, sysAMB_R1 - 10 * drawn);
     sysAmbAt.x = (c ? c.x : 0) + Math.cos(a) * d;
     sysAmbAt.z = (c ? c.z : 0) + Math.sin(a) * d;
     // Mostly upward: the things a place says about itself are birds, bells,
@@ -21241,8 +22413,26 @@ export function createSystems(game) {
       sysPerfMode = clamp(Math.round(v), 0, sysPERF_MODES.length - 1);
       if (sysPerfMode === 1) sysPerfSet(0);
       else if (sysPerfMode === 2) sysPerfSet(3);
+      pausePerfSay();
     },
     function (v) { return sysPERF_MODES[clamp(Math.round(v), 0, sysPERF_MODES.length - 1)]; });
+  // ...AND WHAT EACH STOP COSTS, SAID (L6, E8 / qa F3). The rung sheds the
+  // simulation from rung 2 as well as the pixels, and a player who picks
+  // `fast` is choosing that: the world steps at most twice a frame under a
+  // 1/20 s clock and the shadow map is drawn every other frame. A word on
+  // the row is a promise; the sentence under it is what the promise costs.
+  const sysPERF_SAY = [
+    'the game sheds pixels first, then the shadow map and the world’s steps, as the frame needs',
+    'everything drawn, whatever the frame costs',
+    'the world steps twice a frame, the shadow every other',
+  ];
+  const pausePerfNote = sysEl('div', 'capyui-setnote under', '');
+  pausePerfNote.id = 'capyui-perfnote';
+  pausePerfNote.setAttribute('aria-live', 'polite');
+  pausePerf.rng.setAttribute('aria-describedby', pausePerfNote.id);
+  function pausePerfSay() { pausePerfNote.textContent = sysPERF_SAY[sysPerfMode] || ''; }
+  pauseSet.appendChild(pausePerfNote);
+  pausePerfSay();
   const pauseInv = pauseSwitch('invert turning',
     function () { return sysLookInv; },
     function (v) { sysLookInv = !!v; });
@@ -21557,6 +22747,10 @@ export function createSystems(game) {
   todoTabAim.appendChild(todoTabArrow); todoTabAim.appendChild(todoTabDist);
   todoTab.appendChild(todoTabTxt); todoTab.appendChild(todoTabAim);
   todoEl.appendChild(todoTab);
+  // ...and the one remark under it (L6, E4): the marquee's where-line, or
+  // the finds' count. See the .capyui-tabsub rule.
+  const todoTabSub = sysEl('div', 'capyui-tabsub', '');
+  todoEl.appendChild(todoTabSub);
   let todoAway = false, todoAwayT = 0, todoAwayHold = 0;
   const sysTUCK_AFTER = 4.0;    // s of walking before the paper tucks
   const sysTUCK_V = 1.0;        // m/s: walking, not shuffling on the spot
@@ -21589,6 +22783,13 @@ export function createSystems(game) {
       const on = !!(top && top.aim && top.aim.classList.contains('on'));
       todoTabAim.style.display = on ? '' : 'none';
       if (on && todoTabArrow.style.transform !== sysArrowLast) todoTabArrow.style.transform = sysArrowLast;
+      // the remark: the top row's armed state first, then the marquee's
+      // where while it is a rumour, else the finds
+      const sub = (top && top.armed && sysArmedOn[todoTopId]) ? top.armed.textContent
+                : (marqId && marqEl.classList.contains('on') && !marqEl.classList.contains('row') && marqSayEl.textContent)
+                  ? marqSayEl.textContent
+                  : (findsEl.classList.contains('on') ? findsEl.textContent : '');
+      if (todoTabSub.textContent !== sub) { todoTabSub.textContent = sub; todoTabSub.classList.toggle('on', !!sub); }
     }
   }
   // ---- THE HEADING SAYS WHAT KIND OF THING IT IS (V2) ----------------------
@@ -21870,6 +23071,25 @@ export function createSystems(game) {
     taskRec[sysWAY_ID] = { def: null, li: li, txt: txt, done: false, chapter: 0, tilt: '',
                            shown: false, aim: aim, arrow: arrow, dist: dist };
   }
+  // ...and the traveller's (L6, F4): the same row, built the same way, on
+  // the paper only while the notebook has pinned the arrow on them. See THE
+  // ONE WHO KEEPS TURNING UP, POINTED AT.
+  {
+    const li = sysEl('li', 'capyui-task capyui-way capyui-trav capyui-hidden');
+    const tw = sysEl('span', 'capyui-tw');
+    const txt = sysEl('span', 'capyui-txt', 'somebody keeps turning up');
+    tw.appendChild(txt);
+    li.appendChild(tw);
+    const aim = sysEl('span', 'capyui-aim');
+    const arrow = sysEl('i', 'capyui-arrow');
+    const dist = sysEl('span', null, '');
+    aim.appendChild(arrow);
+    aim.appendChild(dist);
+    li.appendChild(aim);
+    listEl.appendChild(li);
+    taskRec[sysTRAV_ID] = { def: null, li: li, txt: txt, done: false, chapter: 0, tilt: '',
+                            shown: false, aim: aim, arrow: arrow, dist: dist };
+  }
   for (let i = 0; i < TASKS.length; i++) {
     const r = taskRec[TASKS[i].id];
     if (!r) continue;
@@ -21968,6 +23188,11 @@ export function createSystems(game) {
   const photoFlash = sysEl('div', 'capyui-pflash');
   photoFlash.setAttribute('aria-hidden', 'true');
   hudRoot.appendChild(photoFlash);
+  // the coda's caption (L6, E5) — see sysFinaleCoda
+  const codaEl = sysEl('div', 'capyui-coda');
+  codaEl.setAttribute('aria-live', 'polite');
+  hudRoot.appendChild(codaEl);
+  let codaHideT = 0;
   let photoOn = false, photoBareWas = false, photoShots = 0, photoCapT = 0;
   // =========================================================================
   // THE CAMERA (L4, F1a) — photo mode becomes a camera
@@ -22380,7 +23605,7 @@ export function createSystems(game) {
     } catch (e) { /* the picture is a gift, not a promise */ }
     wowShotT = 0;
   }
-  function chapRecap(n) {
+  function chapRecapLines(n) {
     const out = [];
     if (!(n > 0)) return out;
     const rec = chapRec[n];
@@ -22417,6 +23642,25 @@ export function createSystems(game) {
     const lines = [];
     for (let i = 0; i < out.length && lines.length < 3; i++) lines.push(out[i][1]);
     return lines;
+  }
+  // ---- ...AS ONE SENTENCE (L6, E4 / writing W6) ---------------------------
+  // The card had the game's best sentence — the chapter's note — and then
+  // three stat-lines in tracked caps three lines under it (qa/l6r-writing-
+  // hanoi-done.png). chapRecap(n) is the note's voice now: the same three
+  // facts, ranked the same way, joined with commas and "and", sentence case,
+  // one full stop. chapRecapLines keeps the list for the surfaces that are
+  // lists. "here" comes off the phrases — the card is already the place.
+  function chapRecap(n) {
+    const l = chapRecapLines(n);
+    if (!l.length) return '';
+    const parts = [];
+    for (let i = 0; i < l.length; i++) parts.push(String(l[i]).replace(/ here\b/, '').trim());
+    let s = parts.length === 1 ? parts[0]
+          : parts.length === 2 ? parts[0] + ' and ' + parts[1]
+          : parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1];
+    s = s.charAt(0).toUpperCase() + s.slice(1);
+    if (!/[.!?]$/.test(s)) s += '.';
+    return s;
   }
 
   // ---- ...AND THREE SURFACES ASK IT NOW (v36) -----------------------------
@@ -22710,15 +23954,19 @@ export function createSystems(game) {
         cardFit = { line: line, fs: fs, w: Math.round(g2.measureText(line).width), pw: pw };
         g2.fillText(line, px, by + 96 * k);
       }
-      // ...and what happened here, small, on the right (L4, F1b): the recap's
-      // first line, which is the rarest thing you did in this place.
+      // ...and what happened here (L4, F1b), as the one sentence the done
+      // card reads (L6, E4 / W6): italic, under the world's line, in the
+      // same voice, shrunk to the picture's width like the line above it.
       const rl = chapRecap(n);
-      if (rl.length) {
+      if (rl) {
         g2.fillStyle = sysRgba(PALETTE.ibisHead, 0.62);
-        g2.font = '700 ' + Math.round(14 * k) + 'px ' + sysCARD_FACE;
-        g2.textAlign = 'right';
-        g2.fillText(rl[0].toUpperCase().split('').join(String.fromCharCode(8202)), px + pw, by + 96 * k);
-        g2.textAlign = 'left';
+        let rfs = Math.round(15 * k);
+        g2.font = 'italic 500 ' + rfs + 'px ' + sysCARD_FACE;
+        while (rfs > 11 * k && g2.measureText(rl).width > pw) {
+          rfs -= 1;
+          g2.font = 'italic 500 ' + rfs + 'px ' + sysCARD_FACE;
+        }
+        g2.fillText(rl, px, by + 118 * k);
       }
       return cardCan.toDataURL('image/png');
     } catch (e) { return ''; }
@@ -24086,7 +25334,9 @@ export function createSystems(game) {
   doneEl.appendChild(doneSub);
   hudRoot.appendChild(doneEl);
   let doneTimer = 0;
-  function showDone(n, sub, kicker) {
+  // `note` overrides the chapter's own sentence: the departure card for the
+  // player who did not stay reads `left` on the same paper (L6, F4).
+  function showDone(n, sub, kicker, note) {
     const def = chapterDef(n);
     if (!def) return;
     doneKick.textContent = kicker || 'that is the whole place';
@@ -24101,11 +25351,13 @@ export function createSystems(game) {
     // one if it took one (L4, F1b), or the player's newest picture here.
     albShotOn(def.biome, doneArt, 2);
     doneName.textContent = def.name.toUpperCase();
-    doneNote.textContent = def.note || '';
-    doneNote.hidden = !def.note;
+    const say = note || def.note || '';
+    doneNote.textContent = say;
+    doneNote.hidden = !say;
+    // one sentence in the note's voice, italic under it (L6, E4 / W6)
     const rl = chapRecap(n);
-    doneLines.textContent = rl.join(String.fromCharCode(10));
-    doneLines.hidden = !rl.length;
+    doneLines.textContent = rl;
+    doneLines.hidden = !rl;
     doneSub.textContent = sub || '';
     doneEl.classList.add('show');
     if (doneTimer) clearTimeout(doneTimer);
@@ -24171,6 +25423,7 @@ export function createSystems(game) {
   placeEl.appendChild(placeNews);
   hudRoot.appendChild(placeEl);
   let placeTimer = 0;
+  // the marquee's line is appended once sysPlaceLine has declared it, below
   // The headline of the card that is up, or '' once it has faded. Read by the
   // act curtain so a chapter whose act kick and whose marquee are the same word
   // does not say it twice — see the note at that call site.
@@ -24252,6 +25505,10 @@ export function createSystems(game) {
     // would turn up again under the next act break.
     placeNews.textContent = news || '';
     placeNews.hidden = !news;
+    // ...and the marquee's line, if one was on the slot (L6, E4)
+    placeLine.textContent = '';
+    placeLine.hidden = true;
+    placeEl.classList.remove('line');
     placeEl.classList.add('show');
     showPlaceLast = title;
     if (placeTimer) clearTimeout(placeTimer);
@@ -24259,6 +25516,39 @@ export function createSystems(game) {
       placeEl.classList.remove('show');
       showPlaceLast = '';
     }, sysFADE_CARD);
+  }
+  // ---- THE MARQUEE'S OWN LINE, ALONE (L6, E4 / writing W3) ---------------
+  // While the big one is live, a line in the game's voice — the flood's "san
+  // marco is going under", the concert's "they are coming over" — takes THIS
+  // slot, on the place card's paper wash, with no title over it and no stack
+  // under it, at the weight of a name rather than a pill. It holds less than
+  // an arrival (sysLINE_CARD) and a second line replaces the first rather
+  // than queueing behind it: the marquee speaks in the present tense.
+  // Refused — the caller falls back to the queue — while a real card (an
+  // arrival, a banner) has the slot.
+  const sysLINE_CARD = 3400;
+  const placeLine = sysEl('div', 'capyui-placeline', '');
+  placeLine.hidden = true;
+  placeEl.appendChild(placeLine);
+  function sysPlaceLine(text) {
+    if (!text) return false;
+    if (showPlaceLast && placeEl.classList.contains('show')) return false;
+    placeH.textContent = '';
+    placeSub.textContent = '';
+    placeNews.textContent = '';
+    placeNews.hidden = true;
+    placeLine.textContent = String(text);
+    placeLine.hidden = false;
+    placeEl.classList.add('show');
+    placeEl.classList.add('line');
+    showPlaceLast = '';
+    if (placeTimer) clearTimeout(placeTimer);
+    placeTimer = setTimeout(function () {
+      placeEl.classList.remove('show');
+      placeEl.classList.remove('line');
+      placeLine.hidden = true;
+    }, sysLINE_CARD);
+    return true;
   }
 
   // --- the moment card: the payoff for a `mini` task ---------------------
@@ -24284,7 +25574,26 @@ export function createSystems(game) {
    * the card it always got — the row is display:none with nothing in it, so
    * the layout does not move.
    */
+  // ---- ...AND IT WAITS FOR THE MARQUEE (L6, E4 / writing W3) ---------------
+  // THE HERD's tutorial card sat centre-screen over the flood's onset. A card
+  // raised while the big one is live is held (sysMomentDefer) and shown when
+  // the marquee closes or sysMOMENT_DEFER seconds have passed, whichever is
+  // first; a second card raised while one waits replaces it — the newer one
+  // is about the thing that just happened.
+  const sysMOMENT_DEFER = 8.0;
+  let sysMomentDefer = null;
+  function sysMomentTick() {
+    if (!sysMomentDefer) return;
+    if (wowLiveOn && sysWall() - sysMomentDefer.at < sysMOMENT_DEFER) return;
+    const m = sysMomentDefer;
+    sysMomentDefer = null;
+    showMomentNow(m.kicker, m.text, m.note);
+  }
   function showMoment(kicker, text, note) {
+    if (wowLiveOn) { sysMomentDefer = { kicker: kicker, text: text, note: note, at: sysWall() }; return; }
+    showMomentNow(kicker, text, note);
+  }
+  function showMomentNow(kicker, text, note) {
     momentKick.textContent = kicker || '';
     momentText.textContent = text || '';
     momentNote.textContent = note || '';
@@ -24437,11 +25746,123 @@ export function createSystems(game) {
     const now = game.state.time;
     if (now - sysToastLastAt < sysFRESH_GAP || now - sysTickLastAt < sysFRESH_TICK_GAP) return;
     const t = sysToastHeld.shift();
-    toastNow(t.text, t.kind);
+    sysToastEnqueue(t.text, t.kind, true);
   }
-  function toast(text, kind) {
+  // ---- ONE VOICE AT A TIME (L6, E4 / writing W3, play 8) ------------------
+  //
+  // MEASURED (qa/l6r-writing-venice-053-toast.png, t = 53 s): eight text
+  // surfaces at once — the paper, THE HERD tutorial card centre-screen, two
+  // bubbles, THREE STACKED PILLS, pips, map — and the flood's own sentence
+  // ("san marco is going under. if you want to be in it, go now.") was the top
+  // pill of three under a tutorial about wheeking at pigeons. Two ambient
+  // narration pills at once at 68 s; "Twelve dollars for a coffee" three
+  // times at once in Sydney (play 34.png). Every writer in the game had the
+  // floor whenever it chose to speak, and the fresh-file budget above only
+  // ever governed the first three minutes.
+  //
+  // So there is a FLOOR and a QUEUE, for every file and every minute:
+  //
+  //   - a pill has the floor for sysTOAST_MIN seconds; a line raised inside
+  //     that WAITS. The queue drops a text already waiting, holds at most
+  //     sysTOAST_QUEUE, lets the oldest go when one more arrives, and lets a
+  //     line in the game's voice go unsaid once it is sysTOAST_STALE old — an
+  //     ambient remark said twenty seconds late is worse than one not said,
+  //     which is the fresh budget's own rule.
+  //   - while the marquee is LIVE (wowLiveOn) the floor is the pill's whole
+  //     hold, so at most one is up at a time; and a line in the game's voice
+  //     does not go to the stack at all — it takes the PLACE-CARD SLOT, alone,
+  //     at name-card weight (sysPlaceLine), because the marquee is the chapter
+  //     and its one sentence must not compete with a pigeon.
+  //   - a chapter's ambient narration — game.toast() with no kind, which is
+  //     the italic "the figs were full of lorikeets, apparently" — shares one
+  //     6 s fence (sysAMBIENT_GAP), the fence E3 gave the teaching lines.
+  //   - a 'note' (a tick, a record) is an answer to the player: it goes AHEAD
+  //     of a fenced line in the queue, but still waits for the floor.
+  //   - 'last' is what it was: it clears the stack and arrives alone.
+  //
+  // Wall clock throughout (sysWall), like the record line's watchdog: a pill's
+  // hold is a setTimeout, and the world at 0.55x under a marquee must not make
+  // the next line wait longer than the pill is actually up.
+  const sysTOAST_MIN   = 1.6;    // s a pill has the floor
+  const sysTOAST_QUEUE = 5;      // lines waiting, at most
+  const sysTOAST_STALE = 12;     // s a waiting 'say' is worth saying
+  const sysAMBIENT_GAP = 6.0;    // s between two lines of ambient narration
+  let sysToastFloorAt = -1e9, sysToastFloorFor = 0, sysToastFloorKind = '';
+  let sysAmbientAt = -1e9;
+  const sysToastQ = [];
+  function sysWall() { return performance.now() * 0.001; }
+  function sysToastEnqueue(text, kind, ambient, keep) {
+    const t = String(text);
+    for (let i = 0; i < sysToastQ.length; i++) if (sysToastQ[i].text === t) return;
+    sysToastQ.push({ text: t, kind: kind, ambient: !!ambient, keep: !!keep, at: sysWall() });
+    // overflow lets the oldest line that is not `keep` go
+    while (sysToastQ.length > sysTOAST_QUEUE) {
+      let i = 0;
+      while (i < sysToastQ.length && sysToastQ[i].keep) i++;
+      if (i >= sysToastQ.length) break;
+      sysToastQ.splice(i, 1);
+    }
+  }
+  /**
+   * A line said ONCE A JOURNEY (the puff bar's name) must not be one of the
+   * ambient remarks the fresh budget lets go: it skips the budget, is never
+   * stale, and survives an overflow. Measured: the puff line was dropped by
+   * sysFRESH_HELD in one soak of four, and the flag was already on the save.
+   */
+  function toastKeep(text) {
     if (text == null) return;
-    const k0 = (kind === 'note' || kind === 'last') ? kind : 'say';
+    sysToastEnqueue(text, 'say', false, true);
+    sysToastDrainQ();
+  }
+  // A label after a label waits the whole hold: two tracked-caps pills — a
+  // tick over the governor's apology, a record over a tick — read as one
+  // notice in two lines, which is the "1 OF 5" confusion the fresh player
+  // reported. A sentence may follow a label at the floor.
+  function sysToastFloorFree(kind) {
+    const full = wowLiveOn || (kind === 'note' && sysToastFloorKind === 'note');
+    const need = full ? sysToastFloorFor : Math.min(sysTOAST_MIN, sysToastFloorFor);
+    return sysWall() - sysToastFloorAt >= need;
+  }
+  /** Once a frame from the HUD update, and once from every toast() call. */
+  function sysToastDrainQ() {
+    if (!sysToastQ.length) return;
+    const now = sysWall();
+    for (let i = 0; i < sysToastQ.length; i++) {
+      const e = sysToastQ[i];
+      if (e.kind !== 'note' && !e.keep && now - e.at > sysTOAST_STALE) { sysToastQ.splice(i, 1); i--; continue; }
+    }
+    if (!sysToastQ.length) return;
+    for (let i = 0; i < sysToastQ.length; i++) {
+      const e = sysToastQ[i];
+      // a line in the game's voice raised into a marquee that has since gone
+      // live takes the slot, not the stack — and not the fence: the flood's
+      // own sentence is raised on the frame the flood arms, one frame before
+      // the live channel opens, and measured behind the pigeons' remark it
+      // waited the whole six seconds as if it were one more of them
+      if (e.kind === 'say' && wowLiveOn && sysPlaceLine(e.text)) { sysToastQ.splice(i, 1); return; }
+      if (e.ambient && now - sysAmbientAt < sysAMBIENT_GAP) continue;
+      if (!sysToastFloorFree(e.kind)) return;
+      sysToastQ.splice(i, 1);
+      if (e.ambient) sysAmbientAt = now;
+      if (e.kind === 'note') sysTickLastAt = game.state.time;
+      toastNow(e.text, e.kind);
+      return;
+    }
+  }
+  /**
+   * `ambient` is set by the public game.toast wrapper for a line with no kind:
+   * that is what a chapter's narration looks like from here. Every internal
+   * caller passes two arguments and gets exactly the pill it always got.
+   */
+  function toast(text, kind, ambient) {
+    if (text == null) return;
+    const k0 = (kind === 'note' || kind === 'last' || kind === 'heard') ? kind : 'say';
+    if (k0 === 'last') {
+      sysToastQ.length = 0; sysToastHeld.length = 0;
+      toastNow(text, kind);
+      return;
+    }
+    if (k0 === 'say' && wowLiveOn && sysPlaceLine(text)) return;
     if (k0 === 'say' && sysFreshBudget()) {
       const now = game.state.time;
       if (now - sysToastLastAt < sysFRESH_GAP || now - sysTickLastAt < sysFRESH_TICK_GAP) {
@@ -24450,17 +25871,17 @@ export function createSystems(game) {
         return;
       }
     }
-    if (k0 === 'note') sysTickLastAt = game.state.time;
-    toastNow(text, kind);
+    sysToastEnqueue(text, k0, ambient && k0 === 'say');
+    sysToastDrainQ();
   }
   function toastNow(text, kind) {
-    if (text == null) return;
+    if (text == null) return null;
     sysToastLastAt = game.state.time;
     // ---- AND NOTHING SPEAKS OVER THE LEDGER --------------------------------
     // The end card is the last word by construction now rather than by
     // whoever happens to fire last. A toast raised while it is up is DROPPED,
     // not queued: it is an autosave notice or a record, and the run is over.
-    if (ledShown) return;
+    if (ledShown) return null;
     const k = (kind === 'note' || kind === 'last') ? kind : 'say';
     // A closing sentence arrives alone. Same exit every other pill gets — the
     // pills already up are pushed, not deleted, which is the lesson the
@@ -24472,17 +25893,21 @@ export function createSystems(game) {
     // the game written to arrive alone never did. `sysToastPush(0)` is the
     // call the other site makes for the same reason.
     if (k === 'last') sysToastPush(0);
-    const el = sysEl('div', 'capyui-toast ' + k, String(text));
+    // 'heard' is a 'say' in roman with a speaker on the end — see game.hud.heard.
+    const el = sysEl('div', 'capyui-toast ' + k + (kind === 'heard' ? ' heard' : ''), String(text));
     toastWrap.appendChild(el);
+    if (kind === 'heard') sysHeardEl = el;     // see sysHeardTick
     // ...unless it has already been pushed off the top by more toasts landing
     // in the same turn, in which case it is on its way out and must not be
     // told to arrive.
     requestAnimationFrame(function () { if (!el.dataset.going) el.classList.add('in'); });
+    const holdMs = sysTOAST_HOLD[k] + (k === 'last' ? 0 : Math.max(0, String(text).length - 40) * 38);
+    sysToastFloorAt = sysWall(); sysToastFloorFor = holdMs * 0.001; sysToastFloorKind = k;
     setTimeout(function () {
       el.classList.remove('in');
       el.classList.add('out');
       setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 400);
-    }, sysTOAST_HOLD[k] + (k === 'last' ? 0 : Math.max(0, String(text).length - 40) * 38));
+    }, holdMs);
     // ---- AND THE FOURTH TOAST LETS THE FIRST ONE GO, RATHER THAN DELETING IT
     // This was `while (children.length > 4) removeChild(firstChild)`: the
     // oldest pill was torn out of the document mid-frame with no `.out` on it,
@@ -24491,6 +25916,135 @@ export function createSystems(game) {
     // ones under it slid up. Every other exit in this HUD is eased and this
     // was the one that was not.
     sysToastPush(sysTOAST_MAX);
+    return el;
+  }
+  /** Ease one pill out on its own, the way sysToastPush would. */
+  function sysToastOut(old) {
+    if (!old || !old.parentNode || old.dataset.going) return;
+    old.dataset.going = '1';
+    old.classList.remove('in');
+    old.classList.add('out');
+    old.style.position = 'absolute';
+    old.style.pointerEvents = 'none';
+    setTimeout(function () { if (old.parentNode) old.parentNode.removeChild(old); }, 400);
+  }
+  // ---- WHY NOT (L6, E4 / play 3) ------------------------------------------
+  // Nine wheeks on or beside the red carpet over four minutes and not one
+  // word about why the concert was not happening. game.marqueeWhy(text) is
+  // the channel a chapter answers a failed press on: ONE pill — the last why
+  // is pushed out if it is still up — rate-limited, the same text not twice
+  // in sysWHY_SAME, and at the place-card weight while the marquee is live.
+  // It bypasses the queue: it is the answer to a key the player just pressed.
+  const sysWHY_GAP = 2.0;        // s between why-lines
+  const sysWHY_SAME = 7;         // s the same why-line is not said twice
+  const sysWHY_R = 10;           // m from the marquee point a press is "at" it
+  let sysWhyAt = -1e9, sysWhyTxt = '', sysWhyEl = null;
+  function marqueeWhy(text) {
+    const t = String(text || '');
+    if (!t) return;
+    const now = sysWall();
+    if (now - sysWhyAt < sysWHY_GAP) return;
+    if (t === sysWhyTxt && now - sysWhyAt < sysWHY_SAME) return;
+    sysWhyAt = now; sysWhyTxt = t;
+    if (wowLiveOn && sysPlaceLine(t)) return;
+    sysToastOut(sysWhyEl);
+    sysWhyEl = toastNow(t, 'say');
+  }
+  game.marqueeWhy = marqueeWhy;
+  // ---- ...AND THE CONCERT SAYS IT (L6, E4 / play 3) -----------------------
+  // A Q inside sysWHY_R of the podium that is not a note — off the red, or on
+  // the deck beside it — is answered from concertAudit's state. On the red
+  // every Q IS a note and stageNote speaks for itself. And the same press in
+  // any chapter whose marquee is a CLOCK (Venice's tide, Hong Kong's train,
+  // the balloon, the surf, the pho run) is answered with the clock, off the
+  // same nextIn the signpost reads — chapter-neutral, no chapter file touched.
+  game.events.on('capy:wheek', function () {
+    if (!started || !game.capy || !game.capy.position || wowLiveOn) return;
+    const p = game.capy.position;
+    const env = game.env;
+    if (game.biome && game.biome.isActive('sydney') && env && env.zones && env.zones.operaStage &&
+        typeof env.inZone === 'function') {
+      const z = env.zones.operaStage;
+      const dx = p.x - (z.x0 + z.x1) * 0.5, dz = p.z - (z.z0 + z.z1) * 0.5;
+      if (dx * dx + dz * dz > sysWHY_R * sysWHY_R) return;
+      if (taskRec['opera-stage'] && taskRec['opera-stage'].done) return;
+      if (env.inZone('operaStage', p.x, p.z) && p.y > 0.9) return;     // a note; stageNote spoke
+      const a = typeof env.concertAudit === 'function' ? env.concertAudit() : null;
+      if (!a || !a.on) marqueeWhy(p.y > 0.9 ? 'closer to the middle — on the red, then Q' : 'up onto the red first, then Q');
+      else if (a.notes < 3) marqueeWhy('that’s ' + (a.notes === 1 ? 'one' : 'two') + ' — back on the red, and again');
+      else if (a.house < 2) marqueeWhy('nobody’s here yet — wait for them, on the red');
+      else marqueeWhy('on the red, and once more');
+      return;
+    }
+    if (!marqId || (taskRec[marqId] && taskRec[marqId].done)) return;
+    const mp = sysMarqueePoint();
+    if (!mp) return;
+    const dx = p.x - mp.x, dz = p.z - mp.z;
+    if (dx * dx + dz * dz > sysWHY_R * sysWHY_R) return;
+    const nx = todoNextIn(marqId);
+    if (nx > 1) marqueeWhy('not yet — ' + Math.ceil(nx) + ' s. be here when it comes');
+  });
+  // ---- OVERHEARD, AND SAID BY SOMEBODY (L6, E4 / writing W4) --------------
+  // npc.js reads a bubble whose speaker is off the frame out as a pill (F4),
+  // and it arrived here in the narrator's own italic: Sydney, 5 of 11 pills
+  // in 180 s were a tourist; Venice 6 of 18; one frame had "Everybody all
+  // right?" as a bubble AND a pill. The crowd and the narrator shared one
+  // mouth. So an overheard line is QUOTED — a hair-space inside the quotes —
+  // and ATTRIBUTED, from the record's kind where the roster has one (Sydney
+  // and Pasto) and from the place where it does not (a Venetian local's
+  // anchor carries no kind: "somebody on the Molo"), in roman, and never the
+  // same text within sysHEARD_REPEAT or while a bubble on the frame is
+  // saying the same words.
+  const sysHEARD_REPEAT = 20;
+  const sysHEARD_KIND = {
+    tourist: 'a tourist', gardener: 'the gardener', jogger: 'a jogger', busker: 'the busker',
+    patron: 'somebody at a table', waiter: 'the waiter', owner: 'the dog’s owner',
+    queue: 'somebody in the queue', commuter: 'a commuter', abuela: 'the woman with the broom',
+    farmer: 'a farmer', churchgoer: 'a churchgoer', vendor: 'a vendor',
+  };
+  const sysHEARD_WHERE = {
+    sydney: 'somebody in the gardens', quay: 'somebody on the quay', pasto: 'somebody in the plaza',
+    kyoto: 'somebody on the path', cali: 'somebody on the corner', rio: 'somebody on the sand',
+    iceland: 'somebody at the pool', sahara: 'somebody in the souk', drift: 'somebody on the island',
+    venice: 'somebody on the Molo', kowloon: 'somebody in the market', palawan: 'somebody on the jetty',
+    goreme: 'somebody in the valley', manly: 'somebody on the beach', pantanal: 'somebody at the pen',
+    cave: 'somebody on the rope', antarctic: 'somebody at the base', monaco: 'somebody on the quay',
+    hanoi: 'somebody on the pavement',
+  };
+  let sysHeardTxt = '', sysHeardAt = -1e9;
+  function heard(text, who) {
+    const t = String(text || '').trim();
+    if (!t) return;
+    const now = game.state.time;
+    if (t === sysHeardTxt && now - sysHeardAt < sysHEARD_REPEAT) return;
+    // never the same words as a bubble that is up: the speaker of THIS one is
+    // off the frame by construction, but two people say the same line
+    const bubs = document.querySelectorAll('.capynpc-bubble');
+    for (let i = 0; i < bubs.length; i++) {
+      if (bubs[i].style.display !== 'none' && bubs[i].textContent === t) return;
+    }
+    sysHeardTxt = t; sysHeardAt = now;
+    let name = '';
+    if (who) {
+      if (who.trav) name = 'the traveller';
+      else if (who.kind && sysHEARD_KIND[who.kind]) name = sysHEARD_KIND[who.kind];
+      else if (typeof who.role === 'string' && who.role && who.role !== 'somebody') name = who.role;
+    }
+    if (!name) name = sysHEARD_WHERE[(game.biome && game.biome.current) || ''] || 'somebody';
+    toast('“ ' + t + ' ” — ' + name, 'heard');
+  }
+  // ...and a heard pill that is UP when a second speaker says the same words
+  // on the frame gives way to the bubble (measured in the soak: the queue's
+  // "change for a fifty?" three times in a breath). Once a frame while one
+  // is up, which is a few seconds in nine; the bubble pool is eight elements.
+  let sysHeardEl = null;
+  function sysHeardTick() {
+    if (!sysHeardEl) return;
+    if (!sysHeardEl.parentNode || sysHeardEl.dataset.going) { sysHeardEl = null; return; }
+    const bubs = document.querySelectorAll('.capynpc-bubble');
+    for (let i = 0; i < bubs.length; i++) {
+      if (bubs[i].style.display !== 'none' && bubs[i].textContent === sysHeardTxt) { sysToastOut(sysHeardEl); sysHeardEl = null; return; }
+    }
   }
   /**
    * Push live pills out until at most `keep` of them are left, easing every
@@ -25057,9 +26611,270 @@ export function createSystems(game) {
   jrRepGrid.setAttribute('aria-label', 'named stunts');
   jrRepDet.appendChild(jrRepGrid);
   jrRepDet.hidden = true;
+  // =========================================================================
+  // THE TRAVELLER'S NOTEBOOK (L6, F4 / writing A, W1, W2)
+  //
+  // The repo refuses a voice for the animal (see the note at 'the capybara
+  // has never spoken'), rightly. But somebody in this game HAS been watching
+  // it for six months and says so on the lawn: the traveller, four cameos and
+  // a finale, met in 0 of 3 review runs and pointed at by nothing. This is
+  // that person made into the narrator the game was missing — a second page
+  // on the journal, one entry per place, written the moment the place is
+  // LEFT (jrTravel), from CHAPTERS[n].nb filled with what the journey already
+  // counts. The first entry is written before the two have met; a chapter
+  // stood in and not left is a blank line with a date; a second visit
+  // REWRITES the page, keeping the better of the two facts; the finale's
+  // last line is the last page. Saved as `nb` on the same terms as `chapms`.
+  //
+  // THE ENTRY IS FACTS, NOT TEXT. What is stored is the counts at the moment
+  // of leaving (nbFacts), and the prose is rendered from the template every
+  // time the page is opened — so a rewrite is a merge of numbers rather than
+  // a choice between two paragraphs, and a template reworded in a later
+  // build rewrites every old page with it. `met` is the one fact copied off
+  // a session-scoped set (npcTravMet, deliberately not on the file), which
+  // is how the pointer at them stays down across a reload.
+  //
+  // A FOLD, LIKE THE REPERTOIRE, and hidden until there is a first entry:
+  // the reason given there. It sits above the repertoire because it is the
+  // thing on this card most worth reading.
+  // =========================================================================
+  const jrNbDet = sysEl('details', 'capyui-jrkeys capyui-jrnb');
+  const jrNbSum = sysEl('summary');
+  jrNbSum.appendChild(sysGlyphEl('chev'));
+  const jrNbSumT = document.createTextNode('the notebook');
+  jrNbSum.appendChild(jrNbSumT);
+  jrNbDet.appendChild(jrNbSum);
+  const jrNbList = sysEl('div', 'capyui-nb');
+  jrNbList.setAttribute('role', 'list');
+  jrNbList.setAttribute('aria-label', 'the traveller’s notebook');
+  jrNbDet.appendChild(jrNbList);
+  jrNbDet.hidden = true;
+  jrCard.appendChild(jrNbDet);
   jrCard.appendChild(jrRepDet);
   jrCard.appendChild(jrKeys);
   jrCard.appendChild(jrFoot);
+
+  const jrNb = Object.create(null);   // chapter -> { d, f }; 'fin' -> { d, t }
+  const sysNB_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  // The date is the real one: a notebook carries the day it was written on,
+  // and the journey has no calendar of its own worth inventing one for.
+  function nbToday() {
+    const d = new Date();
+    const m = d.getMonth() + 1, day = d.getDate();
+    return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+  }
+  function nbDateSay(s) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
+    return m ? ((+m[3]) + ' ' + (sysNB_MON[+m[2] - 1] || '')) : '';
+  }
+  /** Rows done in chapter n that are not the arrival tick. */
+  function nbDoneHere(n) {
+    const rec = chapRec[n];
+    if (!rec) return 0;
+    let d = 0;
+    for (let i = 0; i < rec.ids.length; i++) {
+      const r = taskRec[rec.ids[i]];
+      if (r && r.done && rec.ids[i].indexOf('to-') !== 0) d++;
+    }
+    return d;
+  }
+  /** Everything the page can be filled from, as numbers, at this moment. */
+  function nbFacts(n) {
+    const rec = chapRec[n], def = chapterDef(n);
+    const f = { done: nbDoneHere(n), total: rec ? rec.ids.length : 0,
+                inc: jrChapInc[n] || 0, scn: jrChapScene[n] || 0, pho: jrChapPho[n] || 0,
+                fed: jrChapFed[n] || 0, pas: jrChapPerch[n] || 0, ln: Math.round(jrChapLine[n] || 0),
+                err: jrChapErr[n] || 0, tier: jrChapPal[n] || 0,
+                wow: 0, keep: chapComplete(n) ? 1 : 0, enough: chapEnough(n) ? 1 : 0, met: 0, par: 0 };
+    const w = wowOfChapter(n);
+    if (w && taskRec[w.id] && taskRec[w.id].done) f.wow = 1;
+    if (rec) for (let i = 0; i < rec.ids.length; i++) {
+      if (recAtPar(RECORDS[rec.ids[i]], jrRecs[rec.ids[i]])) { f.par = 1; break; }
+    }
+    try { if (def && typeof game.travMet === 'function' && game.travMet(def.biome)) f.met = 1; } catch (e) { /* older npc.js */ }
+    return f;
+  }
+  /** Write (or rewrite) chapter n's page from what is counted right now. */
+  function nbWrite(n) {
+    if (!(n > 0) || !chapterDef(n)) return;
+    const f = nbFacts(n);
+    const e = jrNb[n];
+    if (e && e.f) {
+      // the better of the two: every fact is a count or a flag, and neither
+      // goes down between visits, so "better" is simply the larger
+      for (const k in f) if (typeof f[k] === 'number' && f[k] > (e.f[k] || 0)) e.f[k] = f[k];
+      e.d = nbToday();
+    } else {
+      jrNb[n] = { d: nbToday(), f: f };
+    }
+    saveSoon();
+  }
+  /** `if` against the facts: `wow`, `!met`, `inc>=3`, `pho=1`, `a&b`. */
+  function nbTest(cond, f) {
+    const parts = String(cond || '').split('&');
+    for (let i = 0; i < parts.length; i++) {
+      let p = parts[i].trim();
+      const neg = p.charAt(0) === '!';
+      if (neg) p = p.slice(1);
+      const m = /^([a-z]+)(>=|<=|=|<|>)?(\d+)?$/.exec(p);
+      if (!m) return false;
+      const v = +f[m[1]] || 0;
+      let ok;
+      if (!m[2]) ok = v > 0;
+      else {
+        const k = +m[3];
+        ok = m[2] === '>=' ? v >= k : m[2] === '<=' ? v <= k : m[2] === '=' ? v === k : m[2] === '<' ? v < k : v > k;
+      }
+      if (neg) ok = !ok;
+      if (!ok) return false;
+    }
+    return true;
+  }
+  /** The page for chapter n as one paragraph, or '' if it has not been written. */
+  function nbText(n) {
+    const def = chapterDef(n), e = jrNb[n];
+    if (!def || !def.nb || !e || !e.f) return '';
+    const f = e.f;
+    let who = null;
+    try { who = typeof game.palWho === 'function' ? game.palWho(def.biome) : null; } catch (err) { who = null; }
+    const out = [];
+    for (let i = 0; i < def.nb.length; i++) {
+      const el = def.nb[i];
+      let s = '';
+      if (typeof el === 'string') s = el;
+      else if (el && el.if) s = nbTest(el.if, f) ? (el.t || '') : (el.else || '');
+      if (!s) continue;
+      s = s.replace(/\{([a-z]+)\}/g, function (_, k) {
+        if (k === 'call' || k === 'who') return who ? (who[k] || '') : '';
+        if (k === 'ln' || k === 'done' || k === 'total') return String(f[k] || 0);
+        return sysNumWord(f[k] || 0);
+      });
+      // a number word at the head of a sentence is a sentence
+      out.push(s.charAt(0).toUpperCase() + s.slice(1));
+    }
+    return out.join(' ');
+  }
+  // ---- THE LAST PAGE (L6, F4) -------------------------------------------
+  // The traveller's line on the lawn stays a bubble (npc.js) AND is written
+  // here as the closing entry: it is the one sentence the game has never
+  // said out loud, and a bubble is gone in four seconds. The names, when
+  // there are two or more — the same list npc.js reads for its line.
+  function nbClose() {
+    let known = false;
+    try { known = typeof game.travMet === 'function' && game.travMet() >= 2; } catch (e) { known = false; }
+    let t = known ? 'Nineteen places. Every one of them made its own mind up about you.'
+                  : 'You will not know me. I have been three steps behind you since Sydney.';
+    const names = palNames();
+    if (names.length >= 2) t += ' ' + names.join('. ') + '. You have more names than I have countries.';
+    jrNb.fin = { d: nbToday(), t: t };
+    saveSoon();
+  }
+  // ---- THE ONE WHO KEEPS TURNING UP, POINTED AT (L6, F4 / writing W2) ----
+  // Four cameos at eight metres and nothing on any surface said they were
+  // there. The notebook's page for each of those chapters carries the line
+  // until they have been stood in front of; in the chapter you are standing
+  // in it is a button, and pressing it pins the paper's arrow on them
+  // through sysHINTS.traveller — a pseudo-row like the way on, on the paper
+  // only while it is the thing pointed at, and reachable by F once this page
+  // has been read here (nbTravArm). Where they stand is npc.js's (travWhere);
+  // what to call the place is this table's, because a page for a chapter
+  // that is not built has no figure to ask.
+  const sysTRAV_PLACE = { quay: 'the ferry wharf', sahara: 'Jemaa el-Fnaa, by the snake basket',
+                          goreme: 'the square', hanoi: 'Hang Ngang, by the pho stall' };
+  let nbTravArm = '';
+  function nbTravMet(n) {
+    const def = chapterDef(n);
+    if (!def || !sysTRAV_PLACE[def.biome]) return true;      // nobody to meet
+    const e = jrNb[n];
+    if (e && e.f && e.f.met) return true;
+    try { return typeof game.travMet === 'function' && !!game.travMet(def.biome); } catch (err) { return false; }
+  }
+  /** The live chapter has them, unmet, and this page has been read here. */
+  function travRowOn() {
+    const b = game.biome && game.biome.current;
+    if (!b || !sysTRAV_PLACE[b] || nbTravArm !== b) return false;
+    if (nbTravMet(chapterOf(b))) return false;
+    let p = null;
+    try { p = typeof game.travWhere === 'function' ? game.travWhere() : null; } catch (e) { p = null; }
+    return !!p;
+  }
+  function nbTravPin() {
+    nbTravArm = (game.biome && game.biome.current) || '';
+    if (!travRowOn()) return;
+    todoPin = sysTRAV_ID;
+    riddleForce = true;
+    jrHide();
+    todoRefresh();
+    sfx('pop', { volume: 0.22, pitch: 1.5 });
+  }
+  game.events.on('npc:travMet', function () {
+    if (todoPin === sysTRAV_ID) todoPin = '';
+    nbTravArm = '';
+    todoRefresh();
+  });
+  /**
+   * THE PAGE. Rebuilt on every open, like the repertoire and for the same
+   * reason. A chapter is on it once it has been stood in (blank) or left
+   * (written); the closing page last. Hidden until the first written entry.
+   */
+  function nbPage() {
+    let count = 0;
+    for (let n = 1; n <= chapMax; n++) if (jrNb[n] && jrNb[n].f) count++;
+    const fin = jrNb.fin && jrNb.fin.t ? jrNb.fin : null;
+    jrNbDet.hidden = !(count || fin);
+    if (jrNbDet.hidden) return;
+    jrNbSumT.nodeValue = 'the notebook  ·  ' + (count + (fin ? 1 : 0)) + (count + (fin ? 1 : 0) === 1 ? ' entry' : ' entries');
+    while (jrNbList.firstChild) jrNbList.removeChild(jrNbList.firstChild);
+    const here = game.biome ? chapterOf(game.biome.current) : 1;
+    for (let n = 1; n <= chapMax; n++) {
+      const e = jrNb[n];
+      if (!e && !jrSeen[n] && n !== here) continue;
+      const def = chapterDef(n);
+      const ent = sysEl('div', 'capyui-nbe');
+      ent.setAttribute('role', 'listitem');
+      const d = sysEl('div', 'capyui-nbd', nbDateSay(e ? e.d : nbToday()));
+      d.appendChild(sysEl('span', null, def.name));
+      ent.appendChild(d);
+      const txt = nbText(n);
+      if (txt) ent.appendChild(sysEl('div', 'capyui-nbt', txt));
+      else {
+        const bl = sysEl('div', 'capyui-nbt blank', '');
+        bl.setAttribute('aria-label', 'nothing written yet');
+        ent.appendChild(bl);
+      }
+      if (sysTRAV_PLACE[def.biome] && !nbTravMet(n)) {
+        const line = 'somebody keeps turning up  ·  ' + sysTRAV_PLACE[def.biome];
+        if (n === here) {
+          // read here: the arrow may reach them from now on (F), and the
+          // button reaches them now
+          nbTravArm = def.biome;
+          const go = sysEl('button', 'capyui-nbgo', line);
+          go.type = 'button';
+          go.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+          go.addEventListener('click', function (ev) { ev.preventDefault(); ev.stopPropagation(); nbTravPin(); });
+          ent.appendChild(go);
+        } else {
+          ent.appendChild(sysEl('div', 'capyui-nbgo', line));
+        }
+      }
+      jrNbList.appendChild(ent);
+    }
+    if (fin) {
+      const ent = sysEl('div', 'capyui-nbe');
+      ent.setAttribute('role', 'listitem');
+      const d = sysEl('div', 'capyui-nbd', nbDateSay(fin.d));
+      d.appendChild(sysEl('span', null, 'Sydney, again'));
+      ent.appendChild(d);
+      ent.appendChild(sysEl('div', 'capyui-nbt', fin.t));
+      jrNbList.appendChild(ent);
+    }
+  }
+  /** The harness's window: the pages as text, and the pointer's state. */
+  game.notebook = function () {
+    const out = { entries: {}, fin: jrNb.fin ? jrNb.fin.t : '', arm: nbTravArm, row: travRowOn() };
+    for (let n = 1; n <= chapMax; n++) if (jrNb[n] && jrNb[n].f) out.entries[n] = { d: jrNb[n].d, t: nbText(n), f: jrNb[n].f };
+    return out;
+  };
 
   /** Name one souvenir under the shelf, or say what it would take to get it. */
   function jrShelfSay(n) {
@@ -25143,6 +26958,8 @@ export function createSystems(game) {
     // ...and the forty names, on exactly the same terms: a fold that is only
     // on the card once there is something in it. See repPage.
     repPage();
+    // ...and the traveller's pages (L6, F4). See nbPage.
+    nbPage();
     let done = 0;
     for (const k in taskRec) if (taskRec[k].done) done++;
     let places = 0;
@@ -25360,7 +27177,21 @@ export function createSystems(game) {
     game.events.emit('chapter:leave', { chapter: from, name: fdef && fdef.biome, to: def.biome });
     if (fdef && chapEnough(from) && !chapComplete(from)) {
       showDone(from, fdef.keep ? 'you are taking  ·  ' + fdef.keep : '', 'that will do here');
+    } else if (fdef && !chapEnough(from) && fdef.left && nbDoneHere(from) >= 1) {
+      // ---- ...AND THE PLAYER WHO DID NOT STAY (L6, F4 / writing W1) --------
+      // `note` had three readers and all three were gated on finishing, so a
+      // player leaving at five of twelve read nothing (0 of 19, measured).
+      // Same card, same pull-back, the chapter's other sentence, and the
+      // kicker says which player this is. Nothing is taken: the keepsake
+      // is a projection of finishing, and the sub stays empty rather than
+      // printing what they did not get. One real row at least — the arrival
+      // tick is not staying.
+      showDone(from, '', 'you did not stay', fdef.left);
     }
+    // ...and the notebook is written, whichever card went up (L6, F4). On
+    // the decision, not at the cut: the facts are this place's and the
+    // counters are about to start belonging to the next one.
+    nbWrite(from);
     setTimeout(function () {
       leaveBusy = false;
       sfx('horn');
@@ -25477,8 +27308,10 @@ export function createSystems(game) {
   const sysHINTS = {
     // ---- Sydney -----------------------------------------------------------
     wheek:        { clue: 'press Q, anywhere', where: function () { return null; } },
+    // ...not the busker's: his hat is the Quay's own row (busker-hat), and an
+    // arrow that walks the Sydney player to him arms the wrong row (L6, E4).
     'steal-hat':  { clue: 'grab it off their head with E',
-                    where: function () { return hintNpc(function (r) { return r.heldProp && r.heldProp.type === 'hat'; }) || hintProp('hat'); } },
+                    where: function () { return hintNpc(function (r) { return r.heldProp && r.heldProp.type === 'hat' && r.kind !== 'busker'; }) || hintProp('hat'); } },
     'coffee-spill': { clue: 'hold Shift and barge them',
                     where: function () { return hintNpc(function (r) { return r.heldProp && r.heldProp.type === 'coffee'; }) || hintProp('coffee'); } },
     'picnic-thief': { clue: 'grab it with E', where: function () { return hintProp('sandwich'); } },
@@ -25494,7 +27327,8 @@ export function createSystems(game) {
                       const a = e && typeof e.concertAudit === 'function' ? e.concertAudit() : null;
                       if (a && a.on && a.notes < 3) return 'Q again — ' + (3 - a.notes) + ' more, with them in front of you';
                       if (a && a.on) return 'Q once more, with the crowd in front of you';
-                      return 'up onto the red podium, then Q. a crowd comes — Q twice more';
+                      // the podium is a podium now (L6, E4): two steps up
+                      return 'up the two steps onto the red, then Q. a crowd comes — Q twice more';
                     }, where: function () { return hintZone('operaStage'); } },
     'ball-harbour': { clue: hintHoldingBall, where: function () { return hintHolding('ball') ? hintWater() : hintProp('ball'); } },
     swim:           { clue: 'walk in and keep going', where: hintWater },
@@ -26361,6 +28195,20 @@ export function createSystems(game) {
     return 'three wheeks when you get there, and the board opens';
   }
   sysHINTS[sysWAY_ID] = { clue: wayClue, where: wayPoint };
+  // ---- ...AND THE TRAVELLER (L6, F4 / writing W2) ---------------------------
+  // Where the one who keeps turning up is standing in the live chapter, off
+  // npc.js's own register of the four cameos (travWhere): null in the fifteen
+  // chapters they are not in and in a chapter that is not built, which is
+  // the same answer an unbuilt door gives. The clue names the verb; the row
+  // and the notebook's page name the person.
+  sysHINTS[sysTRAV_ID] = {
+    clue: 'go and stand in front of them',
+    where: function () {
+      let p = null;
+      try { p = typeof game.travWhere === 'function' ? game.travWhere() : null; } catch (e) { p = null; }
+      return p ? hintAt(p.x, p.z, p.y) : null;
+    },
+  };
 
   // ---- ...AND SOMETHING TO STAND AT (D6) ---------------------------------
   //
@@ -26849,6 +28697,49 @@ export function createSystems(game) {
 
 
   let hintT = 0, hintHas = false, hintX = 0, hintZ = 0, hintY = NaN;
+  // ONE CLUE ON THE SHEET (L6, E4): the marquee's how is up inside this
+  // radius of its point and the top row's clue folds — see the hint tick.
+  // Thirty metres is the podium seen from the forecourt steps.
+  const sysMARQ_NEAR = 30;
+  let sysMarqNear = false;
+  // ---- ARMED, NOT FINISHED (L6, E4): the theft rows' state line ----------
+  // props.js's getaway table (physGetawayAudit) says which rows have a prop
+  // in the mouth standing for them. Each such row that is open on the paper
+  // gets one line under its words; a row that stops being armed — the prop
+  // taken back, or the row ticked — loses it on the next tick. The span is
+  // made once per row, lazily: most of the 234 never carry one.
+  const sysArmedOn = Object.create(null);   // id -> true while the line is up
+  function sysArmedSet(id, on) {
+    const r = taskRec[id];
+    if (!r) return;
+    if (on && !r.armed) {
+      r.armed = sysEl('span', 'capyui-armed', 'armed · get away with it');
+      r.li.querySelector('.capyui-tw').appendChild(r.armed);
+    }
+    if (!r.armed) return;
+    const want = !!on && !r.done;
+    if (want !== !!sysArmedOn[id]) {
+      if (want) sysArmedOn[id] = true; else delete sysArmedOn[id];
+      r.armed.classList.toggle('on', want);
+      // ...and the paper comes out of its tuck to show it, the way it does
+      // for a tick: the grab is the moment the player looks for the row
+      if (want) { todoAwayHold = sysTUCK_HOLD; todoAwayT = 0; }
+    }
+  }
+  function sysArmedTick() {
+    const ph = game.physics;
+    if (!ph || typeof ph.getawayAudit !== 'function') return;
+    let a = null;
+    try { a = ph.getawayAudit(); } catch (e) { a = null; }
+    const rows = a && a.rows ? a.rows : null;
+    // off first, then on: a row in the table and held is armed
+    for (const id in sysArmedOn) {
+      let still = false;
+      if (rows) for (let i = 0; i < rows.length; i++) if (rows[i].id === id && rows[i].held) { still = true; break; }
+      if (!still) sysArmedSet(id, false);
+    }
+    if (rows) for (let i = 0; i < rows.length; i++) if (rows[i].held) sysArmedSet(rows[i].id, true);
+  }
   // ---- RIDDLE FIRST (L3-14, design review 1). Every row resolved to a
   // point with an arrow, metres and a beacon before the player had asked,
   // so the dominant activity was GPS-following. A row arrives as its clue
@@ -26860,7 +28751,7 @@ export function createSystems(game) {
   const sysRIDDLE_T = 40;
   let riddleT = 0, riddleShown = true, riddleForce = false, riddleTold = false;
   function riddleFirst(id) {
-    if (!id || id === sysWAY_ID) return true;
+    if (!id || id === sysWAY_ID || id === sysTRAV_ID) return true;
     const r = taskRec[id];
     if (!r || !r.def) return true;
     if (r.def.wow) return true;
@@ -27039,6 +28930,10 @@ export function createSystems(game) {
       const r = taskRec[rec.ids[i]];
       if (r && !r.done) open.push(rec.ids[i]);
     }
+    // ...and the traveller, once the notebook has been read here (L6, F4):
+    // F reaches them like any open row, and the pseudo-row is on the paper
+    // only for as long as it is the one pointed at.
+    if (travRowOn()) open.push(sysTRAV_ID);
     if (open.length < 2) return;              // nothing to choose between
     let i = open.indexOf(todoTopId);
     if (i < 0) i = 0;
@@ -27164,8 +29059,12 @@ export function createSystems(game) {
     // A pin only survives while it is still open and still in this chapter.
     // It may sit in ANY act: F and a tap reach the whole open list, which is
     // the promise that stops a movement from ever being a wall.
-    let pi = todoPin ? openIds.indexOf(todoPin) : -1;
-    if (pi < 0) todoPin = '';
+    // The traveller's pin is not in the chapter's list (L6, F4): it holds
+    // while the row is on (same chapter, unmet, page read here) and the
+    // window under it is the live act's, as with no pin at all.
+    const travPin = todoPin === sysTRAV_ID && travRowOn();
+    let pi = (todoPin && !travPin) ? openIds.indexOf(todoPin) : -1;
+    if (pi < 0 && !travPin) todoPin = '';
     let winIds, top;
     if (pi >= 0) {
       // CLAMPED, NOT WRAPPED. The rows are built once and live in a fixed DOM
@@ -27229,6 +29128,16 @@ export function createSystems(game) {
       }
       if (wayRec.txt.textContent !== wtxt) wayRec.txt.textContent = wtxt;
       wayRec.li.classList.toggle('soon', !wayOpen);
+    }
+    // ...and the traveller's row, which takes the arrow while it is pinned
+    // and is otherwise not on the paper at all (L6, F4). After the way on,
+    // because a pin is a choice and the door is only ever a default.
+    if (travPin) {
+      top = sysTRAV_ID;
+      show[sysTRAV_ID] = true;
+      const tt = 'somebody keeps turning up  ·  ' + (sysTRAV_PLACE[cdef.biome] || '');
+      const trec = taskRec[sysTRAV_ID];
+      if (trec.txt.textContent !== tt) trec.txt.textContent = tt;
     }
     for (let i = 0; i < winIds.length; i++) show[winIds[i]] = true;
     // ---- THE MARQUEE LINE (B1) --------------------------------------------
@@ -27560,6 +29469,34 @@ export function createSystems(game) {
   // itself, so it is said once per journey and not once per session.
   let saveTold = false;
 
+  // ---- A `v:1` FILE THAT IS THE WRONG SHAPE IS A BROKEN FILE (L6, E8 / qa F8)
+  //
+  // The reader checked the version and nothing else, and the restore branch
+  // in startGame is defensive field by field — so a file with `tasks: 5` or
+  // `seen: "abc"` booted, read as EMPTY, and the next autosave wrote an empty
+  // journey over it: a hand-edited or half-corrupted file lost its evidence
+  // by being tolerated. Every key the writer emits has one shape, and a key
+  // that is PRESENT in another shape goes to quarantine with the rest of the
+  // unreadable — a key that is absent is an older file and fine (the writer's
+  // own rule: additive, no version bump). `ms` must also be finite:
+  // JSON.parse hands back Infinity for `1e309` and the ledger's clock is a
+  // sum. Element types inside the arrays and objects are still the restore
+  // branch's problem and it already has them. The table is sysSAVE_SHAPE, up
+  // with sysSAVE_BAD_KEY, for the reason given there: saveRead runs from the
+  // title card, above this block, where a `const` here is still in its TDZ.
+  function saveShapeOk(o) {
+    for (const k in sysSAVE_SHAPE) {
+      const v = o[k];
+      if (v === undefined || v === null) continue;
+      const want = sysSAVE_SHAPE[k];
+      if (want === 'array') { if (!Array.isArray(v)) return false; }
+      else if (want === 'object') { if (typeof v !== 'object' || Array.isArray(v)) return false; }
+      else if (want === 'number') { if (typeof v !== 'number' || v !== v || v === Infinity || v === -Infinity) return false; }
+      else if (typeof v !== want) return false;
+    }
+    return true;
+  }
+
   function saveRead() {
     let raw = null;
     try {
@@ -27573,7 +29510,7 @@ export function createSystems(game) {
     if (!raw) return null;
     let o = null;
     try { o = JSON.parse(raw); } catch (e) { o = null; }
-    if (o && o.v === 1) return o;
+    if (o && o.v === 1 && saveShapeOk(o)) return o;
     // NON-EMPTY BYTES WE CANNOT READ. Set them aside before anybody else gets
     // the chance to clear the key — this is the only reader, and it runs once,
     // at boot, before the title card is built. A quarantine already on file is
@@ -27702,6 +29639,10 @@ export function createSystems(game) {
         // no version bump, and a file written before it existed reads as a
         // player who has not found any out, which is what they had.
         rep: jrRep,
+        // ...and THE NOTEBOOK (L6, F4): chapter -> { d, f }, and `fin`. Additive,
+        // no version bump; a file written before it existed reads as a
+        // traveller who has not written anything down yet.
+        nb: jrNb,
         biome: (game.biome && game.biome.current) || 'sydney',
         // Additive, exactly like `chapms` and `finds` above, and the version
         // does not move for it. `fin` means the closing beat on the lawn has
@@ -27718,6 +29659,8 @@ export function createSystems(game) {
         slip: slipEver ? 1 : 0,
         // ...and the paper, on the same terms (V2).
         paper: paperEver ? 1 : 0,
+        // ...and the puff bar's name (L6, E4).
+        puff: puffEver ? 1 : 0,
       }));
       // ---- SAY IT ONCE ----------------------------------------------------
       // This game is three and a quarter hours long and it has kept a save file
@@ -29343,11 +31286,28 @@ export function createSystems(game) {
     musProg = clamp(p, 0, 1);
   }
 
+  // id -> what the tick pill says instead of the row, for the rows the WORLD
+  // ticks (L6, E4). One entry; the arrival tick is the only one measured.
+  const sysTICK_CAUSE = {
+    'photo-op': 'in somebody’s holiday photos — the one with the phone',
+  };
   function completeTask(id, silent) {
     const r = taskRec[id];
     if (!r || r.done) return false;
+    // ---- A TICK BELONGS TO ITS PLACE (L6, E5) ------------------------------
+    // Sydney's bin ticked in St Mark's Square ("KNOCK OVER A BIN (FOR THE
+    // IBIS)" over the flood) and in Monaco; the journal then said Sydney 3/19
+    // from a Venetian bin. The props.js gates fixed one at a time (coffee-spill
+    // in L3-8) were the wrong place for this rule: a row's chapter is on the
+    // row, so the one door every tick goes through can read it. A restore
+    // (silent) is not a tick and is exempt; so is a row that says `anywhere`.
+    if (!silent && r.def && r.def.chapter && !r.def.anywhere && game.biome && game.biome.current) {
+      const cd = chapterDef(r.def.chapter);
+      if (cd && cd.biome && cd.biome !== game.biome.current) return false;
+    }
     r.done = true;
     r.li.classList.add('done');
+    if (r.armed) sysArmedSet(id, false);   // the getaway is the tick (L6, E4)
     doneCount++;
     nudgeT = 0;                   // anything ticked empties the bank. See THE NUDGE.
     game.state.score = doneCount;
@@ -29421,7 +31381,10 @@ export function createSystems(game) {
       punch(0.09);
     } else {
       if (cp) confettiBurst(cp.x, cp.y + 0.45, cp.z, taskStreak > 0 ? 16 : 12);
-      toast('ticked  ·  ' + (r.def ? r.def.text : id), 'note');
+      // THE TICK NAMES ITS CAUSE where the cause was not the player (L6, E4
+      // / play 7): "Get in a tourist's photo" ticked at nine seconds with no
+      // input, and the pill said only that it had.
+      toast('ticked  ·  ' + (sysTICK_CAUSE[id] || (r.def ? r.def.text : id)), 'note');
       punch(0.06);
     }
     todoEl.classList.remove('stamp');
@@ -29636,6 +31599,23 @@ export function createSystems(game) {
     for (const k in jrChapPal) if (jrChapPal[k] >= t) c++;
     return c;
   }
+  // ---- THE NAMES YOU HAVE BEEN GIVEN (L6, F4 / writing B) -----------------
+  // Tier three is where every regular says the name (npcPAL[].tiers[2]), so
+  // the list is a projection of the tiers and needs no field of its own. In
+  // chapter order, which is the order they were earned in for nearly every
+  // journey. npc.js's finale line and the notebook's closing page read it.
+  const sysPAL_NAME_T = 3;
+  function palNames() {
+    const out = [];
+    for (let n = 1; n <= chapMax; n++) {
+      if ((jrChapPal[n] || 0) < sysPAL_NAME_T) continue;
+      let w = null;
+      try { w = typeof game.palWho === 'function' ? game.palWho(chapterDef(n).biome) : null; } catch (e) { w = null; }
+      if (w && w.call) out.push(w.call);
+    }
+    return out;
+  }
+  game.palNames = palNames;
   game.palDebug = function () {
     const out = { max: sysPAL_MAX, here: todoChapter(), tiers: {} };
     for (const k in jrChapPal) out.tiers[k] = jrChapPal[k];
@@ -29912,6 +31892,16 @@ export function createSystems(game) {
         const d = chapterDef(fn);
         place = (d && d.name) || '';
       }
+      // ---- ...AND THE NAME OUTRANKS BOTH (L6, F4 / writing B) ------------
+      // The regular in the last place reached the tier where the name is
+      // given: that is what travelled, and the place you arrive in has
+      // heard it. `place` carries the WORD — npc.js's heardName pool has no
+      // town in it. Below the reputation, which still takes the mouth.
+      if ((jrChapPal[fn] || 0) >= sysPAL_NAME_T) {
+        let w = null;
+        try { w = typeof game.palWho === 'function' ? game.palWho(chapterDef(fn).biome) : null; } catch (e) { w = null; }
+        if (w && w.call) { kind = 'name'; place = w.call; }
+      }
     }
     // ...and the reputation takes the mouth off the place rumour when there is
     // one to take. Resolved HERE and not in npc.js for the reason the whole
@@ -30100,9 +32090,13 @@ export function createSystems(game) {
   ];
   /** The headline for arriving in chapter n, or '' below tier 2. */
   function notoHeadline(n) {
+    const def = chapterDef(n);
+    // A chapter with a line of its own says it instead (L6, F4 / writing
+    // W2): the Pantanal is the one, and "nobody is going to mention it" is
+    // the whole reason the rumour yields there.
+    if (def && def.news) return def.news;
     const pool = sysNOTO_NEWS[notoTier()];
     if (!pool || !pool.length) return '';
-    const def = chapterDef(n);
     return pool[randInt(0, pool.length - 1)]
       .replace('{P}', (def ? def.name : '').toUpperCase());
   }
@@ -30278,6 +32272,8 @@ export function createSystems(game) {
     }
     const span = Math.PI * 2 - sysFIN_GAP;
     const n = chapMax > 1 ? chapMax - 1 : 1;
+    sysFinOpen = open;
+    game.state.finaleOn = true;         // the gardener stands down; npc.js reads it (L6, E5)
     for (let k = 1; k <= chapMax; k++) {
       if (!chapComplete(k)) continue;
       const a = open + sysFIN_GAP / 2 + ((k - 1) / n) * span;
@@ -30294,7 +32290,7 @@ export function createSystems(game) {
     // nothing here to gather. npc.js owns its own cast and now answers this.
     // An event rather than a call: the finale should not know what a `humans`
     // array is, and a chapter with nobody in it simply does not answer.
-    try { game.events.emit('finale:staged', { x: sysFIN_X, z: sysFIN_Z, r: sysFIN_R }); }
+    try { game.events.emit('finale:staged', { x: sysFIN_X, z: sysFIN_Z, r: sysFIN_R, mouth: open }); }
     catch (e) { /* nobody coming is not worth the ending either */ }
   }
 
@@ -30317,9 +32313,15 @@ export function createSystems(game) {
 
   function sysFinaleStep(dt) {
     if (sysFinCodaT >= 0 && shotReq) {
-      // the title's drift, a quarter turn over the coda
+      // the title's drift — a slow eighth of a turn over the coda now that
+      // the lens is inside the ring's mouth (0.16 rad/s was a quarter turn,
+      // which walked the lens into the gathered cast at 45 degrees)
       sysFinCodaT += dt;
-      shotReq.yaw = sysFinCodaYaw + sysFinCodaT * 0.16;
+      shotReq.yaw = sysFinCodaYaw + Math.sin(sysFinCodaT * 0.35) * 0.22;
+    }
+    if (codaHideT > 0) {
+      codaHideT -= dt;
+      if (codaHideT <= 0) codaEl.classList.remove('show');
     }
     if (!sysFinStaged || sysFinDone || sysFinClosing || !game.capy) return;
     const p = game.capy.position;
@@ -30351,8 +32353,18 @@ export function createSystems(game) {
   // ledger is the nineteen objects and the animal in the middle of them.
   const sysFIN_NOTE_GAP = 0.34;       // s between the nineteen
   const sysFIN_HUSH = 2.6;            // s of silence before the ledger
-  const sysFIN_CODA_DIST = 15;        // m the lens stands back
+  // THE CODA IS THE RESTING LENS, NOT THE CEREMONY'S (L6, E5). At fifteen
+  // metres a 24 cm keepsake is four pixels, and the frame the player keeps
+  // was a picnic seen past two strangers with a to-do list in the corner
+  // (review-design 2.7, qa/l6r-design-ending-04-coda.png). The horseshoe was
+  // sized for the shoulder camera (sysFIN_R's note above); the coda now uses
+  // one: seven metres, pitched low, the paper and the map off from the
+  // closing beat to the ledger, and each keepsake NAMED as its note sounds.
+  const sysFIN_CODA_DIST = 7;         // m the lens stands back
+  const sysFIN_CODA_PITCH = 0.18;
+  const sysFIN_CODA_RAISE = 0.5;
   let sysFinCodaT = -1, sysFinCodaYaw = 0, sysFinCodaN = 0;
+  let sysFinOpen = Math.PI;             // the horseshoe's mouth, world atan2(z, x)
   function sysFinaleCoda() {
     let t = 0.4;
     const chord = musCurChord;
@@ -30371,14 +32383,24 @@ export function createSystems(game) {
         const midi = musFold(chord[idx] + 12 * Math.floor((k - 1) / chord.length), sysMUS_LIFT_LO, sysMUS_LIFT_HI);
         try { musLiftNote(inst, musSnap(now + t), midi, pan, 0.14, sysFIN_NOTE_GAP * 1.6); sysFinCodaN++; } catch (e) { /* one voice missing */ }
       }
-      (function (biome, delay) {
+      (function (biome, delay, name, keep) {
         setTimeout(function () {
           try {
             const p = ph && typeof ph.keepOut === 'function' ? ph.keepOut(biome) : null;
             if (p && typeof ph.flash === 'function') ph.flash(p, 10);
           } catch (e) { /* a keepsake that will not flash is still a keepsake */ }
+          // ...and its name, with the note (L6, E5)
+          try {
+            codaEl.textContent = '';
+            codaEl.appendChild(document.createTextNode(name));
+            const i = document.createElement('i');
+            i.textContent = keep || '';
+            codaEl.appendChild(i);
+            codaEl.classList.add('show');
+            codaHideT = sysFIN_NOTE_GAP * 3;
+          } catch (e) { /* a caption */ }
         }, delay * 1000);
-      })(def.biome, t);
+      })(def.biome, t, def.name, def.keep);
       t += sysFIN_NOTE_GAP;
     }
     // the hush, at the last note's tail
@@ -30397,12 +32419,26 @@ export function createSystems(game) {
     saveSoon();
     toast('and that is the lot.', 'last');
     // the lens: the ceremony's pull-back, walked round the horseshoe
-    sysFinCodaYaw = camYaw;
+    // THE LENS LOOKS IN THROUGH THE MOUTH (L6, E5). camYaw is the bearing
+    // from the animal to the camera, with the camera at (sin, cos) of it —
+    // world atan2(z, x) of the mouth is `open`, so the yaw that stands the
+    // lens in the mouth is PI/2 - open. From there the whole horseshoe is
+    // behind the animal and the gathered cast (laid out opposite the mouth)
+    // is out of the line. The old rig kept whatever bearing the walk in had
+    // left, which was two tourists' backs in both settled frames.
+    sysFinCodaYaw = Math.PI / 2 - sysFinOpen;
     sysFinCodaT = 0;
     const sysFinCodaTotal = sysFinaleCoda();
     if (typeof game.frameShot === 'function') {
-      game.frameShot({ dist: sysFIN_CODA_DIST, pitch: 0.30, raise: 1.2, hold: sysFinCodaTotal + 1, yaw: sysFinCodaYaw });
+      game.frameShot({ dist: sysFIN_CODA_DIST, pitch: sysFIN_CODA_PITCH, raise: sysFIN_CODA_RAISE, hold: sysFinCodaTotal + 1, yaw: sysFinCodaYaw });
     }
+    // the paper, the map, the pips and the aim off for the length of it —
+    // the photo mode's own switch, put back the way it was at the ledger
+    hudRoot.classList.add('bare');
+    // and nobody walks through the shot: the crowd is asked to keep off the
+    // lawn while the ring is staged (npc.js reads it), and the closing beat
+    // says so a second time for anyone already on it
+    game.state.finaleOn = true;
     // THEN the ledger — after the line has been read, and never before the
     // player has stopped moving, which by construction they have.
     //
@@ -30416,6 +32452,8 @@ export function createSystems(game) {
       sysFinClosing = false;
       sysFinCodaT = -1;
       ended = true;
+      hudRoot.classList.toggle('bare', hudBare);
+      codaEl.classList.remove('show');
       ledShow(true);
       // the ledger brings the score back, over four seconds
       try { if (musVol && ac) musVol.gain.setTargetAtTime(musMuted ? 0.0001 : musLevel, ac.currentTime + 0.5, 1.6); } catch (e) {}
@@ -30659,6 +32697,7 @@ export function createSystems(game) {
   // the slide to be a real option, and `slidSaid` stops the prompt repeating
   // inside one session for a player who is ignoring it.
   let slidEver = false, slidT = 0, slidSaid = false;
+  let puffEver = false;   // the puff bar has been named on this journey (L6, E4)
   // ...and the same pair for the slip, which is the other half of the same
   // idea: the slide is a verb the player is given and the slip is one the
   // ground takes away. Saved beside it. See sysSLIP_SAY.
@@ -30920,6 +32959,23 @@ export function createSystems(game) {
       for (const k in rp) if (typeof rp[k] === 'number' && rp[k] > 0) jrRep[k] = rp[k];
       const ev = jrFile.eve || {};
       for (const k in ev) if (ev[k]) jrEve[k] = 1;
+      // ...and THE NOTEBOOK (L6, F4), field by field: a page is a date and an
+      // object of numbers, the last page a date and a string, and anything
+      // else on the key is left where it is.
+      const nbf = jrFile.nb || {};
+      for (const k in nbf) {
+        const p = nbf[k];
+        if (!p || typeof p !== 'object') continue;
+        if (k === 'fin') {
+          if (typeof p.t === 'string' && p.t) jrNb.fin = { d: typeof p.d === 'string' ? p.d : '', t: p.t };
+          continue;
+        }
+        const n = +k;
+        if (!(n >= 1 && n <= chapMax) || !p.f || typeof p.f !== 'object') continue;
+        const f = {};
+        for (const q in p.f) if (typeof p.f[q] === 'number' && p.f[q] === p.f[q]) f[q] = p.f[q];
+        jrNb[n] = { d: typeof p.d === 'string' ? p.d : '', f: f };
+      }
       const pl = jrFile.pal || {};
       for (const k in pl) {
         if (typeof pl[k] !== 'number') continue;
@@ -30945,6 +33001,7 @@ export function createSystems(game) {
       slidEver = !!jrFile.slid;
       slipEver = !!jrFile.slip;
       paperEver = !!jrFile.paper;
+      puffEver = !!jrFile.puff;
       // a chapter already finished on the file must not throw its party again
       for (let n = 1; n <= chapMax; n++) if (chapComplete(n)) jrChapDone[n] = true;
     } else if (!restore) {
@@ -32549,8 +34606,16 @@ export function createSystems(game) {
         // bleached — so pull white a quarter of the way back toward the horizon
         // and a dusty sky gets dusty cloud with no second table.
         sysCloudSkyBody.setRGB(1, 1, 1).lerp(hz, sysCLOUD_SKY_TINT);
-        const cm = cs.material;
-        if (!cm.color.equals(sysCloudSkyBody)) cm.color.copy(sysCloudSkyBody);
+        // ...which is now the TOP uniform (E6): the sun side of a puff is the
+        // sky bleached, exactly as before. The base is the same pull toward
+        // the horizon taken further and then the BASE fraction of it, so a
+        // cloud's underside is the light that is actually under it, darker.
+        sysCloudTopU.value.copy(sysCloudSkyBody);
+        sysCloudBaseU.value.setRGB(1, 1, 1).lerp(hz, Math.min(1, sysCLOUD_SKY_TINT * sysCLOUD_SKY_SHADE))
+          .multiplyScalar(sysCLOUD_SKY_BASE);
+        // and the sun, into VIEW space, because the puff's normal is read
+        // there — the same hand-over leafTick makes for the foliage
+        sysCloudSunV.value.copy(sysAxDir).transformDirection(camera.matrixWorldInverse);
       }
     }
 
@@ -33351,6 +35416,119 @@ export function createSystems(game) {
     return true;
   }
 
+  // ---- THE SHADERS, BEHIND THE WHITE (L6, E8 / qa F1) -----------------------
+  //
+  // WHAT THE STALL WAS. Every first entry was one frozen frame of 1.5–5.7 s
+  // (qa/l6-load.js: Cave 5 700, Antarctica 4 983, Pantanal 3 800, Hanoi
+  // 3 033) and the review read it as the build. It was not: `tSwitch` — the
+  // first rAF that saw the new chapter live — landed 0–130 ms after the fade,
+  // so ensureBuilt() is cheap. The stall was the FIRST DRAW: the driver
+  // compiles a chapter's 7–32 new programs the moment one is used, on the
+  // main thread, at ~180 ms each on the Arc's D3D11 path. And because the
+  // game loop keeps drawing under the white, the stall happened to fall
+  // inside the hold — `progAfter` read 0 in 16/19 — so the player saw a
+  // card whose animation stopped dead and then a world, and a synchronous
+  // renderer.compile() here would have moved nothing at all.
+  //
+  // WHAT IS HERE. `KHR_parallel_shader_compile` is on this path (and on
+  // every Chromium/ANGLE build): linkProgram returns at once and the driver
+  // compiles on its own threads, and a program is only waited on when a
+  // draw first uses it. So: link every program the new chapter needs the
+  // moment it is attached, then DO NOT DRAW until they answer ready
+  // (`game.state.renderHold`, consumed in game.tick). The world steps, the
+  // postcard rises on the compositor, nothing on the main thread waits. The
+  // crossing takes as long as the compile takes, which is what it already
+  // took, and the frame stops being the thing that pays for it.
+  //
+  // Scoped to the chapter's own objects (game.biome.objectsOf) and lit from
+  // the live scene: renderer.compile(scene, camera) walks the eighteen
+  // detached chapters as well and would compile their materials against
+  // this chapter's fog and lights. three's compile() only asks its first
+  // argument for traverse(), so a two-method shim over the chapter's roots
+  // is enough; anything else about the renderer being unavailable falls
+  // through to the draw compiling on first use, exactly as before.
+  //
+  // Without the extension isReady() answers true at once and the hold is a
+  // frame long; with a promise that never comes back, sysWARM_MAX_MS clears
+  // it here and MAIN_HOLD_MAX_MS clears it in main.js.
+  const sysWARM_MAX_MS = 8000;
+  const sysWARM_POLL_MS = 12;
+  let biomeWarmN = 0;               // which warm is live; a new cross supersedes
+  // traverse() is what compile() prepares materials from. traverseVisible()
+  // is what it gathers LIGHTS from — from the target scene AND from its
+  // first argument — and the chapter's roots are already in the target
+  // scene, so the Cave's ten point lights were counted twice (key token
+  // `numPointLights` 20 at the warm, 10 at the draw: 52 of 55 materials
+  // recompiled on the first frame and the 6.4 s stall stayed). A no-op.
+  //
+  // AND THE WHOLE VISIBLE SCENE, NOT ONLY THE CHAPTER'S ROOTS. The animal,
+  // the locals, the props, the sky and the weather are lit by this chapter's
+  // lights too, and a program is keyed on the light count: their materials
+  // needed a ten-point-light variant on the Cave's first frame that nothing
+  // had compiled (13 programs, 2.5 s, after the chapter's own were warm).
+  // traverseVisible over the scene skips the eighteen detached chapters —
+  // which is the reason for not using compile(scene) — and skips the live
+  // chapter's at-rest-hidden effects, which the roots' full traverse then
+  // picks up. An object seen twice costs a cache lookup.
+  const biomeWarmShim = {
+    objs: null,
+    traverse: function (fn) {
+      scene.traverseVisible(fn);
+      const a = this.objs; for (let i = 0; i < a.length; i++) a[i].traverse(fn);
+    },
+    traverseVisible: function () {},
+  };
+  function biomeWarmDone(id) {
+    if (id !== biomeWarmN) return;   // a later crossing owns the hold now
+    game.state.renderHold = false;
+    game.state.warmMs = +(performance.now() - game.state.warmAt).toFixed(0);
+  }
+  function biomeWarm(name) {
+    const id = ++biomeWarmN;
+    // A new crossing ends the old hold whatever happens below: the earlier
+    // poll stops answering to `id`, so it must not be the one to clear it.
+    game.state.renderHold = false;
+    // A TEST HOOK, never a verb: `game.state.noWarm` lets a probe measure the
+    // crossing with and without the warm in one session, under one load —
+    // the only differential a contended machine can give (qa/l6-load-ab.js).
+    if (game.state.noWarm) return;
+    const bio = game.biome;
+    const objs = bio && typeof bio.objectsOf === 'function' ? bio.objectsOf(name) : null;
+    if (!objs || !objs.length || !renderer || typeof renderer.compile !== 'function' || !renderer.properties) return;
+    let mats = null;
+    game.state.warmAt = performance.now();
+    game.state.renderHold = true;
+    // INTO THE TARGET THE SCENE IS ACTUALLY DRAWN INTO. A program is keyed on
+    // its destination (colour space, tone mapping): compiled against the
+    // screen, the warm linked one set and the first draw into the composite's
+    // target compiled another — see post.warmTarget in main.js.
+    const rt = game.post && typeof game.post.warmTarget === 'function' ? game.post.warmTarget() : null;
+    try {
+      biomeWarmShim.objs = objs;
+      if (rt) renderer.setRenderTarget(rt);
+      mats = renderer.compile(biomeWarmShim, camera, scene);
+    } catch (e) {
+      mats = null;
+    } finally {
+      biomeWarmShim.objs = null;
+      try { renderer.setRenderTarget(null); } catch (e) { /* context lost */ }
+    }
+    if (!mats || typeof mats.forEach !== 'function' || !mats.size) { biomeWarmDone(id); return; }
+    game.state.warmN = mats.size;
+    const props = renderer.properties;
+    const poll = function () {
+      if (id !== biomeWarmN) return;
+      mats.forEach(function (m) {
+        const pr = props.get(m);
+        const p = pr && pr.currentProgram;
+        if (!p || typeof p.isReady !== 'function' || p.isReady()) mats.delete(m);
+      });
+      if (!mats.size || performance.now() - game.state.warmAt > sysWARM_MAX_MS) biomeWarmDone(id);
+      else setTimeout(poll, sysWARM_POLL_MS);
+    };
+    poll();
+  }
+
   /** Hard cut: swap the world, land the capybara on its spawn. No fade. */
   function biomeGo(name) {
     const bio = game.biome;
@@ -33380,6 +35558,12 @@ export function createSystems(game) {
       try { game.physics.release(null); } catch (e) {}
     }
     if (!bio.switchTo(name)) return false;
+    // The chapter is attached and visible and its lights are the scene's:
+    // link its programs now, and hold the draw until they are ready. See
+    // THE SHADERS, BEHIND THE WHITE. And the shadow map is the old chapter's
+    // until the pass runs — at half rate that has to be asked for by name.
+    game.state.shadowDirty = true;
+    biomeWarm(name);
     teleportCapy(typeof bio.spawnOf === 'function' ? bio.spawnOf(name) : bio.SYDNEY_SPAWN, true);
     // AFTER the teleport, because the copy is put down where the animal IS and
     // before it the animal is still standing in the country it has left.
@@ -33430,7 +35614,20 @@ export function createSystems(game) {
     musCross(-1);
     setTimeout(function () {
       biomeGo(name);
-      setTimeout(function () {
+      // ---- THE WHITE COMES OFF A DRAWN FRAME, NOT A TIMER (L6, E8) --------
+      // The 460 ms hold used to be armed here and fire whenever it could —
+      // which, with the first draw stalling the thread for seconds, was the
+      // instant that draw returned: the white lifted off the back of the
+      // freeze with no hold at all. Now the draw is held while the shaders
+      // compile (biomeWarm), so the release waits for THREE things: the
+      // minimum hold, so the card is readable; the warm to have let go; and
+      // two frames actually drawn since, so the first picture the player
+      // sees is the second one — the first uploads the chapter's geometry
+      // and the shadow map. Polled on a timer rather than rAF so a hidden
+      // tab still finishes its crossing, and capped so a hold that never
+      // clears cannot keep the card up for ever.
+      const heldAt = performance.now(), frames0 = game.state.frames | 0;
+      const release = function () {
         fadeEl.classList.remove('on');
         transBusy = false;
         // The palette was swapped by biome:enter inside the hold, so this is
@@ -33461,7 +35658,15 @@ export function createSystems(game) {
           fadeName.textContent = '';
         }, sysFADE_OUT + 60);
         if (onArrive) setTimeout(onArrive, 600);
-      }, sysFADE_HOLD);
+      };
+      const wait = function () {
+        const held = performance.now() - heldAt;
+        const drawn = (game.state.frames | 0) - frames0;
+        const ready = !game.state.renderHold && drawn >= 2;
+        if ((held >= sysFADE_HOLD && ready) || held >= sysFADE_HOLD_MAX) release();
+        else setTimeout(wait, 16);
+      };
+      setTimeout(wait, sysFADE_HOLD);
     }, sysFADE_OUT);
     return true;
   }
@@ -33979,7 +36184,10 @@ export function createSystems(game) {
   //
   //   rung 0   everything
   //   rung 1   pixels — dpr scale sysPF_DPR (0.6; the old floor was 0.7)
-  //   rung 2   ...and the shadow map 2048 → 1024
+  //   rung 2   ...and the shadow map 2048 → 1024, drawn every other frame,
+  //            and the world stepping at most twice a frame with dt clamped
+  //            to 1/20 (L6, E8 / qa F3 — the solver's bill used to GROW as
+  //            the frame slowed; see MAIN_SHED_RUNG in main.js)
   //   rung 3   ...and the composite's DoF and wide crease off
   //
   // DOWN when the half-second mean frame is over sysPF_SLOW_MS for
@@ -34024,7 +36232,11 @@ export function createSystems(game) {
   const sysPF_BOUNCE_S = 20;     // s — a step down this soon after a step up is a bounce
   const sysPF_DPR      = 0.6;    // dpr scale from rung 1 up
   const sysPF_SHADOW   = 1024;   // shadow map from rung 2 up
-  const sysPF_SAY_S    = 8;      // s of play before the note may be said — past Begin's own pills
+  // 8 -> 30 (L6, E4 / play 8): the apology shared the first ten seconds with
+  // the first tick on the fresh player's run. Half a minute in, the player has
+  // read the paper; and it never lands inside sysPF_TICK_GAP of a tick pill.
+  const sysPF_SAY_S    = 30;     // s of play before the note may be said
+  const sysPF_TICK_GAP = 3.0;    // s after a tick pill the note waits
   let pfSlowT = 0, pfFastT = 0, pfUpNeed = sysPF_UP_S, pfLastUp = -1e9, pfSaid = false, pfOnT = 0;
   let pfBiome = '', fpsPrev = 0, pfMs = 16.7, pfFastMs = 18;
   function sysPerfSet(r) {
@@ -34034,6 +36246,9 @@ export function createSystems(game) {
     game.state.perfRung = r;
     const scale = r >= 1 ? sysPF_DPR : 1;
     if (scale !== dprScale) { dprScale = scale; applyDPR(); }
+    // The far cascade is the first thing to go (THE FAR CASCADE): it is one
+    // whole extra shadow pass, and it is gone on the same step as the pixels.
+    if ((r === 0) !== sysFarOn) sysFarSet(r === 0);
     const res = r >= 2 ? sysPF_SHADOW : sysSHADOW_RES;
     if (res !== sysShadowRes) {
       sysShadowRes = res;
@@ -34043,6 +36258,9 @@ export function createSystems(game) {
       // ...and the texel snap in sunFollow is now on a different grid.
       sysTexelX = (sysShadowHalf * 2) / sysShadowRes;
       sysTexelY = (sysShadowTop + sysShadowHalf) / sysShadowRes;
+      // ...and the map is null until the pass runs: at half rate (main.js,
+      // MAIN_SHED_RUNG) a frame that skipped it would light everything.
+      game.state.shadowDirty = true;
     }
   }
   /** The governor's own numbers, for the overlay and the harness. */
@@ -34259,7 +36477,10 @@ export function createSystems(game) {
    */
   game.recordLive = recordLive;
   game.recordEnd = recordEnd;
-  game.toast = toast;
+  // The public door marks a line with no kind as AMBIENT (see toast): from
+  // here, that is what a chapter's narration looks like. A kind passed
+  // through is what it was.
+  game.toast = function (text, kind) { toast(text, kind, kind === undefined); };
   /**
    * A CONTROL LINE, TOASTED IN THE SCHEME THE PLAYER IS HOLDING (D5.2).
    *
@@ -34430,6 +36651,16 @@ export function createSystems(game) {
       pal: musPalN, chapProg: +musProg.toFixed(3),
       skyRain: +skyRainNow.toFixed(3), skyCut: +skyCutNow.toFixed(1),
       second: !!sysMUS_2ND[musPalN], secondN: musSecondN,
+      // THE PROGRESS LAYERS (L6, E3): the three gains as chapProg opens them —
+      // the shimmer (continuous), the second voice (from sysMUS_2ND_AT, when
+      // the palette has one), the pulse (from sysMUS_LAYER_PULSE, pad
+      // palettes). Monotone in chapProg by construction. `pulseN` counts.
+      layers: [+(musProg * 0.85).toFixed(3),
+               sysMUS_2ND[musPalN] ? +clamp((musProg - sysMUS_2ND_AT) / (1 - sysMUS_2ND_AT), 0, 1).toFixed(3) : 0,
+               (musPal && musPal.band) ? 0 : +clamp((musProg - sysMUS_LAYER_PULSE) / (1 - sysMUS_LAYER_PULSE), 0, 1).toFixed(3)],
+      pulseN: musPulseN,
+      // THE SLEEP (L6, E3): 0 awake, 1 gone; and the edges counted
+      sleep: +musSleep.toFixed(3), sleepN: musSleepN, wakeN: musWakeN,
       // THE MELODY (L3, F2): where the walk is, and how many cells have played
       melDeg: musMelDeg, melCells: musMelCells, melN: musMelN, melNext: musMelNext, throws: musThrows,
       // THE STRING (L3-12): is the worklet up, and how many plucks it has taken
@@ -36172,7 +38403,7 @@ export function createSystems(game) {
                // The per-call room send sfx() would build for a sound here,
                // as a share of the live room's `wet` (0.35 at the feet, 1.0
                // sixty metres past `near`), and the dry it gives back.
-               wet: g > 0 ? +(sysSEND_NEAR + (1 - sysSEND_NEAR) * sysSendK(sysSfxDist, near)).toFixed(3) : 0,
+               wet: g > 0 ? +(acSendNear + (1 - acSendNear) * sysSendK(sysSfxDist, near)).toFixed(3) : 0,
                roomWet: +acRoomWet.toFixed(3),
                ear: { x: sysEar.x, y: sysEar.y, z: sysEar.z },
                earVel: { x: +sysEarVel.x.toFixed(2), y: +sysEarVel.y.toFixed(2),
@@ -36276,7 +38507,7 @@ export function createSystems(game) {
           rate: +m.rateNow.toFixed(4), d: +m.d.toFixed(2),
           k: +m.k.toFixed(3), amp: +m.amp.toFixed(3), parkedT: +m.parkedT.toFixed(1),
           // L4, audio #6: the mover's own room send, as a share of the row's wet
-          send: m.send ? +(sysSEND_NEAR + (1 - sysSEND_NEAR) * (m.live ? sysSendK(m.d, m.near) : 0)).toFixed(3) : 0,
+          send: m.send ? +(acSendNear + (1 - acSendNear) * (m.live ? sysSendK(m.d, m.near) : 0)).toFixed(3) : 0,
         });
       }
       return { biome: (game.biome && game.biome.current) || '', live: liveN,
@@ -36425,7 +38656,10 @@ export function createSystems(game) {
       return { biome: acRoomFor, wet: acRoomWet, key: sysRoomKey(),
                conv: !!(acRoomConv && acRoomConv.buffer),
                secs: acRoomConv && acRoomConv.buffer ? acRoomConv.buffer.duration : 0,
-               bus: !!acSfxIn };
+               bus: !!acSfxIn,
+               // L6, E3: the live near share and the make-up on the return
+               near: acSendNear, makeup: +acRoomMakeup.toFixed(3),
+               out: acRoomOut ? +acRoomOut.gain.value.toFixed(3) : null };
     },
     /** Is the camera out, and how many pictures has it taken. */
     photoAudit: function () { return { on: photoOn, shots: photoShots, lens: +photoLens.toFixed(3),
@@ -36511,6 +38745,14 @@ export function createSystems(game) {
     albumShow: function () { albShow(); },
     chapRecap: function (n) { return chapRecap(n); },
     showDone: function (n, sub, kicker) { showDone(n, sub, kicker); },
+    // the moment card, for the harness (L6, E4): it defers under a marquee
+    showMoment: function (k, t, n) { showMoment(k, t, n); },
+    /** The toast machinery's window (L6, E4): what waits, and who has the floor. */
+    toastAudit: function () {
+      return { queued: sysToastQ.length, held: sysToastHeld.length, live: wowLiveOn,
+               floorFor: +sysToastFloorFor.toFixed(2), sinceFloor: +(sysWall() - sysToastFloorAt).toFixed(2),
+               momentHeld: !!sysMomentDefer, whyLast: sysWhyTxt, heardLast: sysHeardTxt };
+    },
     leaveAudit: function () { return { busy: leaveBusy, n: leaveN, said: game.state.leaveSaid || 0 }; },
     codaAudit: function () { return { notes: sysFinCodaN, hushed: sysFinHushed, running: sysFinCodaT >= 0, yaw: +sysFinCodaYaw.toFixed(2),
                                        music: musVol ? +musVol.gain.value.toFixed(4) : null, closing: sysFinClosing, done: sysFinDone }; },
@@ -36577,6 +38819,7 @@ export function createSystems(game) {
     // times a session for the sake of a handful, and a chapter that has already
     // composed its own wording should be able to say so.
     say: function (s) { toast(sysSay(s)); },
+    heard: heard,
     completeTask: completeTask,
     // The ids of one chapter, so a probe can finish a place without a table
     // of nineteen literals that goes stale the moment a task is renamed.
@@ -37893,7 +40136,7 @@ export function createSystems(game) {
     // arrangement has to be made again the next time you walk in. See THE LAWN.
     // ...and every OTHER arrival, on a journey that is finished but has not
     // been closed, is a chance to say where the last of it is. See sysEndSayHome.
-    if (name === 'sydney') sysFinaleCheck(); else { sysFinStaged = false; sysEndSayHome(); }
+    if (name === 'sydney') sysFinaleCheck(); else { sysFinStaged = false; game.state.finaleOn = false; sysEndSayHome(); }
     // Every biome is authored in the SAME coordinates, so a breadcrumb dropped
     // on the Corso is a point inside a basilica once Venice is attached. The
     // trail belongs to the world it was walked in and to no other.
@@ -39271,6 +41514,9 @@ export function createSystems(game) {
     // scaled one — a find should not take longer to notice in slow motion.
     findTick(game.state.rawDt || dt);
     if (sysFresh && started && !game.state.paused) { sysFreshT += dt; sysToastDrain(); }
+    sysToastDrainQ();     // one voice at a time — see toast()
+    sysMomentTick();      // a tutorial card held for the marquee
+    sysHeardTick();       // an overheard pill gives way to the same words in a bubble
     wowShotTick(game.state.rawDt || dt);
     sysMoveTick(dt);
     eveTick(dt);
@@ -39343,6 +41589,7 @@ export function createSystems(game) {
     hintT -= dt;
     if (hintT <= 0) {
       hintT = sysHINT_TICK;
+      let howUp = false;      // the marquee's how has the sheet this tick (L6, E4)
       // ---- ...AND HOW FAR THE MARQUEE IS (B1) ----------------------------
       // On the signpost's own line, in the clue's soft italic and NOT in the
       // aim's accent: the accent on this card means "this is where the arrow
@@ -39384,8 +41631,10 @@ export function createSystems(game) {
         // caption — "the party bus. it goes up the hill and it does not wait"
         // — and the second sentence is the one the card cannot afford. The
         // first clause names the place; the metres and the clock do the rest.
+        sysMarqNear = false;
         if (mp) {
           const md = Math.sqrt((mp.x - p.x) * (mp.x - p.x) + (mp.z - p.z) * (mp.z - p.z));
+          sysMarqNear = md < sysMARQ_NEAR;
           // A NON-BREAKING SPACE in the figure. `.capyui-marqsay` is a wrapping
           // sentence and not the aim's `white-space:nowrap` chip, so an
           // ordinary space lets "40" end one line and "m" start the next.
@@ -39408,14 +41657,25 @@ export function createSystems(game) {
         // todoParLine's, one card element over.
         if (when) line += '\u00a0·  ' + when;
         if (marqSayEl.textContent !== line) marqSayEl.textContent = line;
+        // the where-line stays on the full sheet only while it is a clock —
+        // see the .capyui-marqsay fold rule (L6, E4)
+        marqEl.classList.toggle('when', !!when);
         // ---- HOW (W3): the marquee's own clue, unless the row is top -----
+        // ---- ...AND ONLY WHEN THE MARQUEE IS THE THING YOU ARE AT (L6, E4
+        // / writing W8). Hanoi's arrival showed two clues: the marquee's how
+        // over the top row's clue. One clue on the sheet: within
+        // sysMARQ_NEAR of the marquee point the how is up and the top row's
+        // clue folds; further off, the top row's clue has the sheet and the
+        // signpost keeps its name and sentence. The fresh player's nine
+        // wheeks at the podium happened inside this radius.
         const hw = sysHINTS[marqId];
         let how = '';
-        if (hw && todoTopId !== marqId) {
+        if (hw && todoTopId !== marqId && sysMarqNear) {
           try { how = sysSay(typeof hw.clue === 'function' ? hw.clue() : hw.clue) || ''; } catch (e) { how = ''; }
         }
         if (marqHowEl.textContent !== how) marqHowEl.textContent = how;
         marqEl.classList.toggle('how', !!how);
+        howUp = !!how;
       }
       hintHas = false;
       const h = started && todoTopId ? sysHINTS[todoTopId] : null;
@@ -39444,12 +41704,21 @@ export function createSystems(game) {
         // Rewritten BEFORE the comparison, not after: comparing the raw clue
         // against the rewritten text on screen is never equal, and this runs
         // four times a second.
-        const clue = todoParLine(todoTopId, sysSay(typeof h.clue === 'function' ? h.clue() : h.clue));
+        // ...and folded while the marquee's how has the sheet (L6, E4): one
+        // clue at a time. The element keeps its words so it comes back
+        // without a rewrite; only the fold moves.
+        const clue = howUp ? '' : todoParLine(todoTopId, sysSay(typeof h.clue === 'function' ? h.clue() : h.clue));
         if (clue !== clueEl.textContent) {
           clueEl.textContent = clue || '';
           clueEl.classList.toggle('off', !clue);
         }
       }
+      // ---- ARMED, NOT FINISHED (L6, E4 / design 2.6b): the theft rows ----
+      // The physics audit says which rows are armed (a prop in the mouth
+      // standing for them); each open row on the paper gets its state line.
+      // Four times a second, a handful of rows at most, no allocation past
+      // the audit's own.
+      sysArmedTick();
     }
     todoTuckTick(dt);
     // the riddle's clock (L3-14): the arrow comes on its own after a while
@@ -40190,6 +42459,20 @@ export function createSystems(game) {
       cloudSet(sysCloudForce >= 0 ? sysCloudForce : sysCalmOn() ? 0 : day * (sysCLOUD_SHADOW_BASE + cv * sysCLOUD_SHADOW_MORE));
     }
     sysDressFrame(dt);
+    // ---- THE SPLIT (L6, E1 — THE FAR CASCADE) ------------------------------
+    // LAST in the light section, after every writer and every reader of the
+    // sun's intensity: the key has held its lit value on the SUM, the dome, the
+    // leaf and the cloud cards have read it. Only now does the far light take
+    // its share, and atmosApply rewrites the total on the next frame. Parked
+    // (any rung but 0) the share is zero and NEAR is the whole sun, which is
+    // the frame as it was before this existed.
+    {
+      const fk = sysFarOn ? sysFAR_SHARE : 0;
+      sunFar.color.copy(sun.color);
+      sunFar.intensity = sun.intensity * fk;
+      sun.intensity *= 1 - fk;
+      game.state.sunTotal = sun.intensity + sunFar.intensity;   // for the probes
+    }
     // ...and the bed the atmosphere is heard over. Immediately after the
     // picture, because it is the other half of the same state: the shower that
     // just took a third of the sun is the shower you can now hear.
@@ -40307,6 +42590,15 @@ export function createSystems(game) {
         stamShown = want;
         stamEl.classList.toggle('show', want);
         stamLblEl.classList.toggle('show', want);
+        // ---- AND THE FIRST TIME IT APPEARS IT IS NAMED (L6, E4 / play 7).
+        // A bar with a word on it is a puzzle to a player who has not been
+        // told what the word means. Once a journey, on the save with the
+        // slide's and the paper's.
+        if (want && !puffEver && !transBusy) {
+          puffEver = true;
+          saveSoon();
+          toastKeep('that bar is your puff. a run spends it; stand still and it comes back.');
+        }
       }
       const low = s < 0.28;
       if (low !== stamLow) { stamLow = low; stamEl.classList.toggle('low', low); }
@@ -40642,12 +42934,14 @@ export function createSystems(game) {
       const wantAmb = started && !muted && !game.state.paused && !document.hidden;
       ambientSet(wantAmb);
       if (wantAmb) {
-        // THE CALM STRETCHES THE GAPS. Not the levels — a settled world is not
-        // a quieter world, it is a world in which less is happening — so the
-        // clock runs slow rather than the bus coming down, and at a full hold
-        // a place speaks up about two thirds as often. It is the cheapest of
-        // the three calm readers and the one you notice last, which is right.
-        ambTimer -= dt * (1 - sysCalmNow * 0.35);
+        // THE CALM SHORTENS THE GAPS (L6, E3; it stretched them until then).
+        // Not the levels — every volume in this ladder was tuned by ear as "a
+        // distant thing" — but the clock: at a full hold a place speaks up
+        // 1.4× as often, because the still state is the world's and a player
+        // who has stopped to listen should hear more of the place, not less.
+        // Measured before: Kyoto's ladder fired 5 rungs in two minutes of
+        // play and the world bus sat 17 dB under the score at rest.
+        ambTimer -= dt * (1 + sysCalmNow * 0.4);
         // ---- ONE SOUNDSCAPE PER PLACE -----------------------------------
         // This used to be "a silver gull, unless you are in the Andes", which
         // was right when there were two biomes and became wrong the moment
@@ -41593,6 +43887,32 @@ export function createSystems(game) {
     const musWant = clamp(game.state.chaos * 0.7 + (musChaseT > 0 ? 0.55 : 0)
                           + musHeat * sysHEAT_MUS + sysFlowNow * sysFLOW_MUS, 0, 1);
     musIntensity = damp(musIntensity, musWant, musChaseT > 0 ? 0.9 : 0.35, dt);
+    // ---- THE SLEEP, INTEGRATED (L6, E3) ---------------------------------
+    // Per frame, on the game clock, with hysteresis on the nap: over 0.6 the
+    // score goes (ten seconds to nothing), under 0.4 it is a wake (a second
+    // and a bit back). The wake is an EDGE — the latch — because it does two
+    // things once: pulls the next chord forward to now, and plays one note on
+    // the lead a third of a second before it, as an upbeat. Both through the
+    // scheduler's own clock and voices; nothing here is a second writer.
+    {
+      const napNow = sysNapNow;
+      if (!musSleepOn && napNow > sysMUS_SLEEP_ON) { musSleepOn = true; musSleepN++; }
+      else if (musSleepOn && napNow < sysMUS_SLEEP_OFF) {
+        musSleepOn = false; musWakeN++;
+        if (ac && musVol && ac.state === 'running' && musCurChord && musCurChord.length && !musMuted) {
+          const tw = ac.currentTime;
+          const lead = (musPal && musPal.lead && musPal.lead !== 'none') ? musPal.lead : 'pluck';
+          try {
+            musLiftNote(lead, tw + 0.05, musFold(musMelPick(musCurChord) + 12, 64, 88), 0, sysMUS_SLEEP_UP, 0.4);
+          } catch (e) { /* one voice missing; the chord still comes */ }
+          musChordAt = tw + 0.42;
+          musPluckAt = Math.max(musPluckAt, tw + 0.9);
+        }
+      }
+      const sleepWant = musSleepOn ? 1 : 0;
+      const sleepRate = musSleepOn ? 1 / sysMUS_SLEEP_IN : 1 / sysMUS_SLEEP_OUT;
+      musSleep += clamp(sleepWant - musSleep, -sleepRate * dt, sleepRate * dt);
+    }
     musApplyT += dt;
     if (musApplyT > 0.3 && musPad && ac.state === 'running') {
       musApplyT = 0;
@@ -41612,6 +43932,10 @@ export function createSystems(game) {
       // filter and the bass terms are proportional rather than absolute
       // because the palettes run from cut 470 to cut 1320 and a flat 500 Hz
       // subtraction would take the Drift's pad below its own fundamental.
+      // (L6, E3: the pad no longer comes up with the calm — it comes DOWN 4 dB,
+      // sysMUS_CALM_PAD. Measured, the lift made the still state as loud as a
+      // chase; and the still state is the world's, not the score's. The filter
+      // and the bass keep the lean above; "closer" is still the shape.)
       const lift = musLiftNow();
       // ---- ...AND THE LOAF SWELLS IT FURTHER (v23) ---------------------
       // musCalm saturates at 1 and sysCalmNow gets there on eight seconds of
@@ -41665,14 +43989,46 @@ export function createSystems(game) {
       const voiceCutK = isBand ? 1 : sysMUS_VOICE.cutK;
       const voiceBassK = isBand ? 1 : sysMUS_VOICE.bassK;
       const chaseOn = musChaseT > 0 && !isBand ? 1 : 0;
-      sysAudioSet(musPad.gain, musPal.bus * voiceBusK * (1 - (chaseOn ? sysMUS_CHASE_PAD : musIntensity * 0.3)) *
-        (1 + 0.32 * lift) * (1 + calmLean * sysCALM_MUS) * musBreath *
-        (1 + skyRain * sysMUS_SKY_BUS) * (1 - 0.18 * musSpeak) * musPadSpecK,
-        nowA, lift > 0.02 ? 0.6 : musSpeak > 0.5 ? 0.35 : 1.2);
+      // ---- THE RANGE, THE STING AND THE SLEEP ARE THREE MORE TERMS (L6, E3)
+      // Same one writer. The calm now CUTS the pad (it lifted it, which is why
+      // the still state measured as loud as a chase); a sting takes 45 % off
+      // for its own length; the sleep takes it to nothing. `sleepK` is the
+      // one factor that is allowed to reach the floor — everything else is a
+      // lean — and the time constant follows whichever is moving fastest:
+      // the sting's attack, the sting's release, the lift, or the rest.
+      const sleepK = Math.max(0.0001, 1 - musSleep);
+      const stingK = 1 - sysMUS_STING_PAD * musStingPad;
+      const padTau = musStingPad > 0.5 ? sysMUS_STING_IN : musStingPad > 0 ? sysMUS_STING_OUT
+                   : lift > 0.02 ? 0.6 : musSpeak > 0.5 ? 0.35 : 1.2;
+      // The bands have no chase layer — the band is the layer, and its pad
+      // bus (0.045–0.062) is its only sustained mid-range — so on a band the
+      // intensity LIFTS the pad instead of ducking it (sysMUS_INT_BAND).
+      // Measured with the duck at 0.8 (states probe, Venice): the pad fell
+      // 7.5 dB into a chase, the bass doubled and the centroid went 165 → 128.
+      const intPad = isBand ? -sysMUS_INT_BAND : sysMUS_INT_PAD;
+      // The chase's rise and the lift's are each allowed on their own and
+      // capped TOGETHER (sysMUS_PAD_STACK): a marquee in the middle of a
+      // chase is rare, and ×1.6 × ×1.9 measured as a −4.5 dBFS peak.
+      const padUp = Math.min(isBand ? 1 + sysMUS_LIFT_BAND : sysMUS_PAD_STACK,
+        (1 - (chaseOn ? sysMUS_CHASE_PAD : musIntensity * intPad)) *
+        (1 + (isBand ? sysMUS_LIFT_BAND : sysMUS_LIFT_PAD) * lift));
+      sysAudioSet(musPad.gain, Math.max(0.0001, musPal.bus * voiceBusK * padUp *
+        (1 - clamp(calmLean, 0, 1) * sysMUS_CALM_PAD) * musBreath *
+        (1 + skyRain * sysMUS_SKY_BUS) * (1 - 0.18 * musSpeak) * musPadSpecK * stingK * sleepK),
+        nowA, padTau);
+      // ...and the pad palettes' cut has a floor (sysMUS_VOICE.cutFloor) under
+      // the opened value AFTER the calm's lean: measured with the floor
+      // before it, the calm closed Sydney's 992 to 575 at rest and the share
+      // over 500 Hz fell rather than rose. The darkest palettes stay the
+      // darkest above the floor; nothing RESTS under 900 Hz any more. The
+      // breath, the sky and a voice still close it from there, as before.
+      const padCut = isBand ? musPal.cut * (1 - clamp(calmLean, 0, 2) * 0.22)
+                   : Math.max(sysMUS_VOICE.cutFloor, musPal.cut * voiceCutK * (1 - clamp(calmLean, 0, 2) * 0.22));
       sysAudioSet(musFilt.frequency, Math.max(180,
-        musPal.cut * voiceCutK * (1 - clamp(calmLean, 0, 2) * 0.22) +
-        musIntensity * 780 + chaseOn * sysMUS_CHASE_CUT + lift * 760 - br * sysMUS_BREATH_CUT - skyCut - 220 * musSpeak),
-        nowA, lift > 0.02 ? 0.7 : 1.4);
+        padCut +
+        musIntensity * 780 + chaseOn * sysMUS_CHASE_CUT + lift * 760 - br * sysMUS_BREATH_CUT - skyCut - 220 * musSpeak -
+        sysMUS_STING_CUT * musStingPad),
+        nowA, musStingPad > 0.5 ? sysMUS_STING_IN : musStingPad > 0 ? sysMUS_STING_OUT : lift > 0.02 ? 0.7 : 1.4);
       // `musChaseHit` is P4's chase onset: a lean on the bottom of the band at
       // the moment somebody starts after you. A TERM in the one expression that
       // writes this gain, not a second writer — musBassGain already has exactly
@@ -41682,8 +44038,12 @@ export function createSystems(game) {
         // ...and the bass does not climb with the intensity DURING a chase (L4,
         // F3): measured, it doubled (0.07 -> 0.19) and pulled the centroid
         // under calm's however bright the pulse was; the onset hit is halved
-        musIntensity * 0.08 * (1 - chaseOn) + chaseOn * sysMUS_CHASE_BASS + lift * 0.05 + musChaseHit * 0.15) * musBreath,
-        nowA, musChaseHit > 0.02 ? 0.28 : 1.5);
+        // ...and on a band the climb is halved (L6, E3): a band's chase is
+        // its intensity, and a bass that doubled was the whole of why Venice's
+        // chase measured darker than its rest.
+        musIntensity * 0.08 * (1 - chaseOn) * (isBand ? 0.5 : 1) + chaseOn * sysMUS_CHASE_BASS + lift * 0.05 + musChaseHit * 0.15) * musBreath *
+        sleepK,   // THE SLEEP (L6, E3): the bass goes with the pad
+        nowA, musChaseHit > 0.02 ? 0.28 : musSleep > 0 ? 0.8 : 1.5);
       // ---- THE WORLD MAKES ROOM (L4, E2 / audio #5) ----------------------
       // `acSfxIn.gain` had exactly one write — `= 1` at construction — so the
       // arrival phrase, the six stings and the lift all played on top of a
@@ -41709,6 +44069,8 @@ export function createSystems(game) {
       }
       musStingEnv *= 0.55;
       if (musStingEnv < 0.01) musStingEnv = 0;
+      musStingPad *= 0.69;
+      if (musStingPad < 0.01) musStingPad = 0;
       // ---- ...AND THE BAND MAKES ROOM FOR THE LIFT (F3) -----------------
       //
       // Every other bus in this block answers `lift`, `calmLean` and
@@ -41726,11 +44088,12 @@ export function createSystems(game) {
       // that does not. 0.35 is a duck and not a mute — a paradinha is the
       // band stopping, and that is a different idea from the band making room.
       if (musDrum) {
-        sysAudioSet(musDrum.gain, sysMUS_VOICE.drum * (1 - lift * 0.35) * musBreath,   // 0.62 until L4 (E2)
+        sysAudioSet(musDrum.gain, Math.max(0.0001, sysMUS_VOICE.drum * (1 - lift * 0.35) * musBreath * sleepK),   // 0.62 until L4 (E2)
           nowA, lift > 0.02 ? 0.5 : 1.2);
       }
       // the thickening layer: silent at zero tasks, a shimmer at all of them
-      if (musShimGain) sysAudioSet(musShimGain.gain, 0.0001 + musProg * 0.85, nowA, 2.5);
+      // (...and asleep — L6, E3: it is a pad voice and goes with the pad)
+      if (musShimGain) sysAudioSet(musShimGain.gain, 0.0001 + musProg * 0.85 * sleepK, nowA, 2.5);
       // ---- THE AURORA'S CHOIR ------------------------------------------
       // One number, one gain, and a two-and-a-half second time constant so it
       // arrives the way the sky does. Everywhere but under an Icelandic aurora
@@ -41746,7 +44109,10 @@ export function createSystems(game) {
       // otherwise leaves two overlapping ramps fighting over the same gain and
       // the level lands wherever the race lands it.
       if (musLiftGain) {
-        musLiftGain.gain.setTargetAtTime(0.0001 + musLiftNow(), nowA, 0.55);
+        // ...×sleepK (L6, E3): measured asleep in the cave's doline, whose
+        // chapter holds swell(0.9) every frame, the lift's bed was the one
+        // voice left and the "silent" score sat at −16 dBFS.
+        musLiftGain.gain.setTargetAtTime(0.0001 + musLiftNow() * sleepK, nowA, 0.55);
       }
     }
     // The live bed: up in about a second and a half, down in three, so a
@@ -41758,7 +44124,8 @@ export function createSystems(game) {
     // aurora comes back to a swell that is permanently up.
     if (musLiftT > 0) {
       musLiftT -= dt;
-      if (musLiftT <= 0) { musLiftT = 0; musLift = 0; }
+      musLiftAtk += dt;      // ...and the attack's own clock, which a hold cannot pin (L6, E3)
+      if (musLiftT <= 0) { musLiftT = 0; musLift = 0; musLiftAtk = 0; }
     }
     // ---- the gnawa's two live inputs -----------------------------------
     // Read every frame rather than in the 0.3 s music block, because the storm
@@ -41848,7 +44215,8 @@ export function createSystems(game) {
       // the paper hint, the autosave) and the stack is three, so a note in the
       // same breath is pushed off before it is read, or pushes the hint off.
       if (started) pfOnT += win;
-      if (!pfSaid && started && pfOnT >= sysPF_SAY_S && sysPerfMode === 0 && sysPerfRung > 0) {
+      if (!pfSaid && started && pfOnT >= sysPF_SAY_S && sysPerfMode === 0 && sysPerfRung > 0 &&
+          game.state.time - sysTickLastAt >= sysPF_TICK_GAP) {
         pfSaid = true;
         toast('drawing a little less to keep up', 'note');
       }

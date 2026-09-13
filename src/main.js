@@ -589,6 +589,15 @@ function mainMakeBiomes(game) {
     register(name, api) { setOf(name).api = api; },
     isActive(name) { return biome.current === name; },
     has(name) { return sets.has(name); },
+    /**
+     * Everything a chapter added to the scene, for the shader warm in
+     * systems.js's biomeGo (L6, E8). The live array, not a copy — read it,
+     * never edit it. Scoped on purpose: `renderer.compile(scene)` walks the
+     * eighteen hidden chapters too and would compile their materials against
+     * THIS chapter's fog and lights, which is a program per material nothing
+     * will ever draw.
+     */
+    objectsOf(name) { const s = sets.get(name); return s ? s.objects : null; },
 
     attach(name, on) {
       const s = sets.get(name);
@@ -1375,6 +1384,43 @@ let mainPostLoudAt = 0;
 // Substeps the solver took since the top of the last game.tick. See the
 // postStep listener in mainBoot and the perf snapshot at the top of tick.
 let mainSubsteps = 0;
+// ---- THE GOVERNOR SHEDS PHYSICS TOO (L6, E8 / qa F3) -----------------------
+// The rungs in systems.js touched dpr, the shadow map and the DoF: pixels,
+// never the simulation. And the simulation is the one cost that GROWS as the
+// frame slows — `world.step(STEP, dt, 5)` takes as many 1/60 substeps as the
+// frame has room for, so a machine that has dipped to 20 fps pays THREE
+// substeps a frame and one at 12 fps pays five: measured contended, Quay at
+// 4 fps with world.step at 33 ms = 5 × 6.6 (qa/l6r-qa-cpu-contended). That is
+// the spiral the governor exists to stop, paid by the rung-3 machine only.
+// From rung 2 the world takes at most two substeps a frame and the frame is
+// clamped at 1/20 s before the accumulator sees it (the tab-switch guard is
+// 0.1 s — five substeps — and stays at 0.1 on the lower rungs). Time runs
+// slow under that clamp rather than the solver running hot; cannon drops the
+// remainder (`accumulator % dt`), so nothing piles up to be paid later.
+const MAIN_SHED_RUNG = 2;
+const MAIN_SHED_SUBSTEPS = 2;
+const MAIN_SHED_DT = 1 / 20;
+// ...and the shadow pass at HALF RATE from the same rung. The sun does not
+// move in a frame; the box follows the animal in texel steps. The map is
+// re-rendered every other frame, and on any frame that asks for it by name:
+// `game.state.shadowDirty` is set by a chapter cross, by the shadow box
+// refitting (shadowFitBiome / shadowFitAlt in systems.js) and by the rung
+// changing the map size — three's map is null after the resize until the
+// pass runs, and a frame that skipped the pass would light everything.
+let mainShadowOdd = false;
+// ---- THE PICTURE WAITS FOR ITS SHADERS (L6, E8 / qa F1) --------------------
+// `game.state.renderHold` is set by biomeGo while the new chapter's programs
+// are still compiling in the driver (see biomeWarm in systems.js): a draw
+// that touched one of them would block the main thread until the compile
+// finished — 1.5 to 5.7 s on the Arc, one frozen frame, the whole of what the
+// crossing used to feel like. While held, the world is stepped and every
+// module runs; only post.render is skipped. `game.state.frames` counts the
+// frames actually DRAWN, so the crossing can wait for one before it lifts
+// the white. The cap is the belt under systems.js's own braces: a hold that
+// has lasted this long is a promise that never came back, and a stale frame
+// for ever is worse than the stall it was avoiding.
+const MAIN_HOLD_MAX_MS = 9000;
+let mainHoldAt = 0;
 // Scratch for the airlight ray basis. Nothing in post.render allocates.
 const mainAirR = new THREE.Vector3();
 const mainAirU = new THREE.Vector3();
@@ -1587,6 +1633,18 @@ function mainMakePost(game) {
   post.set = function (p) {
     for (const k in p) if (P[k] !== undefined) P[k] = p[k];
   };
+
+  /**
+   * THE TARGET THE SCENE IS DRAWN INTO, for the shader warm (L6, E8).
+   * three keys a program on where it is going: rendering to the screen means
+   * the renderer's output colour space and tone mapping, rendering into a
+   * target means linear and none. `renderer.compile()` prepares programs for
+   * the screen — so a warm run with no target bound linked one set of
+   * programs (never used) and the first draw into sceneRT still compiled the
+   * other: measured on the Cave, 21 programs at compile, then 32 more and
+   * 6.4 s at the first draw. biomeWarm binds this before it compiles.
+   */
+  post.warmTarget = function () { return sceneRT; };
 
   post.render = function () {
     post.resize();
@@ -2019,6 +2077,8 @@ function mainBoot() {
     game.peopleNear = npcs.peopleNear;
     // M11: the traveller's arc, as a number. See npcTravMet.
     game.travMet = npcs.travMet;
+    // L6, F4: where they are standing in the live chapter, for the arrow.
+    game.travWhere = npcs.travWhere;
     // B11 (5d): the one way to make the people near a point jump, from
     // outside npc.js. systems.js's herd loop is the only caller.
     game.startlePeople = npcs.startlePeople;
@@ -2225,7 +2285,10 @@ function mainBoot() {
       pf.substeps = mainSubsteps; mainSubsteps = 0;
       ri.reset();
     }
-    if (dt > 0.1) dt = 0.1;              // tab-switch guard
+    // The tab-switch guard, and from rung 2 the shed clamp — see MAIN_SHED_*.
+    const shed = (game.state.perfRung | 0) >= MAIN_SHED_RUNG;
+    const dtCap = shed ? MAIN_SHED_DT : 0.1;
+    if (dt > dtCap) dt = dtCap;
     game.state.rawDt = dt;
     // THE ONE PLACE THE WORLD'S CLOCK IS SET. Everything below — the solver,
     // every module's update, the gait, the crowd, the score's lookahead — runs
@@ -2246,7 +2309,7 @@ function mainBoot() {
       // the frame. Modules MUST render from those, not from body.position — a hand
       // rolled accumulator (what this used to be) renders the world at a hard 60Hz
       // no matter the display refresh, which is exactly what made motion look jerky.
-      game.world.step(STEP, dt, MAX_SUBSTEPS);
+      game.world.step(STEP, dt, shed ? MAIN_SHED_SUBSTEPS : MAX_SUBSTEPS);
       mainSaneWorld();
     }
 
@@ -2331,9 +2394,40 @@ function mainBoot() {
     // the middle leaves the renderer pointed at an offscreen target for good —
     // and every later recovery path then draws to nowhere as well, which is a
     // black screen that no longer has an error to explain it.
-    if (render !== false) {
+    // ---- NO DRAW AT ALL WHILE THE SHADERS ARE STILL COMPILING -------------
+    // See MAIN_HOLD_MAX_MS. The hold is systems.js's to set and to clear;
+    // this only refuses to let it last for ever.
+    let held = false;
+    if (game.state.renderHold) {
+      const nowMs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      if (!mainHoldAt) mainHoldAt = nowMs;
+      if (nowMs - mainHoldAt > MAIN_HOLD_MAX_MS) {
+        game.state.renderHold = false;
+        console.warn('[render hold] ' + MAIN_HOLD_MAX_MS + ' ms without a release — drawing anyway');
+      } else held = true;
+    }
+    if (!game.state.renderHold) mainHoldAt = 0;
+    // ---- THE SHADOW PASS, EVERY OTHER FRAME FROM RUNG 2 -------------------
+    // See MAIN_SHED_RUNG. `autoUpdate` back on below the rung, so the lower
+    // rungs are exactly what they were; `needsUpdate` is consumed by three at
+    // the end of the pass, so a frame that skips it leaves it false.
+    {
+      const sm = renderer.shadowMap;
+      if (shed) {
+        sm.autoUpdate = false;
+        mainShadowOdd = !mainShadowOdd;
+        sm.needsUpdate = mainShadowOdd || !!game.state.shadowDirty;
+      } else if (!sm.autoUpdate) {
+        sm.autoUpdate = true;
+      }
+      // A held frame draws nothing, so the request it carried is still owed
+      // to the first frame that does; the flag is only spent by a draw.
+      if (!held && render !== false) game.state.shadowDirty = false;
+    }
+    if (render !== false && !held) {
       try {
         game.post.render();
+        game.state.frames = (game.state.frames | 0) + 1;
       } catch (e) {
         const nowS = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
         if (!mainPostLoudAt || nowS - mainPostLoudAt > 4) {

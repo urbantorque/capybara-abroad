@@ -5791,7 +5791,7 @@ function hkBuild(game) {
                 when: hkSoon },
               { t: 'Nobody eats during the lights. I turn the gas down and watch it too.',
                 when: hkDuring },
-              { t: 'Now they all come back at once. Every night. Every single night.',
+              { t: 'Now they all come back at once. Every night. Ten past eight, every night.',
                 when: hkAfter },
               { t: 'The lion goes up the poles later. Do not stand under the lettuce.',
                 before: 'choi-cheng' },

@@ -58,6 +58,7 @@ const palSPAWN = { x: 0, y: 2.0, z: 46 };
 const palWATER = 0;
 
 let palShoreBed = null;              // M13
+let palLagoonBed = null;             // ...and the bay itself, at the animal (L6, E3)
 const palBEACH_Z = 26;               // where the sand goes under
 const palFLAT_Z = -12;               // where the reef flat ends
 // SEVEN AND A HALF, NOT SIX AND A HALF. Measured on the coral garden: the
@@ -307,6 +308,8 @@ function palVC() {
 function palVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
                { scale: 0.55, amount: 0.15, warp: 0, near: 0.62, nearScale: 9, contact: 1, broad: 0.24, broadM: 26,
+                 // the mid octave (L6, E6): damp coral sand in seven-metre patches
+                 mid: 0.06, midM: 7, midColor: PALETTE.palSandWet, midBase: PALETTE.palSand,
                  // THE WATER'S EDGE (D5), and Palawan is the chapter with the
                  // most of it: the beach shelves at about one in twelve, so a
                  // 0.42 m band is five metres of sand wide and the lace has
@@ -4514,7 +4517,7 @@ function palUpdateTasks(game, dt) {
     if (!palCathDone) {
       palCathDone = true;
       palTask('cathedral');
-      palToast('nobody has ever swum in here without stopping. neither did you.');
+      palToast('the cathedral has never been swum straight through. not by you either.');
       palSfx('chime', { volume: 0.7, pitch: 0.55 });
       if (typeof game.music === 'object' && game.music && typeof game.music.swell === 'function') {
         game.music.swell(0.7);
@@ -4872,6 +4875,10 @@ export function createPalawan(game) {
         const lp2 = game.capy.position;
         palShoreBed.at(lp2.x, palWATER + 0.4, palBEACH_Z);
         palShoreBed.set(0.34);
+        // The lagoon, which is the chapter, at the animal (L6, E3): the shore
+        // bed is a distant break and this is the water you are standing in.
+        if (!palLagoonBed && game.sfxMover) palLagoonBed = game.sfxMover('lagoon', { key: 'pal:lagoon', near: 24, far: 120 });
+        if (palLagoonBed) { palLagoonBed.at(lp2.x, palWATER + 0.2, lp2.z); palLagoonBed.set(1); }
       }
       palTime += dt;
 

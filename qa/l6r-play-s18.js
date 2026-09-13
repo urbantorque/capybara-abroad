@@ -1,0 +1,20 @@
+async page => {
+  await page.keyboard.press('KeyC')
+  await page.waitForTimeout(1500)
+  await page.screenshot({ path: 'qa/l6r-play-39.png' })
+  await page.keyboard.press('Tab')
+  await page.waitForTimeout(1200)
+  await page.screenshot({ path: 'qa/l6r-play-40.png' })
+  await page.keyboard.press('Tab')
+  await page.waitForTimeout(600)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(1200)
+  await page.screenshot({ path: 'qa/l6r-play-41.png' })
+  const s = await page.$('text=settings')
+  if (s) { await s.click(); await page.waitForTimeout(1000); await page.screenshot({ path: 'qa/l6r-play-42.png' }) }
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(500)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(800)
+  await page.screenshot({ path: 'qa/l6r-play-43.png' })
+}

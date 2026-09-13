@@ -2580,7 +2580,10 @@ export const TASKS = [
   // promenade. All the acts do is put the paper in the one you are standing
   // in; nothing is gated, and F still reaches every row (see the two rules
   // above).
-  { id: 'opera-stage',  text: 'Wheek from the Opera House stage till a crowd comes', chapter: 1, act: 2, wow: 'THE OPERA HOUSE CONCERT' },
+  // WOW ROWS ARE ≤ 48 CHARACTERS (L6, E4 / writing W8). The row wraps to
+  // three lines on the paper at 1280 and the pho row was seventy-four; the
+  // sentence is the signpost's job now and the row is a row.
+  { id: 'opera-stage',  text: 'Wheek from the Opera House podium till they come', chapter: 1, act: 2, wow: 'THE OPERA HOUSE CONCERT' },
   { id: 'ball-harbour', text: 'Put the beach ball in the harbour',      chapter: 1, act: 2 },
   { id: 'swim',         text: 'Have a dignified swim',                  chapter: 1, act: 2 },
   { id: 'hat-harbour',  text: 'Drop the stolen hat in the harbour',     chapter: 1, act: 2 },
@@ -2703,7 +2706,7 @@ export const TASKS = [
   // fourth in Pasto: you get on the roof, and then the roof leaves. Everything
   // after this line happens at night, because the ride is what puts the sun
   // down — see caliNight() in cali.js.
-  { id: 'chiva-mirador',  text: 'Ride the party bus roof to the top, under every cable', chapter: 5, act: 2, wow: 'THE PARTY BUS' },
+  { id: 'chiva-mirador',  text: 'Ride the party bus roof up, under every cable', chapter: 5, act: 2, wow: 'THE PARTY BUS' },
   { id: 'cane-run',       text: 'Disappear into the sugarcane',          chapter: 5 },
   { id: 'salsa-dance',    text: 'Dance salsa, properly',                 chapter: 5 },
   { id: 'cristo-rey',     text: 'Climb up to Cristo Rey',                chapter: 5, act: 3 },
@@ -2806,7 +2809,7 @@ export const TASKS = [
   // what it had nothing of at all was something alive.
   { id: 'the-whale',     text: 'Be on the pier when the whale comes up',         chapter: 7,
     mini: 'THE BAY' },
-  { id: 'aurora',         text: 'Sit in the hot spring till the northern lights come, then call to them', chapter: 7, act: 3, wow: 'THE AURORA' },
+  { id: 'aurora',         text: 'Wait in the hot spring for the lights, then call', chapter: 7, act: 3, wow: 'THE AURORA' },
 
   // ---- Chapter 8: Marrakech & the Erg ----
   // The densest place in the game immediately followed by the emptiest, which
@@ -2827,7 +2830,7 @@ export const TASKS = [
   { id: 'dune-surf',      text: 'Sandboard down the great dune, flat out', chapter: 8, act: 2 },
   // The marquee, and it is ridiculous on purpose (X3): the pack on the crest,
   // four rings across the erg, and the top of the minaret to land on.
-  { id: 'jetpack',        text: 'Strap on the jetpack and fly the rings to the top of the minaret', chapter: 8, act: 2, wow: 'THE JETPACK' },
+  { id: 'jetpack',        text: 'Jetpack the rings to the top of the minaret', chapter: 8, act: 2, wow: 'THE JETPACK' },
   { id: 'sandstorm',      text: 'Stand in the sandstorm',                chapter: 8, act: 3 },
   { id: 'fire-circle',    text: 'Take over the fire circle',             chapter: 8, act: 3 },
   // The mini, and the only one of the thirteen that uses capy.launch():
@@ -2924,7 +2927,7 @@ export const TASKS = [
   { id: 'neon-sign',    text: 'Hang off the biggest sign in Mong Kok',  chapter: 11, act: 2 },
   // The marquee, and it is a helicopter (X2): off the scaffold roof, through
   // the eight rings over the harbour, and the skyline goes up for you.
-  { id: 'symphony',     text: 'Fly the helicopter through the eight rings over the harbour', chapter: 11, act: 2, wow: 'THE HELICOPTER' },
+  { id: 'symphony',     text: 'Fly the helicopter through the eight rings', chapter: 11, act: 2, wow: 'THE HELICOPTER' },
   { id: 'star-ferry',   text: 'Take the Star Ferry like a commuter',     chapter: 11, act: 3 },
   // Sydney sounds off under the Bridge and it is the best thirty seconds in
   // chapter three. This ship has had a horn on it since 1957.
@@ -3022,7 +3025,7 @@ export const TASKS = [
   // starts taking you with it, which is exactly what a take-off is.
   { id: 'take-off',      text: 'Catch a wave, on purpose',               chapter: 14, act: 2,
     mini: 'THE TAKE-OFF' },
-  { id: 'all-the-way',   text: 'Surf the biggest wave of the set all the way to the sand', chapter: 14, act: 2, wow: 'THE BIG WAVE' },
+  { id: 'all-the-way',   text: 'Surf the biggest wave of the set to the sand', chapter: 14, act: 2, wow: 'THE BIG WAVE' },
   { id: 'the-bommie',    text: 'Sit on the bommie while it breaks over you', chapter: 14, act: 3 },
   { id: 'bower-pool',    text: 'Use the ocean pool properly',               chapter: 14, act: 3 },
   { id: 'blue-groper',   text: 'Introduce yourself to the blue groper',   chapter: 14, act: 3 },
@@ -3056,7 +3059,7 @@ export const TASKS = [
     mini: 'O TAMANDUÁ' },
   // The marquee, with a boss in it (X4): O Grandão comes up behind the line
   // and takes three wheeks to see off.
-  { id: 'the-crossing',  text: 'Lead the whole herd across the river and see off O Grandão', chapter: 15, act: 2, wow: 'THE HERD CROSSING' },
+  { id: 'the-crossing',  text: 'Lead the herd across the river, past O Grandão', chapter: 15, act: 2, wow: 'THE HERD CROSSING' },
 
   // ---- Chapter 16: Sơn Đoòng ----
   // Sixteen chapters and the game had never once turned the lights off. The
@@ -3106,7 +3109,7 @@ export const TASKS = [
   // chapter 17's gentoos-on-the-bow figure said in a cave — and it is the one
   // moment in nineteen chapters where the game hands you height and then asks
   // you to give it back.
-  { id: 'the-column',    text: 'Climb the column and drop through the shaft of daylight', chapter: 16, act: 2,
+  { id: 'the-column',    text: 'Climb the column and drop through the daylight', chapter: 16, act: 2,
     wow: 'THE DROP INTO THE LIGHT' },
   { id: 'phytokarst',    text: 'Shout at the garden that leans',         chapter: 16, act: 2 },
   // The second mini. There is a river in here and things come down it.
@@ -3142,7 +3145,7 @@ export const TASKS = [
   // sea. It is going north through the gate with or without you.
   { id: 'floe-drift',      text: 'Let a floe take you north',             chapter: 17, act: 2,
     mini: 'THE FLOE' },
-  { id: 'orca-ride',       text: 'Drive the boat into the orca pod and keep up with them', chapter: 17, act: 3, wow: 'THE ORCA POD' },
+  { id: 'orca-ride',       text: 'Drive the boat into the orca pod and keep up', chapter: 17, act: 3, wow: 'THE ORCA POD' },
 
   // ---- Chapter 18: Monte Carlo -------------------------------------------
   // A HEIST, IN THREE MOVEMENTS, and the acts are geography: the water, the
@@ -3150,7 +3153,11 @@ export const TASKS = [
   // on it (ten up at the wheel) and the first with a row you can be thrown out
   // of the middle of — and neither of them can lock anything, because the
   // penalty for being caught is ten seconds and the stack only ever goes up.
-  { id: 'to-monaco',    text: 'Get past the door',                      chapter: 18 },
+  // The arrival row ticks on the spawn, as every arrival row does — so it
+  // cannot be titled after the door, which is act two's `pass-the-door` and
+  // is a hundred metres away when this lands (L6, E5: "Get past the door"
+  // was the chapter's thesis, ticked at 0 s before the door had been seen).
+  { id: 'to-monaco',    text: 'Turn up somewhere that will mind',        chapter: 18 },
   { id: 'superyacht',   text: 'Board a boat nobody invited you onto',   chapter: 18 },
   { id: 'black-tie',    text: 'Acquire a dinner jacket',                chapter: 18 },
   { id: 'high-dive',    text: 'Go off the top deck into the harbour',   chapter: 18 },
@@ -3174,7 +3181,7 @@ export const TASKS = [
     mini: 'LE GRAND VIRAGE' },
   // The marquee, and it is yours to drive (X1): the red car on the grid, one
   // lap of the circuit against the pack, through the tunnel.
-  { id: 'the-tunnel',   text: 'Drive the red car one lap of the circuit and pass the pack', chapter: 18, act: 3,
+  { id: 'the-tunnel',   text: 'Drive the red car one lap and pass the pack', chapter: 18, act: 3,
     wow: 'THE GRAND PRIX' },
 
   // ---- Chapter 19: Hanoi --------------------------------------------------
@@ -3188,7 +3195,7 @@ export const TASKS = [
   // The marquee, and it is a scooter (X5): the stall's Cub, three bowls on
   // the rack, three lanterns round the quarter, and two hundred and forty
   // riders in the way.
-  { id: 'pho-run',      text: 'Take the pho scooter round the quarter — three deliveries through the traffic', chapter: 19,
+  { id: 'pho-run',      text: 'Take the pho scooter round — three deliveries', chapter: 19,
     wow: 'THE PHO RUN' },
   { id: 'flower-bike',  text: 'Unload a flower bicycle',                chapter: 19 },
   { id: 'barber',       text: 'Give the barber’s mirror a surprise',       chapter: 19 },
@@ -3285,6 +3292,34 @@ export const TASKS = [
 //           A chapter whose marquee MOVES publishes `marqueeAt()` on its own
 //           api (pasto.js does, for the condor) and that wins while it answers.
 //           See sysMarqueePoint.
+//
+//   left    THE SENTENCE FOR THE PLAYER WHO DID NOT STAY (L6, F4 / writing
+//           W1). `note` has three readers and every one of them is gated on
+//           finishing — so the game's only past-tense narration was a reward
+//           for completionists and silence for everyone else (measured: a
+//           player leaving nineteen chapters at one row each read 0 of 19).
+//           `left` is read on the departure card, under the kicker "you did
+//           not stay", whenever a place is left with something done in it and
+//           not enough. Same register as `note`, and it is never a scolding:
+//           the place carried on, and you were somewhere else.
+//
+//   nb      THE TRAVELLER'S NOTEBOOK PAGE for the place (L6, F4 / writing A):
+//           the one person who has been watching the animal for six months,
+//           writing it up the moment it leaves. An array. A plain string is
+//           always written; `{ if, t, else }` is written when `if` holds
+//           against the facts the journey already counts (nbFacts in
+//           systems.js): a key alone (`wow` the marquee landed, `keep`, `met`
+//           the traveller was stood in front of, `par` a record past par,
+//           `enough`), a count with a comparator (`inc>=3`, `pho=1`, `ln<40`),
+//           `!key`, and `&` between terms. Slots: `{call}` is the regular's
+//           name for you (only written past tier three, where it is given),
+//           `{who}` the regular; `{inc}` `{scn}` `{pho}` `{fed}` `{pas}`
+//           `{err}` are number words, `{ln}` metres, `{done}` `{total}` rows.
+//           THE FIRST AND LAST ELEMENT OF EVERY PAGE ARE UNCONDITIONAL, so a
+//           page reads as prose whatever the slots hold: the empty case was
+//           written first and the facts were added to it, never the reverse.
+//           Third person, "it": the traveller does not know its name, and
+//           the notebook never answers the title's question.
 export const CHAPTERS = [
   { n: 1, biome: 'sydney',  name: 'Sydney',          sub: 'the gardens, unsupervised',
     // door: the count that opens the way on (L4, F4), overriding the seventy
@@ -3309,12 +3344,29 @@ export const CHAPTERS = [
       { kick: 'THE FORECOURT', line: 'the white sails, and the water under them.' },
       { kick: 'THE PROMENADE', line: 'north, past the buskers. the ferry goes from the end.' },
     ],
+    left: 'Nobody in these gardens had finished thinking about you. You left them to it.',
+    // Written before the two of them have met: see the Quay's page.
+    nb: ['Sydney. Something the size of a labrador got on the ferry. I was on it.',
+         { if: 'inc>=3', t: 'The gardens had, by the look of them, already had a morning of it.' },
+         { if: 'inc>=1&inc<3', t: 'One of the gardeners was shouting at it. Not for the first time, I gathered.' },
+         { if: 'wow', t: 'It had apparently been on the Opera House steps. In front of people. On purpose.' },
+         { if: 'pho>=3', t: 'It was photographed {pho} times that I saw. It faces the camera. I do not know how it knows to.' },
+         { if: 'tier>=3', t: 'A waiter has it down as {call}. I did not ask.' },
+         'I start in the morning. West, everybody says.'],
     note: 'Nobody in these gardens had ever had to think about a rodent this size. Several of them do now.' },
   { n: 2, biome: 'pasto',   name: 'Pasto, Nariño',   sub: '2 527 metres up, and no better behaved',
     arrive: 'to-pasto',   far: 900,  tall: true,  pal: 1,
     hint: '2 527 m up, and a condor',                 open: 'two thousand five hundred metres up, and nobody told them.', way: 'the crater on Galeras',
     keep: 'a condor’s flight feather', win: 3,
     marquee: { x: -40, z: -70, up: 26, say: 'the sky over the volcano' },
+    left: 'The bird was still up there when you went. It is up there now.',
+    nb: ['Pasto. Two and a half thousand metres up, and it was up here before I was.',
+         { if: 'wow', t: 'There is a condor. It has had a passenger.',
+           else: 'There is a condor. It circles the whole town and lands on nothing.' },
+         { if: 'inc>=2', t: 'A woman with a broom followed it round the plaza for most of the afternoon.' },
+         { if: 'tier>=3', t: 'She calls it {call}. From her, I am told, that is a kind one.' },
+         { if: 'pas', t: 'Something rode on its back. Up a volcano.' },
+         'I have not seen it since the bus. I am not looking for it.'],
     note: 'The bird was up there the whole time you were stealing potatoes.',
     // ---- THE SECOND CHAPTER HAD NO SHAPE (R8) --------------------------
     // Pasto is a town, then a bird, then a mountain — the geography says so
@@ -3347,6 +3399,16 @@ export const CHAPTERS = [
     hint: 'a boat, and Manly somewhere north',        open: 'find the wheel.', way: 'up the Corso at Manly',
     keep: 'an unpunched ferry ticket', win: 3,
     marquee: { x: 6.6, z: 6, up: 4, say: 'the ferry at the wharf' },
+    left: 'She sails when you say she sails. You said it early.',
+    // The first of the four places the traveller is actually standing in.
+    // `met` is npc.js's set (npcTravMet): stood in front of them, or not.
+    nb: ['Circular Quay. Six months, a very bad map, and it walked past me on the wharf.',
+         { if: 'met', t: 'I said hello. It looked at me the way it looks at everything, which is not much.',
+           else: 'It did not see me. It was going somewhere.' },
+         { if: 'wow', t: 'It took the ferry. I do not mean it rode on it.' },
+         { if: 'par', t: 'Alongside at Manly on the first go, according to the man who used to drive her.' },
+         { if: 'tier>=3', t: 'The platform guard has it down as {call}. Nobody has reported it yet.' },
+         'West, then.'],
     note: 'You took a boat off a man who had been driving it for eleven years, and he watched you dock it.',
     acts: [
       { kick: 'THE QUAY', line: 'she is yours. find the wheel.' },
@@ -3358,6 +3420,14 @@ export const CHAPTERS = [
     hint: 'ten thousand gates and a lot of tea',      open: 'four hundred years of arrangement, and you.', way: 'the bridge at Uji',
     keep: 'a tea whisk, slightly chewed',
     marquee: { x: 4, z: 128, up: 3, say: 'the river, off the shrine bay' },
+    left: 'Four hundred years of arrangement, and you gave it the one afternoon.',
+    nb: ['Kyoto. Four hundred years of arrangement. I was here two days and it was here for one.',
+         { if: 'wow', t: 'It went down the Uji. The whole river heard about it.' },
+         { if: 'keep', t: 'It has a tea whisk now. The man at the mill is still not pleased.' },
+         { if: 'tier>=3', t: 'The step-sweeper calls it {call}, and sweeps around it.' },
+         { if: 'err', t: 'It ran an errand. In Kyoto. For the sweeper.' },
+         { if: 'inc>=3', t: 'Everything here is arranged very carefully, and {inc} things are now arranged differently.' },
+         'I bought a fan. I do not know why I am telling the notebook that.'],
     note: 'Ten thousand gates, and for one afternoon the loudest thing in Kyoto was you.',
     acts: [
       { kick: 'KYOTO', line: 'everything here has been arranged very carefully for a very long time.' },
@@ -3368,6 +3438,13 @@ export const CHAPTERS = [
     hint: 'the salsa capital of the world',           open: 'listen first.', way: 'the bridge over the Río Cali',
     keep: 'a stick of sugarcane',
     marquee: { x: 30, z: 40, up: 3, say: 'the party bus' },
+    left: 'The beat was still going when you left. It did not need you to stay.',
+    nb: ['Cali. Everything here is on top of the same beat, and I was on the wrong side of it.',
+         { if: 'wow', t: 'It got on the party bus. The party bus went up the hill with it on the roof.' },
+         { if: 'inc>=2', t: '{inc} incidents, and the music did not stop for any of them.' },
+         { if: 'tier>=3', t: 'The lulada man calls it {call}. Con hielo. No charge.' },
+         { if: 'fed>=2', t: 'People kept giving it things. It kept taking them.' },
+         'I could not find the beat. It could. That is my whole note on Cali.'],
     note: 'You got the timing right some while before you understood what you were counting.',
     acts: [
       { kick: 'THE CITY', line: 'listen first. everything here is on top of the same beat.' },
@@ -3384,6 +3461,13 @@ export const CHAPTERS = [
     // the whistle brings the bird down. rio.js publishes `marqueeAt`, so this
     // point is only what the arrow shows BEFORE a fragata is in the air.
     marquee: { x: -62, z: -26, up: 11, say: 'Arpoador, at the west end' },
+    left: 'The drums were still on the avenue when you went. They had not noticed you arrive either.',
+    nb: ['Rio. The bateria was already moving when I got off the bus and it had not stopped when I got back on.',
+         { if: 'wow', t: 'Something with a two-metre wingspan came down to it on the rock at Arpoador. It whistled. That was all it did.' },
+         { if: 'keep', t: 'It has a tile off Selarón’s steps. Somebody is going to notice.' },
+         { if: 'tier>=3', t: 'The Globo man calls it {call}. Sweet. He is not wrong.' },
+         { if: 'pho>=3', t: 'It was photographed {pho} times on the beach that I counted.' },
+         'I got sunburnt. It did not.'],
     note: 'The bateria did not slow down for you, and you did not ask it to.',
     acts: [
       { kick: 'COPACABANA', line: 'four kilometres of pavement with a pattern in it.' },
@@ -3405,6 +3489,14 @@ export const CHAPTERS = [
     // rendered half past eleven at night, and the local on the pavement has
     // always said it does not get darker than this until October, which is now
     // the truth rather than a contradiction.
+    left: 'The dark had only just come back. You did not stay for the sky.',
+    nb: ['Iceland. Late August, and the dark has only just come back. I stayed up for it.',
+         { if: 'wow', t: 'The sky did the thing. The animal was in the hot pool when it did.' },
+         { if: 'par', t: 'It went down the glacier at a speed the pylsa man described as not right.' },
+         { if: 'inc=1', t: 'One incident, in a town where nobody was out.' },
+         { if: 'inc>=2', t: '{inc} incidents, in a town where nobody was out.' },
+         { if: 'tier>=3', t: 'The pylsa stand calls it {call}. It has never eaten one.' },
+         'I have a photograph of the sky. It is a photograph of the dark.'],
     note: 'The dark had only just come back, and the sky spent your one night here showing off with it.',
     acts: [
       { kick: 'REYKJAVÍK', line: 'nobody is out. that is the good news.' },
@@ -3416,6 +3508,14 @@ export const CHAPTERS = [
     hint: 'a maze, and then no maze at all',          open: 'a thousand people in this square and every one of them is working.', way: 'the fire at the desert camp',
     keep: 'an orange off the cart',
     marquee: { x: 275, z: 55, up: 4, say: 'the jetpack at the top of the staked track, on the big dune' },
+    left: 'The square was still learning your face. You did not give it the second evening.',
+    nb: ['Marrakech, and forty minutes east of it, nothing at all.',
+         { if: 'met', t: 'It was in the square. I said Sydney, the gardens, and it looked at me as if I was the one who had followed it.',
+           else: 'It was in the square. I did not get near enough to say so.' },
+         { if: 'wow', t: 'It has been up the big dune on a jetpack. I have been on four buses.' },
+         { if: 'inc>=2', t: 'The orange cart has been robbed. More than once, by the sound of it.' },
+         { if: 'tier>=3', t: 'The orange man calls it {call}. Because it has never once paid it.' },
+         'I sleep in the desert tonight. It is, I assume, already there.'],
     note: 'By the second evening the square knew your face.',
     acts: [
       { kick: 'JEMAA EL-FNAA', line: 'do not rob anybody yet. or do.' },
@@ -3427,6 +3527,13 @@ export const CHAPTERS = [
     hint: 'no ground to speak of, and a wind',        open: 'nobody is entirely sure how you got up here, you included.', way: 'the lantern plinth, once it is lit',
     keep: 'a seed-head, still trying to leave',
     marquee: { x: 36, z: -190, up: 8, say: 'the plinth at the top' },
+    left: 'There was no floor, and you went and found one somewhere else.',
+    nb: ['The Drift. Nobody is entirely sure how it got up here. Nobody is entirely sure how I did.',
+         { if: 'wow', t: 'The lantern on the plinth is lit. I was told it had not been for years.' },
+         { if: 'ln>=20', t: 'It held a line of {ln} metres in that wind. I held a railing.' },
+         { if: 'tier>=3', t: 'The ice fisherman calls it {call}. Eleven years alone, and then that.' },
+         { if: 'pas', t: 'Something rode on it. Up here. In the wind.' },
+         'The wind goes up. Everything goes up. I came down by the stairs.'],
     note: 'There was no floor, and you stopped minding somewhere over the third island.',
     acts: [
       { kick: 'NO GROUND', line: 'nothing here is nailed down. step off something and find out.' },
@@ -3437,6 +3544,13 @@ export const CHAPTERS = [
     hint: 'the floor is negotiable',                  open: 'the ground here is a negotiation with the sea, and the sea is early.', way: 'the two columns on the Molo',
     keep: 'a pigeon feather from the Piazza',
     marquee: { x: -4, z: -35, up: 7, say: 'St Mark’s Square' },
+    left: 'The water was coming in. You did not wait for it.',
+    nb: ['Venice. The water was coming in and I was standing in it, holding the map.',
+         { if: 'wow', t: 'The siren went four times and it was in the square for the fourth.' },
+         { if: 'inc>=1', t: 'Something went in a canal. Nobody is saying what.' },
+         { if: 'tier>=3', t: 'The gondolier calls it {call}. That is what it costs him, apparently.' },
+         { if: 'keep', t: 'It has a pigeon feather from the Piazza. There were plenty.' },
+         'My shoes have not dried.'],
     note: 'The water came up over the paving and everybody carried on doing what they were doing.',
     acts: [
       { kick: 'LOW WATER', line: 'the tide is early. mind the paving.' },
@@ -3451,6 +3565,13 @@ export const CHAPTERS = [
     // qa/MF-kowloon.png, which framed black. The subject is the roof you have
     // to be standing on and the wall of neon under it, not the air above both.
     marquee: { x: -20.5, z: -11, up: 34, say: 'the helicopter on the scaffold roof' },
+    left: 'Up is a direction here, and you had a look at it from the ground.',
+    nb: ['Hong Kong. Up is a direction here, and it went there.',
+         { if: 'wow', t: 'A helicopter on a scaffold roof. It was on the roof. I was on the pavement, in the way.' },
+         { if: 'ln>=20', t: '{ln} metres in a straight line, on a street where nothing is at ground level.' },
+         { if: 'tier>=3', t: 'The egg tart baker calls it {call}. It turns up when the tray comes out.' },
+         { if: 'pho>=3', t: 'It has been photographed {pho} times here. It is on a wall somewhere by now.' },
+         'I took the tram. I looked up. That is my whole account of it.'],
     note: 'You spent most of this chapter above the people who live in it.',
     acts: [
       { kick: 'MONG KOK', line: 'nothing on this street is at ground level.' },
@@ -3467,6 +3588,13 @@ export const CHAPTERS = [
     // palawan.js publishes `marqueeAt`, so once you are in the water the arrow
     // tracks her rather than a patch of sea.
     marquee: { x: -4, z: -17, up: 1, say: 'the lagoon drop-off' },
+    left: 'The interesting half was underneath. You stayed on the top of it.',
+    nb: ['Palawan. The interesting half is underneath, they said, and it went there.',
+         { if: 'wow', t: 'It went under with a manta the size of a car. I watched from the jetty.' },
+         { if: 'keep', t: 'It has a pearl out of the giant clam. The clam has not been consulted.' },
+         { if: 'tier>=3', t: 'The net mender calls it {call}. Here, apparently, that is an honour.' },
+         { if: 'par', t: 'Longer under the water than a semi-aquatic rodent has any business being.' },
+         'I do not swim. I sat on the jetty and wrote this.'],
     note: 'Eleven chapters of paddling about on the surface, and the whole thing was underneath.',
     acts: [
       { kick: 'THE ISLAND', line: 'a beach, a jetty, and a boat that goes out to the good part.' },
@@ -3478,6 +3606,14 @@ export const CHAPTERS = [
     hint: 'no steering. only up and down.',           open: 'the wind goes a different way at every height. that is the whole game.', way: 'the landing plain, once you have flown',
     keep: 'a scrap of balloon envelope',
     marquee: { x: 0, z: -40, up: 12, say: 'the launch field' },
+    left: 'Eighty balloons go up at dawn. You were on a different plan.',
+    nb: ['Cappadocia. Of course. Of course it was here.',
+         { if: 'met', t: 'I have stopped asking. I said so, to its face, and it looked past me at the balloons.',
+           else: 'I saw it across the square. I did not go over. I have some pride left.' },
+         { if: 'wow', t: 'It went up at dawn. Eighty balloons, and I could tell which one.' },
+         { if: 'tier>=3', t: 'The tea maker calls it {call}. It is the tea now, he says.' },
+         { if: 'inc>=1', t: 'Something happened at the dovecote. The whole cliff went up.' },
+         'No steering wheel. It did not seem to want one.'],
     note: 'You could not steer, and it turned out that was never the problem.',
     acts: [
       { kick: 'THE VALLEY', line: 'soft rock, and everybody who ever lived here dug into it.' },
@@ -3489,6 +3625,13 @@ export const CHAPTERS = [
     hint: 'the sea has a shape here',                 open: 'this is the side of the peninsula that faces the whole Pacific.', way: 'between the red and yellow flags',
     keep: 'a Norfolk pine cone',
     marquee: { x: 0, z: -23.8, up: 1, say: 'out the back, past the break' },
+    left: 'The sea here has a shape, and you left it the argument.',
+    nb: ['Manly. The other side of the Corso, and it is not the harbour. The sea has a shape.',
+         { if: 'wow', t: 'It went out the back, past the break, and came in on a wave. On it.' },
+         { if: 'tier>=3', t: 'The lifeguard calls it {call}. It has never once been between them.' },
+         { if: 'pas', t: 'Something rode in on its back. Through surf.' },
+         { if: 'inc>=1', t: 'The gulls have been informed, and they are still discussing it.' },
+         'Sand in the notebook. Sand in everything.'],
     note: 'The sea here has a shape, and it took you a while to stop arguing with it.',
     acts: [
       { kick: 'THE BEACH', line: 'a kilometre of sand and nobody in charge of any of it.' },
@@ -3504,6 +3647,18 @@ export const CHAPTERS = [
     // hold up a drawn object; this one holds up the sentence and nothing
     // else, and the empty frame is what makes the sentence land.
     keepNone: true,
+    // ...and the place card says the thing the chapter is about (L6, F4 /
+    // writing W2): the one line in the game that states where it is from,
+    // on the one card every arrival reads. The rumour's headline yields to
+    // it here and nowhere else — see notoHeadline.
+    news: 'you are from here. nobody is going to mention it.',
+    left: 'You are from here, and you left the way you came. Nobody looked up for that either.',
+    nb: ['The Pantanal. It is from here. Nobody mentioned it. Nobody looked up.',
+         { if: 'wow', t: 'It crossed the river at the crossing, with the others, and nothing in the water objected.' },
+         { if: 'tier>=3', t: 'The cattle hand calls it {call}. He has started counting it.' },
+         { if: 'pas', t: 'Something rode on it in the water. Here, that is simply how it is done.' },
+         { if: 'keep', t: 'It took nothing from here. It was already its.' },
+         'I was the strangest thing in the water. That has not happened before.'],
     note: 'Nobody looked up. Nobody looked up once.',
     acts: [
       { kick: 'THE NEIGHBOURS', line: 'there are eleven of you standing in this water and nobody has noticed.' },
@@ -3514,6 +3669,13 @@ export const CHAPTERS = [
     hint: 'no light in here but yours',               open: 'nine kilometres of it, and no light that you did not bring.', way: 'the slot of daylight at the far end',
     keep: 'a cave pearl', win: 2,
     marquee: { x: 4, z: -48, up: 40, say: 'the hole in the roof' },
+    left: 'Nine kilometres of dark, and you lit a little of the front of it.',
+    nb: ['Sơn Đoòng. Nine kilometres of dark, and the only light in it was the noise it made.',
+         { if: 'wow', t: 'It dropped through the hole in the roof when the light came down it. I have a photograph. It is a photograph of a hole.' },
+         { if: 'tier>=3', t: 'The rope man calls it {call}. The best thing he can call anybody.' },
+         { if: 'inc>=1', t: 'Something went over in the dark. In there, it went over for a long time.' },
+         { if: 'keep', t: 'It has a cave pearl. It should not have a cave pearl.' },
+         'I did not go past the second chamber. It did.'],
     note: 'You made the only light there was, and it went out every few seconds.',
     acts: [
       { kick: 'THE MOUTH', line: 'wheek. it is the only way to see anything.' },
@@ -3525,6 +3687,13 @@ export const CHAPTERS = [
     hint: 'too cold to walk. take the boat.',         open: 'the orange boat at the end of the jetty. that is the chapter.', way: 'the head of the station jetty',
     keep: 'the station’s enamel mug', win: 3,
     marquee: { x: 14.3, z: -169.5, up: 2, say: 'the channel, where the blows are' },
+    left: 'Nothing on this continent had an opinion about you, and you did not stay long enough to change that.',
+    nb: ['Antarctica. Too cold to walk, and nothing here had any opinion about it whatsoever.',
+         { if: 'wow', t: 'It took the orange boat out to the channel, where the blows are, and the whales came up beside it.' },
+         { if: 'tier>=3', t: 'The base bar calls it {call}. It has never once come at six.' },
+         { if: 'par', t: 'Four rocks, eleven hundred metres apart, and a time the base does not believe.' },
+         { if: 'keep', t: 'It has the station’s enamel mug. The station has fewer mugs.' },
+         'I have never been so cold. It has fur. I have a notebook.'],
     note: 'Nothing on this continent had any opinion about you whatsoever.',
     acts: [
       { kick: 'THE STATION', line: 'too cold to walk. take the boat.' },
@@ -3537,6 +3706,13 @@ export const CHAPTERS = [
     way: 'the steps of the Casino',
     keep: 'a mother-of-pearl plaque', win: 3,
     marquee: { x: 14, z: -96, up: 4, say: 'the red car on the grid, in front of the stand' },
+    left: 'Somebody in there was going to mind. You did not stay to find out who.',
+    nb: ['Monte Carlo. The first place in the world that minded. Somebody in there was always going to.',
+         { if: 'wow', t: 'It was on the grid, in the red car, in front of the stand. In front of the stand.' },
+         { if: 'inc>=1', t: 'It has been escorted from somewhere. Politely, in a uniform.' },
+         { if: 'tier>=3', t: 'The deckhand calls it {call}. He has decided it is the owner now.' },
+         { if: 'keep', t: 'It has a mother-of-pearl plaque. It did not win it.' },
+         'They minded me too. I was wearing the wrong shoes.'],
     note: 'The first place in the world that asked what you thought you were doing.',
     acts: [
       { kick: 'THE PORT', line: 'it is twenty past eight. everything is switched on.' },
@@ -3549,6 +3725,14 @@ export const CHAPTERS = [
     way: 'the head of the Long Biên bridge',
     keep: 'a plastic stool, slightly cracked', win: 3,
     marquee: { x: 6.0, z: 15.5, up: 3, say: 'the pho stall’s scooter, on Hang Ngang' },
+    left: 'The road was not going to stop for you. You did not make it try.',
+    nb: ['Hanoi. Right. I am not even going to write it down.',
+         { if: 'met', t: 'Four countries. Four. I have counted, and I said so, and it sat down on a stool.',
+           else: 'I saw it across six lanes of mopeds. I was not going to cross for it. Nobody crosses.' },
+         { if: 'wow', t: 'It took the pho scooter round. Three deliveries. Two hundred and forty riders in the way.' },
+         { if: 'tier>=3', t: 'The tea lady calls it {call}. The whole street does now, she says. Her fault.' },
+         { if: 'err', t: 'It carried a bowl of pho up the frontage to me. I did not order it. I ate it.' },
+         'I fly home on Tuesday. I would put money on where it is going.'],
     note: 'You crossed six lanes without stopping and the road never noticed you were there.',
     acts: [
       { kick: 'THE THIRTY-SIX STREETS', line: 'do not wait for a gap. there is no gap.' },
@@ -3941,7 +4125,10 @@ export const RECORDS = {
   // column serves is at 80 — so eighty is riding one the whole way up.
   'updraft':       { label: 'carried up to', unit: ' m', better: 'higher', dp: 0, par: 80 },
   'passerelle':    { label: 'the boards in', unit: ' s', better: 'lower', dp: 1 },
-  'pigeon-storm':  { label: 'put up', unit: ' at once', better: 'higher', dp: 0, par: 120 },
+  // A RECORD SAYS ITS UNIT (L6, E4 / play 7): "PUT UP 75 AT ONCE" on the
+  // pill named the number and not the thing, and the player could not tell
+  // what had been counted. The noun goes in the unit.
+  'pigeon-storm':  { label: 'put up', unit: ' pigeons at once', better: 'higher', dp: 0, par: 120 },
   // hkROOF_Y — the deck the scaffold serves — is 34.2 m, and the tick is at 20.
   'bamboo-climb':  { label: 'highest hold', unit: ' m', better: 'higher', dp: 0, par: 32 },
   'laundry-pole':  { label: 'crossed in', unit: ' s', better: 'lower', dp: 1 },
@@ -4002,11 +4189,11 @@ export const RECORDS = {
   'the-rip':       { label: 'out the back in', unit: ' s', better: 'lower', dp: 1 },
   'all-the-way':   { label: 'longest ride', unit: ' m', better: 'higher', dp: 1, par: 55 },
   'take-off':      { label: 'fastest take-off', unit: ' m/s', better: 'higher', dp: 1, par: 6 },
-  'the-crossing':  { label: 'brought over', unit: ' of them', better: 'higher', dp: 0, par: 7 },
+  'the-crossing':  { label: 'brought over', unit: ' of the herd', better: 'higher', dp: 0, par: 7 },
   'cowbird':       { label: 'carried it for', unit: ' s', better: 'higher', dp: 1, par: 45 },
   'gather':        { label: 'longest string', unit: ' behind you', better: 'higher', dp: 0, par: 8 },
   'great-wall':    { label: 'the wall in', unit: ' s', better: 'lower', dp: 1 },
-  'swiftlets':     { label: 'put up', unit: ' at once', better: 'higher', dp: 0, par: 60 },
+  'swiftlets':     { label: 'put up', unit: ' swiftlets at once', better: 'higher', dp: 0, par: 60 },
   'the-log':       { label: 'stayed on for', unit: ' m', better: 'higher', dp: 0, par: 90 },
   // Chapter 17. Three of the four things worth doing WELL down there are
   // things you cannot do at all in any other chapter, which is a reasonable
@@ -4019,7 +4206,7 @@ export const RECORDS = {
   // a stack is a thing you can be better at, a crossing is a thing you can be
   // quieter at, and a tunnel is a thing you can be faster through. The fourth
   // is nine and a half metres of yacht and is simply funny.
-  'chip-stack':      { label: 'left the table', unit: ' up', better: 'higher', dp: 0, par: 20 },
+  'chip-stack':      { label: 'left the table', unit: ' chips up', better: 'higher', dp: 0, par: 20 },
   'the-floor':       { label: 'across in', unit: ' s', better: 'lower', dp: 1 },
   'the-tunnel':      { label: 'the lap in', unit: ' s', better: 'lower', dp: 1, par: 38 },
   'the-hairpin':     { label: 'rode', unit: ' m of the lap', better: 'higher', dp: 0 },
@@ -4050,7 +4237,7 @@ export const RECORDS = {
   //
   // Chapter 1. The house is capped at eight (npcCONCERT_N) and the tick asks
   // for two of them in place. Six is three quarters of the forecourt.
-  'opera-stage':   { label: 'drew a house of', unit: '', better: 'higher', dp: 0, par: 6 },
+  'opera-stage':   { label: 'drew a house of', unit: ' people', better: 'higher', dp: 0, par: 6 },
   // Chapters 2 and 6, the two chapters with a bird. A ride has no clock on it
   // — it ends when you let go, so seconds aloft would reward sitting there —
   // and the height is already `thermal-peak`. What the flight teaches is the
@@ -5006,6 +5193,44 @@ export function grain(m, opts) {
   // fine field, and at sixteen metres there is nothing to stretch.
   const broad = o.broad === undefined ? 0 : o.broad;
   const broadM = o.broadM === undefined ? 16 : o.broadM;
+  // ---------------------------------------------------------------------
+  // MID — THE OCTAVE BETWEEN (L6, E6 / art #6).
+  //
+  // `broad` is sixteen to twenty-six metres and `near` is under a metre, and
+  // the art review photographed what lives between them: nothing. The Erg at
+  // rest was one orange to the horizon (bottom-band luma sd 11, edge
+  // density 0.5 %), Sydney's lawn one green, Palawan's sand one cream — a
+  // single albedo with a fine grain on it and a slow warm/cool wash over it,
+  // and no patch of ground anywhere at the size of a patch of ground. Worn
+  // dry places on a lawn, damp packed sand between loose, dust settled on
+  // asphalt: that is a six-to-ten-metre thing.
+  //
+  //   mid        the ± fraction of the diffuse at the field's extremes,
+  //              0 (off) .. ~0.08. Off by default: every ground keeps the
+  //              picture it was tuned against until its owner asks.
+  //   midM       the wavelength, in metres, for broadM's reason
+  //   midColor   the chapter's SECONDARY — PALETTE already carries a pale
+  //              or dark partner for every ground it names — and
+  //   midBase    the primary it partners, so the drift is a RATIO: the
+  //              secondary over the primary, per channel, normalised to a
+  //              luma of one. A ratio, not a colour, because a chapter's
+  //              ground is one mesh with a lawn and a path in it, and
+  //              mixing an absolute green into the path greens the path.
+  //              The ratio moves a hue and only a hue; `mid` moves the value.
+  //   midHue     how far toward that ratio at the field's extreme
+  //
+  // AND THE DRIFT GOES WITH THE HALF THAT MAKES SENSE. If the secondary is
+  // paler than the primary (a lawn's dry patch) the bright half of the field
+  // drifts; if it is darker (packed sand, wet coral) the dark half does. The
+  // sign is read off the pair's luma here, once, so a call site names two
+  // colours and nothing else. Two octaves and a warp by `gn`, for the
+  // near octave's reason: one octave of value noise at eight metres is a
+  // quilt of eight-metre squares.
+  const mid = o.wetOnly === true ? 0 : (o.mid === undefined ? 0 : o.mid);
+  const midM = o.midM === undefined ? 8 : o.midM;
+  const midColor = o.midColor === undefined ? 0xffffff : o.midColor;
+  const midBase = o.midBase === undefined ? 0xffffff : o.midBase;
+  const midHue = o.midHue === undefined ? 0.6 : o.midHue;
   // cloud shadows: a multiplier on the shared uniform, 1 by default (see _cloudK)
   const cloud = o.wetOnly === true ? 0 : (o.cloud === undefined ? 1 : o.cloud);
   // How the per-channel gain splits. Red rises fastest and blue slowest, so
@@ -5099,7 +5324,8 @@ export function grain(m, opts) {
               '|' + shore + '|' + shoreBand + '|' + shoreDark + '|' + shoreWet + '|' + shoreDeep +
               '|' + shoreTint + '|' + shoreTintC + '|' + shoreCol + '|' + shoreScale +
               '|' + fres + '|' + fresPow + '|' + nearPale +
-              '|' + speck + '|' + speckScale + '|' + speckCut + '|' + speckCol + '|' + cloud;
+              '|' + speck + '|' + speckScale + '|' + speckCut + '|' + speckCol + '|' + cloud +
+              '|' + mid + '|' + midM + '|' + midColor + '|' + midBase + '|' + midHue;
   const hit = _grainCache.get(key);
   if (hit) return hit;
 
@@ -5117,6 +5343,19 @@ export function grain(m, opts) {
   const skc = new THREE.Color(speckCol);
   const shc = new THREE.Color(shoreCol);
   const shtc = new THREE.Color(shoreTintC);
+  // The mid octave's hue ratio (see `mid` above): secondary over primary per
+  // channel, normalised to a luma of one so it carries no value of its own;
+  // and which half of the field it rides on, from the pair's own lumas.
+  let midR = 1, midG = 1, midB = 1, midSign = -1;
+  if (mid > 0) {
+    const mc = new THREE.Color(midColor), mb = new THREE.Color(midBase);
+    midR = mc.r / Math.max(0.02, mb.r); midG = mc.g / Math.max(0.02, mb.g); midB = mc.b / Math.max(0.02, mb.b);
+    const ml = 0.2126 * midR + 0.7152 * midG + 0.0722 * midB || 1;
+    midR /= ml; midG /= ml; midB /= ml;
+    const lc = 0.2126 * mc.r + 0.7152 * mc.g + 0.0722 * mc.b;
+    const lb = 0.2126 * mb.r + 0.7152 * mb.g + 0.0722 * mb.b;
+    midSign = lc > lb ? 1 : -1;
+  }
   // THE WET TERM IS FOR GROUND, NOT FOR WATER. `spark > 0` is this helper's
   // existing and only marker for "this material is a sea", and darkening a sea
   // because it is raining on it is nonsense twice over — it is already water,
@@ -5251,6 +5490,15 @@ export function grain(m, opts) {
         (wetOnly || broad <= 0) ? '' : '  vec2 gbq = vGrainW.xz * ' + (1 / broadM).toFixed(5) + ' + 7.13;',
         (wetOnly || broad <= 0) ? '' : '  gbq += gn * 0.8;',
         (wetOnly || broad <= 0) ? '' : '  float gb = (grNoise(gbq) - 0.5) * ' + broad.toFixed(4) + ';',
+        // ---- THE MID OCTAVE (L6, E6). See the note on `mid` above. Two
+        // octaves (the second at 2.3x, a third of the weight, in a frame
+        // turned a radian) warped by `gn`, so an eight-metre lattice is
+        // neither a quilt nor a grid. `gm` runs about -0.4..0.4; the value
+        // term joins the one multiply below, the hue rides its own.
+        (wetOnly || mid <= 0) ? '' : '  vec2 gmq = vGrainW.xz * ' + (1 / midM).toFixed(5) + ' + 3.71;',
+        (wetOnly || mid <= 0) ? '' : '  gmq += gn * 1.1;',
+        (wetOnly || mid <= 0) ? '' : '  vec2 gmq2 = vec2(gmq.x * 0.5403 - gmq.y * 0.8415, gmq.x * 0.8415 + gmq.y * 0.5403) * 2.3 + 17.9;',
+        (wetOnly || mid <= 0) ? '' : '  float gm = (grNoise(gmq) - 0.5) * 0.68 + (grNoise(gmq2) - 0.5) * 0.32;',
         // ---- CLOUD SHADOWS (L3, E2). See _cloudK. Two octaves of the same
         // value noise at ~12 m and ~5 m, drifting at about half a metre a
         // second, thresholded so a cloud is a SHAPE with an edge and not a
@@ -5284,11 +5532,18 @@ export function grain(m, opts) {
           '  }',
         ].join('\n') : '',
         wetOnly ? '' : '  diffuseColor.rgb *= vec3(1.0 + gn * ' + amount.toFixed(4) +
-                       ((!wetOnly && near > 0) ? ' + gnr' : '') + ')' +
+                       ((!wetOnly && near > 0) ? ' + gnr' : '') +
+                       // ±mid at the field's extremes (gm is ~±0.4, so 2.5x)
+                       ((!wetOnly && mid > 0) ? ' + gm * ' + (mid * 2.5).toFixed(4) : '') + ')' +
                        ((!wetOnly && broad > 0)
                          ? ' + gb * vec3(' + _BROAD_K[0].toFixed(3) + ', ' +
                            _BROAD_K[1].toFixed(3) + ', ' + _BROAD_K[2].toFixed(3) + ')'
                          : '') + ';',
+        // the hue drift, on the half of the field the pair's lumas chose; a
+        // luma-neutral ratio, so it compounds with nothing above it
+        (wetOnly || mid <= 0) ? '' :
+          '  diffuseColor.rgb *= mix(vec3(1.0), vec3(' + midR.toFixed(4) + ', ' + midG.toFixed(4) + ', ' + midB.toFixed(4) +
+          '), clamp(gm * ' + (2.5 * midSign).toFixed(2) + ', 0.0, 1.0) * ' + midHue.toFixed(4) + ');',
         cloud > 0 ? '  diffuseColor.rgb *= 1.0 - gc;' : '',
         speck > 0 ? '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(' +
                     skc.r.toFixed(4) + ', ' + skc.g.toFixed(4) + ', ' + skc.b.toFixed(4) + '), skM * ' +
@@ -5703,6 +5958,57 @@ function _mergeJitter(c, x, y, z, amt, hue) {
   c.r = Math.min(1, Math.max(0, c.r * (1 + v + w)));
   c.g = Math.min(1, Math.max(0, c.g * (1 + v)));
   c.b = Math.min(1, Math.max(0, c.b * (1 + v - w)));
+}
+// ---------------------------------------------------------------------------
+// THE WEAR PATH (L6, E6 / art #6) — a darker band on the ground along the line
+// everybody walks: from the spawn toward the chapter's marquee.
+//
+// Kyoto's tar and Venice's fondamenta band showed what one dark line does for
+// a hundred metres of one value, and the three open chapters the art review
+// named (Sydney's lawn, Copacabana, the Erg) had nothing between the animal
+// and the thing the paper points at. This is that line, as a strip of quads
+// lying ON the terrain — sampled from the chapter's own height rule every
+// `seg` metres, so it follows a dune or a lawn's swell rather than pitching a
+// box at it — merged into whichever mesh the chapter already draws its floor
+// graphics in (no draw call, no collider). The colour is the ground's own,
+// eight per cent down: `color` may be a hex, a Color, or a function
+// (x, z, out) that fills `out` with the ground's colour at that point, so a
+// band across sand that is damp near the water darkens damp sand there.
+//
+//   M      a merger (makeMerger); the band goes in through vert()/tri()
+//   pts    the polyline, flat: [x0, z0, x1, z1, ...]
+//   w      the band's width in metres (1.5 is a path)
+//   yAt    (x, z) -> the ground's height there
+//   color  see above
+//   seg    metres between samples along the line; match the ground's cell
+//   lift   metres above the ground, so it never fights the terrain's facets
+//   k      the darkening (0.92 is -8 %)
+const _wearC = new THREE.Color();
+export function mergeWearBand(M, pts, w, yAt, color, seg, lift, k) {
+  const hw = w * 0.5, s = seg || 2, up = lift === undefined ? 0.05 : lift, kk = k === undefined ? 0.92 : k;
+  const colAt = function (x, z) {
+    if (typeof color === 'function') color(x, z, _wearC); else _wearC.set(color);
+    return _wearC.multiplyScalar(kk);
+  };
+  let prevL = -1, prevR = -1;
+  for (let p = 0; p + 3 < pts.length; p += 2) {
+    const x0 = pts[p], z0 = pts[p + 1], x1 = pts[p + 2], z1 = pts[p + 3];
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    if (len < 1e-6) continue;
+    // the left-hand normal of this leg, so the strip keeps its width
+    const nx = -(z1 - z0) / len, nz = (x1 - x0) / len;
+    const n = Math.max(1, Math.round(len / s));
+    for (let i = (prevL < 0 ? 0 : 1); i <= n; i++) {
+      const t = i / n, x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t;
+      const lx = x + nx * hw, lz = z + nz * hw, rx = x - nx * hw, rz = z - nz * hw;
+      const L = M.vert(lx, yAt(lx, lz) + up, lz, colAt(lx, lz));
+      const R = M.vert(rx, yAt(rx, rz) + up, rz, colAt(rx, rz));
+      // wound anticlockwise seen from above, so a recomputing merger faces it up
+      if (prevL >= 0) { M.tri(prevR, prevL, L); M.tri(prevR, L, R); }
+      prevL = L; prevR = R;
+    }
+  }
+  return M;
 }
 export function makeMerger(G, opts) {
   const o = opts || {};

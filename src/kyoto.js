@@ -2994,6 +2994,7 @@ const kyoCHUTE_V = 6.0;             // m/s up, off the tongue: clear of the wate
 const kyoCHUTE_MIN = 2.2;           // m/s downstream before the wave throws you
 let kyoChuteS = -1, kyoChuteFired = false, kyoChuteSaid = false, kyoChuteAir = 0;
 let kyoRiverMover = null;                  // the Uji, as a place (A1)
+let kyoLeavesBed = null;                   // ...and the grove, at the animal (L6, E3)
 const kyoBARREL_N = 14;
 
 /** Build the centreline: resample, smooth, measure, and cache the widths. */
@@ -3830,6 +3831,11 @@ function kyoUpdateRun(game, dt) {
     // the mill end is the noisy end.
     kyoRiverMover.set(clamp(0.45 + (seg.w - 5.5) / 19, 0.35, 1));
   }
+  // The bamboo, which is everywhere here and made no sound: a bed at the
+  // animal, so the calm's rise (sysMOVER_CALM) is its whole dynamic. Quieter
+  // in the water — the river is the sound there.
+  if (!kyoLeavesBed && game.sfxMover) kyoLeavesBed = game.sfxMover('leaves', { key: 'kyo:leaves', near: 20, far: 90 });
+  if (kyoLeavesBed) { kyoLeavesBed.at(p.x, p.y + 3, p.z); kyoLeavesBed.set(wet ? 0.5 : 1); }
 
   // --- the gates, for the toast and for nothing else ---
   // They are not required and they are not counted against you. A gate you have
@@ -5070,7 +5076,7 @@ function kyoBuild(game) {
       figure: { shirt: PALETTE.denim, hat: PALETTE.khaki },
       lines: ['The wheel has turned since before the war. Either war.',
               { t: 'River is quick today. Do not get in above the weir.', before: 'uji-run' },
-              { t: 'Nobody comes down that. Nobody has ever come down that.', before: 'uji-run' },
+              { t: 'Nobody comes down that. Not since the wheel went in.', before: 'uji-run' },
               { t: 'You came down the Uji? On purpose?', after: 'uji-run' },
               { t: 'Two hundred metres, no paddle, and you are not even out of breath.', after: 'uji-run' },
               // ...and one he only says while the river actually has you

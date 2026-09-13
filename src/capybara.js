@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matSelf, TASKS, rand, randInt, clamp, damp, lerp, waterYAt, reachRim } from './shared.js';
+import { PALETTE, mat, matSelf, matEmit, TASKS, rand, randInt, clamp, damp, lerp, waterYAt, reachRim } from './shared.js';
 
 // ===========================================================================
 // AGENT B — THE CAPYBARA
@@ -1443,14 +1443,91 @@ const capyHOP_VEL    = 8.0;   // ...and the kick out of it. MEASURED at 120 Hz
                               // third too generous. 8.0 puts the stretch peak
                               // at 0.35, which is where takeoff always had it.
 const capyHOP_POP    = 0.30;  // an in-progress stretch this big or bigger wins
+// ---- THE ARMED CROUCH (L6, E2 / art #3) -----------------------------------
+// The anticipation above was 23 ms — a frame and a half — and measured at
+// 60 Hz the animal was grounded with pop 0 on one frame and airborne with pop
+// +0.11 on the next: the crouch was never on screen. Space now ARMS the hop:
+// the squash is held at capyHOP_CROUCH and the ears go back for capyHOP_ARM,
+// and the impulse fires when the timer expires. 70 ms is four to five frames,
+// which is the shortest crouch a person can see and about as long as a real
+// one. From a run it is 50 ms so the sprint gate keeps its feel. The hold
+// time during the arm is banked and paid back as a lump on the fire frame, so
+// a tap and a hold produce the apex they always did (mv-feel: 1.37 / 0.82 m).
+const capyHOP_ARM     = 0.07;  // s, standing
+const capyHOP_ARM_RUN = 0.05;  // s, from a run
+// ...and the BODY TURNS IN THE AIR. Through a whole running-jump arc the pitch
+// stayed at 0.055: a plank, thrown. Nose up rising, nose down falling, off
+// the actual vertical velocity, blended by capyAirPose so a one-frame contact
+// blip cannot pitch the animal; the head counter-rotates 40 % so it keeps
+// looking where it is going.
+const capyAIR_PITCH_K   = 0.045;  // rad per m/s of vy (negative = nose up)
+const capyAIR_PITCH_MIN = -0.22;
+const capyAIR_PITCH_MAX = 0.30;
+const capyAIR_HEAD_K    = 0.40;   // the head's counter-rotation share
+// ...and the LANDING IS HELD. The squash went to -0.35 for one frame and was
+// back at +0.15 within 70 ms. Held under capyLAND_HOLD_POP for
+// capyLAND_HOLD (seven frames), with the head dipping capyLAND_HEAD, and
+// then handed to the spring it always had.
+const capyLAND_HOLD     = 0.12;   // s
+const capyLAND_HOLD_POP = -0.24;  // squash-y 0.909 — under the 0.92 the probe reads
+const capyLAND_HEAD     = 0.20;   // rad of head dip during the hold
+// ---- THE GRAB IS A LUNGE, THE WHEEK HAS AN INHALE (L6, E2 / art #8) -------
+// The grab was a head-bob: headX 0 -> 0.56 and back, body pitch 0.000, no
+// foreleg. It is now a lunge on the squash node — nose down capyLUNGE_PITCH,
+// capyLUNGE_Z forward, the near foreleg to capyLUNGE_LEG — over capyLUNGE_T,
+// and the head comes UP with the object capyGRAB_UP_DELAY after the wind-up
+// fires, for capyGRAB_UP_T. The wheek fired jaw, head, pop, mood and tail on
+// the same frame as its sound; it now has capyWHEEK_INHALE of breath first —
+// head down, squash in, ears back — and the call and its sound come after.
+const capyLUNGE_T     = 0.12;
+const capyLUNGE_PITCH = 0.12;   // rad, nose down
+const capyLUNGE_Z     = 0.08;   // m forward on the squash node
+const capyLUNGE_LEG   = -0.6;   // rad, the near foreleg reaching
+const capyGRAB_UP_DELAY = 0.20; // s after the grab before the head lifts
+const capyGRAB_UP_T   = 0.30;   // s the head stays up with the object
+const capyGRAB_UP     = -0.28;  // rad
+const capyWHEEK_INHALE = 0.12;  // s
+const capyINHALE_HEAD  = 0.20;  // rad, head down
+const capyINHALE_POP   = -0.15;
+const capyINHALE_ATK   = 0.03;  // s to the bottom of the breath
+// ...and the STOP. Its follow-through was a -0.089 rad lean, correct and
+// small; capyACCEL_LEAN 0.010 -> 0.016 puts it at -0.14, and a 60 ms bump
+// timed on the lean's own peak is the overshoot a body has when it stops.
+const capySTOP_OVER_T   = 0.06;   // s wide
+const capySTOP_OVER_AT  = 0.22;   // s after the release it lands — the lean's own peak, measured at 60 Hz (0.28 s from a sprint)
+const capySTOP_OVER     = -0.05;  // rad
+const capySTOP_OVER_V   = 1.2;    // m/s — a stop from slower than this is a fade
+// ---- THE FACE READS (L6, E2 / art #4) -------------------------------------
+// At the driving lens the head is 12 % larger — the classic cheat, scaled on
+// camInfo.dist so a hand zoomed in to sysCAM_MIN sees the true head and the
+// lens the game is played at sees the readable one. Eased over ~0.3 s, and
+// reset to 1 in the photo pose, where a photograph is owed the true animal.
+const capyHEAD_LENS_K   = 0.12;
+const capyHEAD_LENS_D0  = 7.0;    // m — sysCAM_MIN, no enlargement
+const capyHEAD_LENS_D1  = 9.5;    // m — the driving boom, full
+const capyEAR_LONG      = 1.30;   // the ears are the one channel that reads at 60 px/m
 const capyACCEL_CLAMP = 25;   // m/s^2 — a contact spike is not an acceleration
-const capyACCEL_LEAN  = 0.010;
+const capyACCEL_LEAN  = 0.016;
 const capyDECK_LEAN   = 0.012;
 const capyEAR_LAG_L   = 14;   // how fast the ears catch up with the body
 const capyEAR_LAG_K   = 0.030;// rad per m/s of the difference
 const capyEAR_LAG_MAX = 0.34;
 let capyGaitRate = 0, capySwingAmp = 0, capyStride = 0;
 let capySpeedPrev = 0, capyAccelSm = 0, capyLeanTgt = 0;
+// L6, E2 — see the constants block above each. Every one is render-side
+// except capyHopArm, which delays the impulse and nothing else.
+let capyHopArm = 0, capyHopArmHeld = 0;   // s left of the armed crouch; s of hold banked
+let capyJumpCredit = 0;                   // ...and spent as sustain after the impulse
+let capyAirPitch = 0;                     // the arc's nose-up / nose-down, damped
+let capyLandHold = 0, capyLandDip = 0;    // s left of the held landing; the head's dip
+let capyLungeT = 0, capyLungeW = 0;       // s left of the grab's lunge; its envelope
+let capyGrabUpDelay = 0, capyGrabUpT = 0; // the head coming up with the object
+let capyInhaleT = 0, capyInhaleW = 0;     // s left of the wheek's breath; its envelope
+let capyStopOverT = 0, capyMovingWas = false;  // the stop's overshoot clock
+let capyHeadLens = 1;                     // the head's scale for the lens, damped
+let capyChewSfxT = 0;                     // s to the next chew click
+let capyNapWas = 0;                       // last frame's nap want, for the yawn
+let capyCarrierWas = null;                // last frame's carrier, for the put-down snort
 let capyDeckVX = 0, capyDeckVZ = 0, capyDeckAX = 0, capyDeckAZ = 0;
 let capyEarLag = 0;
 
@@ -1601,6 +1678,21 @@ const capyIDLE_BACK_W = 1.6;        // weight while the rest lens is open
 const capyIDLE_BACK_REST = 0.45;    // camInfo.rest at or above which it is live
 const capyIDLE_SPAN = [capyIDLE_DUR, capyIDLE_LOOK, 1.35, 1.15, 2.6, 2.4];
 let capyIdleBackSide = 1;           // which shoulder, resolved when the beat is drawn
+// ---- ...AND THE REGARD (L6, E2 / art #4) ----------------------------------
+// The look back is a beat, and measured over a minute of rest the face was
+// in the frame for the beat's second and for nothing else: dot(nose, lens)
+// -0.49 the rest of the time, even with the flank drift finished at sixty
+// degrees, because sixty degrees round from astern is still 120 from the
+// nose. So once the resting lens is open and nothing else has the head — no
+// gaze target, no prop, not asleep — the head TURNS to the lens and stays,
+// over three seconds, to the same neck limit the beat uses. It is what a
+// resting animal does when a camera is on it, and it is the only way the
+// resting picture has a face in it: 120 - 47 = 73 degrees off the nose,
+// dot 0.29, and the eye, the catchlight and the near ear all on the lens.
+// Let go the frame anything else wants the head, four times faster.
+const capyREGARD_IN  = 0.8;         // lambda in: ~3 s to arrive
+const capyREGARD_OUT = 4.0;         // ...and under half a second to let go
+let capyRegard = 0, capyRegardYaw = 0, capyRegardPitch = 0;
 const capyIdleW = new Float32Array(6);         // resolved weights — never allocated
 let capyIdleUrge = 0;               // 0..1 how much the situation is asking for
 let capyIdleT = 0;                  // s spent standing still
@@ -2983,6 +3075,9 @@ export function createCapybara(game) {
   // the pad carries its own authored colours and the coat must not paint over
   // them. See capyPadGeo.
   const mNosePad = matSelf(PALETTE.capyNose, { vertexColors: true });
+  // ...AND AN EIGHTH, FOR THE CATCHLIGHT (L6, E2): the one part of the animal
+  // that is a light. See the eye below. Foam is the palette's white.
+  const mCatch = matEmit(PALETTE.foam, 1);
   // The set the coat pass finds its meshes by. See capyPaintCoat, note 4.
   const capyFurMats = new Set([mFur, mFurWet, mBelly, mBellyWet, mDark, mDarkWet]);
   const wetParts = [];
@@ -3127,14 +3222,23 @@ export function createCapybara(game) {
   // 6% of protrusion the old one had, swung round onto the upper front where
   // the resting lens can see it. The old highlight was visible from the front
   // and from nowhere else, and the front is not where this game is played.
-  capyAddPart(eyeL, capyGeoBead, mBelly, 0.135, 0.452, 0.597, 0.30, 0.30, 0.30)
+  //
+  // ...AND IT EMITS (L6, E2 / art #4). A 1.7 cm bead at the resting lens's
+  // 60 px/m is one pixel, and one pixel of belly colour on an eye is nothing.
+  // Over 1.0 it is on the lamp side of every chapter's bloom threshold (see
+  // EMIT_OVER), and the bloom draws it as a two-pixel white dot at 12 m —
+  // the catchlight every animal photograph has, and the first thing on this
+  // face that reads from where the game is played. matEmit is cached by
+  // colour, not in capyFurMats (the coat must not paint it) and not in
+  // wetParts (a wet eye is shinier, not darker).
+  capyAddPart(eyeL, capyGeoBead, mCatch, 0.135, 0.452, 0.597, 0.30, 0.30, 0.30)
     .userData.coat = { flat: true };
   const eyeSockR = new THREE.Group();
   eyeSockR.position.set(-0.128, 0.128, 0.265);
   eyeSockR.rotation.y = -0.62;
   head.add(eyeSockR);
   const eyeR = capyAddPart(eyeSockR, capyGeoBlob, mEye, 0, 0, 0.056, 0.046, 0.050, 0.042);
-  capyAddPart(eyeR, capyGeoBead, mBelly, -0.135, 0.452, 0.597, 0.30, 0.30, 0.30)
+  capyAddPart(eyeR, capyGeoBead, mCatch, -0.135, 0.452, 0.597, 0.30, 0.30, 0.30)
     .userData.coat = { flat: true };
 
   // THE CHEEK (R3). One small mass under and behind each eye, and it does two
@@ -3253,7 +3357,12 @@ export function createCapybara(game) {
   const earL = new THREE.Group();
   earL.position.set(0.135, 0.17, -0.05);
   head.add(earL);
-  const earMeshL = capyAddPart(earL, capyGeoBlob, mDark, 0.02, 0.03, 0, 0.072, 0.078, 0.036);
+  // ...30 % longer (L6, E2 / art #4): at the resting lens's 60 px/m the ear
+  // is the one channel over three pixels, and it is what the look-back, the
+  // crouch, the inhale and the nap are all read off. Taller, and raised by
+  // half the difference so the root stays in the skull.
+  const earMeshL = capyAddPart(earL, capyGeoBlob, mDark, 0.02, 0.03 + 0.078 * (capyEAR_LONG - 1) * 0.5, 0,
+                               0.072, 0.078 * capyEAR_LONG, 0.036);
   // The cup. -z is the face the playing camera actually sees from behind and
   // above, and it is the one that never sees the sky either way.
   earMeshL.userData.coat = { nook: [0, 0, -1], to: capyCOAT_EAR };
@@ -3261,7 +3370,8 @@ export function createCapybara(game) {
   const earR = new THREE.Group();
   earR.position.set(-0.135, 0.17, -0.05);
   head.add(earR);
-  const earMeshR = capyAddPart(earR, capyGeoBlob, mDark, -0.02, 0.03, 0, 0.072, 0.078, 0.036);
+  const earMeshR = capyAddPart(earR, capyGeoBlob, mDark, -0.02, 0.03 + 0.078 * (capyEAR_LONG - 1) * 0.5, 0,
+                               0.072, 0.078 * capyEAR_LONG, 0.036);
   earMeshR.userData.coat = { nook: [0, 0, -1], to: capyCOAT_EAR };
   wetParts.push({ m: earMeshR, dry: mDark, wet: mDarkWet });
 
@@ -4422,7 +4532,15 @@ export function createCapybara(game) {
                yaw: capyYaw,
                legX: [legs[0].rotation.x, legs[1].rotation.x,
                       legs[2].rotation.x, legs[3].rotation.x],
-               pitch: capyModel.rotation.x, roll: capyModel.rotation.z };
+               pitch: capyModel.rotation.x, roll: capyModel.rotation.z,
+               // ---- L6, E2 ----
+               // The armed crouch, the arc's nose, the held landing, the
+               // lunge and the inhale — each a clock or an envelope that is
+               // four to eight frames long, which is exactly the width a
+               // still cannot see and a probe at 60 Hz can. See qa/l6-body.js.
+               hopArm: capyHopArm, airPitch: capyAirPitch, landHold: capyLandHold,
+               lungeW: capyLungeW, inhaleW: capyInhaleW, sqY: capySquash.scale.y,
+               headScale: head.scale.x, lungeZ: capySquash.position.z };
     },
     // ---- THE POSE FOR THE CAMERA (L4, F1a) ---------------------------------
     // systems.js calls this once a frame while the camera is out and the
@@ -4456,6 +4574,9 @@ export function createCapybara(game) {
       }
       head.rotation.y = lerp(head.rotation.y, hy, w);
       head.rotation.x = lerp(head.rotation.x, hp, w);
+      // ...and the lens cheat comes off (L6, E2): see capyHEAD_LENS_K
+      capyHeadLens = lerp(capyHeadLens, 1, w);
+      head.scale.setScalar(capyHeadLens);
       capyModel.position.y = lerp(capyModel.position.y, capyPhotoBaseY - drop, w);
       jawHinge.rotation.x = lerp(jawHinge.rotation.x, jaw * 0.5, w);
       earL.rotation.z = lerp(earL.rotation.z, -0.18 - ear, w);
@@ -4505,6 +4626,15 @@ export function createCapybara(game) {
   // ears already answer all three above; this is deliberately only the two.
   // See capyMOOD_SMUG.
   game.events.on('capy:incident', function () { capySmugT = capySMUG_DUR; });
+  // ...and it SNORTS at a denial (L6, E2 / audio #7): a march that reaches
+  // it. An authority's catch is an escort, and the snort for that one comes
+  // at the put-down instead — see capyCarrierWas in the carry block — so
+  // being carried off the square is one snort and not two.
+  game.events.on('npc:caught', function (e) {
+    if (e && e.authority) return;
+    capySfxAt.volume = 0.6; capySfxAt.pitch = 1.0;
+    game.sfx('snort', capySfxAt);
+  });
   // ...and the jaw works when a bite is actually taken out of something. The
   // event is props.js's — this module owns the model and nothing else does, so
   // the animation for the game's newest verb lives here and the rule for WHEN
@@ -4531,6 +4661,10 @@ export function createCapybara(game) {
     capyLaunchT = 0;
     capyPlatVX = 0; capyPlatVZ = 0; capyPlatT = 0;
     capyRideBody = null; capyRideT = 0; capy.rideBody = null;
+    // ...and the L6 clocks (see capyHOP_ARM and the block after it)
+    capyHopArm = 0; capyHopArmHeld = 0; capyJumpCredit = 0; capyLandHold = 0; capyLungeT = 0;
+    capyInhaleT = 0; capyInhaleW = 0; capyGrabUpDelay = 0; capyGrabUpT = 0; capyStopOverT = 0;
+    capyNapWas = 0; capyCarrierWas = null;
   });
 
   // -------------------------------------------------------------------
@@ -4570,6 +4704,7 @@ export function createCapybara(game) {
     // already at 1.25 on the very next frame, then let the spring ring it out.
     capyPop = capyPop > 0.65 ? capyPop : 0.65;
     capyPopVel = 9;
+    capyLandHold = 0;                  // the call is louder than the landing
     capyWheekHold = 0.42;
     capyEarFlick = 1;
     capyTailFlick = 1;
@@ -4779,6 +4914,7 @@ export function createCapybara(game) {
     if (ph && typeof ph.nearestGrabbable === 'function' &&
         ph.nearestGrabbable(capyPosition, capyGRAB_RADIUS)) {
       capyGrabTimer = capyGRAB_WINDUP;
+      capyLungeT = capyLUNGE_T;          // the reach is a lunge (L6, E2)
       // the press has been spent — see capyBUF_WINDOW
       capyEatBuf(game.input, 'clearActionBuf');
       return;
@@ -4869,6 +5005,11 @@ export function createCapybara(game) {
     capyNap = 0; capy.nap = 0; capyNapWake = 0;      // ...and THE NAP (N4)
     capyShakePend = 0; capyShakeP = -1;
     capyWhiffT = 0; capyWhiffPend = false;
+    // ...and the L6 clocks: an armed hop, a held landing, a lunge or a breath
+    // do not cross a border either
+    capyHopArm = 0; capyHopArmHeld = 0; capyLandHold = 0; capyLandDip = 0; capyAirPitch = 0;
+    capyLungeT = 0; capyLungeW = 0; capyGrabUpDelay = 0; capyGrabUpT = 0;
+    capyInhaleT = 0; capyInhaleW = 0; capyStopOverT = 0; capySquash.position.z = 0;
     // ...and the face's one opinion belongs to the square it was earned in (F2).
     capySmugT = 0;
     capyIdleAct = -1; capyIdleT = 0;
@@ -5444,8 +5585,38 @@ export function createCapybara(game) {
     // the buffer keeps it alive for as long as the coyote window keeps the
     // ledge alive, so a hop asked for just before the feet arrive is a hop.
     const jumpNow = input.jumpPressed || capyBuffered(input, 'jumpBuf');
-    if (jumpNow && canHop) {
+    // ---- THE ARMED CROUCH (L6, E2): see capyHOP_ARM ------------------------
+    // The press arms; the impulse fires when the timer runs out. Only two
+    // things cancel an armed hop — being picked up and catching a wall —
+    // because both hand the body to somebody else. Walking off a ledge during
+    // the arm does not: 70 ms is inside the coyote window. The water is NOT
+    // armed: a swim hop has no crouch to show and the water-entry timings are
+    // measured. The hold is banked during the arm and paid back as a lump on
+    // the fire frame so the variable-height rule sees the press it always did.
+    let hopFire = false;
+    if (capyHopArm > 0) {
+      capyHopArm -= dt;
+      if (input.jump) capyHopArmHeld += dt;
+      if (capyHopArm <= 0) {
+        capyHopArm = 0;
+        hopFire = !capy.carriedBy && !capyClinging;
+      }
+    } else if (jumpNow && canHop) {
       capyEatBuf(input, 'clearJumpBuf');       // spent — one press, one hop
+      if (capySwimming) hopFire = true;
+      else {
+        capyHopArm = capy.isRunning ? capyHOP_ARM_RUN : capyHOP_ARM;
+        capyHopArmHeld = input.jump ? dt : 0;   // the press frame is a held frame
+      }
+    }
+    if (capyHopArm > 0) {
+      // the crouch, held: the spring is parked at the bottom of the dip and
+      // the fire frame kicks it out from there, exactly as the seed always did
+      if (capyPop > capyHOP_CROUCH) { capyPop = capyHOP_CROUCH; capyPopVel = 0; }
+      else if (capyPopVel < 0) capyPopVel = 0;
+      capyLandHold = 0;
+    }
+    if (hopFire) {
       const v0 = capySwimming ? capySWIM_HOP : capyJUMP_V;
       if (body.velocity.y < v0) body.velocity.y = v0;
       // ---- THE RUN-UP (v34) ------------------------------------------------
@@ -5552,7 +5723,17 @@ export function createCapybara(game) {
         capyStamHold = capySTAM_DELAY;
       }
       capyJumpT = capyJUMP_GRACE;
+      // The sustain window runs from the IMPULSE, exactly as it always did, so
+      // a held key gives the 1.37 m apex to the centimetre. A key let go
+      // during the arm is remembered as a CREDIT — the frames it was held —
+      // and spent as sustain after the impulse, so a two-frame tap is the
+      // same two frames of sustain (0.82 m) it was. Paying the arm's hold
+      // back as a lump on the velocity was tried first and measured 1.58 m:
+      // a metre a second on the first frame is worth more height than the
+      // same metre a second spread over a fifth of one.
       capyJumpHold = capyJUMP_HOLD;
+      capyJumpCredit = capySwimming ? 0 : capyHopArmHeld;
+      capyHopArmHeld = 0;
       capyJumpCool = capyJUMP_COOL;
       // A KICK OFF THE BOTTOM ENDS THE DIVE. Space has meant "up" for twelve
       // chapters and it is not about to start meaning something else.
@@ -5569,6 +5750,7 @@ export function createCapybara(game) {
       // — and overshoots to the same 0.42 peak it always had. The policy on the
       // guard is unchanged: a bigger stretch already in flight (a wheek) wins.
       if (capyPop < capyHOP_POP) { capyPop = capyHOP_CROUCH; capyPopVel = capyHOP_VEL; }
+      capyLandHold = 0;                  // a hop out of a held landing is a hop
       capyEarFlick = 1;
       capySfxOpts.pitch = capySwimming ? 0.9 : 1.35;
       capySfxOpts.volume = 0.45;
@@ -5592,10 +5774,14 @@ export function createCapybara(game) {
     if (capyRefuseT > 0) capyRefuseT -= dt;
     // Variable height: hold for the full arc, release early for a clipped one.
     if (capyJumpArm) {
-      if (body.velocity.y <= 0 || !input.jump || capyJumpHold <= 0) {
+      // ...or the credit the arm banked stands in for the key (L6, E2):
+      // see the note at capyJumpCredit's write
+      const heldNow = input.jump || capyJumpCredit > 0;
+      if (body.velocity.y <= 0 || !heldNow || capyJumpHold <= 0) {
         capyJumpArm = false;
       } else {
         capyJumpHold -= dt;
+        if (!input.jump) capyJumpCredit -= dt;
         body.velocity.y += capyJUMP_HOLD_A * dt;
       }
     }
@@ -5767,6 +5953,9 @@ export function createCapybara(game) {
       // the absorb runs on ANY landing, however gentle — it is the difference
       // between an animal arriving and a sprite changing state
       if (fall > 0.8) capyLandVel -= clamp(fall * capyLAND_SCALE, 0, 0.30) * capyLAND_C;
+      // ...and the squash is HELD at the bottom (L6, E2): see capyLAND_HOLD.
+      // Any landing off a real hop; a kerb (under 2 m/s) keeps the old spring.
+      if (fall > 2.0 && capyHopArm <= 0) capyLandHold = capyLAND_HOLD;
       if (fall > 3) {
         capyPop = capyPop > -0.34 ? -0.34 : capyPop;
         capyPopVel = -4;
@@ -6273,8 +6462,21 @@ export function createCapybara(game) {
     const dryStill = grounded && !capySwimming && !capyClinging && !carried &&
                      !capy.atHelm && mag < 0.02 && groundSpeed < 0.35 &&
                      !input.action && !input.jump;
-    if (!dryStill) {
+    // ...BUT THE BEAT ASHORE SURVIVES THE HAUL-OUT (L6, E2). The arm above
+    // fires on the frame the animal stops swimming, and the note beside it
+    // says that frame is "rarely standing on anything" — and this line then
+    // cancelled the arm on exactly that frame, so the shake was reachable
+    // only by stepping out of the water onto a floor at water level. (The
+    // idle timer's arm at capyIDLE_MIN could not save it either: the coat
+    // dries under capySHAKE_WET in 3.6 s and the first idle beat is at 6.)
+    // The PLAYER cancels it — a key, the stick, the water, a wall, a carrier
+    // — and the ground merely waits for it.
+    const dryBusy = capySwimming || capyClinging || carried || capy.atHelm ||
+                    mag >= 0.02 || input.action || input.jump;
+    if (dryBusy) {
       capyShakePend = 0; capyShakeP = -1;
+    } else if (!dryStill) {
+      capyShakeP = -1;                  // a shake in progress is cut by losing the floor; the arm waits
     } else if (capyShakeP >= 0) {
       capyShakeP += dt / capySHAKE_DUR;
       capyShakeSpray -= dt;
@@ -6294,8 +6496,15 @@ export function createCapybara(game) {
         capyShakeP = 0;
         capyShakeSpray = 0;
         capyEarFlick = 1;
-        capySfxAt.volume = 0.50; capySfxAt.pitch = 1.15;
-        game.sfx('rustle', capySfxAt);
+        // ITS OWN VOICE (L6, E2 / audio #7). This was 'rustle' — dry leaves
+        // for a wet animal shaking itself off, the funniest sound it could
+        // make. sfxShake is seven to nine low-passed puffs at the roll's own
+        // 7 Hz-ish with drip grains between them, and the wetness scales the
+        // drips: a rained-on animal patters, one out of the harbour pours.
+        capySfxAt.volume = 0.62; capySfxAt.pitch = 1.0;
+        capySfxAt.wet = clamp(capyWetLevel, 0, 1);   // read by sfxShake alone
+        game.sfx('shake', capySfxAt);
+        capySfxAt.wet = 0;
       }
     }
 
@@ -6546,6 +6755,15 @@ export function createCapybara(game) {
     capyNap = damp(capyNap, napWant, napWant > capyNap ? capyNAP_LAM : capyNAP_LAM * 9, dt);
     if (capyNap < 0.0015 && napWant === 0) capyNap = 0;
     capy.nap = capyNap;
+    // ...AND IT YAWNS ON THE WAY IN (L6, E2 / audio #7). The one edge, once:
+    // the wheek's contour turned over and slowed three times, which is what a
+    // yawn is. On the want rather than the blend, so it is the first thing the
+    // nap does and not something that arrives halfway through it.
+    if (napWant === 1 && capyNapWas === 0 && typeof game.sfx === 'function') {
+      capySfxAt.volume = 0.55; capySfxAt.pitch = 1.0;
+      game.sfx('yawn', capySfxAt);
+    }
+    capyNapWas = napWant;
 
     // ---- ...AND IT SAYS SO (F4) -----------------------------------------
     // The whole calm layer — the pose drop, the pad coming up, the filter
@@ -6571,7 +6789,23 @@ export function createCapybara(game) {
       capyPurrT = rand(2.0, 4.5);
     }
 
-    if (input.honkPressed) capyWheek();
+    // ---- THE INHALE (L6, E2): see capyWHEEK_INHALE ------------------------
+    // The press starts the breath; the call — and its sound, and every
+    // listener on 'capy:wheek' — comes capyWHEEK_INHALE later. A press during
+    // the breath or the call is the same press it always was: nothing.
+    if (input.honkPressed && capyInhaleT <= 0 && capyWheekHold <= 0) capyInhaleT = capyWHEEK_INHALE;
+    if (capyInhaleT > 0) {
+      capyInhaleT -= dt;
+      if (capyInhaleT <= 0) { capyInhaleT = 0; capyInhaleW = 0; capyWheek(); }
+      else {
+        // a quick drop and a hold, not a swell: the bottom of the breath is
+        // reached in capyINHALE_ATK and kept until the call
+        const u = capyWHEEK_INHALE - capyInhaleT;
+        capyInhaleW = u < capyINHALE_ATK ? Math.sin(u / capyINHALE_ATK * Math.PI * 0.5) : 1;
+        if (capyPop > capyINHALE_POP * capyInhaleW) { capyPop = capyINHALE_POP * capyInhaleW; capyPopVel = 0; }
+        capyLandHold = 0;
+      }
+    }
 
     // The action key is shared with the condor, and condor.js runs AFTER this
     // module — so when the talons are in reach the same press used to throw the
@@ -6637,9 +6871,15 @@ export function createCapybara(game) {
         const p = (game.physics && typeof game.physics.nearestGrabbable === 'function')
           ? game.physics.nearestGrabbable(capyPosition, capyGRAB_RADIUS) : null;
         // props.js owns held-state, the 'capy:grab' event and the sfx
-        if (p && typeof game.physics.grab === 'function' && game.physics.grab(p)) capyJawOpen = 1;
+        if (p && typeof game.physics.grab === 'function' && game.physics.grab(p)) {
+          capyJawOpen = 1;
+          // ...and the head comes up with it, a beat later (L6, E2)
+          capyGrabUpDelay = capyGRAB_UP_DELAY; capyGrabUpT = capyGRAB_UP_T;
+        }
       }
     }
+    if (capyGrabUpDelay > 0) capyGrabUpDelay -= dt;
+    else if (capyGrabUpT > 0) capyGrabUpT -= dt;
     // someone (a tourist, gravity, props.js) may have taken it back
     if (capy.heldProp && capy.heldProp.held === false) capy.heldProp = null;
 
@@ -6684,6 +6924,7 @@ export function createCapybara(game) {
       if (!canDig && !capyClinging && !capyDiving && capyWhiffCool <= 0) {
         capyWhiffCool = capyREFUSE_GAP;
         capyWhiffT = capyWHIFF_DUR;
+        capyLungeT = capyLUNGE_T;        // a reach at nothing is still a reach
         // a low click (L4, E3) — the UI's own detent, an octave down — not a
         // rustle: a rustle is the sound of touching something and this is
         // the sound of touching nothing
@@ -6943,6 +7184,21 @@ export function createCapybara(game) {
     // which is longer than any contact hiccup and shorter than the shortest hop.
     capyAirPose = damp(capyAirPose, (!grounded && !capySwimming && !carried &&
                                      capyAirTime > 0.06) ? 1 : 0, 13, dt);
+    // ...and the arc has a NOSE (L6, E2): see capyAIR_PITCH_K. Off the actual
+    // vertical velocity, weighted by the pose blend so the first 60 ms of any
+    // airtime — a stair, a kerb, a contact blip — never pitch the body.
+    capyAirPitch = damp(capyAirPitch,
+                        clamp(-body.velocity.y * capyAIR_PITCH_K, capyAIR_PITCH_MIN, capyAIR_PITCH_MAX) * capyAirPose,
+                        16, dt);
+    // THE PUT-DOWN (L6, E2 / audio #7): an authority letting go of the animal
+    // is the denial the snort is for. Read off the carrier changing to nothing
+    // rather than off an event, because there is none — the escort simply
+    // clears `carriedBy` — and the carrier's own `authority` says which kind.
+    if (capyCarrierWas && !capy.carriedBy && capyCarrierWas.authority) {
+      capySfxAt.volume = 0.6; capySfxAt.pitch = 0.92;
+      game.sfx('snort', capySfxAt);
+    }
+    capyCarrierWas = capy.carriedBy || null;
     // ...and the CLIMB is the fourth answer on the same channel. It has to be
     // computed here rather than inside the loop because the body's own pitch
     // reads it too. See THE CLIMB HAS A POSE NOW.
@@ -7064,6 +7320,19 @@ export function createCapybara(game) {
       legs[i].scale.y = 1 - capyGAIT_SHIN * lift;
       feet[i].rotation.x = -legs[i].rotation.x * capyLoaf + capyGAIT_TOE * lift;
     }
+    // ---- THE LUNGE (L6, E2): see capyLUNGE_T ------------------------------
+    // A raised sine over the reach — zero at both ends, so it cannot pop
+    // against whichever of the five writers above has the leg — on the near
+    // foreleg, the squash node's z, and the model's pitch (further down, in
+    // the one writer). Only on the ground: a reach from a wall or a carrier's
+    // arms has nowhere to lunge to.
+    if (capyLungeT > 0) {
+      capyLungeT -= dt;
+      capyLungeW = capyLungeT > 0 ? Math.sin((1 - capyLungeT / capyLUNGE_T) * Math.PI) *
+                                    (1 - capyClimbPose) * (carried ? 0 : 1) : 0;
+    } else capyLungeW = 0;
+    if (capyLungeW > 0) legs[0].rotation.x = lerp(legs[0].rotation.x, capyLUNGE_LEG, capyLungeW);
+    capySquash.position.z = capyLUNGE_Z * capyLungeW;
 
     // squash & stretch spring — stiff and under-damped, so a wheek is a sharp
     // pop with an elastic overshoot instead of a gentle swell.
@@ -7092,6 +7361,17 @@ export function createCapybara(game) {
     }
     if (capyPop > 1.15) { capyPop = 1.15; if (capyPopVel > 0) capyPopVel = 0; }
     else if (capyPop < -0.5) { capyPop = -0.5; if (capyPopVel < 0) capyPopVel = 0; }
+    // ---- THE HELD LANDING (L6, E2): see capyLAND_HOLD -------------------
+    // Parked at the bottom of the dip for the hold, after the spring has had
+    // its step, so the frame the hold ends the spring takes over from rest at
+    // the bottom — the same shape the hop's own crouch has — and rings out
+    // through the 0.17 stretch it always had.
+    if (capyLandHold > 0) {
+      capyLandHold -= dt;
+      if (capyPop > capyLAND_HOLD_POP) capyPop = capyLAND_HOLD_POP;
+      if (capyPopVel > 0) capyPopVel = 0;
+    }
+    capyLandDip = damp(capyLandDip, capyLandHold > 0 ? capyLAND_HEAD : 0, capyLandHold > 0 ? 30 : 12, dt);
 
     // body bob / roll / pitch — a run is a different GAIT, not a faster walk:
     // ~2.5x the bob, ~2.3x the forward lean, ears further back, head up.
@@ -7210,6 +7490,19 @@ export function createCapybara(game) {
       : capyIdleAct === 4 ? idleEnv * 0.10
       : capyIdleAct === 2 ? idleEnv * 0.06
       : capyIdleAct === 5 ? Math.min(1, idleEnv * 1.35) * capyIDLE_BACK_PITCH : 0, 9, dt);
+    // THE REGARD: see capyREGARD_IN. Gated the way the look-back's weight is
+    // (capyIdleW[5]), plus on the animal actually resting; the beat itself
+    // fades it while it runs so the two cannot stack past the neck.
+    {
+      const ci = game.camInfo;
+      const want = (idleOk && ci && ci.rest >= capyIDLE_BACK_REST && capyGazeWantY === 0 &&
+                    capyGazeWantP === 0 && !capy.heldProp && capyNap < 0.5) ? 1 : 0;
+      capyRegard = damp(capyRegard, want, want ? capyREGARD_IN : capyREGARD_OUT, dt);
+      const loc = capyWrapAngle(input.camYaw - capy.group.rotation.y);
+      const beat5 = capyIdleAct === 5 ? Math.min(1, idleEnv * 1.35) : 0;
+      capyRegardYaw = clamp(loc, -capyIDLE_BACK_YAW, capyIDLE_BACK_YAW) * capyRegard * (1 - beat5);
+      capyRegardPitch = capyIDLE_BACK_PITCH * capyRegard * (1 - beat5);
+    }
     capyIdleCrouch = damp(capyIdleCrouch, capyIdleAct === 2 ? idleEnv * 0.045 : 0, 8, dt);
     capyIdleEar = damp(capyIdleEar, capyIdleAct === 2 ? idleEnv : 0, 8, dt);
     capyIdleChew = damp(capyIdleChew,
@@ -7347,6 +7640,20 @@ export function createCapybara(game) {
                          + capyAccelSm * capyACCEL_LEAN
                          + clamp(deckFwd * capyDECK_LEAN, -0.20, 0.20);
     capyLeanTgt = leanTarget;
+    // ---- THE STOP OVERSHOOTS (L6, E2): see capySTOP_OVER_T ---------------
+    // Clocked from the frame the stick is released at speed, and landed
+    // capySTOP_OVER_AT later — which is where the damped lean's own peak is
+    // (lambda 8, measured) — so the bump reads as the lean going past and
+    // coming back rather than as a second event. Ground only, on purpose.
+    if (capyMovingWas && mag < 0.02 && !capySwimming && grounded && !carried &&
+        capySpeedSm > capySTOP_OVER_V) capyStopOverT = capySTOP_OVER_AT + capySTOP_OVER_T;
+    capyMovingWas = mag >= 0.02;
+    let stopOver = 0;
+    if (capyStopOverT > 0) {
+      capyStopOverT -= dt;
+      const u = (capySTOP_OVER_T - capyStopOverT) / capySTOP_OVER_T;   // < 0 while waiting
+      if (u > 0 && u < 1) stopOver = Math.sin(u * Math.PI) * capySTOP_OVER;
+    }
     // The speed lean damps on its OWN variable. Damping capyModel.rotation.x
     // toward the lean while the terrain pitch is also written into it would
     // feed the hill back into its own filter every frame.
@@ -7360,8 +7667,13 @@ export function createCapybara(game) {
     // pitch and the slide, for the reason those two are outside it: it has its
     // own clock (capyCLIMB_LAM) and running it through the lean's as well
     // would make getting onto a wall take a second and a half.
+    // ...and three more outside it (L6, E2), each on its own clock: the arc's
+    // nose (capyAirPitch, on the pose blend), the lunge (a 120 ms envelope)
+    // and the stop's overshoot (a 60 ms one). Damping any of them through the
+    // lean's lambda 8 would leave a tenth of each on the frame after it ended.
     capyModel.rotation.x = capyLean + capyPosePitch - capySLIDE_TILT * capySlideW
-                           - capyCLIMB_PITCH * capyClimbPose;
+                           - capyCLIMB_PITCH * capyClimbPose
+                           + capyAirPitch + capyLUNGE_PITCH * capyLungeW + stopOver;
     // ---- THE BREATH (R5), and it is the FOURTH TERM IN THIS WRITER --------
     // ON ITS OWN PHASE, not on `t`, because the rate changes three ways (idle
     // act 4 slows it, the loaf slows it further, and both can be part way in):
@@ -7418,7 +7730,11 @@ export function createCapybara(game) {
     // grab and the whiff because both of those are reaches at the GROUND.
     else if (capyClinging) headTarget = -0.30;
     else if (digging) headTarget = 0.62 + Math.sin(t * 13) * 0.09;
-    else if (capyGrabTimer > 0) headTarget = 0.62;
+    // ...held down through capyGRAB_UP_DELAY after the wind-up fires, and
+    // then UP with the object for capyGRAB_UP_T (L6, E2): the grab has a
+    // before and an after, which is what made it a head-bob before
+    else if (capyGrabTimer > 0 || capyGrabUpDelay > 0) headTarget = 0.62;
+    else if (capyGrabUpT > 0) headTarget = capyGRAB_UP;
     // a reach that found nothing is still a reach: a short dip on the same
     // channel the wind-up uses, damped in and out, so it cannot pop
     else if (capyWhiffT > 0) headTarget = 0.34;
@@ -7451,8 +7767,15 @@ export function createCapybara(game) {
     // ...and the head goes down asleep (N4). ADDED, like the gaze and the
     // nod, so nothing about the pose stack changes for the ninety-nine per cent
     // of the time the animal is awake.
+    // ...and three from L6, E2, all added: the inhale (head DOWN, on its own
+    // envelope so the bottom of the breath is reached in 30 ms and not on a
+    // lambda), the landing's dip, and the arc's counter-rotation — the body
+    // pitches with the arc and the head keeps 60 % of its line, which is
+    // what an animal that is looking where it is going does.
     head.rotation.x = capyHeadPitch + capyGazePitch + capyIdlePitch + capyHeadNod +
-                      capyNap * capyNAP_HEAD;
+                      capyNap * capyNAP_HEAD +
+                      capyINHALE_HEAD * capyInhaleW + capyLandDip - capyAIR_HEAD_K * capyAirPitch +
+                      capyRegardPitch;
     head.rotation.z = clamp(-capyYawRate * 0.05, -0.2, 0.2);
     // the look-around (see the idle beat) plus whatever is worth looking at.
     // Nothing else writes the head's yaw, and the mouth anchor is derived from
@@ -7461,7 +7784,8 @@ export function createCapybara(game) {
     // than wrapped, and why a held prop resolves to a glance and not a target.
     // ...and the head LEADS a turn while the tail trails it (L3, E2): an S
     // through the spine from two nodes, on the yaw rate the roll already reads
-    head.rotation.y = capyIdleYaw + capyGazeYaw + clamp(capyYawRate * 0.08, -0.26, 0.26);
+    // ...and the regard (L6, E2), the fourth term: see capyREGARD_IN
+    head.rotation.y = capyIdleYaw + capyGazeYaw + capyRegardYaw + clamp(capyYawRate * 0.08, -0.26, 0.26);
 
     if (capyWheekHold > 0) { capyWheekHold -= dt; capyJawOpen = 1; }
     // snaps open, drifts shut
@@ -7473,7 +7797,19 @@ export function createCapybara(game) {
     // Three terms summed rather than three writers of the same value: the idle
     // chew is a mime and this one is not, and a player holding a sandwich is
     // entitled to both at once.
-    if (capyChewT > 0) capyChewT -= dt;
+    if (capyChewT > 0) {
+      capyChewT -= dt;
+      // ...and it is audible (L6, E2 / audio #7): a soft double click every
+      // 0.4 s while there is really something in the mouth. The first one
+      // lands with the bite; the timer is left at zero when the chew ends so
+      // the next graze starts on its own first click.
+      capyChewSfxT -= dt;
+      if (capyChewSfxT <= 0) {
+        capyChewSfxT = 0.4;
+        capySfxAt.volume = 0.42; capySfxAt.pitch = 1.0;
+        game.sfx('chew', capySfxAt);
+      }
+    } else capyChewSfxT = 0;
     const chewNow = capyChewT > 0
       ? (0.5 - 0.5 * Math.cos(capyChewT * Math.PI * 2 * 7)) * clamp(capyChewT / 0.3, 0, 1)
       : 0;
@@ -7490,8 +7826,14 @@ export function createCapybara(game) {
     // it is published so a chapter or the card can answer a beat-landed hop
     // without capybara.js having to know what the answer looks like.
     if (capyBeatFlash > 0) capyBeatFlash = damp(capyBeatFlash, 0, 5, dt);
+    // ...and BACK for the armed crouch and the inhale (L6, E2): the ears are
+    // the one channel that reads at the playing lens, so the two anticipations
+    // are on them as well as on the squash. Hard-edged on the arm — it is four
+    // frames long and a lambda would never arrive — and on the breath's own
+    // envelope.
     const earBack = clamp(gaitSpeed * (running ? 0.115 : 0.075), 0, 0.88) +
-                    (capySwimming ? 0.2 : 0) + capyIdleEar * 0.25;
+                    (capySwimming ? 0.2 : 0) + capyIdleEar * 0.25 +
+                    (capyHopArm > 0 ? 0.55 : 0) + capyInhaleW * 0.45;
     const flick = Math.sin(t * 34) * capyEarFlick * 0.5;
     const earDown = capyIdleEar * 0.34;
     // ...and they TURN toward whatever just happened (see capyHeardFrom).
@@ -7693,9 +8035,25 @@ export function createCapybara(game) {
     }
     if (ringDirty) capyRingMesh.instanceMatrix.needsUpdate = true;
 
+    // ---- THE HEAD FOR THE LENS (L6, E2): see capyHEAD_LENS_K --------------
+    // Scaled about the neck, so it grows forward and up and the ears with it.
+    // Off camInfo.dist — the boom the rig actually has, after clearance —
+    // and not the reach it asked for, so a lens pushed in by a wall sees the
+    // true head. photoPose() undoes it: a photograph is owed the real animal.
+    {
+      const ci = game.camInfo;
+      const d = ci && ci.dist > 0 ? ci.dist : capyHEAD_LENS_D1;
+      const u = clamp((d - capyHEAD_LENS_D0) / (capyHEAD_LENS_D1 - capyHEAD_LENS_D0), 0, 1);
+      capyHeadLens = damp(capyHeadLens, 1 + capyHEAD_LENS_K * u * u * (3 - 2 * u), 10, dt);
+      head.scale.setScalar(capyHeadLens);
+    }
     // ---- mouth anchor: outside the squash, so its world quaternion is
     //      clean for props.js's matrixWorld.decompose()
-    capyMouthLocal.set(0, -0.055, 0.50).applyEuler(head.rotation).add(head.position);
+    // ...at the head's scale, plus the lunge's forward on the squash node, so
+    // a prop in the mouth stays in the mouth
+    capyMouthLocal.set(0, -0.055, 0.50).multiplyScalar(capyHeadLens)
+      .applyEuler(head.rotation).add(head.position);
+    capyMouthLocal.z += capySquash.position.z;
     mouthAnchor.position.copy(capyMouthLocal);
     mouthAnchor.quaternion.copy(head.quaternion);
 

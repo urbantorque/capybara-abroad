@@ -5082,7 +5082,11 @@ function venUpdateTide(game, dt) {
                   (venPhase < prevPhase && venTIDE_WARN <= venPhase);
   if (crossed && venSirenT < 0) {
     venSirenT = 0; venSirenStep = 0;
-    venToast('that is the siren. the water is about forty minutes out.');
+    // FORTY SECONDS, NOT FORTY MINUTES (L6, E5). A real siren gives Venice
+    // forty minutes; this one gives you 0.04 of a 205 s cycle before the rise
+    // starts and the paving is under at +41 s. In a chapter whose clock is
+    // the point, the one number the paper says must be the one the water keeps.
+    venToast('that is the siren. the water is about forty seconds out.');
     // ---- AND THE MAN WHOSE JOB IT IS SAYS SO -----------------------------
     // He is nine metres from the spawn point and the boards come out of the
     // shed behind him. Two seconds after the fourth tone, not on it, so it
@@ -5528,7 +5532,7 @@ function venUpdateTasks(game, dt) {
             if (typeof game.recordEnd === 'function') game.recordEnd('rialto');
             venSfx('pop', { volume: 0.85, pitch: 1.15 });
             if (!again) venTask('rialto');
-            if (!again) venToast('nobody has ever crossed that bridge without stopping. until now.');
+            if (!again) venToast('no one crosses that bridge without stopping. until now.');
             // ...and the far side is the start of the next one.
             venRialtoFrom = side; venRialtoHigh = 0; venRialtoT = 0;
           } else {
@@ -6115,7 +6119,7 @@ function venBuild(game) {
                 when: venDry }],
       onTask: { 'passerelle': ['Six hundred metres of that and he did the good bit.'],
                 'acqua-alta': ['He was standing in the square. On purpose. In it.'],
-                'the-calli': ['Through the calli at high water. That is the local route, that is.'] } });
+                'the-calli': ['Through the calli at high water. That is how a Venetian goes home.'] } });
     venSeedRec = game.addLocal({ biome: 'venice', x: venSEED_AT.x, y: venTerrain(venSEED_AT.x, venSEED_AT.z), z: venSEED_AT.z, near: 6, face: 0.4,
       figure: { shirt: PALETTE.cloth4, hat: PALETTE.venStone },
       lines: ['Corn is forbidden since 2008. This is birdseed. Entirely different.',

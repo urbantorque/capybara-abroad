@@ -53,11 +53,21 @@ const ASSERTS = [
   // found by kind rather than by their first line are still on the table.
   ['qa/l4-lines-dups.mjs', 'dialogue pools: no line in two pools'],
   ['qa/l4-pal-static.cjs',  'the two regulars found by kind (Sydney, Pasto)'],
+  // THE VOICE'S TICS (L6, E7): no author's phrase in more than three files.
+  ['qa/l6-tics.mjs',        'dialogue literals: no phrase in more than three files'],
   ['build.mjs',           'the one-file build: wraps, splices, no collisions, writes dist/'],
 ];
 const REPORTS = [
   ['qa/p7-tokens.cjs',    'the HUD vocabulary: radii, type steps, shadows'],
   ['qa/p8-spawn.cjs',     'is there anything loose where the player lands'],
+  // THE SOAK HAS A HISTORY (L6, E8 / qa F5). `npm run soak` boots the game
+  // under playwright and appends one line to qa/soak-history.jsonl; this
+  // reads it back and says which columns moved more than 30 % against the
+  // last three rows. A REPORT and not an assert on purpose: it needs a
+  // history this checkout may not have, and a check that cannot run must
+  // not be a check that fails. It exits non-zero on a move for `npm run
+  // soak`, which is the run that has just added the row it is judging.
+  ['qa/soak-diff.mjs',    'the soak against its last three rows'],
 ];
 
 function run(file) {

@@ -4591,7 +4591,7 @@ function monBuildLocals(game) {
   put(monSTEPS.x + 3.6, monSTEPS.z + 2.4, {
     figure: { shirt: PALETTE.monCrowdC }, face: Math.PI - 0.4, near: 8,
     lines: ['Someone has parked something enormous on the pavement again.',
-            'I have been here eleven years. You are the fourth.',
+            'Nine Grands Prix from this step. You are the fourth.',
             'The fourth ANIMAL. The others were a peacock and two dogs.',
             { t: 'The Palace is up the hill. You will not get up there.', before: 'the-rock' },
             { t: 'You got up the Rock. Nobody walks up the Rock.', after: 'the-rock' },
@@ -4604,7 +4604,7 @@ function monBuildLocals(game) {
     figure: { shirt: PALETTE.monCrowdD, hat: PALETTE.monCrowdE }, face: 1.2, near: 8,
     // and he has not moved either
     beat: { kind: 'rock', every: 7.0, dur: 2.6 },
-    lines: ['Nothing in this water since Tuesday.',
+    lines: ['Nothing in this water since the regatta.',
             'They put a boat in there once. Cost more than the country.',
             'Everybody looks up the hill. Nobody looks down here.',
             { t: 'That big white one is not going anywhere. Nobody is aboard.', before: 'superyacht' },
@@ -4620,7 +4620,7 @@ function monBuildLocals(game) {
     monLocDeck.lines = ['The owner is in Gstaad. The owner is always in Gstaad.',
                         'You may go up. Everybody goes up.',
                         'That is nine metres to the water. People do ask.',
-                        { t: 'Nobody has ever actually gone off it. People ask, and then they look.', before: 'high-dive' },
+                        { t: 'Not one guest has actually gone off it. People ask, and then they look.', before: 'high-dive' },
                         { t: 'You went off it. From the TOP deck. I have to write that up.', after: 'high-dive' },
                         { t: 'You are dressed better than the owner now.', after: 'black-tie' }];
     monLocDeck.wheekLines = ['I shall put you down as a guest.'];
@@ -4634,7 +4634,7 @@ function monBuildLocals(game) {
             { t: 'You rode the hairpin. On the ROOF. I am still not writing it down.', after: 'the-hairpin' },
             { t: 'The tunnel is the loud one. Mind your ears.', before: 'the-tunnel' },
             { t: 'They heard that tunnel in Nice.', after: 'the-tunnel' }],
-    wheek: ['Yellow flag. That is you, that is.'],
+    wheek: ['Yellow flag. That would be you, sir.'],
     onTask: { 'the-hairpin': ['I saw that. I am not writing it down.'] },
   });
   monLocBar = put(monCASINO.x + monCASINO.w * 0.5 - 7.5, monFRONT_Z + 6, {

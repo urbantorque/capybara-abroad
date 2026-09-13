@@ -27,8 +27,11 @@ travelled per NPC), `props.js` (props under the terrain or asleep in mid-air),
 `pointers.js` (every task the card cannot point at), `audio2.js` (real keys and
 a real clock, so the score and the ambience are actually running), `kine.js`
 (kinematic bodies moving with zero velocity), `gag-ring.js` (what
-`p8-spawn.cjs` says to check before believing it), `r10-soak.js` (`npm run
-soak`).
+`p8-spawn.cjs` says to check before believing it), `r10-soak.js` (the R10
+shipping soak, by hand). `npm run soak` is `soak.mjs` (L6): it opens
+playwright itself, runs `fuzz.js`, `l4-ks.js` and `l6-load.js`, appends one
+line per run to `soak-history.jsonl` and then runs `soak-diff.mjs`, which
+fails on any column that moved more than 30 % against the last three rows.
 
 `nr-travel.js` is item 5, customs. It is the file that found the dead
 confiscation: props.js has a carefully-argued block for a held prop at the

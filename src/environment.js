@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, dampAngle, lerp, grain, swayMesh, leafMesh, makeMerger, warnOnce, skyDomeLit } from './shared.js';
+import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, dampAngle, lerp, grain, swayMesh, leafMesh, makeMerger, mergeWearBand, warnOnce, skyDomeLit } from './shared.js';
 
 // ===========================================================================
 // AGENT A — ENVIRONMENT.  Sydney as low-poly stage dressing.
@@ -686,8 +686,14 @@ const envBOUNDS = {
   ],
 };
 
+// The top of the red podium (L6, E4): the deck at 1.2 plus the block the
+// carpet sits on. The 'opera-stage' height test (> 0.9) still passes on it;
+// the zone is the carpet's own rectangle now rather than 2.5 m wider each
+// side, so "on the red" and "in the zone" are the same fact — and a metre
+// north of where the flat carpet lay, for the stair (see the block's note).
+const envSTAGE_Y = 1.5;
 const envZONES = {
-  operaStage: { x0: -9.0, z0: 1.05, x1: 9.0, z1: 3.9 },
+  operaStage: { x0: -6.5, z0: 0.0, x1: 6.5, z1: 2.9 },
   gardens:    { x0: 14, z0: 4, x1: 62, z1: 58 },
   flowerbed:  { x0: 17, z0: 6, x1: 56, z1: 51 },
   promenade:  { x0: -62, z0: -9, x1: -14, z1: 12 },
@@ -2363,7 +2369,10 @@ export function createEnvironment(game) {
   // one chapter with no paving in it at all, so the ground carries twice the
   // whisper the buildings do.
   const matVCGnd = grain(mat(envVC_BASE, { vertexColors: true }),
-                         { scale: 0.68, amount: 0.17, warp: 0, near: 1.00, speck: 0.70, nearScale: 8, contact: 1, broad: 0.11, broadM: 17 });
+                         { scale: 0.68, amount: 0.17, warp: 0, near: 1.00, speck: 0.70, nearScale: 8, contact: 1, broad: 0.11, broadM: 17,
+                           // the mid octave (L6, E6): worn dry patches on the lawn
+                           // in eight-metre pieces, yellowing toward grassPale
+                           mid: 0.06, midM: 8, midColor: PALETTE.grassPale, midBase: PALETTE.grass });
   const matVC2  = mat(envVC_BASE2, { vertexColors: true, side: THREE.DoubleSide });
   // DoubleSide defaults shadowSide to DoubleSide -> the open sail surfaces would
   // sample their own depth and speckle. Front faces only.
@@ -2604,8 +2613,12 @@ export function createEnvironment(game) {
     const jz = -10.4 + i * 3.5;
     D.quad(-12.6, jz - 0.07, 12.6, jz + 0.07, 1.212, PALETTE.sandstoneDark);
   }
-  // the 'stage' — a red carpet on the podium top so the task target reads
-  D.quad(-6.5, 1.05, 6.5, 3.9, 1.224, PALETTE.petalRed);
+  // the 'stage' — a red carpet on the podium top so the task target reads.
+  // ON TOP OF THE RED PODIUM now (L6, E4 / play 3): the row says "up onto the
+  // red podium" and the podium was a flat carpet, so the fresh player stood
+  // on it, wheeked nine times, and could not tell whether they were on it.
+  // The carpet sits on the block built under ARCHITECTURE at envSTAGE_Y.
+  D.quad(-6.5, 0.0, 6.5, 2.9, envSTAGE_Y + 0.004, PALETTE.petalRed);
   // Circular Quay paving
   envQuayDecals(D);
   const decals = new THREE.Mesh(D.build(), matVC2);
@@ -2621,6 +2634,13 @@ export function createEnvironment(game) {
   for (let i = 0; i < envBLOSSOM.length; i++) {
     envBlossom(BL, envBLOSSOM[i][0], envBLOSSOM[i][1], envBLOSSOM[i][2]);
   }
+  // ---- and the wear path (L6, E6): the lawn between the spawn and the
+  // podium, worn 8 % darker along the line everybody walks — see
+  // mergeWearBand. The lawn's own colour rule at every vertex, so it is the
+  // lawn darker and not a stripe painted on it. In this mesh, on this
+  // material, for the blossom's reason.
+  mergeWearBand(BL, [0.0, 21.0, -0.6, 12.0, 0.2, 4.6], 1.5, envLawnY,
+                function (x, z, out) { envLawnColor(x, z, out); }, 2.0, 0.05, 0.92);
   const blossom = new THREE.Mesh(BL.build(), matVCGnd);
   blossom.receiveShadow = true;
   blossom.castShadow = false;
@@ -2750,6 +2770,26 @@ export function createEnvironment(game) {
   // because the sails are DoubleSide and an eye inside them sees vault.
   envStaticBox(game, 0, 0.6, -4, 13, 0.6, 8).userData = { camSolid: true };
   envNavR.push(-13.2, -12.2, 13.2, 4.2);
+  // ---- THE RED PODIUM IS A PODIUM (L6, E4 / play 3) ----------------------
+  // A 0.3 m block under the carpet, x -6.5..6.5 z 1.05..3.9 (the zone), so
+  // "up onto" is a thing that happens. 0.3 m is two of the stair's treads and
+  // more than the animal walks up in one step (0.17, see envQUAY_DECK_Y), so
+  // a half-step riser runs 0.6 m out from every side at 0.15: the animal
+  // walks up two steps from any direction rather than hopping, and the
+  // arrow-follower who arrives from the north edge is not stopped by a kerb.
+  // Sandstone for the mass, the dark for the riser, the carpet on top.
+  // The riser stops at z 4.05, INSIDE the deck edge (4.1): measured with the
+  // first cut it ran to 4.5, over the top tread of the stair, and the animal
+  // arriving up the stairs met a 0.32 m step and stood at the top for three
+  // seconds (qa/l6-paper-podium.json, run 2).
+  // ...and the whole thing sits 1.0 m further from the stair than the carpet
+  // did (z 0..2.9, see envZONES), so there is a stride of deck (3.5..4.1)
+  // between the stair's last tread and the first riser: two 0.15 steps a
+  // stride apart walk; the same two steps in one place do not.
+  A.box(0, 1.2 + (envSTAGE_Y - 1.2) * 0.5, 1.45, 13.0, envSTAGE_Y - 1.2, 2.9, PALETTE.sandstone);
+  A.box(0, 1.2 + 0.075, 1.45, 14.2, 0.15, 4.1, PALETTE.sandstoneDark);
+  envStaticBox(game, 0, 1.2 + (envSTAGE_Y - 1.2) * 0.5, 1.45, 6.5, (envSTAGE_Y - 1.2) * 0.5, 1.45);
+  envStaticBox(game, 0, 1.2 + 0.075, 1.45, 7.1, 0.075, 2.05);
 
   // ---- the great ceremonial staircase up the southern face -----------------
   // Six broad treads, 0.171 rise on a 0.533 going — shallower than the old

@@ -1202,7 +1202,7 @@ function manBuild(game) {
       ['Are we playing to eleven?', 'We are playing until somebody goes home.'],
       ['There is a capybara on the court.', 'There is a capybara on the court, yes.'],
       ['Wind has swung.', 'The wind has not swung. You are just serving badly.'],
-      ['Somebody has taken the ball again.', 'Somebody takes the ball every single day.'],
+      ['Somebody has taken the ball again.', 'Somebody takes the ball every set.'],
     ] });
   }
 
@@ -4104,7 +4104,7 @@ function manUpdateFlags(game, dt) {
       manTask(game, 'move-flags');
       manSaysNow('guard',
         ['You moved them. I am not saying I approve. I am saying nobody drowned.',
-         'Everyone followed. Every single one. That is the system, that is.',
+         'Everyone followed. The whole beach. That is what the flags are for.',
          'Sixty years those poles have gone in the same two holes.',
          'Right. New holes. I will have to redo the board.'],
         ['Yes, all right, I have moved. Everybody has moved.']);

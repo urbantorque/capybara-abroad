@@ -392,6 +392,10 @@ const physWHEEK_VOICE_SPD = 1.6;
 // centred (0,0,-4), 26x16, deck top 1.2). Its static collider is x [-13,13],
 // z [-12,4]; the stair down to the forecourt occupies z 4 -> 7.
 const physPODIUM_Y = 1.2;
+// ...and the red podium on it, a 0.3 m block since L6 (environment.js
+// envSTAGE_Y; the `operaStage` zone is exactly this rect)
+const physSTAGE_Y = 1.5;
+const physSTAGE_RECT = { x0: -6.5, z0: 0.0, x1: 6.5, z1: 2.9 };
 // generous — anything even near the deck must resolve to the deck height
 const physDECK_FULL = { x0: -13.1, z0: -12.1, x1: 13.1, z1: 4.1 };
 // conservative — a prop may only be *scattered* well inside the deck
@@ -2723,6 +2727,10 @@ function physSurfaceY(x, z) {
     if (typeof env.surfaceY === 'function') return env.surfaceY(x, z);
     if (typeof env.groundY === 'function') return env.groundY(x, z);
   }
+  // THE RED IS A BLOCK NOW (L6, E4): 0.3 m over the deck at x ±6.5, z 0..2.9
+  // (environment.js envSTAGE_Y), so a prop placed on the old carpet rect at
+  // deck height landed inside it and was popped up by the solver.
+  if (physRectIn(physSTAGE_RECT, x, z, 0)) return physSTAGE_Y;
   if (physRectIn(physDECK_FULL, x, z, 0)) return physPODIUM_Y;
   return 0;
 }
@@ -5582,6 +5590,18 @@ function physHide(prop, delay) {
   physSyncBodyTransform(b);
   b.allowSleep = true;
   b.sleep();
+  // ---- ...AND STATIC, NOT MERELY ASLEEP (L6, E8 / qa F4) -------------------
+  // A sleeping DYNAMIC body still has gravity, and nothing kept it asleep:
+  // one wakeUp() from any path that touches the body — a gust, an owner, a
+  // contact wake from the broadphase — and it fell from −900 at terminal
+  // velocity until `hiddenUntil`, clamped by the sanitiser at MAIN_V_CAP once
+  // a frame. Measured: Monaco's `camera` at −1 529 m and `solverSaves` +211
+  // in nine seconds of standing at the spawn; Hanoi's wine bottle +45. The
+  // escape check further down this file skips hidden props by design, so
+  // nothing ever put it back. STATIC has no gravity and is not integrated,
+  // whatever its sleep state; physUnhide re-types it before the rescue.
+  b.type = CANNON.Body.STATIC;
+  b.updateMassProperties();
   prop.mesh.visible = false;
   prop.pop = 1; prop.sq = 0; prop.sqV = 0;
   prop.mesh.scale.setScalar(1);
@@ -5600,6 +5620,12 @@ function physUnhide(prop) {
   prop.grabbable = def.grabbable === false ? false : !prop.planted;
   prop.body.collisionResponse = true;
   prop.mesh.visible = prop.solo || !prop.instGroup;
+  // Parked STATIC by physHide; a body the rescue is about to wake and drop
+  // the last 35 cm has to be DYNAMIC again first, or it hangs there.
+  if (prop.body.type !== CANNON.Body.DYNAMIC) {
+    prop.body.type = CANNON.Body.DYNAMIC;
+    prop.body.updateMassProperties();
+  }
   physRescue(prop);                      // home, dead still, asleep, transforms synced
   physPuff3(prop.homeX, prop.homeY + 0.35, prop.homeZ, 3);
 }
@@ -6474,7 +6500,24 @@ function physUpdate(dt) {
   physHangStep(dt, live);
   for (let i = 0; i < arr.length; i++) {
     const p = arr[i];
-    if (p.removed || p.hidden) continue;      // hidden = parked off-map, awaiting restock
+    if (p.removed) continue;
+    if (p.hidden) {                           // hidden = parked off-map, awaiting restock
+      // Belt under physHide's braces: a parked body that has somehow left
+      // its parking (a caller that re-typed it, a future path that moves
+      // it) is put back on the spot and parked again, before it can spend
+      // a solver save a frame under the world.
+      const hb = p.body;
+      if (hb && hb.position.y < -950) {
+        hb.type = CANNON.Body.STATIC;
+        hb.updateMassProperties();
+        hb.velocity.set(0, 0, 0);
+        hb.angularVelocity.set(0, 0, 0);
+        hb.position.set(p.homeX, -900, p.homeZ);
+        physSyncBodyTransform(hb);
+        hb.sleep();
+      }
+      continue;
+    }
     // a prop in the capybara's mouth travels with it, whatever it was born into
     // — and a KEEPSAKE has no biome at all and is simulated everywhere, which
     // is the whole of what makes it a keepsake. See physKEEPS.

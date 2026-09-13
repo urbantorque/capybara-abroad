@@ -694,6 +694,7 @@ function driDeck(M, x, z, y, hx, hz, yaw, top, top2, moss, seed) {
   const NX = 13, NZ = 10;
   const cy = Math.cos(yaw), sy = Math.sin(yaw);
   const cA = new THREE.Color(), cB = new THREE.Color(top2), cM = new THREE.Color(moss);
+  const cR = new THREE.Color(PALETTE.driRockDark);     // the tear (L6, E5)
   const g = new THREE.PlaneGeometry(hx * 2 - 0.3, hz * 2 - 0.3, NX, NZ);
   g.rotateX(-Math.PI / 2);
   const p = g.attributes.position.array;
@@ -717,6 +718,13 @@ function driDeck(M, x, z, y, hx, hz, yaw, top, top2, moss, seed) {
     cA.lerp(cM, clamp((0.62 - r) * 0.9, 0, 0.42) * (0.5 + 0.5 * Math.sin(lx * 0.27 + lz * 0.19)));
     // and it thins to bare ground at the torn edge
     cA.lerp(cB, clamp((r - 0.72) * 2.6, 0, 0.55));
+    // ...AND THE LAST HALF-METRE IS THE TEAR (L6, E5). Three falls in five
+    // moves for the fresh-eyes player, one off the start island: from the
+    // walking lens the deck's pale edge sat against the pale cloud sea and
+    // the drop did not read until the animal was over it. The outermost
+    // vertex ring takes the island's dark rock — the cliff's own colour
+    // brought up over the lip — so every deck has a drawn edge from above.
+    cA.lerp(cR, clamp((r - 0.88) * 5.0, 0, 0.62));
     col[i] = cA.r; col[i + 1] = cA.g; col[i + 2] = cA.b;
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -2628,7 +2636,7 @@ const driTRAVELLERS = [
               before: 'updraft' },
             { t: 'You went up the column. Add a hundred metres to my map.',
               after: 'updraft' },
-            { t: 'I have got as far as the gap. Nobody has ever surveyed past the gap.',
+            { t: 'I have got as far as the gap. The map stops at the gap. So did everyone.',
               before: 'long-gap' },
             { t: 'You crossed the gap. I am putting a line on the map. A dotted line.',
               after: 'long-gap' }],
@@ -2657,7 +2665,7 @@ const driTRAVELLERS = [
               before: 'puff-up' },
             { t: 'You have worked out the shout, then. That is the chapter, that.',
               after: 'puff-up' }],
-    wheek: ['Every time. Every single time somebody does that.',
+    wheek: ['Without fail. Somebody shouts, and that happens.',
             'Save it. You will want it for the pale ones up the top.'],
     onTask: { 'updraft': ['Straight up. On a noise and a lot of nerve.'],
               'puff-up': ['THERE it is. Did you feel it hold you?'],

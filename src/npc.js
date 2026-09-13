@@ -1378,7 +1378,28 @@ export function createNPCs(game) {
     // speaker's `vpitch` — so the blip and the gasp are recognisably the same
     // person. Below the default level, because a line is punctuation under the
     // bubble rather than an event in its own right.
-    sfx('blip', npcRec, 0.26, 1, text.length < 22 ? 2 : 3);
+    //
+    // ---- ...AND SINCE F5 (L6) IT IS A SENTENCE. A line of two words or more
+    // goes to sfxBabble — syllables at the person's own pitch, in their own
+    // mouth, falling for a statement and rising for a question — and the
+    // blip is kept for the one-word line, where a sentence would be a lie.
+    // The count is WORDS now rather than characters, because the synth
+    // makes syllables out of it; counted by hand so a line does not split
+    // an array every time somebody speaks. `npcSayOpt` is one object, rewritten
+    // per line: the door reads it synchronously and never keeps it.
+    let words = 0;
+    for (let i = 0, sp = true; i < text.length; i++) {
+      const c = text.charCodeAt(i), ws = c === 32 || c === 10 || c === 9;
+      if (sp && !ws) words++;
+      sp = ws;
+    }
+    if (words >= 2) {
+      npcSayOpt.line = text;
+      npcSayOpt.q = text.indexOf('?') >= 0;
+      npcSayOpt.low = !!npcRec.authority;
+      npcSayOpt.slow = npcRec.role === 'the storyteller';
+      sfx('babble', npcRec, 0.26, 1, words, npcSayOpt);
+    } else sfx('blip', npcRec, 0.26, 1, text.length < 22 ? 2 : 3);
   }
 
   // =========================================================================
@@ -1739,6 +1760,20 @@ export function createNPCs(game) {
                 'They said you were no trouble at all in {P}. Were you?',
                 'Word from {P} is that you are all right.',
                 'They fed you in {P}, did they.'],
+    // ---- ...AND THE NAME THE LAST PLACE GAVE YOU (L6, F4 / writing B) -----
+    // Nineteen regulars each have a name for you and none of them knew the
+    // others existed. This is the one that travels: when the regular in the
+    // last place reached the tier where the name is given, the place you
+    // arrive in has heard it — and does not think much of it. `{N}` is the
+    // name; no `{P}`, because the name is the whole of the gossip and the
+    // town that gave it is beside the point. Outranks `heardGood` and
+    // `heardBad` for that crossing: a name is a bigger sentence than an
+    // incident, and there is one mouth per arrival.
+    heardName: ['{N}, they called you. That is not a name.',
+                'They call you {N} back there, I hear. We will see.',
+                'So you are {N}. Somebody said that like it meant something.',
+                '{N}. That is what came up the road ahead of you.',
+                'Word is somebody calls you {N}. Nobody here does.'],
     // ---- ...AND THE ONE THAT IS NOT ABOUT A PLACE AT ALL -----------------
     // THE TWO POOLS ABOVE ARE ABOUT WHERE YOU HAVE BEEN. These are about WHO
     // YOU ARE, and that is the difference between B15's gossip and item 6's
@@ -1970,22 +2005,22 @@ export function createNPCs(game) {
       incident: ['That is three off this wharf.', 'Righto. That is a pattern.',
                  'Somebody wants to ring somebody.',
                  'The nine-forty is going to be late and I know why.',
-                 'Eleven years on this run and this is new.',
+                 'Forty crossings a day and this is new.',
                  'I am not paid enough to describe this.'],
     },
     kyoto: {
-      wary:     ['Ah. You.', 'I remember.', 'Please. Not again.',
+      wary:     ['Ah. You.', 'The face is familiar.', 'Please. Not again.',
                  'We were having such a quiet morning.',
                  'You are very welcome. Somewhere else.',
                  'It has worked out where the gate is.'],
-      incident: ['Three times now.', 'Everyone is being very polite about this.',
+      incident: ['That settles it.', 'Everyone is being very polite about this.',
                  'It is not confused. It has decided.',
                  'Four hundred years, and then this afternoon.',
                  'Nobody is going to say anything. That is the problem.',
                  'Something is going to have to be rearranged.'],
     },
     cali: {
-      wary:     ['Otra vez vos.', 'I know you now.', 'Ay, no. Not you.',
+      wary:     ['Otra vez vos.', 'It is the same one.', 'Ay, no. Not you.',
                  'You come back every afternoon, vos.',
                  'The whole barrio knows the animal.',
                  'Go on. Go and bother the other block.'],
@@ -1996,7 +2031,7 @@ export function createNPCs(game) {
                  'Put on something louder. Drown it out.'],
     },
     rio: {
-      wary:     ['Ah, e voce.', 'I know that one.', 'Not on my stretch.',
+      wary:     ['Ah, e voce.', 'That face again.', 'Not on my stretch.',
                  'Every day now. Every single day.',
                  'You were down by the rock yesterday.',
                  'Go and be somebody else’s problem.'],
@@ -2007,12 +2042,12 @@ export function createNPCs(game) {
                  'That is not a dog. I have said so twice.'],
     },
     iceland: {
-      wary:     ['Oh. The animal.', 'I know what you are now.',
+      wary:     ['Oh. The animal.', 'So that is what you are.',
                  'Not in this weather. Not again.',
                  'Do not make me put a coat on.',
                  'There is nobody else out here, you know.',
                  'I have got all night. So have you, apparently.'],
-      incident: ['That is three, on an island with nobody on it.', 'That was deliberate.',
+      incident: ['On an island with nobody on it. Of course.', 'That was deliberate.',
                  'There is nobody else out here to blame.',
                  'It has stopped being weather and started being you.',
                  'Nothing here has ever needed a rule before.',
@@ -2023,7 +2058,7 @@ export function createNPCs(game) {
                  'You come past twice and you buy nothing.',
                  'Everybody in the square knows you now.',
                  'Go and be somebody else’s afternoon.'],
-      incident: ['Three times in this square.', 'Everybody saw that.',
+      incident: ['Again, in the same square.', 'Everybody saw that.',
                  'It is not lost. It is choosing.',
                  'And it is not yet noon.',
                  'Somebody go and find whoever owns it.',
@@ -2034,18 +2069,18 @@ export function createNPCs(game) {
                  'There is nothing under us. Remember that.',
                  'You came all the way up here to do that.',
                  'Hold on to something. Anything.'],
-      incident: ['Three. Even up here.', 'Nothing up here is safe from it.',
+      incident: ['Up here. Even up here.', 'Nothing up here is safe from it.',
                  'It has worked out how this place works.',
                  'Whatever that was, it is still falling.',
                  'We are a very long way from a replacement.',
                  'It does not mind the drop at all.'],
     },
     venice: {
-      wary:     ['Ancora tu.', 'I know you now, signore.', 'Not in my calle.',
+      wary:     ['Ancora tu.', 'Ah. It is you, signore.', 'Not in my calle.',
                  'You were in the campo on Tuesday.',
                  'The whole sestiere is talking about it.',
                  'Go and swim somewhere else.'],
-      incident: ['Three. In one campo.', 'This one is not the water.',
+      incident: ['All in one campo.', 'This one is not the water.',
                  'Somebody is going to have to fish that out.',
                  'For once we cannot blame the tide.',
                  'It knows the bridges better than the tourists do.',
@@ -2056,25 +2091,25 @@ export function createNPCs(game) {
                  'Every night, this one.',
                  'The whole building knows about you.',
                  'Go. Next street. Go.'],
-      incident: ['Three already.', 'Aiyah. Again and again and again.',
+      incident: ['Fast, this one.', 'Aiyah. Again and again and again.',
                  'Whole street saw that one.',
                  'Business is bad enough without this.',
                  'Somebody has put it in the group chat already.',
                  'It is faster than the delivery boys.'],
     },
     palawan: {
-      wary:     ['Ay, ikaw na naman.', 'I know this one.', 'Not the boat. Please.',
+      wary:     ['Ay, ikaw na naman.', 'This one, again.', 'Not the boat. Please.',
                  'You were on the far beach this morning.',
                  'The whole barangay has met you now.',
                  'Go on. The water is that way.'],
-      incident: ['Three, and it is still morning.', 'It is going down the whole beach.',
+      incident: ['It has not even had breakfast.', 'It is going down the whole beach.',
                  'Somebody watch the bangka.',
                  'Nothing on this island moves that fast.',
                  'The tide will take it. The tide takes everything.',
                  'It has been in the water again.'],
     },
     goreme: {
-      wary:     ['Sen yine.', 'I remember you from the valley.', 'Not the ropes again.',
+      wary:     ['Sen yine.', 'You were in the valley. I saw.', 'Not the ropes again.',
                  'Every morning before the sun. Every one.',
                  'The crews all know the animal now.',
                  'Stay on the ground. Please stay on the ground.'],
@@ -2089,11 +2124,11 @@ export function createNPCs(game) {
                  'You were down the other end yesterday.',
                  'Half the surf club knows your face.',
                  'Righto. Off you go, then.'],
-      incident: ['Three. That is three.', 'Righto, that is a habit.',
+      incident: ['Yep. Saw that coming.', 'Righto, that is a habit.',
                  'Half the beach just watched that.',
                  'Somebody is going to put that on the internet.',
                  'It is not the wind doing that.',
-                 'That is a Saturday, that is.'],
+                 'Well. That is a Saturday.'],
     },
     // The Pantanal is the one place that does not mind you, and its whole
     // premise is that nobody looks up. So its wariness is not wariness and
@@ -2105,7 +2140,7 @@ export function createNPCs(game) {
                  'Sit where you like, primo.',
                  'Nobody here has ever asked you to leave.',
                  'You have been here longer than I have.'],
-      incident: ['Third one. Nobody minds.', 'That is just what they do.',
+      incident: ['Another one. Nobody minds.', 'That is just what they do.',
                  'Leave it. It will sort itself out.',
                  'The river will have it by morning.',
                  'Nothing out here belongs to anybody.',
@@ -2117,7 +2152,7 @@ export function createNPCs(game) {
                  'Do not go quiet on me.',
                  'You are the only other thing moving down here.',
                  'Right. Where are you off to now.'],
-      incident: ['Three. Down HERE.', 'Nothing down here is replaceable.',
+      incident: ['Even down HERE.', 'Nothing down here is replaceable.',
                  'That echoed for a long time.',
                  'Everything in this cave is older than everybody in it.',
                  'We carried all of that in on our backs.',
@@ -2129,7 +2164,7 @@ export function createNPCs(game) {
                  'Nine of us and one of you, and you are the problem.',
                  'There is nowhere for you to have come from.',
                  'You never sign in. Nobody ever signs in.'],
-      incident: ['Three, on a station of nine people.', 'Nobody back home is going to believe this.',
+      incident: ['On a station of nine people. Nine.', 'Nobody back home is going to believe this.',
                  'I am writing this one down.',
                  'We are eight hundred miles from another one of anything.',
                  'That is the most that has happened since March.',
@@ -2689,7 +2724,26 @@ export function createNPCs(game) {
   // is not on the save file, so it says what happened on this journey rather
   // than what has ever happened, which is what the last scene is about.
   const npcTravMet = Object.create(null);
-  function npcTravCount() { let n = 0; for (const k in npcTravMet) n++; return n; }
+  // With a biome it is that one chapter's flag (0/1), for the notebook's
+  // page and the pointer that hides once they have been stood in front of
+  // (L6, F4); with none it is the count the closing lines have always read.
+  function npcTravCount(biome) {
+    if (biome) return npcTravMet[biome] ? 1 : 0;
+    let n = 0; for (const k in npcTravMet) n++; return n;
+  }
+  // ---- WHERE THEY ARE STANDING, BY CHAPTER (L6, F4 / writing W2) ---------
+  // Four cameos at `near: 8`, none pointed at, met in 0 of 3 review runs. The
+  // arrow needs a point and the four chapter files hand one to addTraveller
+  // already, so it is kept here as they are registered — a chapter's own
+  // constants never have to be repeated in systems.js's hint table. The live
+  // chapter's figure only: a chapter that is not built has nobody to point at.
+  const npcTravAt = Object.create(null);
+  function npcTravWhere(biome) {
+    const b = biome || (game.biome && game.biome.current);
+    const p = b && npcTravAt[b];
+    if (!p || !game.biome || !game.biome.isActive(b)) return null;
+    return p;
+  }
   // Two of the four is the bar for "you know each other". One is a stranger you
   // walked past; two is a coincidence you have both noticed, which is the whole
   // joke of the character and is what the closing lines assume.
@@ -2706,6 +2760,9 @@ export function createNPCs(game) {
     // chapters, and they are already the character who remembers you.
     o.trav = true;
     if (o.near === undefined) o.near = 8;
+    // The lawn's figure is the finale's, not a cameo: the notebook points
+    // at the four places they keep turning up, never at the last one.
+    if (o.biome && o.biome !== 'sydney') o.wheres = npcTravAt[o.biome] = { x: o.x || 0, y: o.y || 0, z: o.z || 0 };
     return addLocal(o);
   }
 
@@ -4088,10 +4145,16 @@ export function createNPCs(game) {
    * Nearest-first, so the people who come are the ones who were already in the
    * gardens rather than a delegation teleporting in from the quay.
    */
-  function npcGather() {
+  function npcGather(ev) {
     if (npcGathered) return 0;
     const live = game.biome && game.biome.current;
     if (live !== 'sydney') return 0;
+    // THE MOUTH OF THE HORSESHOE IS WHERE THE CODA LOOKS IN FROM (L6, E5):
+    // the ring was spread over an absolute three quarters, and two of the
+    // five stood between the lens and the animal in both settled frames of
+    // the ending. The event says where the mouth is; the three quarters are
+    // laid out opposite it, so the bearing the coda's lens takes is clear.
+    const mouth = ev && typeof ev.mouth === 'number' ? ev.mouth : -Math.PI * 0.25;
     const pool = [];
     for (let i = 0; i < humans.length; i++) {
       const r = humans[i];
@@ -4112,7 +4175,7 @@ export function createNPCs(game) {
       // Spread over the mouth-facing three quarters so nobody stands directly
       // behind the souvenirs from the approach, and jitter the radius so five
       // people are not a firing squad.
-      let a = (i / n) * Math.PI * 1.5 + Math.PI * 0.25;
+      let a = mouth + Math.PI * 0.25 + (i / Math.max(1, n - 1)) * Math.PI * 1.5;
       const rad = npcGATHER_R + rand(-0.5, 0.8);
       // A SLOT IN A FLOWER BED CAN NEVER BE ARRIVED AT, and the first version
       // put one there — measured, `navBlocked` true at (29, 20), so that person
@@ -4333,6 +4396,26 @@ export function createNPCs(game) {
     { t: 'Do not mind me. I am just working out how you got here.',
       when: function () { return !npcTravKnown(); } },
   ];
+  // ---- ...AND THE NAMES (L6, F4 / writing B) ------------------------------
+  // The regulars' names for you, read off the file through game.palNames
+  // (systems.js owns the tiers; this end never learns a number). Two or more
+  // and the traveller lists them — the only person in the game who has been
+  // in enough places to know there is more than one. Built when the pool is
+  // resolved, which is once per line and not per frame; the pool is a
+  // function so localResolve sees the line only when there is one to see.
+  function npcTravNames() {
+    let names = null;
+    try { names = typeof game.palNames === 'function' ? game.palNames() : null; } catch (e) { names = null; }
+    if (!names || names.length < 2) return '';
+    return names.join('. ') + '. You have more names than I have countries.';
+  }
+  const npcTRAV_FIN_POOL = npcTRAV_FIN_LINES.slice();
+  npcTRAV_FIN_POOL.push({ t: '', when: function () { return !!npcTravNames(); } });
+  function npcTravFinLines() {
+    const last = npcTRAV_FIN_POOL[npcTRAV_FIN_POOL.length - 1];
+    last.t = npcTravNames();
+    return npcTRAV_FIN_POOL;
+  }
   // 'There it is. Every time.' is what they say in Cappadocia. This is that
   // line one chapter later, and it is the only place it can land.
   const npcTRAV_FIN_WHEEK = ['There it is. Last time, I suppose.'];
@@ -4370,7 +4453,7 @@ export function createNPCs(game) {
       // 4.5 rather than 30 (M11): see the note on npcTRAV_FIN_LINES. At thirty
       // the player heard one line of four and then the ledger arrived.
       near: 9.5, cool: 4.5,
-      lines: npcTRAV_FIN_LINES, wheek: npcTRAV_FIN_WHEEK,
+      lines: npcTravFinLines, wheek: npcTRAV_FIN_WHEEK,
     });
   }
   game.events.on('finale:staged', npcTravellerHome);
@@ -7110,7 +7193,12 @@ export function createNPCs(game) {
         // joining them is four cameos; this is the only place in the game that
         // can know a player actually stood in front of them, because nothing
         // else in the arc is gated on anything at all.
-        if (r.trav && r.biome) npcTravMet[r.biome] = 1;
+        if (r.trav && r.biome && !npcTravMet[r.biome]) {
+          npcTravMet[r.biome] = 1;
+          // ...and the notebook is told (L6, F4): its pointer at this
+          // person comes off the paper the moment they have been met.
+          try { game.events.emit('npc:travMet', { biome: r.biome, n: npcTravCount() }); } catch (e) { /* a listener */ }
+        }
         localLine(r, r.lines);
       }
       r.was = near;
@@ -7682,7 +7770,11 @@ export function createNPCs(game) {
    * capable of playing at 1.0 by omission any more.
    */
   const npcSFX_VOL = 0.34;
-  function sfx(n, rec, vol, pitch, streak) {
+  // What a line is, for the one synth that reads words (sfxBabble, L6 F5):
+  // the text, whether it asks, and whose kind of voice says it. One object,
+  // rewritten by sayBubble per line and read by the door synchronously.
+  const npcSayOpt = { line: '', q: false, low: false, slow: false };
+  function sfx(n, rec, vol, pitch, streak, say) {
     const p = rec && rec.group && rec.group.position;
     const v = typeof vol === 'number' ? vol : npcSFX_VOL;
     // ...and WHOSE voice it is (F2). See `vpitch` on the three record
@@ -7691,8 +7783,8 @@ export function createNPCs(game) {
     // record — the handful that play to nobody in particular — is unchanged.
     const vp = (rec && typeof rec.vpitch === 'number' && rec.vpitch === rec.vpitch)
       ? rec.vpitch : 1;
-    if (p) { sfxAt(n, p.x, p.z, v, (pitch || 1) * vp, streak); return; }
-    try { game.sfx(n, { volume: v, pitch: (pitch || 1) * vp, streak: streak }); }
+    if (p) { sfxAt(n, p.x, p.z, v, (pitch || 1) * vp, streak, say); return; }
+    try { game.sfx(n, { volume: v, pitch: (pitch || 1) * vp, streak: streak, say: say || null }); }
     catch (e) { /* optional */ }
   }
 
@@ -8806,6 +8898,18 @@ export function createNPCs(game) {
     const src = rec.quay ? npcQUAY_PTS : npcPOI;
     const pi = randInt(0, (src.length / 2) - 1) * 2;
     rec.target.set(src[pi] + rand(-2.5, 2.5), 0, src[pi + 1] + rand(-2.5, 2.5));
+    // ...AND NOT THROUGH THE ENDING (L6, E5). While the nineteen are on the
+    // lawn, a point of interest inside the ring is a person walking through
+    // the last frame of the game; push it out to the ring's edge on its own
+    // bearing. The gathered five have their own slots and never come here.
+    if (game.state && game.state.finaleOn) {
+      const dx = rec.target.x - sysFIN_LAWN_X, dz = rec.target.z - sysFIN_LAWN_Z;
+      const d = Math.hypot(dx, dz), keep = 8.5;
+      if (d < keep) {
+        const a = d > 0.01 ? Math.atan2(dz, dx) : rand(0, 6.283);
+        rec.target.set(sysFIN_LAWN_X + Math.cos(a) * keep, 0, sysFIN_LAWN_Z + Math.sin(a) * keep);
+      }
+    }
   }
   function pickBed(rec) {
     const e = game.env;
@@ -9127,10 +9231,10 @@ export function createNPCs(game) {
       if (typeof game.toast === 'function') game.toast('the bin chickens have found it');
     }
   }
-  function sfxAt(name, x, z, vol, pitch, streak) {
+  function sfxAt(name, x, z, vol, pitch, streak, say) {
     try {
       game.sfx(name, { volume: vol, pitch: pitch, at: { x: x, y: 0.6, z: z }, near: 7, far: 70,
-                       streak: streak });
+                       streak: streak, say: say || null });
     }
     catch (e) { /* optional */ }
   }
@@ -9225,7 +9329,7 @@ export function createNPCs(game) {
     // ...and everybody near enough to hear it looks over. This is the third
     // mischief chain, reaching the two chapters that have no `locals`.
     npcWitnessChain(rec);
-    try { game.toast('Man overboard.'); } catch (e) { /* optional */ }
+    try { game.toast('man overboard.'); } catch (e) { /* optional */ }
   }
 
   /** A diner discovers a capybara standing in the calamari. */
@@ -9297,6 +9401,11 @@ export function createNPCs(game) {
   function startChase(rec) {
     if (rec.state === 'chase' || rec.carryT >= 0) return;
     if (rec.state === 'swim' || rec.state === 'plunge') return;   // finish the swim first
+    // THE PLACE KNOWS IT IS OVER (L6, E5). On a finished file the gardener
+    // carried the player out three times in twelve seconds on the walk to the
+    // lawn (review-design 2.7). While the nineteen are staged, the gardener
+    // has nothing left to defend; everybody else keeps their reasons.
+    if (rec.kind === 'gardener' && game.state && game.state.finaleOn) return;
     setState(rec, 'chase');
     rec.chaseT = 0;
     rec.alarm = 1;
@@ -9671,7 +9780,7 @@ export function createNPCs(game) {
         pickLine(rec, 'dump');
         sfx('thud', rec);
         try { game.shake(0.35); } catch (e) { /* optional */ }
-        try { game.toast('Escorted from the premises.'); } catch (e) { /* optional */ }
+        try { game.toast('escorted from the premises.'); } catch (e) { /* optional */ }
         rec.carryT = -1;
         if (game.capy && game.capy.carriedBy === rec) game.capy.carriedBy = null;
         setState(rec, 'calm');
@@ -11687,7 +11796,7 @@ export function createNPCs(game) {
             rec.spat = true;
             sfx('pop', rec);
             paShoveCapy(rec, 52, 26);
-            try { game.toast('The llama has made its position clear.'); } catch (e) { /* optional */ }
+            try { game.toast('the llama has made its position clear.'); } catch (e) { /* optional */ }
           }
           if (rec.stateT > 1.3) paSet(rec, 'stand');
           break;
@@ -12770,7 +12879,14 @@ export function createNPCs(game) {
             game.hud && typeof game.hud.say === 'function') {
           b.said = true;
           npcHeardT = npcSAY_HEAR_GAP;
-          try { game.hud.say(b.el.textContent); } catch (e) { /* never fatal */ }
+          // ...and it says WHO (L6, E4 / writing W4): the record goes with the
+          // line, so the pill can read `“…” — a tourist` rather than in the
+          // narrator's own italic. game.hud.heard is the attributed channel;
+          // game.hud.say is what it was.
+          try {
+            if (typeof game.hud.heard === 'function') game.hud.heard(b.el.textContent, b.owner);
+            else game.hud.say(b.el.textContent);
+          } catch (e) { /* never fatal */ }
         }
         if (b.shown) { b.el.style.display = 'none'; b.shown = false; }
       }
@@ -13954,6 +14070,15 @@ export function createNPCs(game) {
       return npcRumLine;
     }
     if (!place) return '';
+    // ...and the name, which arrives in `place` (L6, F4): systems.js holds
+    // the tier and asks npcPalWho for the word, so this end is handed the
+    // finished name and only has to say it.
+    if (kind === 'name') {
+      const np = npcLOC_SAY.heardName;
+      if (!np || !np.length) return '';
+      npcRumLine = np[randInt(0, np.length - 1)].split('{N}').join(place);
+      return npcRumLine;
+    }
     const pool = npcLOC_SAY[kind === 'good' ? 'heardGood' : 'heardBad'];
     if (!pool || !pool.length) return '';
     npcRumLine = pool[randInt(0, pool.length - 1)].split('{P}').join(place);
@@ -14996,6 +15121,9 @@ export function createNPCs(game) {
            // stopped in. A COUNT, and read-only: the find and the closing lines
            // are its only readers and neither may set it.
            travMet: npcTravCount,
+           // ...and where they are standing in the live chapter, for the
+           // notebook's pointer and sysHINTS.traveller (L6, F4).
+           travWhere: npcTravWhere,
            addLocal: addLocal, addTraveller: addTraveller,
            addExchange: addExchange, say: sayAt, sayNear: saySomebodyNear, heat: npcHeat,
            // ---- THE RUMOUR FROM THE LAST PLACE (B15) ----

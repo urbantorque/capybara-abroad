@@ -5095,7 +5095,7 @@ function quayStepBoat(game, dt) {
         if (!quayBridged) {
           quayBridged = true;
           quayTask('under-bridge');
-          if (typeof game.toast === 'function') game.toast('every skipper does it. every single one.');
+          if (typeof game.toast === 'function') game.toast('every skipper does it. none of them admit it.');
         }
       }
     }
@@ -5846,7 +5846,7 @@ function quayBuild(game) {
   // nobody has to be given their own.
   const W = {
     startled: ['Oi — watch it!', 'That is coming out of somebody’s wages.',
-               'Mind the paintwork.', 'Every day. Every single day.',
+               'Mind the paintwork.', 'Regular as the ferry, that.',
                'Right on the timetable, that.', 'I did not see anything.'],
     splash:   ['Straight in the harbour.', 'That is the tide’s problem now.',
                'Twelve metres down, that is.', 'It will wash up at Kirribilli.',
@@ -5932,7 +5932,7 @@ function quayBuild(game) {
               'I do this crossing twice a day. It is still the best commute in the world.',
               { t: 'You are not on the timetable. I have checked.', before: 'take-helm' },
               { t: 'You are not on the timetable and you are DRIVING. I have checked twice.', after: 'take-helm' },
-              { t: 'Twice a day for eleven years and I have never once been under it that close.', after: 'under-bridge' }],
+              { t: 'Twice a day since the Olympics and I have never once been under it that close.', after: 'under-bridge' }],
       startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['Nobody even looked up. That is Sydney for you.'] });
     game.addLocal({ biome: 'quay', x: -11, y: 0.20, z: quayAPRON_Z1 - 9.2, near: 6, face: 0.2,

@@ -3431,7 +3431,7 @@ function cavBuildCamp(game, root) {
                          'Sound like that, you count to two and then you worry.',
                          'Fine. It is fine. It is all fine.',
                          'That was you, was it. Good.', 'Ah — that is a big one.'];
-  const CAVE_SPLASH   = ['That is going to Laos.', 'Gone. That is the sump, that is.',
+  const CAVE_SPLASH   = ['That is going to Laos.', 'Gone. The sump has it now.',
                          'It will come out somewhere. They usually do.',
                          'Eighty metres down and it is still going.',
                          'Do not go in after it.'];
@@ -3439,7 +3439,7 @@ function cavBuildCamp(game, root) {
                          'That has been growing since before the Romans, but go on.',
                          'Oh, we are doing that, are we.',
                          'Put it back. — you are not going to put it back.',
-                         'Every single person. Every one.'];
+                         'Everybody takes one. Everybody.'];
   const CAVE_RUSH     = ['Walk! It is all holes!', 'Nobody runs in here. Nobody.',
                          'That is how people end up in the river.',
                          'Where. Where is it going.',
@@ -3478,7 +3478,7 @@ function cavBuildCamp(game, root) {
             'Nothing came back. You are standing under the hole — it went out.'],
     onTask: {
       'the-doline': ['There. That is the face everybody makes.',
-                     'Everyone stops there. Everyone. Nobody has ever not.'],
+                     'Everyone stops there. Everyone. Not one has walked past it.'],
       'great-wall': ['Over the Wall. Under two minutes, was it? Do not tell the porters.'],
       'hand-of-dog': ['You have been up the Hand. Nothing has been up the Hand.'],
       'phytokarst': ['That is rock. That is rock GROWING. Nobody believes me either.'],

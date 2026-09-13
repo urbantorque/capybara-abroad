@@ -15997,6 +15997,68 @@ frame and every water surface in the game moves. Do not add a second clock.
 
 ## Performance budget (hard limits — critics will enforce)
 
+**Measured 13 Sep 2026 (L6, E8) — THE FRAME IS THE PICTURE, NOT THE SIMULATION.** Nineteen
+chapters, five seconds standing at each spawn, `world.step`, every module's `update` and
+`post.render` wrapped, on a quiet machine (`qa/l6r-qa-cpu.js`; HeadlessChrome 152, ANGLE D3D11
+on an Intel Arc 130V, 1280×720, dpr 1, the governor free to move). Per frame the solver costs
+0.45–2.1 ms and all twenty-two modules together 0.55–2.4 ms; the composite — CPU submit and the
+GPU wait it carries — costs 4.0–12.1 ms. The governor's own verdict on that laptop: rung 1
+(0.6 dpr) in sixteen chapters, rung 3 in Hanoi, rung 0 only in Pasto and Manly. So the player on
+the most common hardware never sees the picture the art passes were graded on, and the 3 ms the
+rungs protect is not where the frame goes. The two limits the bullets below open with — 220
+calls, 130k triangles — were measured without the shadow pass; `game.state.perf` counts it (every
+caster is a second call) and ten chapters are over 220 on that count. The limits stand as what a
+chapter should cost; the table is what they do cost. The older measurements under the bullets
+are kept: each one says what a pass paid for and how.
+
+| chapter | fps | rung | world.step ms | all modules ms | post.render ms | calls | triangles |
+|---|---|---|---|---|---|---|---|
+| sydney | 60 | 1 | 0.55 | 0.55 | 5.44 | 230 | 135,953 |
+| pasto | 49 | 0 | 0.45 | 0.62 | 3.98 | 162 | 151,309 |
+| quay | 58 | 1 | 0.54 | 1.12 | 8.18 | 324 | 251,485 |
+| kyoto | 54 | 1 | 1.40 | 0.70 | 4.93 | 185 | 133,879 |
+| cali | 46 | 1 | 1.38 | 0.80 | 5.82 | 292 | 208,703 |
+| rio | 52 | 1 | 1.08 | 0.89 | 5.02 | 146 | 200,377 |
+| iceland | 53 | 1 | 1.57 | 0.67 | 5.06 | 188 | 160,499 |
+| sahara | 49 | 1 | 1.33 | 0.67 | 6.06 | 212 | 209,501 |
+| drift | 51 | 1 | 0.78 | 0.96 | 6.39 | 193 | 216,961 |
+| venice | 51 | 1 | 1.04 | 1.11 | 8.60 | 237 | 276,327 |
+| kowloon | 47 | 1 | 1.64 | 1.31 | 12.02 | 376 | 241,327 |
+| palawan | 51 | 1 | 0.75 | 1.51 | 8.85 | 256 | 207,651 |
+| goreme | 55 | 1 | 0.81 | 0.82 | 10.37 | 414 | 290,383 |
+| manly | 49 | 0 | 2.04 | 2.41 | 7.21 | 176 | 167,555 |
+| pantanal | 56 | 1 | 0.51 | 0.86 | 6.86 | 215 | 348,079 |
+| cave | 53 | 1 | 1.05 | 0.81 | 7.10 | 243 | 248,797 |
+| antarctic | 56 | 1 | 1.42 | 1.38 | 7.60 | 166 | 261,351 |
+| monaco | 53 | 1 | 2.12 | 1.20 | 9.46 | 141 | 185,419 |
+| hanoi | 47 | 3 | 2.12 | 1.34 | 12.05 | 288 | 467,432 |
+
+Three things were changed on the strength of it, all in the tick and the crossing rather than in
+any chapter. **The governor sheds physics from rung 2** (`MAIN_SHED_RUNG`, main.js): the world
+takes at most two substeps a frame and `dt` is clamped at 1/20 s, because `world.step(STEP, dt,
+5)` took as many 1/60 substeps as the slow frame had room for — contended, Quay ran at 4 fps with
+`world.step` at 33 ms = five substeps × 6.6 — and the shadow map is drawn every other frame from
+the same rung (`shadowMap.autoUpdate = false`, `needsUpdate` on the odd frame and on any frame
+that asks: a chapter cross, a shadow-box refit, the map resizing). The settings card says so
+under the performance row. **The crossing's frozen frame was the first draw, not the build.**
+`qa/l6-load.js` (fresh page, each chapter's first entry, rAF gaps for nine seconds after
+`hud.cross`): the new chapter was live 0–130 ms after the fade, and the one frozen frame of
+1.5–5.7 s that followed (Cave 5 700, Antarctica 4 983, Pantanal 3 800, Hanoi 3 033) was the
+driver compiling the chapter's 7–32 new programs at their first use — on this ANGLE path, about
+180 ms per program, on the main thread. `biomeWarm` (systems.js) now links every program the
+scene will need the moment the chapter is attached, INTO THE COMPOSITE'S TARGET (a program is
+keyed on its destination's colour space and tone mapping; compiled against the screen the warm
+made one set and the first draw compiled another) and with the lights counted ONCE (three's
+`compile()` gathers them from the target scene and its first argument both), and holds
+`post.render` until the driver answers ready — `KHR_parallel_shader_compile` is what makes that a
+wait rather than a stall. The white lifts off a drawn frame, after the minimum hold, not off a
+timer. Measured on the Cave: first draw 6 479 → 140 ms; Venice 1 731 → 69; Kowloon 1 731 → 81
+(`qa/l6-split.js`). **A hidden prop is STATIC.** `physHide` used to park the body asleep and
+DYNAMIC, and nothing kept it asleep: Monaco's `camera` fell from −900 m at the 90 m/s cap for the
+whole of its `hiddenUntil`, one solver save per frame (+211 in nine seconds standing at the
+spawn; Hanoi's wine bottle +45), and `solverSaves` had stopped meaning "clean". The fuzz now
+FAILS on a non-zero delta.
+
 - Total draw calls < 220. Use `InstancedMesh` for repeated flora/crowd filler. **Re-measured 20 Aug
   2026 after the presentation pass: 43 to 122, and Sydney is still the worst. The
   sky dome is +1 in the ten chapters that do not own one.**

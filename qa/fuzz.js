@@ -234,6 +234,12 @@ async page => {
     if (r.nanFrames) fail.push(n + ': nanFrames ' + r.nanFrames);
     if (r.camNaN) fail.push(n + ': camNaN ' + r.camNaN);
     if (r.belowVoid) fail.push(n + ': belowVoid ' + r.belowVoid);
+    // THE SANITISER IS A NET, NOT A FLOOR (L6, E8 / qa F4). `solverSaves` is
+    // the delta over the eight seconds of input, with the keepsake teleport's
+    // own clamps kept apart in `keepSaves`; a non-zero delta is a body being
+    // clamped every frame — Monaco's hidden camera, falling for ever under
+    // the world, read +107 here and the column had stopped meaning "clean".
+    if (r.solverSaves) fail.push(n + ': solverSaves +' + r.solverSaves + ' (a body is being clamped every frame)');
     if (r.lastError) fail.push(n + ': lastError ' + String(r.lastError).slice(0, 120));
   }
   await page.evaluate(async (o) => {

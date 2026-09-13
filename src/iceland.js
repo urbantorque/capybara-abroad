@@ -5749,12 +5749,12 @@ function iceBuild(game) {
                 after: 'the-whale' },
               { t: 'THERE. Out past the moorings — look now, not in a minute.',
                 when: function () { return !!(iceGame && iceGame.iceland && iceGame.iceland.whaleUp()); } },
-              { t: 'Green sky and a whale in the same night. That is a Tuesday, that is.',
+              { t: 'Green sky and a whale in the same night. The island is showing off.',
                 when: lit }],
       wheek: ['Aye. Loud out here, is it not.',
               { t: 'Do that again and she will come and look at YOU.', before: 'the-whale' }],
       onTask: { 'the-whale': ['THIRTY TONNES. Out of the water. Eight metres off my boards.',
-                              'Eleven years I have stood here. Twice, I have seen that. Twice.'],
+                              'Every winter I have stood here. Twice, I have seen that. Twice.'],
                 'aurora': ['That is a good one. Nine, I would say. Out of ten.'] },
       praise: ['Mm. This harbour has seen worse.'] });
     // FOUR MORE. Two people in a chapter is not austerity, it is an oversight

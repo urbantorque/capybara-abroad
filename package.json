@@ -9,7 +9,7 @@
     "dev": "node server.mjs",
     "build": "node build.mjs",
     "test": "node qa/run.mjs",
-    "soak": "npx playwright-cli -s=soak run-code --filename=qa/r10-soak.js"
+    "soak": "node qa/soak.mjs"
   },
   "engines": {
     "node": ">=18"

@@ -3989,7 +3989,7 @@ function gorUpdateHerd(game, dt) {
       gorTask('the-herd');
       gorSaysNow('horse',
         ['She let you stay on. She does not let me stay on.',
-         'That is the whole name, that is. Land of beautiful horses.',
+         'That is the whole of the name. Land of beautiful horses.',
          'Same run every morning before the sun. She would do it without me.'],
         ['Now she has heard everything.']);
     }
@@ -6096,14 +6096,14 @@ function gorBuild(game) {
               { t: 'In the basket, please. Both feet. All four feet.', before: 'aboard' },
               { t: 'You have been in one now. So you know.', after: 'aboard' },
               { t: 'Three winds. You found all three. Most pilots take a season.', after: 'three-winds' },
-              { t: 'Nobody has ever put one down on that trailer first go. Nobody.', after: 'on-the-trailer' }],
+              { t: 'Not one pilot has put one down on that trailer first go. Not one.', after: 'on-the-trailer' }],
       wheek: ['Careful — the burner is louder and it is right there.'],
       praise: ['Right. Noted. Carry on.',
                'You are going to be a story I tell at the tea house.',
                'Not on my field, whatever it was.'],
       onTask: { 'aboard': ['Both feet in. All four. Good.'],
                 'the-envelope': ['You walked it. Did you find anything? No. Nobody ever does.'],
-                'three-winds': ['Three. That is the whole trade, that is.'],
+                'three-winds': ['Three. That is the whole trade, in one morning.'],
                 'sunrise': ['You were up there for it. Nothing I can add to that.'],
                 'on-the-trailer': ['On the trailer. I watched. I said nothing.'],
                 'the-tether': ['That is coming out of somebody’s wages. Not mine.'] } });

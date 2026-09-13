@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger, makeMover, warnOnce } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger, mergeWearBand, makeMover, warnOnce } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 6 — RIO DE JANEIRO
@@ -425,7 +425,9 @@ function rioVC() {
  *  so it wants no vertical shear in the sample at all. */
 function rioVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.58, amount: 0.18, warp: 0, near: 0.55, nearPale: 0.55, nearScale: 7, contact: 1, broad: 0.1, broadM: 17 });
+               { scale: 0.58, amount: 0.18, warp: 0, near: 0.55, nearPale: 0.55, nearScale: 7, contact: 1, broad: 0.1, broadM: 17,
+                 // the mid octave (L6, E6): damp packed sand in eight-metre patches
+                 mid: 0.06, midM: 8, midColor: PALETTE.rioSandDark, midBase: PALETTE.rioSand });
 }
 function rioPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function rioInstance(root, geo, color, list, cast, recv) {
@@ -904,6 +906,24 @@ function rioBuildCalcadao() {
       if (prevA >= 0) { idx.push(prevA, prevB, bb); idx.push(prevA, bb, a); }
       prevA = a; prevB = bb;
     }
+  }
+  // ---- and the wear path (L6, E6): the sand between the calcadao at the
+  // spawn and the point at Arpoador, trodden 8 % darker along the line the
+  // paper points down — see mergeWearBand in shared.js. The sand's own rule
+  // (rioGroundColor's damp-toward-the-water lerp) at every vertex, so it is
+  // the beach darker and not a stripe on it; in this mesh because this is
+  // the chapter's floor graphic and it costs no draw call here.
+  {
+    const W = rioMerger();
+    const sand = new THREE.Color(PALETTE.rioSand), sandD = new THREE.Color(PALETTE.rioSandDark);
+    mergeWearBand(W, [-2.0, -4.6, -22.0, -10.5, -47.0, -17.2], 1.5, rioTerrain,
+                  function (x, z, out) { out.copy(sand).lerp(sandD, clamp((rioPROM_Z - z) / 20, 0, 1)); },
+                  2.4, 0.05, 0.92);
+    const wg = W.build();
+    const wp = wg.attributes.position.array, wc = wg.attributes.color.array, wi = wg.index.array;
+    for (let i = 0; i < wp.length; i += 3) { pos.push(wp[i], wp[i + 1], wp[i + 2]); col.push(wc[i], wc[i + 1], wc[i + 2]); }
+    for (let i = 0; i < wi.length; i++) idx.push(n + wi[i]);
+    n += wp.length / 3;
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -4944,7 +4964,7 @@ function rioBuild(game) {
               { t: 'The set is coming. Look left — no, LEFT.',
                 when: function () { return !!(rioGame && rioGame.rio && rioGame.rio.surfing()); } }],
       wheek: ['Save it for the sunset, eh?'],
-      onTask: { 'arpoador': ['LISTEN to them. That is for you, that is.',
+      onTask: { 'arpoador': ['LISTEN to them. All of that is for you.',
                              'Two hundred people. Clapping. At a rodent.'],
                 'take-a-wave': ['From up here that looked deliberate.'] } });
     rioLocBonde = game.addLocal({ biome: 'rio', x: 34, y: rioTerrain(34, rioBONDE_Z + 2.4), z: rioBONDE_Z + 2.4,
@@ -4990,7 +5010,7 @@ function rioBuild(game) {
       if (rioLocGlobo && rioLocKiosk) {
         game.addExchange({ biome: 'rio', a: rioLocGlobo, b: rioLocKiosk, lines: [
           ['Two reais for a coco. Two!', 'Two reais for a biscuit made of air.'],
-          ['Quiet today.', 'It is Tuesday. It is always quiet on Tuesday.'],
+          ['Quiet today.', 'The flag is red. It is always quiet on a red flag.'],
           ['Something has taken a bag off my pole.', 'Something has been at my counter as well.'],
           ['Rain later.', 'There is never rain later.'],
           ['Did you see that go in the water?', 'I have stopped looking at the water.'],

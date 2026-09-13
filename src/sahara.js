@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, swayMesh, makeMerger, makeMover } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, swayMesh, makeMerger, mergeWearBand, makeMover } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 8 — MARRAKECH AND THE ERG
@@ -435,7 +435,10 @@ function sahVC() {
  *  so it wants no vertical shear in the sample at all. */
 function sahVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.45, amount: 0.15, warp: 0, near: 0.48, nearPale: 0.55, nearScale: 8, contact: 1, broad: 0.12, broadM: 20 });
+               { scale: 0.45, amount: 0.15, warp: 0, near: 0.48, nearPale: 0.55, nearScale: 8, contact: 1, broad: 0.12, broadM: 20,
+                 // the mid octave (L6, E6): packed damp sand between the loose, in
+                 // nine-metre patches, browning toward the lee-face colour
+                 mid: 0.07, midM: 9, midColor: PALETTE.sahSandShade, midBase: PALETTE.sahSand });
 }
 function sahPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function sahInstance(root, geo, color, list, cast, recv, opts) {
@@ -2805,6 +2808,22 @@ function sahBuildDuneTrack(root) {
         }
       }
     }
+  }
+  // ---- and the wear path (L6, E6): the whole way from the square to the
+  // foot of the walk-up track, trodden 8 % darker — the square's dust, the
+  // palmeraie's gravel, the erg's sand, each its own colour down. The band
+  // lies on sahTerrain sampled every three metres (the ground's own cell),
+  // so it climbs the first dunes rather than cutting through them; see
+  // mergeWearBand in shared.js. In this mesh because this mesh IS the
+  // chapter's floor graphic, and the track it ends at is drawn here.
+  {
+    const dust = new THREE.Color(PALETTE.sahOchreDust), gravel = new THREE.Color(PALETTE.sahGravel);
+    const sand = new THREE.Color(PALETTE.sahSand);
+    const footX = sahDUNE_X - sahDUNE_W + 3;
+    const footZ = sahDUNE_Z + sahDUNE_HZ * Math.sqrt(1 - sahSURF_BAND) * 1.06;
+    mergeWearBand(M, [sahSPAWN.x + 4, sahSPAWN.z, sahGATE.x, sahGATE.z, 120, 30, footX, footZ], 1.5, sahTerrain,
+                  function (x, z, out) { out.copy(x < 86 ? dust : x < sahERG_X ? gravel : sand); },
+                  3.0, 0.06, 0.92);
   }
   const m = new THREE.Mesh(M.build(), sahVC());
   m.receiveShadow = true;
