@@ -3052,6 +3052,9 @@ export function createNPCs(game) {
         if ((e.tool === 'gone') !== !!rec.toolOut) continue;
       }
       if (e.when) { let ok = false; try { ok = !!e.when(); } catch (err) { ok = false; } if (!ok) continue; }
+      // ...and a line may be WRITTEN at the moment it is said (L6, F1): the
+      // traveller in Hanoi names whatever animal you have brought.
+      if (typeof e.t === 'function') { let t = ''; try { t = e.t(); } catch (err) { t = ''; } if (t) npcRESOLVED.push(t); continue; }
       npcRESOLVED.push(e.t);
     }
     return npcRESOLVED;

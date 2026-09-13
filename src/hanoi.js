@@ -3965,6 +3965,17 @@ function hanBuildLocals(game) {
     lines: [{ t: 'Right. I am not even going to say it.', when: function () { return game.travMet() >= 2; } },
             { t: 'Four countries. Four. I have counted.', when: function () { return game.travMet() >= 3; } },
             { t: 'Are you following me or am I following you?', when: function () { return game.travMet() >= 2; } },
+            // ---- ...AND THE COUNT INCLUDES THE PASSENGER (L6, F1) -----------
+            // The traveller counts countries; a player who arrives with a
+            // Venetian pigeon on their back gets it counted too. `t` is a
+            // function — the line is written when it is said, because which
+            // animal it is cannot be known when this file is.
+            { t: function () {
+                const c = typeof game.companion === 'function' ? game.companion() : null;
+                if (!c || !c.kind) return '';
+                const k = c.kind, art = /^[aeiou]/i.test(k) ? 'an ' : 'a ';
+                return 'Four countries, and ' + art + k + '. Five, if you count the ' + k + '. I am counting the ' + k + '.';
+              }, when: function () { return game.travMet() >= 2 && typeof game.companion === 'function' && !!game.companion(); } },
             { t: 'You look like somebody I keep nearly meeting.', when: function () { return game.travMet() < 2; } },
             { t: 'Whatever you did in that cave, I heard about it in Laos.', after: 'to-cave' }],
     wheek: ['Yeah. All right. Yeah.'] });

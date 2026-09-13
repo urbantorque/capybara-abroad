@@ -218,6 +218,7 @@ let caliRouteLen = 0;
 let caliChivaBody = null;           // one kinematic compound: deck, roof, ladder
 let caliChivaState = 'parked';      // 'parked' | 'rolling' | 'stopped' | 'arrived'
 let caliChivaS = 0, caliChivaV = 0, caliChivaYaw = 0.32, caliChivaHold = 0;
+let caliChivaYawRate = 0;               // rad/s this frame, written on the body for the roof (see caliStepChiva)
 let caliChivaX = 0, caliChivaY = 0, caliChivaZ = 0, caliChivaPitch = 0, caliChivaRoll = 0;
 let caliRoofT = 0;                  // s the capybara has been stood on the rack
 let caliOnRoof = false;
@@ -2635,6 +2636,18 @@ function caliStepChiva(game, dt) {
   const bob = idle ? Math.sin(caliTime * 5.2) * 0.030 + Math.sin(caliTime * 2.1) * 0.020
                    : Math.sin(caliTime * 9.1) * 0.035 * clamp(caliChivaV / 4, 0, 1);
   caliChivaY = at.y + bob;
+  // ---- THE TURN IS A VELOCITY TOO (L5 owed, the roof drift) ---------------
+  // The body carried a linear velocity and nothing else, so a passenger on
+  // the roof rode the bus's ORIGIN through a corner: measured lx +1.0 → −0.6
+  // across 16 m of bend (qa/l5-chiva.js). A point three metres off the axis
+  // of a body turning at ω moves at ω × r more than the origin does, and
+  // capybara.js's contact sweep now adds that for any kinematic deck that
+  // publishes it. The rate is the polyline's, wrapped, over this frame.
+  {
+    let dyaw = at.yaw - caliChivaYaw;
+    dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw));
+    caliChivaYawRate = dt > 1e-4 ? clamp(dyaw / dt, -2.5, 2.5) : 0;
+  }
   caliChivaYaw = at.yaw;
   // pitch off the road under the axles, roll into the bend; both damped, because
   // an undamped attitude read off a smoothed polyline is a shiver
@@ -2642,7 +2655,15 @@ function caliStepChiva(game, dt) {
   const ya = caliRoadY(caliRouteXAt(sa), caliRouteZAt(sa));
   const yb = caliRoadY(caliRouteXAt(sb), caliRouteZAt(sb));
   const pitchWant = -Math.atan2(yb - ya, Math.max(1, sb - sa));
-  const rollWant = clamp(at.curve * caliChivaV * caliChivaV * 0.035, -0.16, 0.16);
+  // ...AND THE ROLL IS HALF WHAT IT WAS (L5 owed, the roof drift). With the
+  // turn on the body (see caliChivaYawRate) the passenger held its place
+  // through the first banner's bend (lx +0.97 → +0.90; it was +1.0 → −0.6)
+  // and still slid a metre across the second, tighter one — and with the
+  // roll zeroed for one run it did not (qa/l7-roof-drift.js): nine degrees of
+  // lean is a slope, and a capybara on a slope goes down it. Four and a half
+  // degrees reads as a lean and halves the slide; the rest is the physics
+  // of standing on a tilting floor and is left as measured.
+  const rollWant = clamp(at.curve * caliChivaV * caliChivaV * 0.035, -0.08, 0.08);
   caliChivaPitch = damp(caliChivaPitch, pitchWant, 5, dt);
   caliChivaRoll = damp(caliChivaRoll, rollWant, 4, dt);
 
@@ -2658,6 +2679,7 @@ function caliStepChiva(game, dt) {
   // and solves everything in that frame; without it the roof slides out from
   // under the animal at seven metres a second.
   b.velocity.set(Math.sin(caliChivaYaw) * caliChivaV, 0, Math.cos(caliChivaYaw) * caliChivaV);
+  b.angularVelocity.set(0, caliChivaV > 0.05 ? caliChivaYawRate : 0, 0);
   b.previousPosition.copy(b.position);
   b.interpolatedPosition.copy(b.position);
   b.previousQuaternion.copy(b.quaternion);
@@ -4655,7 +4677,7 @@ export function createCali(game) {
                wiresTouched: clear, wiresArmed: armed,
                clearScore: caliWireClear, hits: caliWireHits, lean: +caliBandLean.toFixed(2), duck: +caliBandDuck.toFixed(2),
                night: +caliNightT.toFixed(2), bulbs: caliChivaBulbs ? +caliChivaBulbs.material.color.r.toFixed(2) : null,
-               perfectT: +caliPerfectT.toFixed(2), yaw: +caliChivaYaw.toFixed(3) };
+               perfectT: +caliPerfectT.toFixed(2), yaw: +caliChivaYaw.toFixed(3), yawRate: +caliChivaYawRate.toFixed(3) };
     },
     /** For the harness (L5): the hazards, in route order. */
     wireList() {

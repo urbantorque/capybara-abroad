@@ -4571,6 +4571,13 @@ function gorUpdateBalloon(game, dt) {
   // drops away at a metre and a half a second under a capybara, which is a
   // capybara that spends the whole flight bouncing off its own basket.
   gorCarrying = false;
+  // THE FLOOR'S OWN RISE, published (L6 owed, `cap-at-the-rim`). The frame
+  // channel is horizontal; the basket lifts the animal by writing its
+  // velocity, and THE PERCH reads an upward velocity over 5.4 m/s as the
+  // world throwing you — so the cat got down at take-off, every time
+  // (qa/l7-rim-dbg2.js: off 'hop' 0.6 s after the burner). Written every
+  // frame this chapter is live, zero when the animal is not standing in it.
+  if (capy) capy.floorVY = 0;
   if (gorAboard && capy && capy.body) {
     const rel = capy.position.y - floorY;
     gorCarrying = true;
@@ -4581,6 +4588,16 @@ function gorUpdateBalloon(game, dt) {
     if (rel > -0.35 && rel < 0.85) {
       const vy = capy.body.velocity.y;
       if (vy < gorBalVY + 1.4) capy.body.velocity.y = gorBalVY;
+      // ...AND NOT FASTER THAN THE FLOOR EITHER. The rising basket is a
+      // kinematic body under a dynamic one, and the contact solver answers
+      // the overlap with an impulse: sampled per frame at take-off the animal
+      // read 2.1, 1.6, 0.1, 2.1, 1.6, 0.1 m/s up while the floor did 0.2,
+      // then one kick of 8.3 that put it a metre and a half over the rim
+      // (qa/l7-rim-dbg2.js). A basket does not throw its passenger. The
+      // solver's kick is clipped to the floor's own rise plus a metre a
+      // second; a hop is not, because the key is down on the frame it lands.
+      else if (vy > gorBalVY + 1.0 && !(input && input.jump)) capy.body.velocity.y = gorBalVY + 1.0;
+      capy.floorVY = gorBalVY;
     }
   }
 
@@ -5557,6 +5574,7 @@ export function createGoreme(game) {
       gorEnvOn = -1; gorMouthT = 0;
       // Anything stateful that could hold the player, cleared on the way out.
       gorAboard = false; gorAboardT = 0; gorEmptyT = 0; gorCarrying = false;
+      if (game.capy) game.capy.floorVY = 0;   // the basket is not under it any more
       // A declared frame that survives travel is a capybara in Antarctica
       // being driven sideways by a horse in Cappadocia.
       gorMareCarry = false; gorHerdRideT = 0; gorHerdOffT = 0;

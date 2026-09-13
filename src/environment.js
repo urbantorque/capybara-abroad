@@ -439,25 +439,27 @@ function envMerger(base) {
   });
   const envC = new THREE.Color();
   /** like add(), but the geometry brings its own per-vertex `color`. */
+  // In place, no clone — the same change as makeMerger's add() in shared.js.
+  const envV = new THREE.Vector3(), envNM = new THREE.Matrix3();
   M.addC = function (geo, m4) {
-    const g = geo.clone();
-    g.applyMatrix4(m4);
-    const p = g.attributes.position.array;
-    const nm = g.attributes.normal.array;
-    const cv = g.attributes.color.array;
+    const p = geo.attributes.position.array;
+    const nm = geo.attributes.normal.array;
+    const cv = geo.attributes.color.array;
+    envNM.getNormalMatrix(m4);
     const start = M.n;
     for (let i = 0; i < p.length; i += 3) {
-      M.pos.push(p[i], p[i + 1], p[i + 2]);
-      M.nor.push(nm[i], nm[i + 1], nm[i + 2]);
+      envV.set(p[i], p[i + 1], p[i + 2]).applyMatrix4(m4);
+      M.pos.push(envV.x, envV.y, envV.z);
+      envV.set(nm[i], nm[i + 1], nm[i + 2]).applyNormalMatrix(envNM);
+      M.nor.push(envV.x, envV.y, envV.z);
       envC.setRGB(cv[i], cv[i + 1], cv[i + 2]);
       envDeTint(envC, base);
       M.col.push(envC.r, envC.g, envC.b);
     }
     const vc = p.length / 3;
-    if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) M.idx.push(start + ia[i]); }
+    if (geo.index) { const ia = geo.index.array; for (let i = 0; i < ia.length; i++) M.idx.push(start + ia[i]); }
     else { for (let i = 0; i < vc; i++) M.idx.push(start + i); }
     M.n += vc;
-    g.dispose();
     return M;
   };
   M.quad = function (x0, z0, x1, z1, y, color) {

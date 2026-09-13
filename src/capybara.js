@@ -4172,6 +4172,7 @@ export function createCapybara(game) {
     // fast" is the single most useful thing to be able to read back when a
     // reference-frame mechanic misbehaves, and three chapters now depend on one.
     frameVX: 0, frameVZ: 0,
+    floorVY: 0,            // the floor's own vertical velocity, when a chapter lifts you by writing it (goreme.js); the perch subtracts it
     blown: false,                    // out of puff — walk only until it comes back
     carriedBy: null,
     // THE VESSEL UNDER YOUR FEET, as a cannon body. `carriedBy` is a biome's
@@ -5071,8 +5072,20 @@ export function createCapybara(game) {
       const ov = other.velocity;
       if (!ov) continue;
       if (ov.x * ov.x + ov.z * ov.z < 1e-4) continue;
-      platVX = clamp(ov.x, -capyPLAT_VMAX, capyPLAT_VMAX);
-      platVZ = clamp(ov.z, -capyPLAT_VMAX, capyPLAT_VMAX);
+      // ---- ...AT THE POINT UNDER YOU, NOT AT THE DECK'S ORIGIN -----------
+      // A deck that turns carries a point off its axis at v + ω × r. Without
+      // this the chiva's roof took its passenger through every corner at the
+      // bus's own velocity and the animal slid across it (lx +1.0 → −0.6 over
+      // a 16 m bend, qa/l5-chiva.js). Yaw only — a deck rolls and pitches by
+      // a few degrees and those are not what moved the animal.
+      let ox = ov.x, oz = ov.z;
+      const av = other.angularVelocity;
+      if (av && Math.abs(av.y) > 1e-4) {
+        const rx = body.position.x - other.position.x, rz = body.position.z - other.position.z;
+        ox += av.y * rz; oz -= av.y * rx;
+      }
+      platVX = clamp(ox, -capyPLAT_VMAX, capyPLAT_VMAX);
+      platVZ = clamp(oz, -capyPLAT_VMAX, capyPLAT_VMAX);
     }
     // ...or the biome simply says what the frame is. Applied AFTER the contact
     // sweep and before the latch, so a declared frame wins over a sniffed one

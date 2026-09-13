@@ -16,7 +16,14 @@ async page => {
   await put(c[0] + 1.2, c[1] + 0.6, c[2] + 1.2); await page.waitForTimeout(800)
   for (let k = 0; k < 3; k++) { await tap('KeyQ', 100); await page.waitForTimeout(2200) }
   await page.keyboard.down('KeyW'); await page.waitForTimeout(1500); await page.keyboard.up('KeyW')
-  for (let k = 0; k < 12; k++) { await page.waitForTimeout(1000); if (await ev(() => window.__capy.perchCount())) break }
+  // the loaf takes ~7 s to come on after the walk and the cat ~3 s more (qa/l7-rim-dbg.js: perch at 10 s)
+  out.wait = []
+  for (let k = 0; k < 28; k++) {
+    await page.waitForTimeout(1000)
+    out.wait.push(await ev(() => { const g = window.__capy, c = g.capy, h = g.herdDebug(true).kinds[0], p = c.position; const ds = h.pts.map(q => +Math.hypot(q[0] - p.x, q[2] - p.z).toFixed(1)).sort((a, b) => a - b); return [+c.loaf.toFixed(2), +c.restT.toFixed(1), h.led, ds[0], g.perchCount()] }))
+    if (await ev(() => window.__capy.perchCount())) break
+    if (k === 13) await tap('KeyQ', 100)   // the company is on a 21 s clock; a player would ask again
+  }
   out.perch = await ev(() => window.__capy.perchCount())
   out.herd = await ev(() => { const d = window.__capy.herdDebug().kinds[0]; return [d.led, d.heard] })
   // into the basket (walk in: a hop puts the cat off), then the burner
@@ -26,8 +33,12 @@ async page => {
   out.perch2 = await ev(() => window.__capy.perchCount())
   await page.keyboard.down('KeyE')
   const t0 = Date.now()
+  let lastQ = Date.now()
   while (Date.now() - t0 < 170000) {
     await page.waitForTimeout(2000)
+    // THE COMPANY IS ON A CLOCK (herdHOLD 21 s): a passenger gets down when it runs out, so the
+    // ride wheeks every twelve seconds — the cat is at 0 m, well inside earshot
+    if (Date.now() - lastQ > 12000) { await tap('KeyQ', 100); lastQ = Date.now() }
     const s = await ev(() => { const g = window.__capy.goreme; return [+g.altitude().toFixed(0), +g.sunUp().toFixed(2), window.__capy.perchCount(), window.__capy.taskDone('cap-at-the-rim'), window.__capy.capy.worn] })
     if (s[0] > 90) await page.keyboard.up('KeyE'); else await page.keyboard.down('KeyE')
     if ((Date.now() - t0) % 10000 < 2000) out.rows.push(s)

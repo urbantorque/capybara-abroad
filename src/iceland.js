@@ -548,22 +548,37 @@ function iceStaticBox(game, x, y, z, sx, sy, sz, ry) {
 function iceStaticGroup(game) {
   const b = new CANNON.Body({ mass: 0, material: (game.mats && game.mats.ground) || undefined });
   let used = false;
+  // ---- THE SHAPES GO ON TOGETHER (L6 owed, the build behind the white) ----
+  // `Body.addShape` recomputes the mass properties and the bounding radius
+  // over EVERY shape already on the body, each call — so a row of a hundred
+  // erratics on one body is a hundred passes over a growing list, and the
+  // CPU profile of the crossing (qa/l7-build-prof.js) put addShape at 107 of
+  // Iceland's 230 ms build. The three arrays are pushed here exactly as
+  // addShape pushes them (cannon-es 0.20, vendor/cannon-es.js:3589) and the
+  // two updates run ONCE, in done(), where the body is finished. A static
+  // body's mass properties are zeros whichever way they are computed.
   return {
     add(x, y, z, sx, sy, sz, ry) {
       iceSolids.add(x, y, z, sx * 0.5, sy * 0.5, sz * 0.5, ry);
-      if (ry) {
-        const q = new CANNON.Quaternion();
-        q.setFromEuler(0, ry, 0);
-        b.addShape(new CANNON.Box(new CANNON.Vec3(sx * 0.5, sy * 0.5, sz * 0.5)),
-                   new CANNON.Vec3(x, y, z), q);
-      } else {
-        b.addShape(new CANNON.Box(new CANNON.Vec3(sx * 0.5, sy * 0.5, sz * 0.5)),
-                   new CANNON.Vec3(x, y, z));
-      }
+      const shape = new CANNON.Box(new CANNON.Vec3(sx * 0.5, sy * 0.5, sz * 0.5));
+      const q = new CANNON.Quaternion();
+      if (ry) q.setFromEuler(0, ry, 0);
+      b.shapes.push(shape);
+      b.shapeOffsets.push(new CANNON.Vec3(x, y, z));
+      b.shapeOrientations.push(q);
+      shape.body = b;
       used = true;
       return this;
     },
-    done() { if (used) { iceSyncBody(b); game.world.addBody(b); } return b; },
+    done() {
+      if (used) {
+        b.updateMassProperties();
+        b.updateBoundingRadius();
+        b.aabbNeedsUpdate = true;
+        iceSyncBody(b); game.world.addBody(b);
+      }
+      return b;
+    },
   };
 }
 /** Contract, "Rendering physics transforms": carry the history forward by hand. */

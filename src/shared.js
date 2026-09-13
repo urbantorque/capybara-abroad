@@ -4172,7 +4172,12 @@ export const FINDS = [
 export const RECORDS = {
   // ...with a par since L5: the fisherman says the river does it in forty,
   // and the three boats are two seconds each off the clock (kyoGATE_BONUS).
-  'uji-run':       { label: 'the river in', unit: ' s', better: 'lower', dp: 1, par: 42 },
+  // ...AND THE FLOOR IS MEASURED NOW (L5 owed): a scripted swim from the
+  // bridge, steered down the centreline and to the inside of the hairpin,
+  // through all three boats, is 13.7 s on the clock (qa/l7-floors.js). Forty-
+  // two was three times that — every finished run beat it. Twenty-four is
+  // the fisherman's forty less the boats, and it asks for a clean line.
+  'uji-run':       { label: 'the river in', unit: ' s', better: 'lower', dp: 1, par: 24 },
   // ---- KYOTO HAD ONE NUMBER IN IT (v51) ---------------------------------
   // Eleven tasks and a single record, which made it the thinnest chapter in the
   // game to come back to — and it had TWO set pieces sitting there with a clock
@@ -6138,6 +6143,9 @@ export function mergeWearBand(M, pts, w, yAt, color, seg, lift, k) {
   }
   return M;
 }
+// Scratch for makeMerger's add(): one vector and one normal matrix, module-wide.
+const _mergeV = new THREE.Vector3();
+const _mergeNM = new THREE.Matrix3();
 export function makeMerger(G, opts) {
   const o = opts || {};
   const xform = o.xform;
@@ -6191,11 +6199,23 @@ export function makeMerger(G, opts) {
     n: 0,
     // For the bespoke shapes that write vertices themselves. See the note above.
     pos, nor, col, idx,
+    // ---- NO CLONE (L6 owed, the build behind the white) --------------------
+    // This was `geo.clone(); g.applyMatrix4(m4); ...; g.dispose()` per
+    // primitive, and a CPU profile of the crossing (qa/l7-build-prof.js) put
+    // the clone at 318 of the Cave's 438 ms build, 265 of Hanoi's 515, 247 of
+    // the Drift's 371. Not the copy: BufferGeometry.clone() is
+    // `new this.constructor().copy(this)`, and for a SphereGeometry or a
+    // CylinderGeometry the constructor BUILDS A DEFAULT ONE (32 × 16 for the
+    // sphere) before the copy overwrites it — SphereGeometry 148 ms and
+    // CylinderGeometry 90 ms inside a build that never made a new shape.
+    // The source arrays are read in place through the same two three.js
+    // paths the clone took (Vector3.applyMatrix4, applyNormalMatrix on
+    // getNormalMatrix), so the numbers that reach the buffers are the ones
+    // that always did: qa/rv-geom.js's fingerprints are unchanged.
     add(geo, m4, color) {
-      const g = geo.clone();
-      g.applyMatrix4(m4);
-      const p = g.attributes.position.array;
-      const nm = g.attributes.normal.array;
+      const p = geo.attributes.position.array;
+      const nm = geo.attributes.normal.array;
+      _mergeNM.getNormalMatrix(m4);
       c.set(color);
       if (tint) tint(c);
       // See the block above `jit`. The translation is elements 12..14 of a
@@ -6203,15 +6223,16 @@ export function makeMerger(G, opts) {
       if (jit) _mergeJitter(c, m4.elements[12], m4.elements[13], m4.elements[14], jit, jitHue);
       const start = M.n;
       for (let i = 0; i < p.length; i += 3) {
-        pos.push(p[i], p[i + 1], p[i + 2]);
-        nor.push(nm[i], nm[i + 1], nm[i + 2]);
+        _mergeV.set(p[i], p[i + 1], p[i + 2]).applyMatrix4(m4);
+        pos.push(_mergeV.x, _mergeV.y, _mergeV.z);
+        _mergeV.set(nm[i], nm[i + 1], nm[i + 2]).applyNormalMatrix(_mergeNM);
+        nor.push(_mergeV.x, _mergeV.y, _mergeV.z);
         col.push(c.r, c.g, c.b);
       }
       const vc = p.length / 3;
-      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
+      if (geo.index) { const ia = geo.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
       else { for (let i = 0; i < vc; i++) idx.push(start + i); }
       M.n += vc;
-      g.dispose();
       return M;
     },
     /**

@@ -4305,9 +4305,18 @@ const sysMUS_QNA_LO = 72, sysMUS_QNA_HI = 88;
 // cancel an AudioNode that has already been start()ed, so a 2 s rhythm lookahead
 // would keep a bombo playing over the harbour for two seconds after the swap.
 const sysMUS_RHY_LOOK = 0.7;
-const sysMUS_CENTRE = [52, 59, 64, 69];
-const sysMUS_LEVEL  = [0.15, 0.115, 0.095, 0.07];
-const sysMUS_TYPE   = ['sawtooth', 'sawtooth', 'triangle', 'triangle'];
+// ---- A FIFTH VOICE, AN OCTAVE OVER THE FOURTH (L6 owed / audio #9) --------
+// The four centres sit at E2 B2 E3 A3: 82–220 Hz, and voice-leading keeps
+// every chord tone within a tritone of them, so the pad's whole register was
+// under 440 Hz whatever the chord table said. Two rounds on the filter, the
+// sine and the shelves moved the share over 500 Hz from 1 to 6 palettes of
+// 19 — because the notes were not there to let through. This is the note:
+// a triangle at E5, the chord's own tone nearest 660 Hz, through the same
+// lowpass (which rests at 900 or over since E3, so it gets out) and the same
+// gain, at a level under the fourth's. A register, not a lift.
+const sysMUS_CENTRE = [52, 59, 64, 69, 76];
+const sysMUS_LEVEL  = [0.15, 0.115, 0.095, 0.07, 0.058];
+const sysMUS_TYPE   = ['sawtooth', 'sawtooth', 'triangle', 'triangle', 'triangle'];
 const sysMUS_SPREAD = [-7, 0, 6];      // cents per oscillator in a bank
 const sysMUS_XFADE  = 4.0;             // seconds — long enough to hide the change
 const sysMUS_XFADE2 = 6.5;             // chapter change: reads as a drift, not a cut
@@ -4497,10 +4506,17 @@ const sysMUS_THEME_DUR = [2, 1, 1, 3, 2, 1, 1, 3];   // × the phrase gap; the a
 // no fifth-of-the-tonic in them and the tune's fifth would otherwise be the
 // wrong note twice in eight. Those two are the two palettes (of 21) whose
 // interval sequence phraseAudit reports as its own.
+// `hijaz` is Cappadocia's own row (b2, major third — see sysMUS_CHORDS14 and
+// sfxMuezzin): the tune's descent lands G F# Eb D, the augmented second the
+// ney opens with. Tagged major it was six of eight in the chord and in the
+// wrong mode; tagged hijaz it is the same six (the D F# A of the chord) in
+// the right one. Marrakech shares the row on paper and keeps `minor`: its
+// drone is E B E G B and hijaz on E puts only four of the eight in it.
 const sysMUS_SCALES = {
   major: [0, 2, 4, 5, 7, 9, 11],
   minor: [0, 2, 3, 5, 7, 8, 10],
   pent:  [0, 3, 3, 5, 7, 10, 10],
+  hijaz: [0, 1, 4, 5, 7, 8, 10],
 };
 // The ostinato (layers[3]): the tune once through on the lead, an octave up
 // and under the plucks, then a rest as long as the tune, and again. Quieter
@@ -5445,7 +5461,7 @@ const sysMUS_PAL = [
     // pointed at an Andean one since the row was authored. The bendir is the
     // other half of the correction: a frame drum with a gut snare, sparse
     // enough that it never becomes a pulse.
-    lead: 'ney', xfade: 5.2, rhythm: null, bendir: true, scale: 'major',
+    lead: 'ney', xfade: 5.2, rhythm: null, bendir: true, scale: 'hijaz',
     // The sun clearing the rim. Six flute notes, opening out — the same 'soar'
     // as the condor, two hundred degrees of longitude and eleven chapters away,
     // and deliberately so: those are the only two moments in this game that are
@@ -16449,8 +16465,17 @@ export function createSystems(game) {
   // qa/l6r-audio-states.js): the calm lean was lifting the still state by as
   // much. Now the calm CUTS the pad (sysMUS_CALM_PAD) and the chase lifts it
   // by six tenths, which is the +4 dB the review asked for at the pad alone.
-  const sysMUS_CHASE_PAD = -0.6;    // negative: the pad RISES during a chase (see above)
-  const sysMUS_CHASE_BASS = 0.0;
+  // ...and six tenths measured chase − still at +5.1 Sydney, +4.4 Kyoto,
+  // +2.6 Hanoi, +2.3 Venice, +1.2 the cave (qa/l6r-audio-states.js, four
+  // runs): met in two of five. The pulse stays at ×2.0 — its transient is
+  // the peak — so the last two decibels are the pad's, at −0.85 (+1.4 dB on
+  // the one stem that is the mids), and a twentieth on the bass under it.
+  // At −0.85 the chase met in three of five (Sydney +6.2, Kyoto +6.2, the
+  // cave +6.8; Hanoi +3.6, Venice +3.0) and the cave's peak read −5.2 dBFS
+  // against the −6 the limiter is asked to keep; −0.78 is the same lift
+  // less a decibel of peak.
+  const sysMUS_CHASE_PAD = -0.78;   // negative: the pad RISES during a chase (see above)
+  const sysMUS_CHASE_BASS = 0.05;
   const sysMUS_CHASE_DBL = 0.6;     // intensity over which the lead is doubled up
   let musChaseBeatAt = 0, musChaseBeatN = 0, musChaseHits = 0, musChaseDbl = 0;
   // THE SLEEP (L6, E3): 0 awake, 1 gone. Integrated per frame from sysNapNow
@@ -36298,7 +36323,20 @@ export function createSystems(game) {
     // THE SHADERS, BEHIND THE WHITE. And the shadow map is the old chapter's
     // until the pass runs — at half rate that has to be asked for by name.
     game.state.shadowDirty = true;
-    biomeWarm(name);
+    // ---- ...ON THE NEXT TASK, NOT THIS FRAME (L6 owed, the sliced build) --
+    // The switch frame was the build AND the compile: qa/l7-load-split.js read
+    // the Cave at 225 + 133 ms, Antarctica 132 + 98, the Pantanal 125 + 106.
+    // The hold goes up now, so nothing is drawn before the programs exist;
+    // the linking runs on its own task, so the frame that built the chapter
+    // ends first and the next one links. Two frames behind the white instead
+    // of one long one. A crossing that supersedes this one before it fires
+    // is honoured: the deferred warm checks the live chapter and stands down
+    // (biomeWarm's own id would already refuse to clear a later hold).
+    game.state.renderHold = true;
+    game.state.warmAt = performance.now();
+    setTimeout(function () {
+      if (game.biome && game.biome.current === name) biomeWarm(name);
+    }, 0);
     teleportCapy(typeof bio.spawnOf === 'function' ? bio.spawnOf(name) : bio.SYDNEY_SPAWN, true);
     // AFTER the teleport, because the copy is put down where the animal IS and
     // before it the animal is still standing in the country it has left.
@@ -38556,7 +38594,11 @@ export function createSystems(game) {
       const airborne = !capy.grounded && !capy.swimming && !capy.carriedBy;
       if (airborne) {
         perchAirT += dt;
-        if (capy.velocity && capy.velocity.y > perchTHROW_V) perchLeapt = true;
+        // ...MINUS THE FLOOR'S OWN RISE. A balloon basket lifts the animal by
+        // writing its velocity (goreme.js publishes it as capy.floorVY), and
+        // measured at take-off that read as a throw and put the cat on the
+        // paving 0.6 s after the burner (qa/l7-rim-dbg2.js).
+        if (capy.velocity && capy.velocity.y - (capy.floorVY || 0) > perchTHROW_V) perchLeapt = true;
       } else { perchAirT = 0; perchLeapt = false; }
       if (input && input.jumpPressed && airborne) perchLeapt = true;
       if (perchLeapt && perchAirT > perchAIR) off = 'hop';
@@ -38804,6 +38846,21 @@ export function createSystems(game) {
   const compWALK     = 1.6;    // m/s it wanders off at
   const compLAMBDA_Y = 9;      // how fast its height follows the ground
   const compPORTRAIT = 30;     // m within which it is stood in a picture
+  // ---- THE FETCH (L6, F1 — the design's fourth combination) ----------------
+  // A thrown prop under compFETCH_KG that comes to rest inside compFETCH_R of
+  // a following companion is brought back: it goes to it, takes it up (the
+  // errand's kinematic hold, see localErrandStep in npc.js), walks it to
+  // within compFETCH_GIVE of you and puts it down. Not into water (it does
+  // not swim for it), not a held thing, not one that has spilt.
+  const compFETCH_KG   = 0.4;   // kg and under — a frisbee, a thong, a ball, a hat
+  // The review said three metres. Measured (qa/l7-fetch.js): the companion
+  // walks 1.7 m behind you and a tap throw lands 3.3 m ahead, which is 4.6 m
+  // from it — at three, nothing thrown forward was ever fetched. Six is a
+  // throw it can see.
+  const compFETCH_R    = 6.0;   // m from the companion the thing must land
+  const compFETCH_GIVE = 1.4;   // m from you it is put down
+  const compFETCH_T    = 14;    // s before it gives up on one it cannot reach
+  const compFETCH_LIFT = 0.55;  // m over its feet it carries the thing
   // ---- what each kind is: how it crosses water, what it says, how big ----
   // `span` is the herd offer's, restated here for a restore, which has no
   // offer to read it from (the chapter is not loaded).
@@ -38931,6 +38988,7 @@ export function createSystems(game) {
   let compGo = 0, compGoX = 0, compGoZ = 0, compNews = '', compErr = '';
   let compFarT = 0, compTellT = 0, compCallT = 0, compDecoyT = 0, compWaiting = false, compSeatT = 0;
   let compDecoyX = 0, compDecoyZ = 0;
+  let compFetch = null, compFetchT = 0, compFetchHeld = false, compFetchN = 0;   // the thrown thing, and whether it is in the mouth
   let compSaved = null;      // { kind, from } off the file, until the first started frame
   let compWhy = '';          // why the last one left, for the harness
   let compTold = false;      // "sit beside it and it climbs back on" — said once
@@ -39021,6 +39079,7 @@ export function createSystems(game) {
     compFx = compAt.x; compFy = compAt.y; compFz = compAt.z;
     const d = p ? Math.hypot(p.x - compAt.x, p.z - compAt.z) : 0;
     compRise = clamp(d / compSPEED, perchRISE, compRISE_MAX);
+    compFetchClear();
     compMt = 0; compState = 'climb'; compDecoyT = 0; compWaiting = false;
     perchGapT = perchGAP;
     if (compTr && compTr.voice) {
@@ -39047,6 +39106,7 @@ export function createSystems(game) {
       if (d > 0.05) { compGoX = dx / d; compGoZ = dz / d; }
       else { compGoX = Math.cos(yaw); compGoZ = -Math.sin(yaw); }
     } else { compGoX = 1; compGoZ = 0; }
+    compFetchClear();
     compState = 'go'; compGo = compLEAVE; compDecoyT = 0;
     if (why === 'told') toast('off you go.');
     saveSoon();
@@ -39056,6 +39116,7 @@ export function createSystems(game) {
     if (compObj) { compObj.visible = false; compObj.scale.setScalar(1); }
     compObj = null; compKind = ''; compFrom = ''; compTr = null; compState = '';
     compSaved = null; compGo = 0; compDecoyT = 0;
+    compFetch = null; compFetchT = 0; compFetchHeld = false;
   }
   /** What the file keeps: two fields, or nothing. See saveWrite. */
   function compSave() {
@@ -39175,6 +39236,50 @@ export function createSystems(game) {
     let d = target - cur;
     d = Math.atan2(Math.sin(d), Math.cos(d));
     return cur + d * k;
+  }
+  // ---- THE FETCH (L6, F1): a throw it can reach is a throw it brings back --
+  // `capy:drop` is props.js's release, thrown or set down; only a THROW
+  // (`thrownT` stamped this frame) and only a light one. The landing is
+  // read in stowUpdate — a frisbee is still flying when this fires.
+  game.events.on('capy:drop', function (e) {
+    const prop = e && e.prop;
+    if (!prop || !compObj || compState !== 'follow' || compFetch) return;
+    const t = game.state.time || 0;
+    if (typeof prop.thrownT !== 'number' || t - prop.thrownT > 0.1) return;
+    const def = game.physics && typeof game.physics.typeOf === 'function' ? game.physics.typeOf(prop.type) : null;
+    if (!def || !(def.mass <= compFETCH_KG)) return;
+    compFetch = prop; compFetchT = 0; compFetchHeld = false;
+  });
+  /** Is the thrown thing still something to go for? */
+  function compFetchLive(prop) {
+    return !!prop && !prop.removed && !prop.held && !prop.spilled && !prop.inWater && !!prop.body;
+  }
+  /** Take it up: the errand's kinematic hold, so the solver leaves it alone. */
+  function compFetchTake(prop) {
+    const b = prop.body;
+    b.type = CANNON.Body.KINEMATIC;
+    b.updateMassProperties();
+    b.allowSleep = false;
+    b.collisionResponse = false;
+    b.velocity.set(0, 0, 0); b.angularVelocity.set(0, 0, 0);
+    b.wakeUp();
+    compFetchHeld = true;
+  }
+  /** ...and put it down where it stands, a real body again. */
+  function compFetchGive(prop) {
+    const b = prop.body;
+    b.type = CANNON.Body.DYNAMIC;
+    b.updateMassProperties();
+    b.allowSleep = true;
+    b.collisionResponse = true;
+    b.velocity.set(0, 0.4, 0); b.angularVelocity.set(0, 0, 0);
+    b.wakeUp();
+    compFetchHeld = false;
+  }
+  /** Drop whatever it has, cleanly — a leave, a climb, a chapter change. */
+  function compFetchClear() {
+    if (compFetch && compFetchHeld && compFetchLive(compFetch)) { try { compFetchGive(compFetch); } catch (e) {} }
+    compFetch = null; compFetchT = 0; compFetchHeld = false;
   }
   // ---- THE DECOY (L6, F1): a wheek while hidden sends it out ---------------
   // The event, not the key: a touch honk and a pad honk are wheeks too, and
@@ -39308,7 +39413,36 @@ export function createSystems(game) {
       if (compDecoyT <= 0) compState = 'follow';
       else { tx = compDecoyX; tz = compDecoyZ; }
     }
-    if (compState === 'follow') {
+    let fetching = false;
+    if (compState === 'follow' && compFetch) {
+      // ---- THE FETCH ---------------------------------------------------
+      const fp = compFetch;
+      compFetchT += dt;
+      if (!compFetchLive(fp) || compFetchT > compFETCH_T) compFetchClear();
+      else if (!compFetchHeld) {
+        const bp = fp.body.position, bv = fp.body.velocity;
+        const still = bv.x * bv.x + bv.y * bv.y + bv.z * bv.z < 0.36;
+        const dCo = Math.hypot(bp.x - compAt.x, bp.z - compAt.z);
+        // still, landed near it, and on ground it will step on
+        if (still && dCo <= compFETCH_R + 0.01 && dCo > 0.45 &&
+            (compTr && (compTr.fly || compTr.swim) || compWetY(bp.x, bp.z) === -Infinity)) {
+          tx = bp.x; tz = bp.z; fetching = true;
+        } else if (still && dCo <= 0.45) { compFetchTake(fp); fetching = true; }
+        // ...one that landed further off is left where it is, and taken up if the walk
+        // brings the companion past it inside compFETCH_T
+      }
+      if (compFetch && compFetchHeld) {
+        // bring it to you, and put it down at your feet
+        if (dCapy > compFETCH_GIVE) { tx = p.x; tz = p.z; fetching = true; }
+        else {
+          compFetchGive(fp);
+          compFetchN++;
+          if (compFetchN === 1) toast(stowName(compKind) + ' brought it back', 'note');
+          compFetch = null; compFetchT = 0;
+        }
+      }
+    }
+    if (compState === 'follow' && !fetching) {
       // the herd's own point behind you, on the trail you actually walked
       const back = herdGAP + (compSpan - 1) * 0.4;
       if (herdTrailAt(back, compPt)) { tx = compPt.x; tz = compPt.z; }
@@ -39346,6 +39480,15 @@ export function createSystems(game) {
     compObj.position.set(compAt.x, compAt.y, compAt.z);
     compObj.rotation.y = compYaw;
     compObj.visible = true;
+    // ...and the thing in its mouth comes with it
+    if (compFetch && compFetchHeld && compFetch.body) {
+      const fb = compFetch.body;
+      const hx = compAt.x + Math.sin(compYaw) * 0.30, hz = compAt.z + Math.cos(compYaw) * 0.30;
+      const hy = compAt.y + compFETCH_LIFT;
+      fb.position.set(hx, hy, hz);
+      fb.velocity.set(0, 0, 0); fb.angularVelocity.set(0, 0, 0);
+      if (compFetch.mesh) { compFetch.mesh.position.set(hx, hy, hz); compFetch.mesh.rotation.set(0, compYaw, 0); }
+    }
   }
   /** Who is with you: kind, state and where, or null. The lines and the hints ask. */
   game.companion = function () {
@@ -39373,6 +39516,7 @@ export function createSystems(game) {
              mt: +compMt.toFixed(2), farT: +compFarT.toFixed(1), tellT: +compTellT.toFixed(2),
              decoyT: +Math.max(0, compDecoyT).toFixed(2), waiting: compWaiting,
              why: compWhy, saved: compSaved ? compSaved.kind : null,
+             fetch: compFetch ? compFetch.type : null, fetchHeld: compFetchHeld, fetchN: compFetchN,
              // WHY IT DID NOT TAKE ONE. Three separate reasons — the chapter
              // offers nothing that travels, nothing is on the back, or something
              // is on the back but still climbing — and from outside all three
