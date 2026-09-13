@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh, makeMerger, makeMover } from './shared.js';
+import { PALETTE, mat, EMIT_OVER, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh, makeMerger, makeMover } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 18 — MONTE CARLO
@@ -2582,6 +2582,55 @@ function monBuildCircuit(game, root) {
  * carryFrame() rather than leaving the animal to the contact sweep: at that
  * speed a contact that is missing for two frames is a capybara in a barrier.
  */
+// ---- EMITTERS THAT EMIT (L6, E6 / art #7) — the cars' lamps and the yacht's
+// windows. Two helpers: a merged geometry's vertex colours pushed past white
+// (see EMIT_OVER in shared.js: a lamp RENDERS over 1.0 so any threshold finds
+// it), and one ramped additive disc for a pool of light on the road — the
+// Kowloon instrument (hkPoolDiscs), centre at the colour, a ring at 0.42 r at
+// a third, the rim at black.
+const monLAMP_K       = 1.15;   // the cars' lamps, times EMIT_OVER
+const monLAMP_POOL_K  = 1.45;   // the headlamps' pool at its centre: past white
+const monLAMP_POOL_Y  = 0.10;   // its lift over the tarmac
+const monWIN_K        = 0.95;   // the yacht's cabin windows, times EMIT_OVER
+function monOverWhite(g, k) {
+  const a = g.attributes.color.array;
+  for (let i = 0; i < a.length; i++) a[i] *= k;
+  return g;
+}
+function monPoolDisc(x, y, z, r, hex, k) {
+  const N = 16;
+  const pos = new Float32Array((1 + 2 * N) * 3), col = new Float32Array((1 + 2 * N) * 3);
+  const c = new THREE.Color(hex).multiplyScalar(k);
+  const idx = [];
+  let v = 0;
+  pos[0] = x; pos[1] = y; pos[2] = z; col[0] = c.r; col[1] = c.g; col[2] = c.b; v++;
+  for (let ring = 0; ring < 2; ring++) {
+    const rr = ring === 0 ? r * 0.42 : r, k2 = ring === 0 ? 0.34 : 0;
+    for (let i = 0; i < N; i++) {
+      const a = i / N * Math.PI * 2;
+      pos[v * 3] = x + Math.cos(a) * rr; pos[v * 3 + 1] = y; pos[v * 3 + 2] = z + Math.sin(a) * rr;
+      col[v * 3] = c.r * k2; col[v * 3 + 1] = c.g * k2; col[v * 3 + 2] = c.b * k2; v++;
+    }
+  }
+  for (let i = 0; i < N; i++) {
+    const j = (i + 1) % N;
+    idx.push(0, 1 + j, 1 + i);
+    idx.push(1 + i, 1 + j, 1 + N + j);
+    idx.push(1 + i, 1 + N + j, 1 + N + i);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(idx);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false,
+    blending: THREE.AdditiveBlending, fog: false }));
+  m.renderOrder = 2;
+  m.frustumCulled = false;
+  m.castShadow = false; m.receiveShadow = false;
+  m.userData.noShadow = true;
+  return m;
+}
 const monCAR_COL = [
   { body: PALETTE.monCarSilver, dark: PALETTE.monCarDk, stripe: PALETTE.monCarStripe },
   { body: PALETTE.monCarRed, dark: PALETTE.monCarRedDk, stripe: PALETTE.monMarble },
@@ -2648,6 +2697,32 @@ function monBuildCar(colours) {
   const m = new THREE.Mesh(K.build(), monVCF());
   m.castShadow = true; m.receiveShadow = true;
   g.add(m);
+  // ---- AND THE LAMPS EMIT (L6, E6 / art #7) -----------------------------
+  // The headlamp discs and tail lamps above are Lambert in the body's own
+  // merge, lit by a dusk sky: at twenty past eight they rendered as pale
+  // and dark-red paint. A second copy of the four, a hair proud of the
+  // body, in a Basic material with its vertex colours scaled past white —
+  // the lamp side of the bright pass's threshold (EMIT_OVER) — so the pack
+  // blooms as four pairs of lights coming round Rascasse, which at dusk is
+  // what a car is. And a POOL on the road ahead, the Kowloon disc, additive:
+  // a ramp of the headlamps' colour past white at its centre, low enough
+  // that on the climb it sinks under the tarmac and simply stops rather
+  // than floating.
+  {
+    const E = monMerger();
+    for (let s = -1; s <= 1; s += 2) {
+      E.cyl(s * 0.52, 0.86, 2.34, 0.19, 0.06, PALETTE.monHeadlamp, Math.PI / 2, 0, 0, 8);
+      E.box(s * 0.56, 0.76, -2.07, 0.30, 0.16, 0.04, PALETTE.monTailLamp);
+    }
+    const eg = E.build();
+    monOverWhite(eg, monLAMP_K * EMIT_OVER);
+    const em = new THREE.Mesh(eg, new THREE.MeshBasicMaterial({ vertexColors: true }));
+    em.castShadow = false; em.receiveShadow = false;
+    em.userData.noShadow = true;
+    g.add(em);
+    const pool = monPoolDisc(0, monLAMP_POOL_Y, 3.0, 2.2, PALETTE.monHeadlamp, monLAMP_POOL_K);
+    g.add(pool);
+  }
   // the headlight cone. Two flat wedges, unlit, additive-ish: a light source
   // is a thing you can SEE THE BEAM OF at dusk, and in the tunnel it is most of
   // what tells you a car is coming.
@@ -2752,6 +2827,7 @@ function monBuildCars(game, root) {
   root.add(monCarRoot);
   for (let i = 0; i < monCAR_N; i++) {
     const g = monBuildCar(monCAR_COL[i % monCAR_COL.length]);
+    g.name = 'monCar';   // the probes find them by name (E6)
     monCarRoot.add(g);
     monCarG.push(g);
     const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC,
@@ -3425,7 +3501,48 @@ function monBuildYacht(game, root) {
   const m = new THREE.Mesh(K.build(), monVCF());
   m.castShadow = true; m.receiveShadow = true;
   g.add(m);
+  // ---- AND THE CABIN HAS WINDOWS, AND THEY ARE LIT (L6, E6 / art #7) ------
+  // qa/l6r-art-monaco-walk.png: a hundred and thirty feet of somebody
+  // else's money and the cabin was a grey box — the glass strips above are
+  // Lambert in the hull's merge, and at the blue hour glass that is not lit
+  // from inside is the hull's colour. Six windows a side on the main house,
+  // three on its front and its aft, two each end of the sun-deck house:
+  // twenty-two panes a hair proud of the glass, Basic, scaled past white (EMIT_OVER) in the lamps'
+  // warm — the same colour as the quay's lamps, because that is the light
+  // that is on aboard at twenty past eight. One mesh, unlit, in the group.
+  {
+    const W = monMerger();
+    const wy = y + monDECK1 + 1.6;
+    for (let s = -1; s <= 1; s += 2) {
+      for (let k = 0; k < 6; k++) {
+        const wz = -2 - L * 0.17 + k * (L * 0.34 / 5);
+        W.box(s * (B * 0.5 - 0.55), wy, wz, 0.06, 0.95, 1.6, PALETTE.monLamp);
+      }
+    }
+    // the fronts, and the AFT faces, which are the ones the passerelle looks
+    // at: a player who boards walks straight up the stern, and the first cut
+    // of this lit every face but that one (qa/l6-e6-monaco-walk.png, a grey
+    // box over the animal's head). Three panes on each end of the main
+    // house, clear of flight A at x -2.2; two on each end of the sun-deck
+    // house — panes, not one four-metre sheet, because a sheet of light with
+    // no mullion is a screen and a screen is not a window.
+    for (let k = 0; k < 3; k++) {
+      W.box(-1.5 + k * 1.5, wy, -2 + L * 0.21 + 0.17, 1.1, 0.95, 0.06, PALETTE.monLamp);
+      W.box(0.6 + k * 1.5, wy, -2 - L * 0.21 - 0.17, 1.1, 0.95, 0.06, PALETTE.monLamp);
+    }
+    for (let s = -1; s <= 1; s += 2) {
+      W.box(s * 1.1, y + monDECK2 + 1.6, -4 + L * 0.13 + 0.17, 1.6, 1.05, 0.06, PALETTE.monLamp);
+      W.box(s * 1.1, y + monDECK2 + 1.6, -4 - L * 0.13 - 0.17, 1.6, 1.05, 0.06, PALETTE.monLamp);
+    }
+    const wg = W.build();
+    monOverWhite(wg, monWIN_K * EMIT_OVER);
+    const wm = new THREE.Mesh(wg, new THREE.MeshBasicMaterial({ vertexColors: true }));
+    wm.castShadow = false; wm.receiveShadow = false;
+    wm.userData.noShadow = true;
+    g.add(wm);
+  }
   g.position.set(monYACHT.x, 0, monYACHT.z);
+  g.name = 'monYacht';   // the probes find it by name (E6)
   monYachtG = g;
   root.add(g);
   // the gangway's own collider, which is the one piece of this boat a player

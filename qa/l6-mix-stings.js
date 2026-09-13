@@ -31,7 +31,10 @@ async page => {
   })
   // a short walk so the calm is 0 (the calm's pad cut would otherwise move under the window), then still
   await page.keyboard.down('KeyW'); await page.waitForTimeout(800); await page.keyboard.up('KeyW')
-  await page.waitForTimeout(2500)
+  // 9 s, not 2.5: the first run's bed rose 6 dB across its six seconds (the arrival's
+  // intensity and card were still draining) and `arrive`, the first sting, was judged
+  // against a bed that was not one
+  await page.waitForTimeout(9000)
   // 100 ms rows of the score and the pad
   const meter = (secs) => page.evaluate(async (secs) => {
     function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
@@ -67,7 +70,10 @@ async page => {
     // a tap of W before each: the nap (26 s of rest puts the score to sleep — E3) and the calm's
     // pad cut would otherwise drift under the window. The bed is the second before the sting.
     await page.keyboard.down('KeyW'); await page.waitForTimeout(300); await page.keyboard.up('KeyW')
-    await page.waitForTimeout(2500)
+    // 4.5 s, not 2.5: the tap releases the calm's pad cut (+4 dB over τ 1.2 s) and at 2.5 s
+    // the pad was still rising through the window, so `arrive` and `record` read a pad that
+    // did not duck (+0.1 / −1.3) against a bed second that was lower than the sting's own
+    await page.waitForTimeout(4500)
     const p = meter(4.5); await page.waitForTimeout(1000)
     const n = await page.evaluate((s) => window.__capy.hud.stingAudit(s), s)
     const r = await p

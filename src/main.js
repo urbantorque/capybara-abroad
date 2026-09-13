@@ -2075,6 +2075,7 @@ function mainBoot() {
     // own count walked `game.npcs` with no chapter test, and that array is
     // Sydney's cast, built at boot and never removed. See peopleNear.
     game.peopleNear = npcs.peopleNear;
+    game.npcLensFade = npcs.lensFade;   // the crowd in the lens (L6, E1)
     // M11: the traveller's arc, as a number. See npcTravMet.
     game.travMet = npcs.travMet;
     // L6, F4: where they are standing in the live chapter, for the arrow.

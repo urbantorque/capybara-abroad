@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matOwn, EMIT_OVER, emitSet, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue, swayMesh, makeMerger, warnOnce } from './shared.js';
+import { PALETTE, mat, matOwn, EMIT_OVER, emitSet, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue, swayMesh, makeMerger, mergeWearBand, warnOnce } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 12 — PALAWAN. THE INTERESTING HALF IS UNDERNEATH.
@@ -1226,6 +1226,28 @@ function palBuildBeach(game, root) {
       const c = tides[t][0], w = tides[t][1];
       band((x) => contour(x, c) - w * 0.5, (x) => contour(x, c) + w * 0.5, 0.012, PALETTE.palPearl,
            (x) => hash(Math.floor(x / 6.0) + 31 * t) < 0.12);
+    }
+    // ---- and the wear path (L6, E6): the sand between the spawn and the
+    // foot of the jetty, trodden darker down the line everybody walks — see
+    // mergeWearBand in shared.js. A QUARTER darker, not the lawn's 8 %: this
+    // sand renders at luma 195, on the grade's shoulder, and measured with
+    // qa/l6-e6-wear2.mjs the band read +3 at 0.92, -5 at 0.84 and -16 at
+    // 0.74 — the shoulder eats a small step near white and the number that
+    // is a path on a lawn is nothing on coral sand. The chapter's marquee is under the
+    // water and the way to it is the bangka at the jetty, so that is where
+    // the line goes; it darkens toward the damp band as it drops, so it is
+    // the beach darker and not a stripe on it. In this mesh, the chapter's
+    // floor graphic, for the tide lines' reason; eight centimetres proud,
+    // because the beach is a smoothstep and the ground mesh is a lattice —
+    // between two of its samples the mesh is a chord under the curve's
+    // convex half, and a band a centimetre over palTerrain was under the
+    // facets for most of the way down (qa/l6-e6-wear-palawan-2.png, no line).
+    {
+      const dry = new THREE.Color(PALETTE.palSand), damp = new THREE.Color(PALETTE.palRope);
+      mergeWearBand(M, [palSPAWN.x, palSPAWN.z - 1.5, palJETTY.x * 0.45, 36.0, palJETTY.x, palJETTY.z1 + 1.2],
+                    1.5, palTerrain,
+                    function (x, z, out) { out.copy(dry).lerp(damp, clamp((34 - z) / 8, 0, 1)); },
+                    1.5, 0.08, 0.74);
     }
   }
   palPoolDone(game, solid);
@@ -2644,7 +2666,7 @@ function palUpdateManta(game, dt) {
     // clears the platform and ride state left over from having been CARRIED —
     // which is the state this line is ending. Same 1.6 m/s, same heading.
     if (capy && typeof capy.launch === 'function') {
-      capy.launch(Math.sin(yaw) * 1.6, 0, Math.cos(yaw) * 1.6);
+      capy.launch(Math.sin(yaw) * 1.6, 0, Math.cos(yaw) * 1.6, 'the manta');   // named for the pill (L6, E1)
     }
     palSfx('splash', { volume: 0.5, pitch: 0.9 });
   }

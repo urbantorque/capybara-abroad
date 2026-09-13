@@ -34,6 +34,7 @@ async page => {
     // every line's sound, as it was asked for: name, wall-clock, pitch, streak, the line
     window.__sfxN = {}; window.__lines = []
     const o = g.sfx
+    const mode = window.__babbleMode || 'babble'
     g.sfx = function (name, opts) {
       window.__sfxN[name] = (window.__sfxN[name] || 0) + 1
       if ((name === 'blip' || name === 'babble') && window.__lines.length < 600) {
@@ -41,6 +42,15 @@ async page => {
                               s: opts ? opts.streak : 0, at: opts && opts.at ? 1 : 0,
                               line: opts && opts.say ? String(opts.say.line || '').slice(0, 40) : '' })
       }
+      // THE A/B, in one tree: 'blip' is the pre-F5 game exactly (npc.js sent
+      // every line to the blip with 2 or 3 pulses by its character count);
+      // 'none' is the world with nobody speaking, which is the floor of the
+      // 640 Hz band — the stone footfall's recipe sits at ~750 Hz.
+      if (name === 'babble' && mode === 'blip') {
+        const line = opts && opts.say ? String(opts.say.line || '') : ''
+        return o.call(this, 'blip', Object.assign({}, opts, { streak: line.length < 22 ? 2 : 3, say: null }))
+      }
+      if ((name === 'babble' || name === 'blip') && mode === 'none') return
       return o.apply(this, arguments)
     }
   })
@@ -108,6 +118,10 @@ async page => {
   out.speakers = await page.evaluate(() => { const s = {}; for (const r of window.__lines) s[r.p] = (s[r.p] || 0) + 1; return s })
   out.after = await page.evaluate(() => { const g = window.__capy; let mix = null; try { mix = g.hud.mixAudit() } catch (e) {}
     return { voiceDrops: mix && mix.voiceDrops, threw: mix && mix.synthThrew, why: mix && mix.synthWhy, err: g.state.lastError || null } })
+  // the graph's own account of the voices (game.babbleAudit, F5): read here,
+  // after the drive and before the listen adds its own eight
+  out.audit = await page.evaluate(() => { const g = window.__capy; if (typeof g.babbleAudit !== 'function') return null
+    const a = g.babbleAudit(); return Object.assign({}, a, { voices: a.voices.length, sample: a.voices.slice(0, 6) }) })
 
   // ---- LISTEN: each real speaker's mouth, on its own (stand still, world bus only)
   // For >= 6 of the people who spoke during the drive, say one statement and one

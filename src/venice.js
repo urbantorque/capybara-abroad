@@ -5349,7 +5349,7 @@ function venUpdateTide(game, dt) {
     venCrestSaid = true;
     venSfx('campanile', { volume: 0.8, at: { x: venCAMPANILE.x, y: venCAMPANILE.h, z: venCAMPANILE.z }, force: true });
     venPigeonScare(p.x, p.z, 80, 1);
-    if (capy && typeof capy.launch === 'function') { const v = capy.velocity || { x: 0, z: 0 }; capy.launch(v.x * 0.5, 4.2, v.z * 0.5); }
+    if (capy && typeof capy.launch === 'function') { const v = capy.velocity || { x: 0, z: 0 }; capy.launch(v.x * 0.5, 4.2, v.z * 0.5, 'the tide'); }   // named for the pill (L6, E1)
     if (typeof game.slowmo === 'function') game.slowmo(0.6, 0.8);
     if (typeof game.sparks === 'function') game.sparks(p.x, venWaterHeightAt(p.x, p.z) + 0.3, p.z, 24, { spd: 3, up: 2.5, grav: 9, drag: 0.6, life: 1.0, size: 0.24, rgb: [1.2, 1.45, 1.7] });
     venToast('the top of it — ' + Math.round((venTideHigh) * 100) + ' cm over the paving.');
@@ -5390,7 +5390,7 @@ function venUpdateTide(game, dt) {
       const capy = game.capy;
       if (capy && typeof capy.launch === 'function') {
         const v = capy.velocity || { x: 0, z: 0 };
-        capy.launch(v.x * 0.5, 4.6, v.z * 0.5);
+        capy.launch(v.x * 0.5, 4.6, v.z * 0.5, 'the tide');   // named for the pill (L6, E1)
       }
       if (typeof game.slowmo === 'function') game.slowmo(0.55, 1.0);
       if (typeof game.confetti === 'function') game.confetti(p.x, p.y + 1.0, p.z, 14);
@@ -6406,7 +6406,9 @@ function venBuildCrowd(game, root) {
     venCrowd[k].instanceColor.needsUpdate = true;
   }
   venCrowdBodies = game && typeof game.addCrowdBodies === 'function'
-    ? game.addCrowdBodies({ n: venCROWD_N, at: venCrowdFoot, moving: true })
+    ? game.addCrowdBodies({ n: venCROWD_N, at: venCrowdFoot, moving: true,
+                            // the parts, instance i = person i, so the lens can fade one (L6, E1)
+                            meshes: [venCrowd.a, venCrowd.b, venCrowd.body, venCrowd.head, venCrowd.cam, venCrowd.brolly, venCrowd.al, venCrowd.ar] })
     : null;
 }
 

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matEmit, emitSet, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, makeMerger, makeMover, warnOnce } from './shared.js';
+import { PALETTE, mat, matEmit, emitSet, EMIT_OVER, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, makeMerger, makeMover, warnOnce } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 11 — HONG KONG. UP IS A DIRECTION HERE.
@@ -390,6 +390,7 @@ function hkUpdatePax() {
 
 function hkBuildTaxi(game, root) {
   hkTaxi = new THREE.Group();
+  hkTaxi.name = 'hkTaxi';   // the probes find it by name (E6)
   const M = hkMerger();
   M.box(0, 0.60, 0, 1.80, 0.60, 4.20, PALETTE.hkTaxi);
   M.box(0, 1.04, -0.20, 1.64, 0.50, 2.20, PALETTE.hkTaxi);
@@ -440,6 +441,129 @@ function hkUpdateTaxi(dt) {
   if (red && z > stopZ - 3.5 && z < stopZ + 1.2) hkTaxiHold = 1;
   else if (!red) hkTaxiHold = 0;
   hkTaxiMover.step(hkTaxiHold ? 0 : dt);
+  // ...and its streaks on the road go with it (hkBuildCarLamps): the wet-road
+  // rows are read by position every frame, so moving the row IS moving the
+  // streak. A frame behind the mover, which at nine metres a second is 15 cm.
+  if (hkTaxiWet.length) {
+    const p = hkTaxi.position;
+    for (let i = 0; i < hkTaxiWet.length; i++) {
+      const r = hkTaxiWet[i];
+      r.x = p.x + r.ox; r.z = p.z + r.oz;
+    }
+  }
+}
+
+// ---- THE CARS HAVE LAMPS (L6, E6 / art #7) ---------------------------------
+// qa/l6r-art-kowloon-rest.png: a red taxi and three more parked in the road
+// at night, and not one of them had a headlamp, a tail lamp or anything on the
+// wet tarmac under it — the one street in the game whose palette calls its
+// road `hkWet` had ninety signs on the road and nothing from the things the
+// animal walks past. Every lamp here is an EMITTER in the sense EMIT_OVER
+// gives the word: a Basic material with its vertex colours scaled past 1.0,
+// so the bright pass finds it at any threshold and it blooms as a source.
+// Three things per car, from the same rows the street builds the taxis from:
+//   1. two headlamps and two tail lamps, boxes on the body's faces, and the
+//      roof sign lit (a Hong Kong taxi's is, whenever the driver is in it);
+//   2. a POOL on the road ahead and behind — hkPoolDiscs, the same ramped disc
+//      the lamps and the signs use — the headlamps' pool pushed past white so
+//      the tarmac in front of a car is the brightest thing near it, which is
+//      what a headlamp on a wet road at night is;
+//   3. STREAKS, one per lamp, in the wet-road pool (hkWET) so they run toward
+//      the eye like every other reflection in the chapter. The moving taxi's
+//      four are re-positioned in hkUpdateTaxi.
+// One mesh for all the static lamps, one for the static pools, two more as
+// children of the moving taxi: four draw calls, none of them lit.
+const hkPARKED_TAXI = [[-5.2, 30, 0], [5.0, 12, Math.PI], [-5.2, -18, 0]];   // x, z, yaw — see hkBuildStreet
+const hkLAMP_HEAD_K = 1.25;   // the headlamps, times EMIT_OVER
+const hkLAMP_TAIL_K = 1.00;   // the tail lamps
+const hkLAMP_SIGN_K = 1.00;   // the roof sign — lit as bright as the lamps: from behind it is the car's one white light bar the plate
+const hkLAMP_POOL_K = 1.55;   // the headlamps' pool, past white at its centre
+const hkTaxiWet = [];         // the moving taxi's rows in hkWET: { ox, oz } offsets from the group
+/** Scale a merged geometry's vertex colours past white: the lamp side of the threshold. */
+function hkOverWhite(g, k) {
+  const a = g.attributes.color.array;
+  for (let i = 0; i < a.length; i++) a[i] *= k;
+  return g;
+}
+/** The four lamps and the roof sign of one taxi, at (x, z) facing `f` (+1 is +z). */
+function hkCarLampBoxes(M, x, z, f, kHead, kTail) {
+  // kHead/kTail are baked into the COLOUR here, per box, so one mesh carries
+  // both intensities; the whole geometry is then scaled by EMIT_OVER once.
+  const scale = (hex, k) => {
+    const r = Math.min(255, Math.round(((hex >> 16) & 255) * k)), g = Math.min(255, Math.round(((hex >> 8) & 255) * k)), b = Math.min(255, Math.round((hex & 255) * k));
+    return (r << 16) | (g << 8) | b;
+  };
+  for (let s = -1; s <= 1; s += 2) {
+    M.box(x + s * 0.62, 0.72, z + f * 2.22, 0.30, 0.18, 0.08, PALETTE.hkNeonWhite);
+    M.box(x + s * 0.66, 0.80, z - f * 2.22, 0.24, 0.14, 0.08, scale(PALETTE.hkNeonRed, kTail / kHead));
+  }
+  M.box(x, 1.84, z - f * 0.20, 0.52, 0.18, 0.92, scale(PALETTE.hkNeonGold, hkLAMP_SIGN_K / kHead));
+  // ...and the number-plate lamp, which is the one WHITE light on the back
+  // of a car and the reason a car seen from behind at night is not only red
+  M.box(x, 0.66, z - f * 2.22, 0.30, 0.07, 0.06, PALETTE.hkNeonWhite);
+}
+/** The pool rows for one taxi: ahead, warm and past white; behind, red and small. */
+function hkCarPoolRows(rows, x, z, f) {
+  rows.push([x, 0, z + f * 3.9, 2.6, PALETTE.hkNeonWhite]);
+  rows.push([x, 0, z - f * 3.1, 1.4, PALETTE.hkNeonRed]);
+}
+/** The pool mesh for a set of rows: the head pools' colours pushed past white. */
+function hkCarPoolMesh(rows) {
+  const g = hkPoolDiscs(rows);
+  const a = g.attributes.color.array, per = (1 + 2 * 16) * 3;
+  for (let k = 0; k < rows.length; k++) {
+    const kk = rows[k][4] === PALETTE.hkNeonWhite ? hkLAMP_POOL_K : 0.9;
+    for (let i = k * per; i < (k + 1) * per; i++) a[i] *= kk;
+  }
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0.55,
+    depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+  m.position.y = 0.055;
+  m.renderOrder = 2;
+  m.frustumCulled = false;
+  return m;
+}
+/** The wet-road rows for one taxi's four lamps, at (x, z) facing `f`. */
+function hkCarWetRows(into, x, z, f, ox, oz) {
+  for (let s = -1; s <= 1; s += 2) {
+    into.push({ x: x + s * 0.62, z: z + f * 2.3, w: 0.55, len: 4.2, ox: ox + s * 0.62, oz: oz + f * 2.3,
+                col: new THREE.Color(PALETTE.hkNeonWhite).multiplyScalar(1.6) });
+    into.push({ x: x + s * 0.66, z: z - f * 2.3, w: 0.40, len: 2.4, ox: ox + s * 0.66, oz: oz - f * 2.3,
+                col: new THREE.Color(PALETTE.hkNeonRed) });
+  }
+}
+function hkBuildCarLamps(root) {
+  // ---- the parked three: static lamps, static pools, static streaks --------
+  const M = hkMerger();
+  const rows = [];
+  for (let i = 0; i < hkPARKED_TAXI.length; i++) {
+    const tx = hkPARKED_TAXI[i][0], tz = hkPARKED_TAXI[i][1], f = Math.cos(hkPARKED_TAXI[i][2]) < 0 ? -1 : 1;
+    hkCarLampBoxes(M, tx, tz, f, hkLAMP_HEAD_K, hkLAMP_TAIL_K);
+    hkCarPoolRows(rows, tx, tz, f);
+    hkCarWetRows(hkWET, tx, tz, f, 0, 0);
+  }
+  const lamps = new THREE.Mesh(hkOverWhite(M.build(), hkLAMP_HEAD_K * EMIT_OVER),
+                               new THREE.MeshBasicMaterial({ vertexColors: true }));
+  lamps.frustumCulled = false;
+  root.add(lamps);
+  root.add(hkCarPoolMesh(rows));
+  // ---- the moving one: the same, as children of its group ------------------
+  if (hkTaxi) {
+    const T = hkMerger();
+    hkCarLampBoxes(T, 0, 0, 1, hkLAMP_HEAD_K, hkLAMP_TAIL_K);
+    const tl = new THREE.Mesh(hkOverWhite(T.build(), hkLAMP_HEAD_K * EMIT_OVER),
+                              new THREE.MeshBasicMaterial({ vertexColors: true }));
+    tl.frustumCulled = false;
+    hkTaxi.add(tl);
+    const tr = [];
+    hkCarPoolRows(tr, 0, 0, 1);
+    hkTaxi.add(hkCarPoolMesh(tr));
+    // its streaks: rows in the shared pool, offsets kept so hkUpdateTaxi can
+    // move them (the taxi never turns, so the offsets are in world axes)
+    const before = hkWET.length;
+    hkCarWetRows(hkWET, hkTaxi.position.x, hkTaxi.position.z, 1, 0, 0);
+    for (let i = before; i < hkWET.length; i++) hkTaxiWet.push(hkWET[i]);
+  }
 }
 
 // ---- A POOL OF LIGHT IS ONE DISC WITH A RAMP IN IT (L4, E1 / art #6) ------
@@ -1112,7 +1236,7 @@ function hkBuildStreet(game, root) {
   // this was ever visible: a solidity audit says 'is it solid' and a driven
   // walk says 'can I get past THIS way'; neither of them says 'is there a
   // continuous corridor at all'.
-  const taxis = [[-5.2, 30, 0], [5.0, 12, Math.PI], [-5.2, -18, 0]];
+  const taxis = hkPARKED_TAXI;   // ...and their lamps are built from the same rows: hkBuildCarLamps
   for (let i = 0; i < taxis.length; i++) {
     const tx = taxis[i][0], tz = taxis[i][1], ty = taxis[i][2];
     M.box(tx, 0.72, tz, 1.9, 0.9, 4.4, PALETTE.hkTaxi, 0, ty);
@@ -5547,6 +5671,7 @@ function hkBuild(game) {
   hkBuildHeli(game, hkRoot);   // X2: the marquee is a helicopter
   hkBuildPoles(game, hkRoot);
   hkBuildNeon(game, hkRoot);
+  hkBuildCarLamps(hkRoot);     // E6: the taxis' lamps and their streaks — BEFORE the wet road takes the rows
   hkBuildWetRoad(hkRoot);
   hkBuildBakery(game, hkRoot);
   hkBuildQueue(game, hkRoot);

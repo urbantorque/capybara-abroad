@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, makeSolidIndex, swayMesh, makeMerger, makeMover } from './shared.js';
+import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, grainOwn, makeSolidIndex, swayMesh, makeMerger, makeMover } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 7 — ICELAND
@@ -219,6 +219,9 @@ let iceBergGroup = null, iceBergBody = null;
 const iceChimneys = [];              // x, y, z of every chimney with a fire in it
 let iceVents = null;                 // x, y, z, r of every fumarole and mud pool
 const iceLampPools = [];             // x, y, z of every sodium lamp's ground disc
+const iceWinPools = [];              // ...and of every street-facing lit window's (E6)
+const iceWIN_POOL_R = 1.7;           // metres: a 3.4 m disc, so three windows on one house make one bar
+const iceWIN_POOL_K = 0.22;          // the window's colour at 0.22 — the review said 0.18; measured, that was +18 luma at the arrival lens and +6 walking (qa/l6-e6-lamps.mjs), so a fifth more
 
 // --- task / world state ---
 let iceGeyPhase = 0, iceGeyT = 0, iceGeyFired = 0;
@@ -359,6 +362,7 @@ let iceCar = null, iceCarMover = null;
 
 function iceBuildCar(game, root) {
   iceCar = new THREE.Group();
+  iceCar.name = 'iceCar';   // the probes find it by name (E6)
   const M = iceMerger();
   M.box(0, 0.62, 0, 1.76, 0.56, 4.10, PALETTE.iceHullBlue);
   M.box(0, 1.06, -0.20, 1.62, 0.52, 2.10, PALETTE.iceHullBlue);
@@ -374,17 +378,34 @@ function iceBuildCar(game, root) {
   // Emissive rather than a light: this game has no point lights in a chapter
   // and is not about to grow two for a car. The same law the windows, the
   // beacon and the hot spring already use.
-  const lamp = mat(0xffffff, { emissive: PALETTE.iceWindow, emissiveIntensity: 0.9 });
+  // ...AND OVER WHITE (L6, E6 / art #7): matEmit rather than a hand-written
+  // 0.9, so the lamps sit on the lamp side of the bright pass's threshold —
+  // see EMIT_OVER. At 0.9 they were the one pair of lights in the town that
+  // never bloomed.
+  const lamp = matEmit(PALETTE.iceWindow, 1.1);
   for (let sgn = -1; sgn <= 1; sgn += 2) {
     const h = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.18, 0.10), lamp);
     h.position.set(sgn * 0.62, 0.72, 2.06);
     iceCar.add(h);
   }
-  const tail = mat(0xffffff, { emissive: PALETTE.iceRoofRed, emissiveIntensity: 0.7 });
+  const tail = matEmit(PALETTE.iceRoofRed, 0.8);
   for (let sgn = -1; sgn <= 1; sgn += 2) {
     const h = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.08), tail);
     h.position.set(sgn * 0.66, 0.80, -2.06);
     iceCar.add(h);
+  }
+  // ---- AND THE ROAD UNDER THEM (E6) -------------------------------------
+  // The headlamps' pool ahead of the car and the tail lamps' behind it, the
+  // same ramped additive disc the sodium lamps put on the road, as a child
+  // of the group so it drives with the car. The head pool peaks past white:
+  // the tarmac in front of a car at night is the brightest thing near it.
+  {
+    const pos = [], col = [];
+    iceGlowDisc(pos, col, 0, 0.10, 3.9, 2.8, 1.35, PALETTE.iceWindow);
+    iceGlowDisc(pos, col, 0, 0.10, -3.0, 1.4, 0.45, PALETTE.iceRoofRed);
+    const pool = iceGlowMesh(pos, col);
+    pool.userData.noShadow = true;
+    iceCar.add(pool);
   }
   root.add(iceCar);
 
@@ -1316,6 +1337,16 @@ function iceBuildCity(game, root) {
       // so the lit face is +z for the far row and -z for the near one
       const face = z < iceLANES[0] ? 1 : -1;
       W.box(wx, wy, z + face * (d * 0.5 + 0.07), 1.25, 1.45, 0.12, PALETTE.iceWindow);
+      // ...AND IT LIGHTS THE GROUND UNDER IT (L6, E6 / art #7). Forty lit
+      // windows and the pavement under every one of them was the same value
+      // as the road (qa/l6r-art-iceland-walk.png): a window that touches
+      // nothing is a sticker on a wall. One ramped disc per street-facing
+      // window, on the ground a metre and a half out from the wall — where
+      // light from a window at head height actually lands — in the window's
+      // own colour, merged into the same additive mesh as the sodium pools.
+      // The peak is low and the disc wide: three windows on one house make
+      // one bar of light along its frontage, which is the picture.
+      iceWinPools.push(wx, gy + 0.06, z + face * (d * 0.5 + 1.5));
       // the back of the house faces the next row; about half of those are dark,
       // and a dark window is an ordinary painted quad, not a light source
       if (Math.random() < 0.45) W.box(wx, wy, z - face * (d * 0.5 + 0.07), 1.25, 1.45, 0.12, PALETTE.iceWindow);
@@ -1481,11 +1512,16 @@ function iceBuildCity(game, root) {
   // ---- the pools the lamps put on the road --------------------------------
   // Additively blended, so where two overlap the road genuinely gets brighter,
   // and never fogged: they are the thing the fog is meant to be revealing.
-  if (iceLampPools.length) {
+  if (iceLampPools.length || iceWinPools.length) {
     const pos = [], col = [];
     for (let i = 0; i < iceLampPools.length; i += 3) {
       iceGlowDisc(pos, col, iceLampPools[i], iceLampPools[i + 1], iceLampPools[i + 2],
                   7.4, 0.82, 0xa8905a);
+    }
+    // ...and the windows' (E6): see the note where iceWinPools is filled
+    for (let i = 0; i < iceWinPools.length; i += 3) {
+      iceGlowDisc(pos, col, iceWinPools[i], iceWinPools[i + 1], iceWinPools[i + 2],
+                  iceWIN_POOL_R, iceWIN_POOL_K, PALETTE.iceWindow);
     }
     root.add(iceGlowMesh(pos, col));
   }
@@ -3987,7 +4023,7 @@ function iceUpdateGeyser(game, dt) {
           // grounded for capyLAUNCH_HOLD, so the throw arrives intact.
           if (typeof capy.launch === 'function') {
             capy.launch(capy.body.velocity.x + dx * 0.6, iceGEY_V,
-                        capy.body.velocity.z + dz * 0.6);
+                        capy.body.velocity.z + dz * 0.6, 'the geyser');   // named for the pill (L6, E1)
           } else {
             capy.body.velocity.y = iceGEY_V;
             capy.body.velocity.x += dx * 0.6;
@@ -5144,7 +5180,7 @@ function iceUpdateWhale(game, dt) {
       const d = Math.hypot(dx, dz);
       if (d < 26 && d > 0.4) {
         const k = (1 - d / 26) * 5.5;
-        capy.shove(dx / d * k, dz / d * k);
+        capy.shove(dx / d * k, dz / d * k, 'the whale');   // named for the pill (L6, E1)
       }
     }
     if (!iceWhaleSeen && cp) {

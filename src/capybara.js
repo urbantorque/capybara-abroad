@@ -4380,8 +4380,12 @@ export function createCapybara(game) {
      * All four parts are load-bearing on a MOVING platform. Setting the velocity
      * alone does nothing there at all — see the note by capyLAUNCH_HOLD.
      */
-    launch: function (vx, vy, vz) {
+    launch: function (vx, vy, vz, src) {
       if (!(vx === vx && vy === vy && vz === vz)) return;
+      // ...and WHAT threw it, for the pill (L6, E1 / play #5): an optional
+      // label the caller passes ('the geyser'). systems.js's impulse watch
+      // reads it while it is fresh and falls back to the chapter's table.
+      if (src) { capy.impulseSrc = src; capy.impulseT = game.state.time; }
       body.velocity.set(vx, vy, vz);
       body.wakeUp();
       capyPlatVX = 0; capyPlatVZ = 0; capyPlatT = 0;
@@ -4421,8 +4425,9 @@ export function createCapybara(game) {
      * calling it every frame builds to a steady state against the decay rather
      * than jumping.
      */
-    shove: function (dvx, dvz) {
+    shove: function (dvx, dvz, src) {
       if (!(dvx === dvx && dvz === dvz)) return;
+      if (src) { capy.impulseSrc = src; capy.impulseT = game.state.time; }   // see launch()
       capyShove.x = clamp(capyShove.x + dvx, -capySHOVE_MAX, capySHOVE_MAX);
       capyShove.z = clamp(capyShove.z + dvz, -capySHOVE_MAX, capySHOVE_MAX);
     },

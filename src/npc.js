@@ -2724,6 +2724,12 @@ export function createNPCs(game) {
   // is not on the save file, so it says what happened on this journey rather
   // than what has ever happened, which is what the last scene is about.
   const npcTravMet = Object.create(null);
+  // "Stood in front of" is a distance, and it is not the greeting's eight
+  // metres (L6, F4): counted at `near` the Quay's spawn met them in 0.8 s
+  // from 8.8 m and Marrakech's met them before a key was pressed. Three
+  // metres is the regulars' sitting distance — close enough that you meant
+  // it, far enough that you do not have to stand on their feet.
+  const npcTRAV_MET_R = 3.2;
   // With a biome it is that one chapter's flag (0/1), for the notebook's
   // page and the pointer that hides once they have been stood in front of
   // (L6, F4); with none it is the count the closing lines have always read.
@@ -7184,21 +7190,30 @@ export function createNPCs(game) {
           npcFace(r.fig.face, r.mood, npcBlink(r, dt), r.gest > 0 ? r.t : 0);
         }
       }
+      // ---- ...AND THE ONE PERSON WHO IS IN FOUR CHAPTERS IS COUNTED (M11)
+      // `o.trav` has been set since the traveller was written and NOTHING has
+      // ever read it except the pair-chat exclusion. Four cameos with nothing
+      // joining them is four cameos; this is the only place in the game that
+      // can know a player actually stood in front of them, because nothing
+      // else in the arc is gated on anything at all.
+      //
+      // ON BEING NEAR, NOT ON THE LINE (L6, F4). It sat inside the greeting
+      // below, so it needed the greeting's own transition: `!r.was` and
+      // `r.cd <= 0` on the same frame. `cd` starts at rand(0, 3) and every
+      // other line they say puts it back to ~13 s — so an animal that walked
+      // up during a cooldown was inside eight metres with `was` already
+      // true and never counted. MEASURED: four arrow-led drives, minD 0.0,
+      // 0.1, 1.1 and 1.0 m, travMet 0 in 4/4. The count is the fact of
+      // having stood there; the line is a line. See npcTRAV_MET_R.
+      if (r.trav && r.biome && !npcTravMet[r.biome] && d2 < npcTRAV_MET_R * npcTRAV_MET_R) {
+        npcTravMet[r.biome] = 1;
+        // ...and the notebook is told (L6, F4): its pointer at this
+        // person comes off the paper the moment they have been met.
+        try { game.events.emit('npc:travMet', { biome: r.biome, n: npcTravCount() }); } catch (e) { /* a listener */ }
+      }
       // ---- and they say something the first time you arrive -------------
       if (near && !r.was && r.cd <= 0 && r.lines) {
         r.cd = r.cool * rand(0.8, 1.4);
-        // ---- ...AND THE ONE PERSON WHO IS IN FOUR CHAPTERS IS COUNTED (M11)
-        // `o.trav` has been set since the traveller was written and NOTHING has
-        // ever read it except the pair-chat exclusion. Four cameos with nothing
-        // joining them is four cameos; this is the only place in the game that
-        // can know a player actually stood in front of them, because nothing
-        // else in the arc is gated on anything at all.
-        if (r.trav && r.biome && !npcTravMet[r.biome]) {
-          npcTravMet[r.biome] = 1;
-          // ...and the notebook is told (L6, F4): its pointer at this
-          // person comes off the paper the moment they have been met.
-          try { game.events.emit('npc:travMet', { biome: r.biome, n: npcTravCount() }); } catch (e) { /* a listener */ }
-        }
         localLine(r, r.lines);
       }
       r.was = near;
@@ -13403,6 +13418,47 @@ export function createNPCs(game) {
     return out;
   }
 
+  // ---- THE CROWD IN THE LENS (L6, E1 / art #2) -----------------------------
+  // One person, faded out of the lens through the per-instance `aLensFade`
+  // attribute the rim shader reads (shared.js, vLensFade). The attribute is
+  // made on first use — a chapter nobody ever stands in front of the camera
+  // in never pays for the buffer — and only the changed row is uploaded.
+  // Sydney's cast and Pasto's are the two instanced rigs npc.js owns; a
+  // local is a group of its own meshes and systems.js fades those per mesh.
+  const npcLENS_SYD = [iTorso, iHips, iHead, iHair, iArmL, iArmR, iFarmL, iFarmR, iLegL, iLegR,
+                       iShinL, iShinR, iShoeL, iShoeR, iHat, iEyes, iMouth, iCam, iTool, iCone];
+  let npcLensPas = null;
+  function npcLensSet(m, i, k) {
+    if (!m || !m.geometry || i < 0 || i >= m.instanceMatrix.count) return;
+    let a = m.geometry.getAttribute('aLensFade');
+    if (!a) {
+      a = new THREE_.InstancedBufferAttribute(new Float32Array(m.instanceMatrix.count), 1);
+      a.setUsage(THREE_.DynamicDrawUsage);
+      m.geometry.setAttribute('aLensFade', a);
+    }
+    if (a.array[i] === k) return;
+    a.array[i] = k;
+    a.needsUpdate = true;
+  }
+  /** Fade this cast member's instances to k (0 = drawn, 1 = gone). True if it is one of ours. */
+  function npcLensFade(rec, k) {
+    let i = humans.indexOf(rec);
+    if (i >= 0) {
+      for (let j = 0; j < npcLENS_SYD.length; j++) npcLensSet(npcLENS_SYD[j], i, k);
+      npcLensSet(iBrow, i * 2, k); npcLensSet(iBrow, i * 2 + 1, k);
+      return true;
+    }
+    i = paHumans.indexOf(rec);
+    if (i >= 0 && pTorso) {
+      if (!npcLensPas) npcLensPas = [pTorso, pHips, pHead, pHair, pArmL, pArmR, pFarmL, pFarmR, pLegL, pLegR,
+                                     pShinL, pShinR, pShoeL, pShoeR, pHat, pEyes, pTool, pBroom];
+      for (let j = 0; j < npcLensPas.length; j++) npcLensSet(npcLensPas[j], i, k);
+      npcLensSet(pBrow, i * 2, k); npcLensSet(pBrow, i * 2 + 1, k);
+      return true;
+    }
+    return false;
+  }
+
   function pushInstances() {
     for (let i = 0; i < humans.length; i++) {
       const n = humans[i].nodes;
@@ -15113,6 +15169,7 @@ export function createNPCs(game) {
 
   return { update, humans, ibises, pastoCast: paCast, pastoHumans: paHumans, pastoBeasts: paBeasts,
            peopleNear: peopleNear,
+           lensFade: npcLensFade,          // the crowd in the lens (L6, E1)
            // ---- THE CONCERT (W1) ----
            concert: npcConcert, concertHouse: npcConcertHouse,
            concertCheer: npcConcertCheer, concertEnd: npcConcertEnd,

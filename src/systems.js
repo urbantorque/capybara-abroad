@@ -8,7 +8,7 @@ import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount,
          rimTick, cloudTick, skyTick, fresnelTick, paleTick, shadeTick, bounceSlots, bounceTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo, keyDomeTick, keyDomeInfo, skyDomeLit,
-         exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt } from './shared.js';
+         exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt, lensFadeUniform } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -44,6 +44,38 @@ const sysLightOff  = new THREE.Vector3();
 const sysWorldUp   = new THREE.Vector3(0, 1, 0);
 const sysAimA      = new THREE.Vector3();   // hint arrow: capybara, in NDC
 const sysAimB      = new THREE.Vector3();   // hint arrow: target, in NDC
+// ---- THE SHOVE, NAMED (L6, E1 / play #5) ----------------------------------
+// The fresh player was put 25 m into the harbour in 2.8 s and the only
+// feedback was a bystander's line. Every external impulse over sysIMP_V now
+// names its cause on a pill. The cause comes from the thrower where it says
+// (capy.launch/shove take an optional label — the geyser, the cable, the
+// tide, the whale, the traffic, the acrobats), and from this table where it
+// does not: by chapter, split on whether the animal was in the water, and a
+// medium ("the swell") where nothing better is known. Never a guess at a
+// character: a pill that names Murray for something Murray did not do is
+// worse than one that says "something".
+//
+// The detector is a leaky sum of the speed GAINED per frame (tau sysIMP_TAU):
+// a launch is a one-frame jump of 4–7 m/s and trips it; a shove building at
+// a tenth of a metre a frame never does; a landing is a loss and does not
+// count. The player's own hop is the one gain over the line that is theirs —
+// gated by the jump key for sysIMP_JUMP_T after the press.
+const sysIMP_V      = 5.0;     // m/s of gained speed inside the window
+const sysIMP_TAU    = 0.15;    // s — the window
+const sysIMP_JUMP_T = 0.45;    // s after a jump press the gain is the hop's
+const sysIMP_COOL   = 4.0;     // s between pills
+const sysIMP_FRESH  = 0.6;     // s a thrower's label stays the answer
+const sysIMPULSE_BY = {
+  sydney: { wet: "the ferry's wake" }, quay: { wet: "the ferry's wake" },
+  iceland: { dry: 'the geyser', wet: 'the whale' },
+  kyoto: { dry: 'the river', wet: 'the river' },
+  cali: { dry: 'the chiva' },
+  hanoi: { dry: 'the traffic' },
+  venice: { wet: 'the tide' },
+  palawan: { wet: 'the manta' },
+  manly: { wet: 'the wave' }, antarctic: { wet: 'the swell' },
+};
+let sysImpPrev = 0, sysImpWin = 0, sysImpCool = 0, sysImpJumpT = 0;
 
 // ---------------------------------------------------------------------------
 // THE CONTACT POOL — see the CONTACT block in shared.js for what it feeds and
@@ -553,6 +585,95 @@ const sysCAM_CLEAR_PAD = 0.70;  // m of daylight kept between the lens and the w
 // clusters and the plinth; nothing else in nineteen chapters is tagged, so no
 // other chapter's cut moves by a millimetre.
 const sysCAM_CLEAR_HARD = 0.75; // m — the floor against a camSolid wall
+// ---- THE CROWD IN THE LENS (L6, E1 / art #2) ------------------------------
+// sysCamClear rays against masonry and, since P1, deliberately NOT against
+// people — a person is not a wall and a boom that flinches at every passer-by
+// pumps. So a person could stand in the lens and nothing knew: measured in
+// Venice, two of three settled frames had no capybara in them, and the
+// Sahara walking frame was the back of a man in a hat.
+//
+// A second ray, the same segment, the other filter: lens to animal, and only
+// the bodies a person is (npc.js's `npc` and `local`, props.js's crowd
+// registry). Anyone it finds inside sysLENS_R of the lens is opened up
+// through a screen-door dither (shared.js, vLensFade) over a quarter second —
+// an instanced walker through a row of `aLensFade`, a hand-built local
+// through a per-draw uniform lifted in onBeforeRender, the reach's trick —
+// and held for sysLENS_HOLD after the ray last found them, so a ray that
+// flickers off a shoulder does not flicker the person. Where the person has
+// no drawable this file can reach (a standing crowd is one body of many
+// shapes; Hanoi's folk are ten variant meshes), the boom is biased instead:
+// up sysLENS_UP and round by sysLENS_OUT for as long as they are there, and
+// eased off after.
+const sysLENS_R    = 3.5;   // m from the lens a person is in the way
+const sysLENS_RATE = 4.0;   // 1/s — a quarter second in, a quarter out
+const sysLENS_HOLD = 0.3;   // s the fade outlives the last hit
+const sysLENS_N    = 6;     // people handled at once; the seventh is drawn
+const sysLENS_UP   = 0.6;   // m — the bias, where a person cannot fade
+const sysLENS_OUT  = 12 * Math.PI / 180;
+const sysLensU     = lensFadeUniform();
+const sysLensFrom  = new CANNON.Vec3(), sysLensTo = new CANNON.Vec3();
+const sysLensSlots = [];
+for (let i = 0; i < sysLENS_N; i++) sysLensSlots.push({ body: null, k: 0, t: 0, hit: false, fadable: true });
+let sysLensK = 0, sysLensBias = 0, sysLensBlocked = 0, sysLensUnfaded = 0;
+function sysLensRayHit(res) {
+  if (!res.hasHit) return;
+  const b = res.body, ud = b && b.userData;
+  if (!ud || !(ud.npc || ud.local || ud.crowd)) return;
+  if (res.distance > sysLENS_R) return;
+  let s = null, free = null;
+  for (let i = 0; i < sysLENS_N; i++) {
+    const q = sysLensSlots[i];
+    if (q.body === b) { s = q; break; }
+    if (!free && !q.body) free = q;
+  }
+  if (!s) { s = free; if (!s) return; s.body = b; s.k = 0; s.fadable = true; }
+  s.hit = true; s.t = sysLENS_HOLD;
+}
+// the per-mesh route: `this` is the mesh, three calls the hook as a method
+function sysLensBefore() { sysLensU.value = this.userData.lensFade || 0; }
+function sysLensAfter() { sysLensU.value = 0; }
+function sysLensMesh(o) {
+  if (!o.isMesh) return;
+  if (sysLensK > 0) {
+    o.userData.lensFade = sysLensK;
+    if (o.onBeforeRender !== sysLensBefore) { o.onBeforeRender = sysLensBefore; o.onAfterRender = sysLensAfter; }
+  } else if (o.onBeforeRender === sysLensBefore) {
+    o.userData.lensFade = 0;
+    delete o.onBeforeRender; delete o.onAfterRender;   // back to the prototype's no-ops
+  }
+}
+function sysLensInst(m, i, k) {
+  if (!m || !m.geometry || !m.instanceMatrix || i < 0 || i >= m.instanceMatrix.count) return;
+  let a = m.geometry.getAttribute('aLensFade');
+  if (!a) {
+    a = new THREE.InstancedBufferAttribute(new Float32Array(m.instanceMatrix.count), 1);
+    a.setUsage(THREE.DynamicDrawUsage);
+    m.geometry.setAttribute('aLensFade', a);
+  }
+  if (a.array[i] === k) return;
+  a.array[i] = k; a.needsUpdate = true;
+}
+/** Write k to whatever draws this body's person. False if nothing here can. */
+function sysLensApply(game, b, k) {
+  const ud = b.userData;
+  if (ud.npc) {
+    if (typeof game.npcLensFade === 'function' && game.npcLensFade(ud.npc, k)) return true;
+    const g = ud.npc.group || (ud.npc.fig && ud.npc.fig.group);
+    if (g && g.traverse) { sysLensK = k; g.traverse(sysLensMesh); return true; }
+    return false;
+  }
+  if (ud.local) {
+    const g = ud.local.fig && ud.local.fig.group;
+    if (g && g.traverse) { sysLensK = k; g.traverse(sysLensMesh); return true; }
+    return false;
+  }
+  if (ud.crowd && ud.crowd.meshes && ud.idx >= 0) {
+    const ms = ud.crowd.meshes;
+    for (let i = 0; i < ms.length; i++) sysLensInst(ms[i], ud.idx, k);
+    return true;
+  }
+  return false;
+}
 const sysCAM_CLEAR_OUT = 3.2;   // how fast it lets the boom back out once clear
 // ...and how fast it pulls the RENDERED eye in to the radius the cut asked for
 // (X7). Faster than the boom spring's own 7, because the spring is smoothing a
@@ -792,6 +913,42 @@ const sysCAM_AUTO_V  = 1.8;   // m/s below which the capybara counts as stopped
 const sysCAM_IDLE_T  = 1.1;   // seconds stood still before the rig tidies itself
 const sysCAM_HAND_T  = 1.6;   // seconds the player keeps the rig after touching it
 const sysCAM_KEY_RATE = 2.4;  // rad/s on Q/R — was 1.9, which read as sticky
+// ---- ...AND IT COMES BACK WHILE YOU WALK (L6, E1 / play #1) ---------------
+// The note above is right that the loop is unstable for a stick at any screen
+// angle but dead ahead — and dead ahead is the one case it IS stable, and the
+// case a player is in most of the time. With the stick straight (|ix| under
+// 0.15, iz under -0.5) the animal is already turning to walk away from the
+// lens, so the target (its heading plus a half turn) and the rig converge on
+// each other at the sum of the two lambdas: e' = -(lambda_cam + lambda_capy) e.
+// Held 0.8 s first, so a tap or a turn never trips it, and at a lambda slow
+// enough (0.8) that it reads as the rig settling rather than steering. A held
+// strafe or a turn never triggers it: the timer zeroes the frame the stick
+// leaves the cone.
+//
+// MEASURED (13 Sep, Sydney): from a 90-degree hand orbit, W held, the yaw
+// error is 0.30 rad at 0.2 s and 0.00 at 0.5 s — the ANIMAL turns to the
+// camera, because the stick is camera-relative. So this branch is mostly
+// insurance for the cases where the heading is not the stick's (a rail, a
+// gate, a slope carrying it). What was actually wrong was C: it targeted the
+// heading itself, which is the rig in the animal's FACE, and then the idle
+// tidy-up spent a second and a half swinging it round the back. Measured err
+// -3.14 rad on the press. Fixed at both sites (C and the pad's R3).
+const sysCAM_WALK_T  = 0.8;   // s the stick must be held straight first
+const sysCAM_WALK_L  = 0.8;   // lambda of the walking recentre
+// ...and the frame that has lost the animal cuts back to it. Off the frustum
+// for half a second (a launch outruns the lambda-5 look target; a cut leaves
+// it behind a column) and the eye and the look point run at four times their
+// lambda for 0.3 s — 90 % of the gap gone in a tenth of a second, which is a
+// cut and not a swim, and short enough that the spring is back to itself
+// before the player has read it as a camera move.
+const sysCAM_LOST_T  = 0.5;
+const sysCAM_CUT_T   = 0.3;
+const sysCAM_CUT_K   = 4.0;
+// ...and the one line the fresh player never got: five seconds of walking
+// AWAY from the arrow's target, once, and the paper says which key is the
+// camera. The playtester found C by accident at minute thirty-three.
+const sysCAM_TIP_T   = 5.0;
+const sysCAM_TIP_V   = 1.0;   // m/s the distance to the target must be growing at
 
 // ---- THE TITLE POSE (T1) --------------------------------------------------
 // The rig before the game starts was the PLAY rig: 41 degrees down, 9.5 m back,
@@ -4266,8 +4423,19 @@ const sysMUS_LIFT_PAD  = 0.9;   // what a full lift adds to the pad (was 0.32)
 const sysMUS_LIFT_BAND = 2.4;   // ...and on a band, whose pad bus is 0.05 and whose drums duck for the lift
 const sysMUS_PAD_STACK = 2.0;   // ceiling on chase × lift together: measured ×3 put Sydney's marquee at −4.5 dBFS
 const sysMUS_INT_PAD   = 0.8;   // what full intensity takes off it outside a chase (was 0.3)
-const sysMUS_INT_BAND  = 0.5;   // ...and what it ADDS on a band palette, which has no chase layer
+const sysMUS_INT_BAND  = 0.8;   // ...and what it ADDS on a band palette, which has no chase layer (was 0.5)
+const sysMUS_INT_BAND_BASS = 0.35; // ...and what it takes OFF a band's bass: see the musBassGain writer
 const sysMUS_CALM_PAD  = 0.37;  // what a full calm takes off it: −4 dB. It used to ADD 30 %.
+// ...and the BASS, which was the loudest stem at rest in four of the five
+// chapters and the one that did not move (states probe, after the pad's cut):
+// Hanoi's still was bass −24.7 over a pad at −35.4, and its chase came out
+// +2.0 with the pad up 6 dB, because the pad is not what Hanoi's rest is made
+// of. The calm's thinning of the bass was 0.30 (−2.4 dB at a full hold); −6.
+// Both cuts YIELD TO THE LIFT: Kyoto's and Hanoi's marquee windows measured
+// calm 0.89–0.92 — the animal stands still to watch — and the lift's +5.6 dB
+// on the pad arrived under a −3.5 dB calm cut. A marquee is not the still
+// state, whatever the animal's feet are doing.
+const sysMUS_CALM_BASS = 0.5;   // what a full calm takes off the bass (was 0.30)
 // ---- THE SLEEP (L6, E3 / audio #8) -----------------------------------------
 // Nothing was ever silent, including the nap: `capy.nap` reached this file as
 // sysNapNow and drove the camera and not one music term. Silence is the
@@ -4294,6 +4462,11 @@ const sysMUS_SLEEP_UP   = 0.12;  // the upbeat's velocity
 const sysMUS_LAYER_PULSE = 0.5;  // chapter progress the pulse starts at
 const sysMUS_PULSE_GAP   = 2.4;  // s between strokes at the gate, closing to 1.6 by the end
 const sysMUS_PULSE_VEL   = 0.07; // ...and how hard. Soft: a heartbeat, not a chase.
+// ...and the gate the ostinato opens at. THE HOOK ONLY: F3 builds the tune
+// (sysMUS_THEME, the fixed intervals) and reads this where the pulse reads
+// sysMUS_LAYER_PULSE; until then musAudit().layers[3] says whether a chapter
+// has earned it and nothing plays on it.
+const sysMUS_LAYER_OSTINATO = 1.0;
 // ---- THE SCORE'S ROOM, PER CHAPTER (v41; see musRoomLoad) -----------------
 // secs = A + B * sysROOMS[x].size, so Manly's beach is 3.45 s and the cave is
 // 6.5. The old fixed value was 3.6, which is roughly where Sydney lands.
@@ -5016,7 +5189,11 @@ const sysMUS_PHRASE = [
   { gap: 1.8 },                                // 13 Cappadocia
   null,                                        // 14 Manly
   { gap: 1.6 },                                // 15 the Pantanal
-  { gap: 1.8, oct: 12 },                       // 16 Son Doong
+  { gap: 1.8, oct: 12, vel: 0.8 },             // 16 Son Doong. vel (L6, E3): glass an
+                                               //    octave up into the 6.5 s room peaked
+                                               //    −4.0 / −6.8 / −6.5 dBFS at the master
+                                               //    on three arrivals — the loudest
+                                               //    thing the score does anywhere.
   { gap: 1.6 },                                // 17 Antarctica
   { vel: 0.6 },                                // 18 the title card, quieter
   { inst: 'twang', gap: 0.8 },                 // 19 Monte Carlo
@@ -5262,14 +5439,23 @@ const sysMUS_PAL = [
   // the calm lean (×1.55 at rest) and a 5.5 s room it measured the loudest
   // CHAPTER standing still (−20.2 dBFS, peak −5.5; still −22.6 at 0.22) —
   // over the bands, which is backwards. A cave is quiet; it is only large.
+  // ...and 0.17 -> 0.14, 0.34 -> 0.28 (L6, E3): with the calm's cut yielding
+  // to the lift and the pulse at ×2 it was STILL the loudest chapter at rest
+  // (−22.9 against Sydney's −29.1, qa/l6r-audio-states.js) and the only one
+  // whose chase and marquee peaked over −6 dBFS (−4.6 / −3.8 at the master):
+  // the glass lead is the hottest voice in the table and this row put the
+  // loudest bass under it. The room stays 6.5 s; the size is not the level.
   { chords: sysMUS_CHORDS17, roots: sysMUS_ROOTS17, next: sysMUS_NEXT17,
-    dwellA: 14.0, dwellB: 22.0, pluckA: 5.0, pluckB: 11.0, cut: 560, bus: 0.17, bass: 0.34,
+    dwellA: 14.0, dwellB: 22.0, pluckA: 5.0, pluckB: 11.0, cut: 560, bus: 0.14, bass: 0.28,
     lead: 'glass', xfade: 7.0, rhythm: null,
     // Standing in the shaft. Eight glass notes, wide apart, two octaves up —
     // the only bright thing in the chapter, arriving in the only bright place
     // in it. cave.js holds the swell for the whole walk into the light, so
     // like Iceland's and Cappadocia's this is a melody rather than a chime.
-    lift: { inst: 'glass', shape: 'soar', n: 8, gap: 0.30, oct: 12, vel: 0.9,
+    // vel 0.9 -> 0.7 (L6, E3): with the calm's cut yielding under a held
+    // swell the figure peaked −4 / −3 dBFS at the master (states probe, the
+    // marquee and the window after it) — the room sums eight glass notes.
+    lift: { inst: 'glass', shape: 'soar', n: 8, gap: 0.30, oct: 12, vel: 0.7,
             up: 3.4, dn: 15.0 } },
   // 17 - Antarctica. The widest, slowest, emptiest pad here, and the only
   // one with no thirds in it. It moves about once every fifteen seconds,
@@ -10375,8 +10561,16 @@ export function createSystems(game) {
     const mask = cam.layers.mask;
     cam.layers.mask = 1 << sysFAR_LAYER;
     if (!sm.autoUpdate) sm.needsUpdate = true;
+    // The pass's own CPU cost, smoothed, for the harness (game.state.farMs):
+    // the walk of the scene and the draw submissions, which is the part the
+    // main thread pays. A frame-time A/B under a live rAF loop measured
+    // -5 to +2 ms and meant nothing (13 Sep).
+    const t0 = performance.now();
     try { sysShRaw.call(sm, sysShFar, scn, cam); }
-    finally { cam.layers.mask = mask; sunFar.shadow.needsUpdate = false; }
+    finally {
+      cam.layers.mask = mask; sunFar.shadow.needsUpdate = false;
+      game.state.farMs = (game.state.farMs || 0) * 0.9 + (performance.now() - t0) * 0.1;
+    }
   }
   renderer.shadowMap.render = sysShadowPass;
 
@@ -12784,13 +12978,37 @@ export function createSystems(game) {
   const sysBAB_LEN = 1.05;                     // s: the ceiling on a line
   // The envelope peak at vol 1. Measured on the panner tap (qa/l6-babble.js):
   // 0.22 here gave a 0.013–0.027 RMS peak against the blip's 0.055 — the two
-  // band-passes at Q 7–9 pass a fifth of the sawtooth — so it sits 3 dB up;
-  // still under the blip per syllable, because a sentence is longer.
-  const sysBAB_PEAK = 0.32;
+  // band-passes at Q 7–9 pass a fifth of the sawtooth — and 0.32 put a
+  // syllable level with the blip's pulse. THAT WAS THE WRONG PARITY. A pulse
+  // is 70 ms and a sentence is 700, so at the same peak the sentence carries
+  // ten times the energy and the ear (which integrates over a few hundred
+  // milliseconds) hears it 6–8 dB louder; and a square says a line every
+  // 0.7 s, so at 0.32 the babble was a CONTINUOUS bed at 0.39 of the world's
+  // whole energy and the 450–1000 Hz band went from 0.09 (blip) to 0.23 of
+  // it (qa/l6-babble-ab.js against qa/l6-babble.js, the same two-minute
+  // Sydney drive). The walla has to sit under the harbour, not on it: 0.14
+  // is a syllable 7 dB under the old pulse, which is roughly the same
+  // loudness per line — a sentence under the bubble, as the blip was
+  // punctuation under it. The line said TO you at two metres is still plain;
+  // the square behind you is a murmur.
+  const sysBAB_PEAK = 0.14;
   // [F1, F2] as ratios of the choir's "ah": ah, oh, oo, eh, ee. The largest F2
   // is ee at 2.1× (2290 Hz), which at the +12 % offset is 2565 — under 3 kHz.
   const sysBAB_VOW = [[1, 1], [0.78, 0.77], [0.45, 0.8], [0.73, 1.7], [0.4, 2.1]];
   const sfxBabLive = {};
+  // ---- WHAT THE MOUTHS HAVE DONE, for babbleAudit() ---------------------
+  // A sentence is invisible from outside the graph: the only proof that the
+  // waiter and the monk are two voices was a probe autocorrelating a
+  // recording. So every line writes one row per PERSON (keyed on the pitch,
+  // as the slot is) — the larynx, the mouth and the rate the hash gave them,
+  // and how many lines they have said — and every fallback to the blip says
+  // WHY (captions, a one-word line, further than sysMUS_SPEAK_M). A row is
+  // made once per new speaker, never per line; capped so a long session of
+  // walk-on voices cannot grow it without bound.
+  const sysBAB_VOICE_MAX = 96;
+  const sfxBabVoice = {};
+  let sfxBabVoiceN = 0, sfxBabN = 0, sfxBabCutN = 0;
+  const sfxBabWhy = { cc: 0, one: 0, far: 0 };
   // a deterministic 0–1 from a per-person number, so the same person keeps the
   // same mouth across a session without a field being added to their record
   function sfxBabHash(x, k) { const s = Math.sin(x * 12.9898 + k * 78.233) * 43758.5453; return s - Math.floor(s); }
@@ -12798,15 +13016,18 @@ export function createSystems(game) {
     const say = opts && opts.say;
     const words = clamp(Math.round(extra || 2), 1, 40);
     if (sysCaptions || words < 2 || ((opts && opts.at) && sysSfxDist > sysMUS_SPEAK_M)) {
+      if (sysCaptions) sfxBabWhy.cc++; else if (words < 2) sfxBabWhy.one++; else sfxBabWhy.far++;
       sfxBlip(vol, pitch, words >= 6 ? 3 : 2);
       return;
     }
     const t = ac.currentTime;
     sfxSpeakMark(t, pitch);
+    sfxBabN++;
     // one mouth per person: cut the sentence this person is still saying
     const key = pitch.toFixed(4);
     const live = sfxBabLive[key];
     if (live && live.end > t) {
+      sfxBabCutN++;
       const lg = live.g.gain;
       lg.cancelScheduledValues(t);
       lg.setValueAtTime(Math.max(0.0001, lg.value), t);
@@ -12817,7 +13038,11 @@ export function createSystems(game) {
     const h1 = sfxBabHash(pitch, 1), h2 = sfxBabHash(pitch, 2);
     const off = 1 - sysBAB_OFF + 2 * sysBAB_OFF * h1;
     const f0 = sysBAB_F0 * clamp(pitch, 0.5, 2.2) * (low ? 2 / 3 : 1);
-    let rate = (6 + 2 * h2) * (slow || low ? 0.75 : 1);
+    // The authority is LOW and the storyteller is SLOW, and they are two
+    // different things: the inspector at his own pace a fifth down is not the
+    // same man as the halqa's teller taking his time. Sahara's storyteller is
+    // flagged both, and gets both.
+    let rate = (6 + 2 * h2) * (slow ? 0.75 : 1);
     // 3–7 from the word count, then no more than the ceiling lets through at
     // this person's pace (the storyteller's seven would run 1.6 s)
     let syl = clamp(2 + Math.ceil(words / 2), 3, 7);
@@ -12894,7 +13119,43 @@ export function createSystems(game) {
     }
     o.start(t); o.stop(at + 0.05);
     if (live) { live.g = g; live.end = at; } else sfxBabLive[key] = { g: g, end: at };
+    // the row for the audit: made once per person, then counted
+    let row = sfxBabVoice[key];
+    if (!row && sfxBabVoiceN < sysBAB_VOICE_MAX) {
+      row = sfxBabVoice[key] = { p: +key, f0: Math.round(sysBAB_F0 * clamp(pitch, 0.5, 2.2)), off: +off.toFixed(3), rate: +(6 + 2 * h2).toFixed(2), n: 0, syl: 0, q: 0, low: 0, slow: 0 };
+      sfxBabVoiceN++;
+    }
+    if (row) { row.n++; row.syl = syl; if (q) row.q++; if (low) row.low++; if (slow) row.slow++; }
   }
+  /**
+   * WHO HAS SPOKEN, AND WITH HOW MANY MOUTHS. A test hook, never a verb.
+   *
+   * `voices` is one row per person who has babbled this session (their
+   * fundamental at vpitch, their formant offset, their rate, the lines they
+   * have said); `distinct` is how many VOICES that is, by the rule the
+   * listening probe uses on the recording — two people are one voice if their
+   * f0 is inside 4 %, their formant offset inside 6 % and their rate inside
+   * 0.5 Hz. The roadmap's "distinct voices per person ≥ 3" is this number
+   * read off the graph's own inputs rather than off a microphone; the probe
+   * (qa/l6-babble.js) reads both and they must agree.
+   */
+  game.babbleAudit = function () {
+    const voices = [];
+    for (const k in sfxBabVoice) voices.push(sfxBabVoice[k]);
+    const heads = [];
+    for (const r of voices) {
+      let dup = false;
+      for (const h of heads) {
+        if (Math.abs(h.f0 - r.f0) < 0.04 * Math.max(h.f0, r.f0) && Math.abs(h.off - r.off) < 0.06 * Math.max(h.off, r.off) && Math.abs(h.rate - r.rate) < 0.5) { dup = true; break; }
+      }
+      if (!dup) heads.push(r);
+    }
+    let live = 0;
+    if (ac) { const t = ac.currentTime; for (const k in sfxBabLive) if (sfxBabLive[k].end > t) live++; }
+    return { lines: sfxBabN, cuts: sfxBabCutN, blip: { cc: sfxBabWhy.cc, one: sfxBabWhy.one, far: sfxBabWhy.far },
+             speakers: voices.length, distinct: heads.length, live: live, capped: sfxBabVoiceN >= sysBAB_VOICE_MAX,
+             f0: sysBAB_F0, peak: sysBAB_PEAK, gate: sysMUS_SPEAK_M, voices: voices };
+  };
 
   function sfxPop(vol, pitch) {
     const t = ac.currentTime;
@@ -15674,17 +15935,21 @@ export function createSystems(game) {
     // 0.08 until L6 (E3): the wettest chapter above ground had the quietest
     // bed, and its still window measured 10 dB under the score. The same
     // authored level the two new beds get.
+    // ...and the recipe's own gains 0.55 / 0.18 -> 1.0 / 0.32: at 0.10 the
+    // still window still measured 9.3 dB under the score (qa/l6-mix-still.js)
+    // — the same lesson the marsh taught, a Q-1.2 band at 0.55 is not 0.55 of
+    // anything. Kyoto's leaves and the marsh both meet the window; this did not.
     lap: { level: 0.10, near: 12, far: 80, bed: true,
       build: function (m, out) {
-        m.low = sysMoverNoise(m, out, 'bandpass', 280, 1.2, 0.55);
-        m.mid = sysMoverNoise(m, out, 'bandpass', 900, 0.8, 0.18);
+        m.low = sysMoverNoise(m, out, 'bandpass', 280, 1.2, 1.0);
+        m.mid = sysMoverNoise(m, out, 'bandpass', 900, 0.8, 0.32);
         const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.17;
-        const lg = ac.createGain(); lg.gain.value = 0.28;
+        const lg = ac.createGain(); lg.gain.value = 0.50;
         lfo.connect(lg); lg.connect(m.low.g.gain); lfo.start(); m.src.push(lfo);
       },
       throttle: function (m, k, now) {
-        sysAudioSet(m.low.g.gain, Math.max(0.0001, 0.55 * k), now, 1.2);
-        sysAudioSet(m.mid.g.gain, Math.max(0.0001, 0.18 * k), now, 1.2);
+        sysAudioSet(m.low.g.gain, Math.max(0.0001, 1.0 * k), now, 1.2);
+        sysAudioSet(m.mid.g.gain, Math.max(0.0001, 0.32 * k), now, 1.2);
       } },
     // ---- TWO MORE (L6, E3 / audio #4), for the two still chapters whose
     // one bed was a distant thing. Kyoto's Uji sits at 0.04–0.09 from the
@@ -16851,6 +17116,12 @@ export function createSystems(game) {
     const gap = sysMUS_STING.arrive.gap * (ph && ph.gap > 0 ? ph.gap : 1);
     const base = musMelDeg;
     let t = 0, last = base;
+    // On a ten-second voice the cell is a chord, not a quote (L6, E3): the
+    // glass and the bow walk at 0.016–0.040 and a cell at 0.10 on them was
+    // three to six times the melody it sits in. Measured in the cave: four
+    // glass notes into the 6.5 s room, −15 dBFS on the score bus for three
+    // seconds — louder than the chapter's marquee. Half, on those two.
+    const longK = (inst === 'glass' || inst === 'bow') ? 0.5 : 1;
     for (let i = 0; i < c.deg.length; i++) {
       let d = base + c.deg[i];
       if (d > hi) d -= L;
@@ -16859,7 +17130,7 @@ export function createSystems(game) {
                            sysMUS_LIFT_LO, sysMUS_LIFT_HI);
       const step = gap * c.dur[i];
       musLiftNote(inst, when + t, midi, pan * (i % 2 ? 0.6 : 1),
-                  musVel(0.10 * (ph && ph.vel > 0 ? ph.vel : 1) * (0.8 + musIntensity * 0.4)), step);
+                  musVel(0.10 * longK * (ph && ph.vel > 0 ? ph.vel : 1) * (0.8 + musIntensity * 0.4)), step);
       t += step; last = d;
     }
     musMelDeg = last;
@@ -19495,8 +19766,9 @@ export function createSystems(game) {
       let cg = 0;
       while (musChaseBeatAt < horizon && cg++ < 16) {
         const b4 = musChaseBeatN % 4, bar = Math.floor(musChaseBeatN / 4);
-        // ×2.5 on every stroke (L6, E3): at 0.09–0.11 the pulse landed ten
-        // decibels under the pad and the chase measured as darker than rest.
+        // ×sysMUS_CHASE_VEL on every stroke (L6, E3): at 0.09–0.11 the pulse
+        // landed ten decibels under the pad and the chase measured as darker
+        // than rest. The review asked ×2.5; it is 2.0, and the table says why.
         const lvl = (0.7 + musIntensity * 0.5) * sysMUS_CHASE_VEL;
         if (b4 === 0 || b4 === 2) { musBendir(musChaseBeatAt, musVel((b4 ? 0.09 : 0.11) * lvl)); musChaseHits++; }
         else { musClap(musChaseBeatAt, musVel(0.085 * lvl)); musChaseHits++; if (bar % 2 && b4 === 3 && Math.random() < 0.5) musClap(musChaseBeatAt + beat * 0.5, musVel(0.05 * lvl)); }
@@ -26735,6 +27007,12 @@ export function createSystems(game) {
     const def = chapterDef(n), e = jrNb[n];
     if (!def || !def.nb || !e || !e.f) return '';
     const f = e.f;
+    // A page you never earned is a blank line with a date: the facts are
+    // kept (a return merges into them) but nothing is written from them
+    // until one real row is done here — the same bar the departure card
+    // sets. Measured before this: passing through Sydney on the way back
+    // to Venice wrote Sydney's whole page off nothing at all.
+    if (!(f.done >= 1)) return '';
     let who = null;
     try { who = typeof game.palWho === 'function' ? game.palWho(def.biome) : null; } catch (err) { who = null; }
     const out = [];
@@ -26789,11 +27067,20 @@ export function createSystems(game) {
     if (e && e.f && e.f.met) return true;
     try { return typeof game.travMet === 'function' && !!game.travMet(def.biome); } catch (err) { return false; }
   }
-  /** The live chapter has them, unmet, and this page has been read here. */
+  /**
+   * The live chapter has them, unmet, and either it is the chapter's first
+   * act or this page has been read here. Act one because the review's
+   * minimum was "a paper row in those chapters' act one" — a player who
+   * never opens the notebook has to be able to find the arc too; measured
+   * in three review drives nobody did. After act one the paper is the
+   * chapter's own business again and the row comes back only from the page.
+   */
   function travRowOn() {
     const b = game.biome && game.biome.current;
-    if (!b || !sysTRAV_PLACE[b] || nbTravArm !== b) return false;
-    if (nbTravMet(chapterOf(b))) return false;
+    if (!b || !sysTRAV_PLACE[b]) return false;
+    const n = chapterOf(b);
+    if (nbTravArm !== b && sysActNow(n) !== 1) return false;
+    if (nbTravMet(n)) return false;
     let p = null;
     try { p = typeof game.travWhere === 'function' ? game.travWhere() : null; } catch (e) { p = null; }
     return !!p;
@@ -26819,7 +27106,8 @@ export function createSystems(game) {
    */
   function nbPage() {
     let count = 0;
-    for (let n = 1; n <= chapMax; n++) if (jrNb[n] && jrNb[n].f) count++;
+    // written pages, not dated ones: a blank line is not an entry
+    for (let n = 1; n <= chapMax; n++) if (nbText(n)) count++;
     const fin = jrNb.fin && jrNb.fin.t ? jrNb.fin : null;
     jrNbDet.hidden = !(count || fin);
     if (jrNbDet.hidden) return;
@@ -29129,15 +29417,20 @@ export function createSystems(game) {
       if (wayRec.txt.textContent !== wtxt) wayRec.txt.textContent = wtxt;
       wayRec.li.classList.toggle('soon', !wayOpen);
     }
-    // ...and the traveller's row, which takes the arrow while it is pinned
-    // and is otherwise not on the paper at all (L6, F4). After the way on,
+    // ...and the traveller's row, on the paper while travRowOn says they are
+    // here to be found, and taking the arrow only while it is pinned (L6,
+    // F4): a line saying somebody keeps turning up is a line on the paper,
+    // and pointing at them over the chapter's own rows is a choice the
+    // player makes with F or from the notebook's page. After the way on,
     // because a pin is a choice and the door is only ever a default.
-    if (travPin) {
-      top = sysTRAV_ID;
+    if (travRowOn()) {
+      if (travPin) top = sysTRAV_ID;
       show[sysTRAV_ID] = true;
       const tt = 'somebody keeps turning up  ·  ' + (sysTRAV_PLACE[cdef.biome] || '');
       const trec = taskRec[sysTRAV_ID];
       if (trec.txt.textContent !== tt) trec.txt.textContent = tt;
+      // the way on's grey until it is the thing pointed at
+      trec.li.classList.toggle('soon', !travPin);
     }
     for (let i = 0; i < winIds.length; i++) show[winIds[i]] = true;
     // ---- THE MARQUEE LINE (B1) --------------------------------------------
@@ -32416,6 +32709,11 @@ export function createSystems(game) {
     if (sysFinClosing || sysFinDone) return;
     sysFinClosing = true;
     sysFinDone = true;
+    // ...and the notebook's last page (L6, F4): the traveller's line on the
+    // lawn was a bubble, gone in four seconds, and the one sentence the
+    // game had never said out loud. Written on the same frame the beat is
+    // spent, so the file that carries `fin` carries the page with it.
+    nbClose();
     saveSoon();
     toast('and that is the lot.', 'last');
     // the lens: the ceremony's pull-back, walked round the horseshoe
@@ -32660,6 +32958,8 @@ export function createSystems(game) {
   const sysPinchPts = new Map();
   let sysPinchD = 0, sysDragLastX = null;
   let camYaw = 0, camYawTarget = 0, camHandT = 0, camIdleT = 0;
+  // the walking recentre, the lost-frame cut and the one camera tip (L6, E1)
+  let camStraightT = 0, camLostT = 0, camCutT = 0, camAwayT = 0, camAwayD = -1, camAwayV = 0, camTipSaid = false;
   let camDist = sysCAM_DEF, camDistTarget = sysCAM_DEF;
   // The rig's last finite frame, and how many times it has been handed back.
   // See the sanity check at the head of the camera block. `sysCamSaves` is the
@@ -33453,9 +33753,13 @@ export function createSystems(game) {
     // Snap the rig behind the capybara, right now. The only loop-free way to get
     // "put the camera behind me" WHILE moving (see the idle tidy-up in update),
     // and the one thing a player reaches for most often.
+    // BEHIND IS THE HEADING PLUS A HALF TURN — see the idle tidy-up for the
+    // convention. Targeting the heading itself put the rig in the animal's
+    // face (measured -3.14 rad on the press, 13 Sep) and the tidy-up then
+    // swung it round the back over a second and a half (L6, E1).
     if (c === 'KeyC' && started) {
       const cg = game.capy && game.capy.group;
-      if (cg) { camYawTarget = cg.rotation.y; camHandT = 0; camIdleT = 0; }
+      if (cg) { camYawTarget = cg.rotation.y + Math.PI; camHandT = 0; camIdleT = 0; }
     }
     // Move the arrow to the next thing you have not done. See todoStep.
     if (c === 'KeyF' && started) {
@@ -34218,7 +34522,7 @@ export function createSystems(game) {
     const snap = padBtn(g, 11);
     if (snap && !padWasSnap && started) {
       const cg = game.capy && game.capy.group;
-      if (cg) { camYawTarget = cg.rotation.y; camHandT = 0; camIdleT = 0; }
+      if (cg) { camYawTarget = cg.rotation.y + Math.PI; camHandT = 0; camIdleT = 0; }   // + PI: behind, as C (L6, E1)
     }
     // ...and KEEPING it down is the eye-raise, exactly as V is. See padEyeT.
     padEyeT = snap ? padEyeT + dt : 0;
@@ -35729,7 +36033,8 @@ export function createSystems(game) {
   // rig from inside this closure and neither had ever left it, so "the camera
   // will not settle in this chapter" was a question nothing could answer. See
   // sysREST_W, which is the second feature to hang off camIdleT.
-  const sysCamInfo = { reach: 0, dist: 0, clear: 1, pitch: 0, sky: 0, rest: 0, rig: 0, shot: 0, lift: 0, lift2: 0, floor: 0, idle: 0, hand: 0 };
+  const sysCamInfo = { reach: 0, dist: 0, clear: 1, pitch: 0, sky: 0, rest: 0, rig: 0, shot: 0, lift: 0, lift2: 0, floor: 0, idle: 0, hand: 0,
+                       lens: 0, lensUnfaded: 0, lensBias: 0 };
   // The callback, the running best and the three things it has to skip all live
   // out here rather than in a closure built per frame — this file's whole
   // premise is that update() allocates nothing.
@@ -35764,7 +36069,7 @@ export function createSystems(game) {
     // every one of them in a chapter whose subject is traffic is a lens that
     // never sits still. This is the same ignore list capyClimbRayHit keeps, for
     // the same reason and in the same order.
-    if (b.userData && (b.userData.npc || b.userData.local)) return;
+    if (b.userData && (b.userData.npc || b.userData.local || b.userData.crowd)) return;   // ...and a crowd box (L6, E1)
     if (b.type !== undefined && CANNON.Body && b.type !== CANNON.Body.STATIC) return;
     const t = res.shape && res.shape.type;
     if (t === sysSHAPE_HEIGHTFIELD || t === sysSHAPE_PLANE) return;
@@ -35821,6 +36126,38 @@ export function createSystems(game) {
     // shorter floor only keeps the near plane out of the animal.
     const lo = Math.min((sysCamHard ? sysCAM_CLEAR_HARD : sysCAM_CLEAR_MIN) / len, 1);
     return clamp(sysCamBest - sysCAM_CLEAR_PAD / len, lo, 1);
+  }
+  /**
+   * THE CROWD IN THE LENS (L6, E1). See sysLENS_R. Run on the RENDERED eye,
+   * after the spring and the shake, because that is the lens the person is
+   * standing in; the bias it sets is read by next frame's boom.
+   */
+  function sysLensTick(dt, r) {
+    const w = game.world;
+    for (let i = 0; i < sysLENS_N; i++) sysLensSlots[i].hit = false;
+    if (w && typeof w.raycastAll === 'function' && started && !transBusy) {
+      sysLensFrom.set(camera.position.x, camera.position.y, camera.position.z);
+      sysLensTo.set(r.x, r.y + 0.5, r.z);
+      try { w.raycastAll(sysLensFrom, sysLensTo, sysCAM_RAY_OPTS, sysLensRayHit); } catch (e) { /* a body mid-removal */ }
+    }
+    let block = 0, unfaded = 0, hits = 0;
+    for (let i = 0; i < sysLENS_N; i++) {
+      const s = sysLensSlots[i];
+      if (!s.body) continue;
+      if (s.hit) { hits++; s.k = Math.min(1, s.k + dt * sysLENS_RATE); }
+      else { s.t -= dt; if (s.t <= 0) s.k = Math.max(0, s.k - dt * sysLENS_RATE); }
+      if (s.fadable) s.fadable = sysLensApply(game, s.body, s.k);
+      if (s.hit && (!s.fadable || s.k < 0.5)) unfaded++;
+      // the bias holds through sysLENS_HOLD too, and lets go slowly: it moves
+      // the lens OFF the person, the ray stops finding them, and a bias that
+      // dropped at once would swing back onto them — measured cycling 0.15
+      // to 0.26 at lambda 2.5 (13 Sep).
+      if (!s.fadable && (s.hit || s.t > 0)) block = 1;
+      if (s.k <= 0 && !s.hit) s.body = null;
+    }
+    sysLensBlocked = block; sysLensUnfaded = unfaded;
+    sysLensBias = damp(sysLensBias, block, block ? 6 : 1.0, dt);
+    sysCamInfo.lens = hits; sysCamInfo.lensUnfaded = unfaded; sysCamInfo.lensBias = sysLensBias;
   }
 
   function sysGroundY(x, z) {
@@ -36655,9 +36992,12 @@ export function createSystems(game) {
       // the shimmer (continuous), the second voice (from sysMUS_2ND_AT, when
       // the palette has one), the pulse (from sysMUS_LAYER_PULSE, pad
       // palettes). Monotone in chapProg by construction. `pulseN` counts.
+      // The fourth slot is the ostinato's gate (sysMUS_LAYER_OSTINATO): the
+      // gate is here, the tune is F3's — nothing plays on it yet.
       layers: [+(musProg * 0.85).toFixed(3),
                sysMUS_2ND[musPalN] ? +clamp((musProg - sysMUS_2ND_AT) / (1 - sysMUS_2ND_AT), 0, 1).toFixed(3) : 0,
-               (musPal && musPal.band) ? 0 : +clamp((musProg - sysMUS_LAYER_PULSE) / (1 - sysMUS_LAYER_PULSE), 0, 1).toFixed(3)],
+               (musPal && musPal.band) ? 0 : +clamp((musProg - sysMUS_LAYER_PULSE) / (1 - sysMUS_LAYER_PULSE), 0, 1).toFixed(3),
+               musProg >= sysMUS_LAYER_OSTINATO ? 1 : 0],
       pulseN: musPulseN,
       // THE SLEEP (L6, E3): 0 awake, 1 gone; and the edges counted
       sleep: +musSleep.toFixed(3), sleepN: musSleepN, wakeN: musWakeN,
@@ -40109,6 +40449,11 @@ export function createSystems(game) {
     // title card and the departures board all said one thing and the ferry
     // said whatever this line happened to say. It agreed. Nothing made it.
     const qd = chapterDef(chapterOf('quay'));
+    // ...and the notebook's first page (L6, F4): the ferry is the one exit
+    // that does not go through jrTravel, and it is the exit the first
+    // chapter is built around — "Something the size of a labrador got on
+    // the ferry. I was on it." has to be written on this line or never.
+    nbWrite(chapterOf('sydney'));
     biomeFadeTo('quay', qd.name.toUpperCase(), qd.sub);
   });
 
@@ -40592,6 +40937,9 @@ export function createSystems(game) {
     // quietly puts itself back where you can see what you are doing.
     const camIdle = sp < sysCAM_AUTO_V && Math.abs(ix) + Math.abs(iz) < 0.02;
     if (camIdle) camIdleT += dt; else camIdleT = 0;
+    // ...and the stick held straight, which is the other stable case. See
+    // sysCAM_WALK_T. Any strafe or turn zeroes it on the frame.
+    if (started && Math.abs(ix) < 0.15 && iz < -0.5) camStraightT += dt; else camStraightT = 0;
     // AT THE WHEEL THE STICK IS NOT A DIRECTION, IT IS A THROTTLE AND A RUDDER,
     // so the loop that makes camera-relative movement dangerous (see the note
     // below) does not exist here — the rig can simply sit behind the ship all
@@ -40673,6 +41021,14 @@ export function createSystems(game) {
       camYawTarget = sysDampAngle(camYawTarget,
                                   capy.group.rotation.y + Math.PI + sysREST_FLANK * clamp(skyRestT / sysREST_W, 0, 1),
                                   sysCAM_AUTO_L, dt);
+    // ---- ...AND WHILE YOU WALK STRAIGHT (L6, E1). See sysCAM_WALK_T. ------
+    // Below the idle branch on purpose: a rig that is idle is not walking, so
+    // the two never compete, and this one has no flank term — the walking
+    // lens is dead astern, which is also what undoes the resting flank drift
+    // the frame the stick goes forward (E2).
+    } else if (started && !mounted && camHandT <= 0 && camStraightT > sysCAM_WALK_T &&
+               capy && capy.group) {
+      camYawTarget = sysDampAngle(camYawTarget, capy.group.rotation.y + Math.PI, sysCAM_WALK_L, dt);
     }
     if (mounted !== flyWas) {
       flyWas = mounted;
@@ -40696,9 +41052,23 @@ export function createSystems(game) {
 
     // Anchor + look ride the smooth render position. With no ladder underneath
     // them the whole rig can sit on a gentler spring without feeling laggy.
-    sysAnchor.x = damp(sysAnchor.x, r.x, 8, dt);
-    sysAnchor.y = damp(sysAnchor.y, r.y + 1.0, 4.5, dt);
-    sysAnchor.z = damp(sysAnchor.z, r.z, 8, dt);
+    // ---- THE FRAME THAT LOST THE ANIMAL (L6, E1). See sysCAM_LOST_T. -----
+    // Projected through LAST frame's camera (the matrices are updated at
+    // render), which is the frame the player is looking at. A margin past the
+    // edge, so an animal half out of shot is not a loss; and only once the
+    // game is running and the lens is the play lens, or the title's own
+    // composition and a photo trip the cut.
+    if (started && photoLens < 0.002 && !transBusy) {
+      sysV1.set(r.x, r.y + 0.4, r.z).project(camera);
+      const lost = !(sysV1.x > -1.1 && sysV1.x < 1.1 && sysV1.y > -1.1 && sysV1.y < 1.1 && sysV1.z < 1);
+      camLostT = lost ? camLostT + dt : 0;
+      if (camLostT > sysCAM_LOST_T) { camCutT = sysCAM_CUT_T; camLostT = 0; game.state.camCuts = (game.state.camCuts | 0) + 1; }
+    } else camLostT = 0;
+    if (camCutT > 0) camCutT -= dt;
+    const cutK = camCutT > 0 ? sysCAM_CUT_K : 1;
+    sysAnchor.x = damp(sysAnchor.x, r.x, 8 * cutK, dt);
+    sysAnchor.y = damp(sysAnchor.y, r.y + 1.0, 4.5 * cutK, dt);
+    sysAnchor.z = damp(sysAnchor.z, r.z, 8 * cutK, dt);
 
     // Aim above the capybara and ahead of its travel: this drops the animal to
     // roughly 40% up the frame and fills the top with the world it is entering.
@@ -40719,7 +41089,7 @@ export function createSystems(game) {
     // bird doing 20 m/s and the same disagreement is a visible shimmy of the
     // whole horizon. So the look target is damped at the SAME rate the eye is,
     // and only the deliberate lead (below) is allowed to lag.
-    const lookL = lerp(5, 7, flyT);
+    const lookL = lerp(5, 7, flyT) * cutK;    // cutK: the lost-frame cut (L6, E1)
     sysLook.x = damp(sysLook.x, lx, lookL, dt);
     // ---- THE RAISE IS CUT WITH THE BOOM (P1) ------------------------------
     // A RAISE IS AN ANGLE, NOT A HEIGHT, and this line had only ever been
@@ -41098,7 +41468,10 @@ export function createSystems(game) {
     }
 
     const cp = Math.cos(camPitch), sn = Math.sin(camPitch);
-    const ox = Math.sin(useYaw) * cp, oz = Math.cos(useYaw) * cp;
+    // ...the boom's bearing carries the crowd bias (L6, E1; see sysLENS_OUT):
+    // the RIG swings round the person, the stick's frame (useYaw) does not.
+    const lensYaw = useYaw + sysLENS_OUT * sysLensBias;
+    const ox = Math.sin(lensYaw) * cp, oz = Math.cos(lensYaw) * cp;
     let t = 1;
     // ---- THE OPERA HOUSE KEEP-OUT IS SYDNEY GEOMETRY (v33) ---------------
     // And it now says so. This was `!inPasto`, written when there were two
@@ -41126,7 +41499,7 @@ export function createSystems(game) {
       }
     }
     let dd = camReach * t;
-    sysDesired.set(sysAnchor.x + ox * dd, sysAnchor.y + sn * dd, sysAnchor.z + oz * dd);
+    sysDesired.set(sysAnchor.x + ox * dd, sysAnchor.y + sn * dd + sysLENS_UP * sysLensBias, sysAnchor.z + oz * dd);
     // ---- UNDER THE WATER, THE EYE COMES IN RATHER THAN GOING UP (v19) -----
     // Every clearance rule below is right in sixteen chapters and exactly wrong
     // in one state. An animal three metres down in a lagoon has the eye five
@@ -41289,9 +41662,9 @@ export function createSystems(game) {
     // The spring is tracked separately from camera.position so the shake offset
     // is never fed back into the smoothing (that is what made shake "swim").
     if (!camInit) { camInit = true; sysCamPos.copy(camera.position); }
-    sysCamPos.x = damp(sysCamPos.x, sysDesired.x, 7, dt);
-    sysCamPos.y = damp(sysCamPos.y, sysDesired.y, 6.5, dt);
-    sysCamPos.z = damp(sysCamPos.z, sysDesired.z, 7, dt);
+    sysCamPos.x = damp(sysCamPos.x, sysDesired.x, 7 * cutK, dt);
+    sysCamPos.y = damp(sysCamPos.y, sysDesired.y, 6.5 * cutK, dt);
+    sysCamPos.z = damp(sysCamPos.z, sysDesired.z, 7 * cutK, dt);
     // ---- THE CUT IS ON THE DESIRED POINT; THE FRAME IS DRAWN FROM THE SPRING
     //
     // (X7.) The block above says "in, immediately: a frame spent inside a wall
@@ -41368,6 +41741,8 @@ export function createSystems(game) {
       camera.position.y += Math.sin(bt * sysREST_BR_C + 1.3) * sysREST_BR_Y * bw;
       if (camera.position.y < camFloorY) camera.position.y = camFloorY;
     }
+    // ...and the crowd, on the same rendered eye (L6, E1). See sysLensTick.
+    sysLensTick(dt, r);
     // Second clearance test, on the position actually being rendered from: the
     // spring lags the desired point by a few metres and a shake can add half of one.
     if (relief) {
@@ -41733,6 +42108,21 @@ export function createSystems(game) {
     if (topRec && hintHas && !mounted && riddleShown) {
       const hx = hintX - p.x, hz = hintZ - p.z;
       const hd = Math.sqrt(hx * hx + hz * hz);
+      // ---- THE ONE CAMERA TIP (L6, E1 / play #1). See sysCAM_TIP_T. --------
+      // "Walking away" is the distance to the arrow's target GROWING at a
+      // walking pace, not merely a heading: a detour round a wall grows it
+      // for a second and drops it again, and this timer drains twice as fast
+      // as it fills, so only a sustained wrong way says it. Once a session.
+      if (!camTipSaid && dt > 0) {
+        // the growth rate, smoothed: per-frame it flickers under the line on a
+        // jittery dt and the timer filled at 0.8/s (measured 13 Sep)
+        camAwayV = damp(camAwayV, camAwayD >= 0 ? (hd - camAwayD) / dt : 0, 6, dt);
+        const away = camAwayV > sysCAM_TIP_V && sp > 1.5;
+        camAwayT = away ? camAwayT + dt : Math.max(0, camAwayT - dt * 2);
+        if (camAwayT > sysCAM_TIP_T) { camTipSaid = true; toast('C puts the camera behind you', 'note'); }
+        sysCamInfo.away = camAwayT;
+      }
+      camAwayD = hd;
       // THE ARROW IS A SCREEN-SPACE QUANTITY, so it is measured on the screen.
       // Projecting the horizontal bearing onto the rig's own axes looks right and
       // is not: the rig is pitched 41 degrees, which foreshortens world-forward to
@@ -42491,6 +42881,32 @@ export function createSystems(game) {
     sysRoomSet(dt);
     musRoomSet(dt);
     musBreathStep(dt);
+
+    // ---- THE SHOVE, NAMED (L6, E1). See sysIMPULSE_BY. --------------------
+    {
+      const cpy = game.capy;
+      const spd = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+      const gain = spd - sysImpPrev;
+      sysImpPrev = spd;
+      if (input.jump || input.jumpPressed) sysImpJumpT = sysIMP_JUMP_T; else if (sysImpJumpT > 0) sysImpJumpT -= dt;
+      if (sysImpCool > 0) sysImpCool -= dt;
+      const own = sysImpJumpT > 0 || mounted || !!(cpy && (cpy.carriedBy || cpy.atHelm || cpy.diving)) ||
+                  !!game.state.sailing || transBusy || !started;
+      sysImpWin = own ? 0 : sysImpWin * Math.exp(-dt / sysIMP_TAU) + (gain > 0 ? gain : 0);
+      if (sysImpWin > sysIMP_V && sysImpCool <= 0) {
+        sysImpCool = sysIMP_COOL; sysImpWin = 0;
+        let cause = null;
+        if (cpy && cpy.impulseSrc && game.state.time - (cpy.impulseT || -1e9) < sysIMP_FRESH) cause = cpy.impulseSrc;
+        if (!cause) {
+          const row = sysIMPULSE_BY[game.biome ? game.biome.current : ''];
+          const wet = !!(cpy && cpy.swimming);
+          if (row) cause = wet ? (row.wet || row.dry) : (row.dry || null);
+          if (!cause) cause = wet ? 'the swell' : 'something back there';
+        }
+        game.state.impulseLast = { cause: cause, t: game.state.time, v: +spd.toFixed(1) };   // for the probes
+        toast('that was ' + cause, 'note');
+      }
+    }
 
     // ---- the score goes to sea -------------------------------------------
     // Palette 3 is only ever alive while somebody is actually driving. Taking
@@ -44012,8 +44428,10 @@ export function createSystems(game) {
       const padUp = Math.min(isBand ? 1 + sysMUS_LIFT_BAND : sysMUS_PAD_STACK,
         (1 - (chaseOn ? sysMUS_CHASE_PAD : musIntensity * intPad)) *
         (1 + (isBand ? sysMUS_LIFT_BAND : sysMUS_LIFT_PAD) * lift));
+      // ...×(1 − lift): the calm's cut yields to a marquee (see sysMUS_CALM_BASS).
+      const calmYield = 1 - clamp(lift, 0, 1);
       sysAudioSet(musPad.gain, Math.max(0.0001, musPal.bus * voiceBusK * padUp *
-        (1 - clamp(calmLean, 0, 1) * sysMUS_CALM_PAD) * musBreath *
+        (1 - clamp(calmLean, 0, 1) * sysMUS_CALM_PAD * calmYield) * musBreath *
         (1 + skyRain * sysMUS_SKY_BUS) * (1 - 0.18 * musSpeak) * musPadSpecK * stingK * sleepK),
         nowA, padTau);
       // ...and the pad palettes' cut has a floor (sysMUS_VOICE.cutFloor) under
@@ -44034,14 +44452,19 @@ export function createSystems(game) {
       // writes this gain, not a second writer — musBassGain already has exactly
       // one and it runs on a 1.5 s constant, so a pulse written separately
       // would be dragged back before it was heard. See the npc:chase handler.
-      sysAudioSet(musBassGain.gain, (musPal.bass * voiceBassK * (1 - clamp(calmLean, 0, 1.9) * 0.30) +
+      sysAudioSet(musBassGain.gain, (musPal.bass * voiceBassK * (1 - clamp(calmLean, 0, 1.2) * sysMUS_CALM_BASS * calmYield) *
+        // ...and on a band the intensity takes the bass DOWN (L6, E3): a band's
+        // chase is its intensity, its bass is a bass instrument under a pad bus
+        // of 0.05, and halving its climb (the first cut) still measured Venice's
+        // chase darker than its rest in three runs of three (centroid 160 < 213,
+        // 208 < 352, 153 < 158) — the calm's release alone is +6 dB on it. So
+        // the band comes forward (sysMUS_INT_BAND on the pad) and the bass
+        // steps back the way the pad does on a pad palette.
+        (isBand ? 1 - musIntensity * sysMUS_INT_BAND_BASS : 1) +
         // ...and the bass does not climb with the intensity DURING a chase (L4,
         // F3): measured, it doubled (0.07 -> 0.19) and pulled the centroid
         // under calm's however bright the pulse was; the onset hit is halved
-        // ...and on a band the climb is halved (L6, E3): a band's chase is
-        // its intensity, and a bass that doubled was the whole of why Venice's
-        // chase measured darker than its rest.
-        musIntensity * 0.08 * (1 - chaseOn) * (isBand ? 0.5 : 1) + chaseOn * sysMUS_CHASE_BASS + lift * 0.05 + musChaseHit * 0.15) * musBreath *
+        musIntensity * 0.08 * (1 - chaseOn) * (isBand ? 0 : 1) + chaseOn * sysMUS_CHASE_BASS + lift * 0.05 + musChaseHit * 0.15) * musBreath *
         sleepK,   // THE SLEEP (L6, E3): the bass goes with the pad
         nowA, musChaseHit > 0.02 ? 0.28 : musSleep > 0 ? 0.8 : 1.5);
       // ---- THE WORLD MAKES ROOM (L4, E2 / audio #5) ----------------------

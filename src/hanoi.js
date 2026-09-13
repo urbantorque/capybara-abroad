@@ -2134,7 +2134,7 @@ function hanUpdateBikes(game, dt) {
     hanBikeAt(clipped, hanV3b);
     const dx = p.x - hanV3b.x, dz = p.z - hanV3b.z;
     const d = Math.hypot(dx, dz) || 1;
-    if (typeof capy.shove === 'function') capy.shove(dx / d * 3.4, dz / d * 3.4);
+    if (typeof capy.shove === 'function') capy.shove(dx / d * 3.4, dz / d * 3.4, 'the traffic');   // named for the pill (L6, E1)
     if (typeof game.punch === 'function') game.punch(0.20);
     hanCue('bark', hanV3b.x, hanV3b.y, hanV3b.z, 0.5, 2.6);
     hanSwerved = 0;

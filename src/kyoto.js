@@ -3862,7 +3862,7 @@ function kyoUpdateRun(game, dt) {
           if (typeof game.sparks === 'function') game.sparks(gt.x, kyoRIVER_Y + 0.4, gt.z, 18, { spd: 3, up: 2.5, grav: 9, drag: 0.6, life: 0.9, size: 0.22, rgb: [1.2, 1.45, 1.7] });
           if (capy && typeof capy.launch === 'function' && capy.velocity) {
             const v = capy.velocity;
-            capy.launch(v.x + gt.tx * 1.6, Math.max(0, v.y), v.z + gt.tz * 1.6);
+            capy.launch(v.x + gt.tx * 1.6, Math.max(0, v.y), v.z + gt.tz * 1.6, 'the gate');   // named for the pill (L6, E1)
           }
           if (typeof game.toast === 'function' && n === 1 && !kyoRunDone) game.toast('through the boat — two seconds off. the river agrees with you.');
         }
@@ -3911,7 +3911,7 @@ function kyoUpdateRun(game, dt) {
       if (down > kyoCHUTE_MIN && typeof capy.launch === 'function') {
         kyoChuteFired = true;
         kyoChuteAir = 0.9;
-        capy.launch(v.x * 1.25 + nr.tx * 1.5, kyoCHUTE_V, v.z * 1.25 + nr.tz * 1.5);
+        capy.launch(v.x * 1.25 + nr.tx * 1.5, kyoCHUTE_V, v.z * 1.25 + nr.tz * 1.5, 'the chute');   // named for the pill (L6, E1)
         if (typeof game.sfx === 'function') {
           game.sfx('splash', { volume: 0.9, pitch: 0.8, at: p });
           game.sfx('gasp', { volume: 0.7 });

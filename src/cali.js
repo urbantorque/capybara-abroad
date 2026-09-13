@@ -2147,7 +2147,7 @@ function caliWireSweep(game, w) {
   w.hit = 1.5;
   caliWireHits++;
   capy.launch(Math.sin(caliChivaYaw) * caliChivaV + rand(-0.3, 0.3), 3.6,
-              Math.cos(caliChivaYaw) * caliChivaV + rand(-0.3, 0.3));
+              Math.cos(caliChivaYaw) * caliChivaV + rand(-0.3, 0.3), 'the cable');   // named for the pill (L6, E1)
   capy.body.angularVelocity.set(rand(-4, 4), rand(-6, 6), rand(-4, 4));
   caliBurstSparks(w.x, w.y, w.z, 10, 0.4);
   if (typeof game.punch === 'function') game.punch(0.22);
@@ -2184,7 +2184,7 @@ function caliWireSweepOff(game, w) {
   const rel = caliChivaV + 5.5;
   const away = caliChivaV - rel;                 // = -5.5: backwards down the road
   capy.launch(Math.sin(caliChivaYaw) * away + rand(-1.4, 1.4), 6.4,
-              Math.cos(caliChivaYaw) * away + rand(-1.4, 1.4));
+              Math.cos(caliChivaYaw) * away + rand(-1.4, 1.4), 'the cable');   // named for the pill (L6, E1)
   capy.body.angularVelocity.set(rand(-4, 4), rand(-6, 6), rand(-4, 4));
   caliBurstSparks(w.x, w.y, w.z, 10, 0.4);
   // M4: the chiva throwing you off is a set piece, not a bump.

@@ -1057,7 +1057,7 @@ function sahUpdateAcrobats(game, dt) {
       sahAcroCool = sahACRO_COOL;
       if (cp && sahOnMat(cp) && capy.launch) {
         const a = Math.atan2(-sahACRO.x, 4 - sahACRO.z);   // out over the middle of the square
-        capy.launch(Math.sin(a) * sahACRO_OUT, sahACRO_V, Math.cos(a) * sahACRO_OUT);
+        capy.launch(Math.sin(a) * sahACRO_OUT, sahACRO_V, Math.cos(a) * sahACRO_OUT, 'the acrobats');   // named for the pill (L6, E1)
         sahAcroFlying = true;
         sahAcroTop = 0;
         sahAcroFly = 0;
@@ -2521,7 +2521,7 @@ function sahUpdateChase(game, dt) {
     // spot. launch() clears the frame, lifts clear of the live contact and
     // refuses to be grounded for capyLAUNCH_HOLD, so the throw lands.
     if (capy.body && typeof capy.launch === 'function') {
-      capy.launch(capy.body.velocity.x * -0.4, 5.5, capy.body.velocity.z * -0.4);
+      capy.launch(capy.body.velocity.x * -0.4, 5.5, capy.body.velocity.z * -0.4, 'the orange sellers');   // named for the pill (L6, E1)
     } else if (capy.body) {
       capy.body.velocity.x *= -0.4;
       capy.body.velocity.z *= -0.4;
@@ -5208,7 +5208,7 @@ function sahUpdateStorm(game, dt) {
   // cap by its own size, so it is the one channel a lean survives.
   if (sahStorm > 0.15 && capy && typeof capy.shove === 'function' && out) {
     const push = sahWIND_F * sahStorm * dt;
-    capy.shove(-push, Math.sin(sahTime * 1.7) * push * 0.4);
+    capy.shove(-push, Math.sin(sahTime * 1.7) * push * 0.4, 'the sandstorm');   // named for the pill (L6, E1)
   }
 
 }

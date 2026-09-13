@@ -1605,10 +1605,24 @@ float rmCloud(vec3 w, vec4 P, vec2 S){
  */
 const _RIM_VS_COMMON = `#include <common>
 varying vec3 vRimW;
-varying vec3 vRimN;`;
+varying vec3 vRimN;
+uniform float uLensFade;
+attribute float aLensFade;
+varying float vLensFade;`;
+// vLensFade: THE CROWD IN THE LENS (L6, E1). A per-draw uniform for a mesh of
+// its own (systems.js lifts it in onBeforeRender, the reach's trick) and a
+// per-instance attribute for a walker in an instanced crowd; a geometry that
+// carries no aLensFade reads the generic attribute, which is zero.
 const _RIM_VS_BEGIN = `#include <begin_vertex>
 vRimW = (modelMatrix * vec4(transformed, 1.0)).xyz;
-vRimN = normalize(mat3(modelMatrix) * objectNormal);`;
+vRimN = normalize(mat3(modelMatrix) * objectNormal);
+vLensFade = uLensFade;
+#ifdef USE_INSTANCING
+vLensFade = max(vLensFade, aLensFade);
+#endif`;
+const _lensFadeU = { value: 0 };
+/** The uniform the per-mesh fade is written through. See vLensFade. */
+export function lensFadeUniform() { return _lensFadeU; }
 // ---------------------------------------------------------------------------
 // SPILL — AND IT IS DELIBERATELY NOT A PointLight.
 //
@@ -1949,6 +1963,7 @@ uniform float uBounceN;
 uniform float uWetK;
 uniform vec4 uCloudP;
 uniform vec2 uCloudS;
+varying float vLensFade;
 ${_CLOUD_GLSL}`;
 // ADDED TO outgoingLight, NOT to diffuseColor. Multiplying the diffuse would
 // make the rim take the object's own colour and its own lighting, which is a
@@ -1956,6 +1971,15 @@ ${_CLOUD_GLSL}`;
 // light, it is the sky's colour, and it survives the object standing in shadow
 // — which is exactly where a thing most needs separating from what is behind it.
 const _RIM_FS_OUT = `{
+  // THE CROWD IN THE LENS (L6, E1): a 4x4 ordered dither, the person between
+  // the lens and the animal opened up over a quarter second. See vLensFade.
+  if (vLensFade > 0.001) {
+    vec2 lp = floor(mod(gl_FragCoord.xy, 4.0));
+    vec2 l2 = mod(lp, 2.0);
+    vec2 l4 = floor(lp * 0.5);
+    float lb = 4.0 * (2.0 * l2.x + 3.0 * l2.y - 4.0 * l2.x * l2.y) + (2.0 * l4.x + 3.0 * l4.y - 4.0 * l4.x * l4.y);
+    if ((lb + 0.5) / 16.0 < vLensFade) discard;
+  }
   vec3 rN = normalize(vRimN);
   if (!gl_FrontFacing) rN = -rN;
   if (uRimK > 0.0005) {
@@ -2112,6 +2136,7 @@ function _rimInjectWith(kU, cU) {
     shader.uniforms.uWetK = _grainWet;
     shader.uniforms.uCloudP = _cloudP;
     shader.uniforms.uCloudS = _cloudS;
+    shader.uniforms.uLensFade = _lensFadeU;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', _RIM_VS_COMMON)
       .replace('#include <begin_vertex>', _RIM_VS_BEGIN);

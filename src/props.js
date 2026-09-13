@@ -2205,6 +2205,11 @@ function physAddCrowdBodies(o) {
       // fall asleep — a sleeping static body stops being re-broadphased and the
       // person becomes a ghost again without anything on screen saying so.
       b.allowSleep = false;
+      // ...and who it is (L6, E1): the camera's crowd sweep reads the index
+      // to fade this one walker out of the lens through `o.meshes` (the
+      // chapter's instanced parts, instance i = person i) when the chapter
+      // passes them, and biases the boom round the person when it does not.
+      b.userData = { crowd: o, idx: i };
       physSyncBodyTransform(b);
       game.world.addBody(b);
       bodies.push(b);
@@ -2221,6 +2226,7 @@ function physAddCrowdBodies(o) {
     }
     if (!put) return null;
     b.allowSleep = true;
+    b.userData = { crowd: o, idx: -1 };     // a standing crowd is one body: no index (L6, E1)
     physSyncBodyTransform(b);
     game.world.addBody(b);
     bodies.push(b);
