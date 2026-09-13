@@ -3732,7 +3732,7 @@ export const CHAPTERS = [
          { if: 'wow', t: 'It took the pho scooter round. Three deliveries. Two hundred and forty riders in the way.' },
          { if: 'tier>=3', t: 'The tea lady calls it {call}. The whole street does now, she says. Her fault.' },
          { if: 'err', t: 'It carried a bowl of pho up the frontage to me. I did not order it. I ate it.' },
-         'I fly home on Tuesday. I would put money on where it is going.'],
+         'I fly home on Thursday. I would put money on where it is going.'],
     note: 'You crossed six lanes without stopping and the road never noticed you were there.',
     acts: [
       { kick: 'THE THIRTY-SIX STREETS', line: 'do not wait for a gap. there is no gap.' },
