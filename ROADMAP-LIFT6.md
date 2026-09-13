@@ -355,3 +355,10 @@ regions of systems.js, edited only with the Edit tool.
   stretch item after L6-6 if the budget allows.
 - The far-field rewrite of every chapter's ground: E6's octave and wear band
   are the version that costs no triangles.
+
+## After (13 Sep 2026)
+
+Built in two sessions (the first's limit fell with E1, E3, E6, F4 and F5
+in flight; the second finished them and built F1–F3). The record, the
+numbers and what is owed are in CONTRACT.md's top section. Twenty-two
+`qa/l6-*.js` probes carry the measurements.

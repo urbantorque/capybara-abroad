@@ -1,3 +1,174 @@
+## THE SIXTH LIFT — THE COMPANION, THE SECOND ASK, THE TUNE, THE NOTEBOOK AND THE LOCALS' VOICES (L6 — 13 Sep 2026)
+
+Asked for, a sixth time: functional and enjoyable → memorable, beautiful,
+engaging, in line with the top of the field; six to eight areas in detail
+and four to five features that change what the game is; nothing broken.
+Six reviewers (design, art and animation, audio, writing/UX, QA/perf, a
+fresh-eyes playtester who read nothing first) read the tree and PLAYED it
+under playwright; ROADMAP-LIFT6.md is the synthesis. Built in two
+sessions: the first ran E8, E5, E7, E2 and E4 to completion and had E1, E3,
+E6, F4 and F5 in flight when its limit fell at 00:08 UTC; the second
+(this one) committed that tree as found, finished those five bullet by
+bullet, then built F1, F2 and F3. Every batch under playwright with its
+own instrument, the fuzz started in nineteen chapters, `npm test` (16
+checks now: `qa/l6-tics.mjs` and the soak diff joined it) green.
+
+### The five features
+
+**F1. THE COMPANION.** The stowaway (N3's one-border gag) grown up. On
+Space it gets down and FOLLOWS on the herd trail — a bird flies at +1.2 m
+over water, a gentoo swims, a walker refuses a wet step and calls from the
+bank; it climbs back on when you loaf two seconds beside it; it stays
+across every border until home, left (60 m for 40 s) or told (Q held 1.2 s:
+"off you go"); saved as `stow: { kind, from }`; six biome-neutral builders
+on PALETTE colours. THE SEAT re-mounts it at a helm, carried, or on a
+moving floor. THE PORTRAIT is pose five. THE DECOY: a wheek while hidden
+sends it to the aim ring and the march's last-seen reads it for four
+seconds. Measured: a Venice pigeon carried into Kowloon followed 600/600
+samples inside 3 m over a 60 s walk through street, pontoon and harbour,
+re-mounted on the loaf, came back after `page.reload()`, and ended a
+Marrakech march lost with the capybara moved 0.00 m. qa/l6-companion.js.
+
+**F2. THE SECOND ASK, AND THE WINDOW.** Not one of 234 rows read a
+learned skill. Nineteen rows with `needs:` — herd, carry, worn, vault,
+seed, perch, G, committed, dive — each ticked from a field the animal
+already publishes; and a clocked WINDOW in the five chapters that had no
+clock (the heron off the pond, the kites' dive on a 70 s gust, the jabiru
+home, the big drip's 75 s burst, the calving from the tiller), each with
+a countdown on the live line. `qa/verbs.mjs` gains the needs-before-chapter
+blocker and a consumer count (G 1, dive 6 in 3 chapters, vault 2, seed 2,
+herd 2, perch 3, worn 3, committed 1, carry 1, clock 5). Measured: the
+same directed run with no skills and with nine differs by 3 rows (was
+identical); a naive stand ticks 5/5 windows; 17/19 rows ticked in the
+browser. qa/l6-second-ask.js, qa/l6-f2-windows.js.
+
+**F3. THE TUNE.** One melody — degrees 0 4 7 4 | 3 2 1 0 — over a scale
+tag on all 21 palettes, transposed to the tonic, the third flattened where
+minor; played whole by the arrival sting, quoted as cell 0, ended on by
+every lift figure, the ostinato at chapProg 1.0, sung by a fifth choir
+voice under the aurora, and played once, complete, across the nineteen
+leads by the coda. Measured: palettes sharing the interval sequence 5/21
+→ 19/21; ≥ 6 of 8 notes in the chord 21/21; the coda 8/8 complete; the
+choir 16 notes in 16 s. qa/l6-tune.js.
+
+**F4. THE TRAVELLER'S NOTEBOOK.** A second page of the journal in the
+traveller's voice, one entry per chapter written the moment you leave,
+from a per-chapter template filled from what the journey counts; a blank
+dated line for a place you did not earn; rewritten on a return; saved as
+`nb`. `CHAPTERS[n].left` — a sentence for the player who did NOT stay —
+on the departure card (0/19 → 19/19). The traveller's four cameos have a
+`where()` and a row; `game.travMet` counts on distance (it had lived
+inside the greeting's cooldown: 0/4 → 4/4). The finale's last line is the
+notebook's last page. qa/l6-notebook.js.
+
+**F5. THE LOCALS SPEAK.** `sfxBabble`: a glottal pulse through two formant
+band-passes, 3–7 syllables from the line's word count, a contour that
+falls for a statement and rises for a question, the person's own pitch and
+formant offset, the authority a fifth lower, the storyteller slower;
+captions fall back to the blip. The level was the finding: a syllable at
+the blip's peak was a bed at 0.39 of the world — 0.32 → 0.14. Measured
+over two minutes of Sydney: the blip band's share of the world 22.7 % as
+found → 8.2 %; 8/8 distinct voices; onset ≤ 10 ms. qa/l6-babble.js.
+
+### The eight areas
+
+**E1. THE FAR SHADOW, AND THE LENS THAT COMES BACK.** A second cascade
+(140 m, every other frame, casters under 1.2 m culled): shade in the band
+y 0.20–0.45 on walking frames Sydney 11.7 %, Venice 25.2, Pasto 8.2,
+Sahara 16.5, Pantanal 21.2 (was ~0), 0.08–0.29 ms CPU. THE CROWD IN THE
+LENS: a ray lens→animal against person bodies inside 3.5 m, a screen-door
+dither through the rim shader, the boom biased where nothing can fade.
+THE CAMERA COMES BACK on a straight stick — and C had put the rig in the
+animal's face (rotation.y, not + π): 1.75 → −0.05 rad. Every shove over
+5 m/s names its cause on a pill (thirteen call sites labelled).
+
+**E2. THE BODY.** A 70 ms armed crouch before the hop (grounded frames
+under −0.15: 0 → 5), air pitch across the arc 0 → 0.40 rad, a landing hold
+(1 → 10 frames), the grab a lunge, the wheek an inhale 100 ms before the
+call, the face read (catchlight beads, ears ×1.3, the head ×1.12 at the
+driving lens, THE REGARD — the head turns to a resting lens), four body
+sounds (shake, chew, snort, yawn). qa/l6-body.js.
+
+**E3. THE MIX.** The range, the room's near share and make-up, the still
+state as the world's (leaves/lagoon/marsh beds), stings over the pad, THE
+SLEEP (a nap takes the score to −50 dBFS for 25 s and back in 2 s), the
+progress layers, the stems. Met: rooms cave 10.1 / Venice 17.6 / Hanoi
+16.5 dB; still window world − score ≥ −8 in 4/4; stings ≥ bed + 4 in 6/6;
+marquee ≥ still + 5 in 4/5. Not met, said why: chase ≥ still + 4 dB in
+2/5 (±2 dB run-to-run; Hanoi's rest is its bass, Venice's a band); the
+spectrum's ≥ 500 Hz share 6/19 — the pad is saw banks at 165–440 Hz, the
+register not the voicing.
+
+**E4. THE PAPER, THE PILLS, AND THE REASON WHY.** One pill at a time with
+a queue; a line under a live marquee takes the place-card slot; overheard
+pills attributed and roman; `game.marqueeWhy` — the concert says *up onto
+the red first, then Q*, every clocked marquee says *not yet — 58 s*; the
+podium a real 0.3 m block; the hat row *armed*; the paper 59 % → 42 % of
+the viewport, min font 10.5 px, one clue; the recap one italic sentence.
+Flood onset: pills 3 → 1, moment cards 0, leaf text nodes 57 → 5–8.
+
+**E5. THE TICK BELONGS TO THE PLACE, AND THE ENDING COMPOSES.**
+`completeTask` refuses a row whose chapter is not the live one (Sydney's
+rows refused in Venice, taken in Sydney); Venice's siren says forty
+seconds; the Drift's fall keeps the animal on screen; the coda frames at
+7 m on the resting lens with the HUD off, looking in through the
+horseshoe's mouth, each keepsake named as its note sounds; the gardener
+stands down on a finished file.
+
+**E6. THE SKY, THE GROUND AND THE LAMPS.** Soft cloud cards with a lit
+term and a horizon ribbon (cloud-edge 4 px step p99 Rio 26 → 9); the
+grain's mid octave and a wear path spawn → marquee in Sydney, Rio, Sahara,
+Palawan; Hanoi's lake on the water shader; THE EMITTERS — Kowloon's taxis
+with lamps over white, pools and wet-road streaks, Iceland's lit windows
+pooling on the pavement (+28 luma on the arrival lens), Monaco's car and
+the yacht's 22 lit panes. Not met: the sky-band sd ≥ 1.5× — soft clouds
+have less sd than octagons; the metric wanted the opposite of the edge one.
+
+**E7. THE VOICE'S TICS.** Six phrases (*eleven years*, *Tuesday*, *every
+single*, *, that is.*, *nobody has ever*, *I have been N years*) from 8–11
+files each to ≤ 3, rewritten in the chapter's idiom; `qa/l6-tics.mjs`
+asserts it on `npm test`.
+
+**E8. THE MACHINE.** The frozen frame on every first entry was the first
+DRAW compiling programs, not the build: `biomeWarm` links every program
+into the composite's target behind the white (the Cave 6 479 → 140 ms,
+Venice 1 731 → 69, Kowloon 1 731 → 81); the governor sheds physics from
+rung 2 and draws the shadow map every other frame; a hidden prop is STATIC
+(Monaco's camera +211 solver saves in 9 s → 0); `npm run soak` with a
+history and a diff; the budget table re-measured with the shadow pass
+counted. Not met: ≤ 250 ms longest frame in 19/19 (the synchronous build
+remains; a sliced build is the next instrument).
+
+### What the instruments said that the roadmap did not expect
+
+- **The concert's house is eight on a fresh file** — and a saved one has
+  the same eight standing where they were left, so a tell that waits for
+  the cooldown never counts: the traveller was met 0/4 because the count
+  lived inside the greeting.
+- **A fixed tune sits on 21 chords only if five of its eight notes are the
+  tonic or the fifth.**
+- **The babble's level was the blip's peak on a sentence**: ten times the
+  energy at 1.3 lines a second.
+- **The walking lens sits above a piazza's heads** (y ≈ 4 m), so "a person
+  on the lens segment" only happens under a cut boom; the piazza
+  instrument is vacuous and the mechanism was verified synthetically.
+- **The fuzz's solver gate at zero fails on honest input**: eight seconds
+  of random keys clamp a kicked crate once; the gate is five (a falling
+  body reaches it in a twelfth of a second).
+- **C put the rig in the animal's face** since whenever the C key was
+  written (rotation.y, not + π); measured 1.75 rad, fixed to −0.05.
+- **The far cascade cost is not on the CPU** (0.1–0.3 ms); the GPU was not
+  timed — no timer query on this ANGLE path.
+
+### Owed
+
+The sliced build (E8's 250 ms floor); the CPU-throttle instrument; a
+Cappadocia scale tag for hijaz (tagged major, 6/8 in chord); the
+chase-range and spectrum targets (the register); `cap-at-the-rim` and
+`seed-gap` end-to-end under the harness; the fetch and the Hanoi
+traveller's count (design extras beyond F1's bullet); the settled frames
+re-taken under the far cascade.
+
 ## THE MARQUEE PASS — NINETEEN BIG ONES, EACH A NOTCH HIGHER (L5 — 13 Sep 2026)
 
 Asked for: an assessment of the marquee in each of the nineteen chapters —
