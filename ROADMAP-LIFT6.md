@@ -362,3 +362,10 @@ Built in two sessions (the first's limit fell with E1, E3, E6, F4 and F5
 in flight; the second finished them and built F1–F3). The record, the
 numbers and what is owed are in CONTRACT.md's top section. Twenty-two
 `qa/l6-*.js` probes carry the measurements.
+
+Then the owed (L6-5, the same day): the build behind the white was the
+merger's clone, the pad gained a fifth voice, Cappadocia is hijaz, the
+companion fetches, two rows tick under the harness, the chiva's roof turns
+with the bus, the aurora and the Uji run have measured floors — and the
+game is a link: https://urbantorque.github.io/capybara-abroad/ (built by
+`.github/workflows/pages.yml` from every push to `master`).

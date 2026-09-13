@@ -1,5 +1,11 @@
 # Capybara Abroad — nineteen places, one rodent
 
+**Play it: https://urbantorque.github.io/capybara-abroad/** — one file, no
+install, no account; it runs in the browser and saves to it. Built from every
+push to `master` by `.github/workflows/pages.yml`. (There is no LICENSE yet
+— see LICENSING.md; playing it is fine, redistributing it is not, until the
+author picks one.)
+
 A physics sandbox where a mischievous capybara terrorises nineteen places: the Royal Botanic
 Gardens and the Opera House forecourt in Sydney; Sydney Harbour from Circular Quay out to
 Manly, which you cross by DRIVING A FERRY; the plaza, market and Galeras volcano of Pasto,

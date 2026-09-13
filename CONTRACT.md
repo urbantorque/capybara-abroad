@@ -160,7 +160,7 @@ remains; a sliced build is the next instrument).
 - **The far cascade cost is not on the CPU** (0.1–0.3 ms); the GPU was not
   timed — no timer query on this ANGLE path.
 
-### Owed
+### Owed (as of the closeout; paid below)
 
 The sliced build (E8's 250 ms floor); the CPU-throttle instrument; a
 Cappadocia scale tag for hijaz (tagged major, 6/8 in chord); the
@@ -168,6 +168,150 @@ chase-range and spectrum targets (the register); `cap-at-the-rim` and
 `seed-gap` end-to-end under the harness; the fetch and the Hanoi
 traveller's count (design extras beyond F1's bullet); the settled frames
 re-taken under the far cascade.
+
+### The owed, paid (L6-5 — 13 Sep 2026)
+
+Asked for: finish the rest. Everything the list below the features named,
+and L5's four, each with its own instrument; and a remote, so the game is
+a link (see THE LINK at the end).
+
+**THE BUILD BEHIND THE WHITE (E8's 250 ms).** A CPU profile of the crossing
+(`qa/l7-build-prof.js`) said the build was not the chapter's own code: the
+merger's `add()` was 318 of the Cave's 438 ms, 265 of Hanoi's 515, 247 of
+the Drift's 371 — and not the copy. `BufferGeometry.clone()` is `new
+this.constructor().copy(this)`, and for a SphereGeometry or a
+CylinderGeometry the constructor BUILDS A DEFAULT ONE (32 × 16 for the
+sphere) before the copy overwrites it: SphereGeometry 148 ms and
+CylinderGeometry 90 ms inside builds that never made a new shape. `add()`
+(and environment.js's `addC`) now reads the source arrays in place through
+the same two three.js paths the clone took; a node A/B over 400 primitives
+(58 320 floats) is bit-identical and 15× faster. Iceland's static group put
+its erratics on one body through `Body.addShape`, which recomputes the mass
+properties over every shape already there, per call — 107 of its 230 ms;
+the shapes go on together and the two updates run once. And the shader
+warm runs on the task AFTER the switch: the hold goes up in `biomeGo`, the
+frame that built the chapter ends, the next one links (the Cave was 225 +
+133 ms in one frame). Measured, quiet machine: the switch frame ≤ 250 ms in
+19/19 by the split instrument (`qa/l7-load-split.js`: max Hanoi 233,
+Göreme 233; Iceland 367 → 167 after the group fix) and 18/19 by the full
+one (`qa/l6-load.js`: Iceland 267); the visible frame after the white
+≤ 133 ms in 19/19. The same tree contended by a OneDrive sync read 8/19 —
+the number is the machine's as much as the build's.
+
+**THE THROTTLE INSTRUMENT** (`qa/l7-throttle.js`): CDP
+`Emulation.setCPUThrottlingRate` at 1× and 4× over six chapters. At 4× the
+walk sits at p50 50–83 ms (12–20 fps), the governor at rung 3 in 6/6, the
+crossing's longest frame 367–533 ms, the worst frame after it 267 ms (the
+Pantanal). A slow laptop gets half a second behind the white and a playable
+frame after it.
+
+**THE REGISTER (E3).** The pad's four centres are E2 B2 E3 A3 — 82–220 Hz
+— and voice-leading keeps every chord tone within a tritone of them, so
+two rounds on the filter and the shelves had moved the share over 500 Hz
+from 1 to 6 palettes of 19: the notes were not there to let through. A
+FIFTH VOICE at E5 (triangle, level 0.058, through the same lowpass, which
+rests at 900 or over): 6/19 → 8/19 (Sydney 5.1 → 14.6 %, Cali 7.7 → 15.3,
+Monaco 10.2 → 23.1, Kyoto 8.0 → 11.6; `qa/l6r-audio-spectrum.js`). The
+target was 15/19 and the rest is the bass sine and the six bands' drums —
+the composition, not the voicing. THE CHASE: the pad's lean −0.6 → −0.85
+measured chase − still +6.2 Sydney, +6.2 Kyoto, +6.8 the cave, +3.6 Hanoi,
++3.0 Venice (3/5, was 2/5) with the cave's chase peak at −5.2 dBFS; shipped
+at −0.78, and the re-run read 2/5 with Sydney's still state 3.8 dB louder
+than the run before — the still state is the instrument that cannot hold a
+line (±4 dB run to run), and the numbers above are both of them. The fifth
+voice costs peak: Sydney's walk −8.3 → −5.3 dBFS.
+
+**HIJAZ.** `sysMUS_SCALES.hijaz` = [0, 1, 4, 5, 7, 8, 10]; Cappadocia's
+palette carries it. The tune's descent lands G F# Eb D — the augmented
+second the ney opens with — six of eight in the chord as before; 21/21 at
+six or more. Marrakech keeps `minor`: hijaz on E puts four of eight in its
+drone.
+
+**THE FETCH (F1's fourth combination).** A thrown prop under 0.4 kg that
+comes to rest within 6 m of a following companion is gone for, taken up on
+the errand's kinematic hold, walked to within 1.4 m of you and put down;
+not into water, not a held thing, not one that has spilt; given up after
+14 s. The review said 3 m — measured, the companion walks 1.7 m behind you
+and a tap throw lands 3.3 m ahead, 4.6 m from it, so at three nothing
+thrown forward was ever fetched. `qa/l7-fetch.js`: a Venetian pigeon in Rio
+brought a frisbee back in under a second of its landing. AND THE TRAVELLER
+COUNTS THE PASSENGER: in Hanoi, with one on you, *Four countries, and a
+pigeon. Five, if you count the pigeon. I am counting the pigeon.* A line may
+be a function now (npc.js), written when it is said.
+
+**TWO ROWS END TO END.** `cap-at-the-rim`: the cat got down at take-off,
+every time. The rising basket is a kinematic body under a dynamic one and
+the solver answered the overlap with a kick — 2.1, 1.6, 0.1 m/s up per
+frame while the floor did 0.2, then one of 8.3 that put the animal a metre
+and a half over the rim — and THE PERCH read that as the world throwing
+you. The basket clips the kick to its own rise + 1 m/s (a hop is not
+clipped: the key is down on that frame) and publishes `capy.floorVY`,
+which the perch subtracts; the probe wheeks every 12 s, because the company
+is on a 21 s clock. Ticked at 61 s of flight, sun 0.48, the cat on. The
+perch itself is not deterministic under the harness (1 of 2 runs the loaf
+was interrupted at 3 s and the cat took 10 s; the probe waits 28). 
+`seed-gap`: the Long Gap on the seed, no puff, launched on a +1.2 m/s
+tailwind — 30 m across on the first try, seedT 3.4 s (`qa/l7-seed-gap.js`).
+
+**THE ROOF (L5 owed).** The chiva's body carried a linear velocity and
+nothing else, so a passenger rode the bus's ORIGIN through a corner. The
+yaw rate goes on the body as `angularVelocity.y` and capybara.js's contact
+sweep adds ω × r for any kinematic deck that publishes one: through the
+first banner's bend lx +0.97 → +0.90 (it was +1.0 → −0.6). The second,
+tighter bend still slid a metre, and with the roll zeroed for one run it
+did not — nine degrees of lean is a slope; the roll is clamped to 4.5° and
+the residual (+0.94 → +0.33) is the physics of a tilting floor, left as
+measured (`qa/l7-roof-drift.js`).
+
+**THE FLOORS (L5 owed).** The aurora: six calls 1.8 s apart are a run of
+six, record 6 = par. The Uji run swum end to end (`qa/l7-floors.js`,
+steered in the page every frame down the centreline and to the inside of
+the hairpin — a 100 ms playwright loop was a bank-to-bank swimmer): 13.7 s
+through all three boats. Par was 42, three times that; it is 24. The finish
+lens sat 5.7 m over the water throughout — L5's "under the surface for a
+frame" was the teleport probe's lens, not the swim's. The manta 4.5 and the
+chain 3 were already at par under their L5 probes. The humpback for Manly's
+own ferry arrival: Manly has no ferry of its own — the arrival is a border
+— so there is nothing to attach it to.
+
+**THE SETTLED FRAMES**, re-taken under the far cascade
+(`qa/l6r-art-shots.js`): twelve chapters, arrive / walk / rest, `qa/l6r-art-*-rest.png` on disk. At rest the animal is 102 px tall at 12.4 m (94 before the pass), the horizon 0.28 of the frame from the top (0.32), sky by ray 0 % as before — the lens never sees sky. The Procuratie's shadow lies across the piazza in the Venice frame, which is what the cascade was for.
+
+### What this batch said that the roadmap did not expect
+
+- **The build was the clone.** Every primitive in the game passed through
+  `BufferGeometry.clone()`, and for the parametric geometries that means
+  constructing a default sphere or cylinder to throw away. Two-thirds of
+  every chapter's build, since the mergers were written.
+- **A rising floor is a throw.** The perch's "the world threw you" test
+  (vy over 5.4 m/s) is right for a geyser and wrong for a basket, and the
+  basket's solver kick was 8.3 m/s.
+- **A fetch radius from a design brief is a number about the wrong
+  animal.** Three metres from the companion is a throw you cannot make
+  from where you stand.
+- **The still state moves 4 dB between runs.** A chase target of +4 dB
+  over it is inside the instrument's own noise; the pad lean is reported
+  at both runs rather than tuned to one.
+- **The Uji par was three times the floor.** Nobody had swum it; the L5
+  probe teleported and read 7.3 s.
+
+### Still owed
+
+The last decibel of chase range and the bands' share over 500 Hz (the
+composition); a deterministic perch under the harness; the roof's residual
+slide on a tilted deck; a LICENSE (LICENSING.md — the author's call, and
+the one thing that stands between this repository being public and being
+free to use).
+
+### THE LINK
+
+The repository is `github.com/urbantorque/capybara-abroad` (public; `master`
+is the default branch and `lift-pass` is pushed beside it). Every push to
+`master` runs `.github/workflows/pages.yml` — `node build.mjs`, the one
+file copied to `site/index.html`, deployed to GitHub Pages — so the game is
+**https://urbantorque.github.io/capybara-abroad/** and nothing else is at
+that address. No dependencies, no network at play time: the two libraries
+are in `vendor/` and the build is one script.
 
 ## THE MARQUEE PASS — NINETEEN BIG ONES, EACH A NOTCH HIGHER (L5 — 13 Sep 2026)
 
