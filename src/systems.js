@@ -5999,16 +5999,14 @@ function sysFillLegend(el, which) {
  * useful copy taken away, and it blinked.
  */
 // ===========================================================================
-// THE ROUTE (L3-8, UX) — nineteen dots on a hand-drawn world.
+// WHERE THE PLACES ARE — longitude and latitude, for the coda's pans.
 //
-// The picker was a shelf of postcards and the departures board a list;
-// nothing said where Pasto is relative to Sydney, or that the Quay and Manly
-// are the same city, or that the journey has a shape at all. One inline SVG
-// on page two, above the shelf: the places at their longitude and latitude
-// (the Drift, which is not anywhere, sits in the middle of the Indian
-// Ocean), the chapter order as a dotted thread, the places you have stood
-// in stamped, and the one you are choosing from lit. It is the cheapest
-// place to give the journey a shape.
+// This table used to draw THE ROUTE (L3-8): an inline SVG on the picker's
+// second page, nineteen dots on a hand-drawn world with the chapter order as
+// a dotted thread. The author looked at it and called it ugly, and it was —
+// a strip of grey dots and overlapping labels between the hero tile and the
+// shelf, saying nothing the shelf did not. Gone (13 Sep 2026). The finale's
+// coda still pans each chapter's note by its longitude, so the table stays.
 // ===========================================================================
 const sysROUTE_LL = {
   sydney: [151.2, -33.9], pasto: [-77.3, 1.2], quay: [151.2, -33.9], kyoto: [135.8, 35.0],
@@ -6017,62 +6015,6 @@ const sysROUTE_LL = {
   goreme: [34.8, 38.6], manly: [151.3, -33.8], pantanal: [-57.0, -17.5], cave: [106.3, 17.5],
   antarctic: [-64.0, -65.0], monaco: [7.4, 43.7], hanoi: [105.8, 21.0],
 };
-const sysROUTE_LBL = {
-  monaco: [8, 6, 'start'], venice: [8, -8, 'start'], goreme: [8, 13, 'start'], sahara: [-8, 9, 'end'],
-  cali: [-8, -4, 'end'], pasto: [-8, 12, 'end'],
-  rio: [8, 8, 'start'], pantanal: [-8, 3.5, 'end'],
-  kowloon: [8, -3, 'start'], hanoi: [-8, 12, 'end'], cave: [8, 9, 'start'], palawan: [8, 12, 'start'],
-  sydney: [-8, -2, 'end'], quay: [-8, 4, 'end'], manly: [-8, 10, 'end'],
-};
-function sysBuildRouteMap(seen, here) {
-  const NS = 'http://www.w3.org/2000/svg';
-  // a wide strip, stretched to the wrap's own width (the labels are read at
-  // their authored size; the wrap's aspect is within a few per cent of this)
-  const W = 1000, H = 175;
-  const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
-  svg.setAttribute('preserveAspectRatio', 'none');
-  svg.setAttribute('class', 'capyui-route');
-  svg.setAttribute('role', 'img');
-  svg.setAttribute('aria-label', 'the route: nineteen places on a map');
-  const px = function (ll) { return [ (ll[0] + 180) / 360 * (W - 120) + 40, (72 - ll[1]) / 145 * (H - 30) + 14 ]; };
-  const el = function (tag, attrs, text) {
-    const e = document.createElementNS(NS, tag);
-    for (const k in attrs) e.setAttribute(k, attrs[k]);
-    if (text) e.textContent = text;
-    svg.appendChild(e);
-    return e;
-  };
-  // the graticule, faint
-  for (let lon = -150; lon <= 150; lon += 50) { const a = px([lon, 75]), b = px([lon, -75]); el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], class: 'capyui-routegrid' }); }
-  for (let lat = -60; lat <= 60; lat += 30) { const a = px([-180, lat]), b = px([180, lat]); el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], class: 'capyui-routegrid' }); }
-  // the thread, in chapter order, with a little spread where two dots share a city
-  const pts = [];
-  const jitter = { quay: [0, 13], manly: [0, 26] };
-  for (let n = 1; n <= CHAPTERS.length; n++) {
-    const d = CHAPTERS[n - 1];
-    const ll = sysROUTE_LL[d.biome] || [0, 0];
-    const p = px(ll);
-    const j = jitter[d.biome] || [0, 0];
-    pts.push({ n: n, d: d, x: p[0] + j[0], y: p[1] + j[1] });
-  }
-  let path = '';
-  for (let i = 0; i < pts.length; i++) path += (i ? ' L' : 'M') + pts[i].x.toFixed(1) + ' ' + pts[i].y.toFixed(1);
-  el('path', { d: path, class: 'capyui-routethread' });
-  for (let i = 0; i < pts.length; i++) {
-    const p = pts[i];
-    const was = !!(seen && seen(p.n));
-    const cls = 'capyui-routedot' + (was ? ' seen' : '') + (p.n === here ? ' here' : '');
-    el('circle', { cx: p.x, cy: p.y, r: was ? 5 : 3.5, class: cls });
-    // the label: to the right by default; the crowded corners of the world
-    // (the Med, the Andes, Indochina, the Brazilian pair, Sydney's three)
-    // carry their own offset and anchor so no two names sit on each other
-    const L = sysROUTE_LBL[p.d.biome] || [8, 3.5, 'start'];
-    el('text', { x: p.x + L[0], y: p.y + L[1], class: 'capyui-routelbl' + (was ? ' seen' : ''),
-                 'text-anchor': L[2] }, p.d.name);
-  }
-  return svg;
-}
 function sysTitleFoot(rows, note, touchNote) {
   const el = sysEl('div', 'capyui-foot');
   // ---- A KEYCAP IS A PROMISE, AND ON A PHONE IT IS A FALSE ONE (R5) -------
@@ -8462,20 +8404,6 @@ function sysBuildCSS() {
    restated here or both pages are in the flow at once and the card is twice as
    long as it was before the split. */
 '.capyui-page{display:flex;flex-direction:column;}',
-/* THE ROUTE (L3-8): a strip of world above the shelf. Paper on paper, so the
-   map is the card's own colour with a hairline, and the thread is the ink at
-   a third. Hidden under 560px of height, where the shelf needs every row. */
-'.capyui-routewrap{margin:clamp(6px,1.2vw,10px) 0 2px;border:1px solid ' + rule + ';border-radius:' + rSm + ';',
-  'background:' + sysRgba(PALETTE.sail, 0.55) + ';overflow:hidden;}',
-'.capyui-route{display:block;width:100%;height:clamp(120px,20vh,175px);}',
-'.capyui-routegrid{stroke:' + sysRgba(PALETTE.ibisHead, 0.08) + ';stroke-width:1;}',
-'.capyui-routethread{fill:none;stroke:' + sysRgba(PALETTE.ibisHead, 0.20) + ';stroke-width:1;stroke-dasharray:2 5;}',
-'.capyui-routedot{fill:' + sysRgba(PALETTE.ibisHead, 0.35) + ';}',
-'.capyui-routedot.seen{fill:' + accent + ';}',
-'.capyui-routedot.here{stroke:' + accent + ';stroke-width:2;fill:' + paper + ';}',
-'.capyui-routelbl{font-size:11px;font-weight:600;fill:' + sysRgba(PALETTE.ibisHead, 0.55) + ';letter-spacing:.02em;}',
-'.capyui-routelbl.seen{fill:' + ink + ';}',
-'@media (max-height:560px){.capyui-routewrap{display:none;}}',
 '.capyui-page[hidden]{display:none;}',
 /* ---- THE CARD IS DEALT, AND THE PAGE IS TURNED (T3) --------------------
    The exit was the only transition on this screen: a 0.75 s fade and scale as
@@ -8700,13 +8628,10 @@ function sysBuildCSS() {
    at y 701..807 under the window's edge, cut through the middle. The shelf's
    budget is the window minus the card's own chrome above and below it (505
    px at this width: header, hero, chart, footer, padding), so the shelf is
-   the one thing that gives and it gives exactly as much as it has to. */
-'@media (max-height:770px){.capyui-picks{max-height:clamp(130px,calc(100vh - 522px),420px);}',
-  /* ...and the chart gives a third of its height on the same window: 154 ->
-     ~100 px, which is still every label legible (they are 11 px and do not
-     scale with it), and it is the difference between the shelf showing two
-     rows and one and a half. */
-  '.capyui-route{height:clamp(96px,14.5vh,112px);}}',
+   the one thing that gives and it gives exactly as much as it has to.
+   ...AND THE CHART IS GONE (13 Sep 2026): its 154 px go back to the shelf,
+   so the chrome is 368 and a 770 px window shows three rows, not two. */
+'@media (max-height:770px){.capyui-picks{max-height:clamp(130px,calc(100vh - 368px),420px);}}',
 /* ---- the hero: chapter one, out of the grid and across the card ---- */
 /* ---- MIN-HEIGHT, NOT HEIGHT. THIS IS THE LINE THAT ATE 'SYDNEY'. ----------
    The hero used to be `height:clamp(84px,13.5vh,124px)` with `overflow:hidden`,
@@ -22204,17 +22129,6 @@ export function createSystems(game) {
   picksEl.setAttribute('aria-label', 'the other places');
   for (let i = 1; i < pickDefs.length; i++) {
     picksEl.appendChild(buildPick(pickDefs[i], i, false));
-  }
-  // ---- THE ROUTE (L3-8): the world, with the journey on it, above the shelf
-  {
-    const wrap = sysEl('div', 'capyui-routewrap');
-    wrap.appendChild(sysBuildRouteMap(function (n) {
-      if (jrFileSeen[n]) return true;
-      const ids = tasksInChapter(n);
-      for (let k = 0; k < ids.length; k++) if (jrFileDone[ids[k]]) return true;
-      return false;
-    }, jrFileCount > 0 ? chapterOf(jrFile.biome || 'sydney') : 0));
-    p2El.appendChild(wrap);
   }
   p2El.appendChild(picksEl);
 
