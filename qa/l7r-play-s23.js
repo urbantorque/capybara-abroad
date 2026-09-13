@@ -1,0 +1,14 @@
+async page => {
+  await page.evaluate(() => window.__capy.hud.cross('venice'))
+  await page.waitForTimeout(4000)
+  await page.screenshot({ path: 'qa/l7r-play-44.png' })
+  await page.waitForTimeout(6000)
+  await page.screenshot({ path: 'qa/l7r-play-45.png' })
+  const out = await page.evaluate(() => {
+    const g = window.__capy
+    const vis = [...document.querySelectorAll('body *')].filter(e => { const cs = getComputedStyle(e); const r = e.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && +cs.opacity > 0.05 && r.width > 0 && e.children.length === 0 && e.textContent.trim() }).map(e => e.textContent.trim())
+    const p = g.capy.body.position
+    return { biome: g.biome.current, pos: [p.x, p.y, p.z].map(v => +v.toFixed(1)), vis: vis.slice(-45), err: g.state.lastError }
+  })
+  await page.evaluate((o) => fetch('/shot?name=l7r-play-s23.json', { method: 'POST', body: btoa(unescape(encodeURIComponent(JSON.stringify(o)))) }), out)
+}

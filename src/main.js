@@ -2260,6 +2260,19 @@ function mainBoot() {
     }
   }
 
+  // ---- WHERE THE FRAME GOES (the perf review, 13 Sep 2026) -----------------
+  // The main thread's own bill, per module, smoothed: game.state.perf.ms is
+  // { step, environment, pasto, ..., systems, draw } in milliseconds, an
+  // exponential mean over ~30 frames. 'draw' is the CPU side of post.render —
+  // the scene walk, the shadow pass's submissions, the composite's six passes
+  // — not the GPU's time, which nothing on this path can read (no timer
+  // query on ANGLE/D3D11). Twenty-six performance.now() calls a frame; the
+  // overlay and qa/l7-perf.js read it, nothing in src does.
+  const mainMs = {};
+  function mainMsAdd(k, ms) {
+    const v = mainMs[k];
+    mainMs[k] = v === undefined ? ms : v + (ms - v) * 0.035;
+  }
   // One full frame. Exposed as game.tick so the game can also be advanced manually
   // (headless QA, deterministic capture) when requestAnimationFrame is throttled.
   game.tick = function (dt, render) {
@@ -2284,6 +2297,7 @@ function mainBoot() {
       pf.programs = ri.programs ? ri.programs.length : 0;
       pf.contacts = game.world ? game.world.contacts.length : 0;
       pf.substeps = mainSubsteps; mainSubsteps = 0;
+      pf.ms = mainMs;
       ri.reset();
     }
     // The tab-switch guard, and from rung 2 the shed clamp — see MAIN_SHED_*.
@@ -2310,8 +2324,10 @@ function mainBoot() {
       // the frame. Modules MUST render from those, not from body.position — a hand
       // rolled accumulator (what this used to be) renders the world at a hard 60Hz
       // no matter the display refresh, which is exactly what made motion look jerky.
+      const tStep = performance.now();
       game.world.step(STEP, dt, shed ? MAIN_SHED_SUBSTEPS : MAX_SUBSTEPS);
       mainSaneWorld();
+      mainMsAdd('step', performance.now() - tStep);
     }
 
     // A THROW MUST NOT BE A DEATH SENTENCE.
@@ -2342,9 +2358,11 @@ function mainBoot() {
     for (let i = 0; i < updaters.length; i++) {
       const m = updaters[i];
       if (frozen && m.__name !== 'systems') continue;
+      const tMod = performance.now();
       try {
         m.update(dt);
         if (m.__strikes) m.__strikes = 0;      // a good frame forgives the last bad one
+        mainMsAdd(m.__name || String(i), performance.now() - tMod);
       } catch (e) {
         m.__strikes = (m.__strikes || 0) + 1;
         if (m.__strikes <= 3) {
@@ -2426,9 +2444,11 @@ function mainBoot() {
       if (!held && render !== false) game.state.shadowDirty = false;
     }
     if (render !== false && !held) {
+      const tDraw = performance.now();
       try {
         game.post.render();
         game.state.frames = (game.state.frames | 0) + 1;
+        mainMsAdd('draw', performance.now() - tDraw);
       } catch (e) {
         const nowS = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
         if (!mainPostLoudAt || nowS - mainPostLoudAt > 4) {
