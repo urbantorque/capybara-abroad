@@ -462,6 +462,9 @@ function iceMerger() {
 function iceVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
                { scale: 0.42, amount: 0.075, warp: 0.55, near: 0.34, nearScale: 8, contact: 1,
+                 // `rock` (L7, E4): the basalt at Reynisfjara and the berg
+                 // faces take the broad octave on their own plane.
+                 rock: 0.08, broadM: 12,
                  // THE WATER'S EDGE (D5). The sea and the lagoon are the same
                  // level here (see the note beside waterHeightAt), so one band
                  // puts a waterline on the hulls in the old harbour, the piles

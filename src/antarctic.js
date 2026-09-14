@@ -248,6 +248,7 @@ let antSkua = null, antSkuaT = 0;
 // counters are the only score this keeps, and neither is a task.
 let antSkuaNest = 0, antSkuaLap = -1, antSkuaGot = false, antSkuaHeavy = 0;
 let antSkuaTook = 0, antSkuaSaved = 0;
+let antSkuaSaid = false;   // the colony line, once, in sight (L7, E5)
 // How much flush counts as having put it off. Not "any flush at all": a wheek
 // from ninety metres that happens to land on a dive should not save a chick.
 // antSkuaFlush is written 1 and decays at 1.2/s, so 0.35 is about nine tenths
@@ -4307,8 +4308,10 @@ function antUpdatePod(game, dt) {
         antSeenPod = true;
         antToast('they have formed up on you. do not slow down.');
       }
-      antSfx('splash', placeCue({ volume: 0.5, pitch: 0.5 },
-                                antPodCX, antWATER, antPodCZ, 150));
+      // the pod surfacing beside you is a mass of water going past, not a
+      // thing falling in (L7, E2): `swell`, which was `splash` at 0.5
+      antSfx('swell', placeCue({ volume: 0.6, pitch: 0.9 },
+                               antPodCX, antWATER, antPodCZ, 150));
     }
     if (antPodStateT > 26) antPodState = 'patrol';    // they gave up on you
   } else if (antPodState === 'run') {
@@ -4366,7 +4369,9 @@ function antUpdatePod(game, dt) {
         antBreachT = 0;
         antBreachIdx = 4;                                   // the bull
         const bx = antPodX[antBreachIdx] || antPodCX, bz = antPodZ[antBreachIdx] || antPodCZ;
-        antSfx('splash', placeCue({ volume: 0.62, pitch: 0.36, force: true }, bx, antWATER, bz, 150));
+        // six tonnes landing: the swell, hard, with the slap of it (L7, E2)
+        antSfx('swell', placeCue({ volume: 1.0, pitch: 0.8, force: true }, bx, antWATER, bz, 150));
+        antSfx('thud', placeCue({ volume: 0.5, pitch: 0.7, force: true }, bx, antWATER, bz, 150));
         if (typeof game.shake === 'function') game.shake(0.10);
         antToast('all of it. out of the water. all of it.');
         if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
@@ -4428,8 +4433,8 @@ function antUpdatePod(game, dt) {
       antPodRide = 0;
       antPodRunPX = antPodCX; antPodRunPZ = antPodCZ;
       antToast('they have broken north. that is the lead. GO.');
-      antSfx('splash', placeCue({ volume: 0.6, pitch: 0.42 },
-                                antPodCX, antWATER, antPodCZ, 180));
+      antSfx('swell', placeCue({ volume: 0.7, pitch: 0.85 },
+                               antPodCX, antWATER, antPodCZ, 180));
     }
 
     // --- the marquee: HOLD IT, at speed -----------------------------------
@@ -4481,9 +4486,9 @@ function antUpdatePod(game, dt) {
         antSpyT = 0;
         antSpyTold = false;
         antSpyIdx = 1;
-        antSfx('splash', placeCue({ volume: 0.55, pitch: 0.42 },
-                                  antPodX[antSpyIdx] || antPodCX, antWATER,
-                                  antPodZ[antSpyIdx] || antPodCZ, 150));
+        antSfx('swell', placeCue({ volume: 0.55, pitch: 1.0 },
+                                 antPodX[antSpyIdx] || antPodCX, antWATER,
+                                 antPodZ[antSpyIdx] || antPodCZ, 150));
       }
     } else {
       antSlowT = 0;
@@ -4515,9 +4520,9 @@ function antUpdatePod(game, dt) {
       antBreachIdx = antBreachQueue.shift();
       antBreachT = 0;
       antBreachWait = 0.6;
-      antSfx('splash', placeCue({ volume: 0.58, pitch: 0.40, force: true },
-                                antPodX[antBreachIdx] || antPodCX, antWATER,
-                                antPodZ[antBreachIdx] || antPodCZ, 150));
+      antSfx('swell', placeCue({ volume: 0.9, pitch: 0.85, force: true },
+                               antPodX[antBreachIdx] || antPodCX, antWATER,
+                               antPodZ[antBreachIdx] || antPodCZ, 150));
       if (typeof game.shake === 'function') game.shake(0.08);
     }
   }
@@ -4585,8 +4590,8 @@ function antUpdatePod(game, dt) {
       antPodX[i] = damp(antPodX[i], antBoatX + 11 * sn - 7 * cs, 2.4, dt);
       antPodZ[i] = damp(antPodZ[i], antBoatZ + 11 * cs + 7 * sn, 2.4, dt);
       if (u > 0.93 && u - dt / 2.6 <= 0.93) {
-        antSfx('splash', placeCue({ volume: 0.7, pitch: 0.30, force: true },
-                                  antPodX[i], antWATER, antPodZ[i], 150));
+        antSfx('swell', placeCue({ volume: 1.0, pitch: 0.75, force: true },
+                                 antPodX[i], antWATER, antPodZ[i], 150));
         for (let k = 0; k < 6; k++) {
           antSpray(antPodX[i] + rand(-3, 3), antWATER + 0.6, antPodZ[i] + rand(-3, 3),
                    rand(-5, 5), rand(4, 9), rand(-5, 5));
@@ -4762,7 +4767,8 @@ function antUpdatePenguins(game, dt) {
     antCallT[i] -= dt;
     if (antCallT[i] > 0) continue;
     antCallT[i] = -1;
-    antSfx('bark', { volume: 0.30 - i * 0.07, pitch: rand(1.5, 2.3), force: i === 0 });
+    // a penguin, which is a penguin (L7, E2) — it was `bark` at 1.5–2.3
+    antSfx('penguin', { volume: 0.30 - i * 0.07, pitch: rand(0.9, 1.2), force: i === 0 });
   }
   // ...and the animal's own voice off the dome behind the station
   if (antEchoT >= 0) {
@@ -5174,7 +5180,11 @@ function antUpdateBirds(game, dt) {
         antSkuaHeavy = 1;
         antSfx('gull', { volume: 0.26, pitch: 1.6 });
         antSkuaShout(tnx, tnz, 1);
-        if (antSkuaTook === 1) {
+        // ...said once, the first time it happens where the player can see it
+        // (L7, E5 / play 7): the line went up with no penguin in frame.
+        const scp = game.capy && game.capy.position;
+        if (!antSkuaSaid && scp && Math.hypot(scp.x - tnx, scp.z - tnz) < 30) {
+          antSkuaSaid = true;
           antToast('the whole colony went up at once. one of them did not.');
         }
       }
@@ -5501,7 +5511,9 @@ function antUpdateCalving(game, dt) {
     // for the delay to be real, and the file's own comment has said so since it
     // shipped — there was one thud.
     const v = clamp(0.46 - far * 0.0011, 0.05, 0.46);
-    antSfx('thud', { volume: v, pitch: 0.62 });
+    // the crack is a crack (L7, E2): thirty milliseconds at 3 kHz with the
+    // face's own rumble under it, where a `thud` at 0.62 was standing in
+    antSfx('calve', { volume: v, pitch: 1.0 });
     antCrackT = 0.55 + far * 0.0018;
     // ---- THE WINDOW (L6, F2): `the-calving` — at the tiller, inside the
     // ring of the block that came off, on the frame it comes off.
@@ -5531,8 +5543,10 @@ function antUpdateCalving(game, dt) {
   if (antCrackT > 0) {
     antCrackT -= dt;
     if (antCrackT <= 0) {
-      antSfx('thud', { volume: antCrackV, pitch: 0.24 });
-      antSfx('splash', { volume: antCrackV * 0.8, pitch: 0.30 });
+      // ...and what arrives a beat later is the WATER (L7, E2): a swell,
+      // which is a mass of sea going past, where a `thud` at 0.24 and a
+      // `splash` at 0.30 were standing in for it
+      antSfx('swell', { volume: antCrackV * 1.4, pitch: 0.75 });
     }
   }
   if (antCalveLive > 0) {

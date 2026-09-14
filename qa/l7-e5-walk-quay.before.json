@@ -1,0 +1,315 @@
+{
+ "biome": "quay",
+ "samples": [
+  {
+   "t": 14.3,
+   "biome": "quay",
+   "x": 4,
+   "y": 0.5,
+   "z": 26,
+   "paper": "the big one hereTHE FERRY TO MANLYSteer the ferry across the harbour to Manlythe wheel on the ferry at the wharf: press Ethe ferry at the wharf · 20 mpart 1 of 3THE QUAYAnnounce yourself (wheek)Steal ",
+   "err": null
+  },
+  {
+   "t": 39.4,
+   "biome": "quay",
+   "x": -17.4,
+   "y": 1.2,
+   "z": 24.4,
+   "paper": "the big one hereTHE FERRY TO MANLYSteer the ferry across the harbour to Manlythe wheel on the ferry at the wharf: press Ethe ferry at the wharf · 30 mpart 1 of 3THE QUAYAnnounce yourself (wheek)Steal ",
+   "err": null
+  },
+  {
+   "t": 60.3,
+   "biome": "quay",
+   "x": -28.8,
+   "y": 0.5,
+   "z": 41.3,
+   "paper": "the big one hereTHE FERRY TO MANLYSteer the ferry across the harbour to Manlythe ferry at the wharf · 50 mpart 1 of 3THE QUAYAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat",
+   "err": null
+  },
+  {
+   "t": 78.2,
+   "biome": "quay",
+   "x": -19.3,
+   "y": 0.5,
+   "z": 39.7,
+   "paper": "the big one hereTHE FERRY TO MANLYSteer the ferry across the harbour to Manlythe ferry at the wharf · 43 mpart 1 of 3THE QUAYAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat",
+   "err": null
+  },
+  {
+   "t": 106.6,
+   "biome": "quay",
+   "x": -18.8,
+   "y": 1.9,
+   "z": 35.2,
+   "paper": "the big one hereTHE FERRY TO MANLYSteer the ferry across the harbour to Manlythe ferry at the wharf · 39 mpart 1 of 3THE QUAYAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat",
+   "err": null
+  },
+  {
+   "t": 128.8,
+   "biome": "quay",
+   "x": -3.7,
+   "y": 2.2,
+   "z": 34.6,
+   "paper": "0 of 9 · Cast off from the Quay40 mthe ferry at the wharf · 40 mthe big one hereTHE FERRY TO MANLYSteer the ferry across the harbour to Manlythe ferry at the wharf · 31 mpart 1 of 3THE QUAYAnnounce yo",
+   "err": null
+  },
+  {
+   "t": 145.6,
+   "biome": "quay",
+   "x": 27.2,
+   "y": 0.5,
+   "z": 32.5,
+   "paper": "0 of 9 · Cast off from the Quay28 mthe ferry at the wharf · 28 mthe big one hereTHE FERRY TO MANLYSteer the ferry across the harbour to Manlythe ferry at the wharf · 34 mpart 1 of 3THE QUAYAnnounce yo",
+   "err": null
+  }
+ ],
+ "ticks": [],
+ "imp": [
+  {
+   "cause": "something back there",
+   "t": 15.939899999991127,
+   "v": 6.6
+  },
+  {
+   "cause": "something back there",
+   "t": 25.002299999974824,
+   "v": 6.1
+  },
+  {
+   "cause": "something back there",
+   "t": 33.462999999955436,
+   "v": 7.4
+  },
+  {
+   "cause": "something back there",
+   "t": 42.57419999995812,
+   "v": 7
+  },
+  {
+   "cause": "something back there",
+   "t": 69.09129999995136,
+   "v": 6.5
+  },
+  {
+   "cause": "something back there",
+   "t": 87.13079999994325,
+   "v": 7.4
+  },
+  {
+   "cause": "something back there",
+   "t": 96.27739999995191,
+   "v": 7.3
+  },
+  {
+   "cause": "something back there",
+   "t": 100.28569999997117,
+   "v": 7.3
+  },
+  {
+   "cause": "something back there",
+   "t": 110.06219999999314,
+   "v": 6.8
+  },
+  {
+   "cause": "something back there",
+   "t": 115.58140000001083,
+   "v": 7.4
+  },
+  {
+   "cause": "something back there",
+   "t": 120.31950000000465,
+   "v": 7.3
+  },
+  {
+   "cause": "something back there",
+   "t": 127.73980000000138,
+   "v": 7.4
+  }
+ ],
+ "arrivalTicks": [],
+ "events": [
+  [
+   1.2,
+   "toast",
+   "be a menace."
+  ],
+  [
+   9.5,
+   "toast",
+   "saved — you can close this and come back"
+  ],
+  [
+   18.5,
+   "toast",
+   "that bar is your puff. a run spends it; stand still and it comes back."
+  ],
+  [
+   20.1,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   29.2,
+   "toast",
+   "top left is the paper. the star is the big thing here; F moves the arrow."
+  ],
+  [
+   31.6,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   45.5,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   50.8,
+   "toast",
+   "drawing a little less to keep up"
+  ],
+  [
+   52.5,
+   "toast",
+   "“ Hm? ” — somebody on the quay"
+  ],
+  [
+   58.9,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   64.6,
+   "toast",
+   "“ Cold one. ” — somebody on the quay"
+  ],
+  [
+   86.4,
+   "toast",
+   "“ Ooh. ” — somebody on the quay"
+  ],
+  [
+   93.3,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   107.4,
+   "toast",
+   "“ Bit sharp. ” — somebody on the quay"
+  ],
+  [
+   116.5,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   120.6,
+   "toast",
+   "“ Feel that? ” — somebody on the quay"
+  ],
+  [
+   129.9,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   134.7,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   140.3,
+   "toast",
+   "“ Morning. ” — somebody on the quay"
+  ],
+  [
+   148.5,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   155.2,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   162.5,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   174.5,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   181.7,
+   "toast",
+   "“ That went right through me. ” — somebody on the quay"
+  ],
+  [
+   197.5,
+   "toast",
+   "“ Busy? ” — somebody on the quay"
+  ]
+ ],
+ "done": [],
+ "shove": [
+  [
+   20.1,
+   "that was something back there"
+  ],
+  [
+   31.6,
+   "that was something back there"
+  ],
+  [
+   45.5,
+   "that was something back there"
+  ],
+  [
+   58.9,
+   "that was something back there"
+  ],
+  [
+   93.3,
+   "that was something back there"
+  ],
+  [
+   116.5,
+   "that was something back there"
+  ],
+  [
+   129.9,
+   "that was something back there"
+  ],
+  [
+   134.7,
+   "that was something back there"
+  ],
+  [
+   148.5,
+   "that was something back there"
+  ],
+  [
+   155.2,
+   "that was something back there"
+  ],
+  [
+   162.5,
+   "that was something back there"
+  ],
+  [
+   174.5,
+   "that was something back there"
+  ]
+ ],
+ "shoveUnnamed": 12,
+ "impUnsrc": 12,
+ "voids": 0,
+ "tickN": 0,
+ "firstNonFree": null
+}

@@ -1206,7 +1206,29 @@ function capyCoatAt(x, y, z, limb, out) {
   capyCoatMix(out, capyCOAT_SPINE,
               capyCoat01((0.20 - ax) / 0.10) * capyCoat01((y - 0.52) / 0.10) *
               capyCoat01((0.35 - z) / 0.25));
+  // THE UNDERCOAT (L7, E4 / art #5). The legs, and the barrel's lower third,
+  // −12 % (sRGB intent, note 3). MEASURED (qa/l7r-art-sep.mjs): the animal's
+  // box against an annulus round it is under 10 levels of luma in 11 of 36
+  // settled frames — Venice walk ΔL 7 on warm-grey stone, Cali −1, the
+  // Pantanal −1 — because at 84–150 px the flank IS the animal and the flank
+  // was the ground's value. The coat's rule (see the block above
+  // capyCOAT_FLANK) is to move the variance and leave the mean, and this
+  // bends it on purpose, with the character key in systems.js as the other
+  // half: the key lifts the lens side of the back and the flank, this drops
+  // what stands in the ground's own shadow, and the two together turn a
+  // brown mass into a form with a top and an underside. The belly band and
+  // the throat keep their ratios inside it — it multiplies, it does not
+  // replace — and `limb` takes it whole, so a leg is one value down to the
+  // ankle band rather than paler in the middle.
+  const sh = limb ? 1 : capyCoat01((0.34 - y) / 0.10);
+  if (sh > 0) {
+    const k = 1 - capyCOAT_UNDER * sh;
+    out[0] *= k; out[1] *= k; out[2] *= k;
+  }
 }
+// See THE UNDERCOAT in capyCoatAt: 0.88 in sRGB, through the same transfer
+// every other multiplier in this block goes through.
+const capyCOAT_UNDER = 1 - capyCoatK(0.88);
 
 /**
  * THE CREVICE SHADE. One mechanism, three uses: the inner face of a shoulder
@@ -1296,6 +1318,68 @@ function capyPaintCoat(root, furMats) {
     painted++;
   });
   return painted;
+}
+
+// ---------------------------------------------------------------------------
+// THE CHARACTER KEY (L7, E4 / art #5) — a light that only the animal is in.
+//
+// The roadmap wrote it as a fourth DirectionalLight on a layer of its own,
+// and three.js cannot do that: lights are gathered per CAMERA, not per
+// object (WebGLRenderer.projectObject tests `light.layers` against the
+// camera's), so a light on layer 1 with the camera on 0 + 1 lights every wall
+// in the chapter. What a per-object light is in this renderer is a TERM in
+// the object's own program under a uniform that is zero everywhere else —
+// and the animal already has a program of its own (`vertexColors` is part of
+// three's cache key, see THE COAT), so a term added to the seven `matSelf`
+// materials here costs one compile at boot and no draw call.
+//
+// It is a plain Lambert term — saturate(N·L) · colour · BRDF_Lambert(albedo)
+// — added to the direct diffuse after three's own lights, in three's own
+// units (a DirectionalLight's shader colour is colour × intensity, and
+// BRDF_Lambert carries the 1/π), so "0.35 of the key" means what it says. No
+// shadow: it is a fill from the lens side, and a fill with a shadow is a
+// second sun. systems.js writes the direction once a frame — from the animal
+// toward the camera's azimuth, raised 35° — and the colour as 0.35 of the
+// live key's, under the `noSelfRim` switch so the A/B that reads the rim
+// reads this too.
+const _keyDir = { value: new THREE.Vector3(0, 1, 0) };
+const _keyC = { value: new THREE.Color(0, 0, 0) };
+const _keyK = { value: 0 };
+function capyKeyWrap(m) {
+  const prev = m.onBeforeCompile;
+  const pk = m.customProgramCacheKey;
+  m.onBeforeCompile = function (shader) {
+    if (prev) prev.call(this, shader);
+    shader.uniforms.uCkDir = _keyDir;
+    shader.uniforms.uCkC = _keyC;
+    shader.uniforms.uCkK = _keyK;
+    // The rim's injection keeps `#include <common>` at the head of what it
+    // substitutes, so this anchor is still there after it has run.
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>',
+               '#include <common>\nuniform vec3 uCkDir;\nuniform vec3 uCkC;\nuniform float uCkK;')
+      .replace('#include <lights_fragment_end>', [
+        '#include <lights_fragment_end>',
+        'if (uCkK > 0.0) {',
+        '  vec3 ckD = normalize((viewMatrix * vec4(uCkDir, 0.0)).xyz);',
+        '  reflectedLight.directDiffuse += saturate(dot(geometryNormal, ckD)) * uCkK * uCkC * BRDF_Lambert(material.diffuseColor);',
+        '}',
+      ].join('\n'));
+  };
+  m.customProgramCacheKey = function () { return (pk ? pk.call(this) : '') + '|ckey'; };
+  return m;
+}
+/**
+ * systems.js's hand on the key, once a frame: the world-space direction TO
+ * the light, its colour already scaled, and the switch.
+ */
+export function capyKeyTick(dir, color, k) {
+  _keyDir.value.copy(dir);
+  if (color) _keyC.value.copy(color);
+  _keyK.value = k > 0 ? (k < 2 ? k : 2) : 0;
+}
+export function capyKeyInfo() {
+  return { k: _keyK.value, c: [_keyC.value.r, _keyC.value.g, _keyC.value.b], dir: _keyDir.value.toArray() };
 }
 
 // --- scratch (NEVER allocate inside update) --------------------------------
@@ -1975,6 +2059,13 @@ let capyClinging = false;           // hanging off a face — see capyCLIMB_UP
 let capyClingCool = 0;              // s before a kicked-off wall will take us back
 let capyClingT = 0;                 // s spent on the current hold, for the pose
 let capyStallT = 0;                 // s spent blocked with the stick down
+// THE SILENT WALL (L7, E5). See the block after the kerbs.
+const capyWALL_V     = 0.3;         // m/s of ground speed that is "going nowhere"
+const capyWALL_HOLD  = 0.4;         // s of it, with a key down, before it is a wall
+const capyWALL_AGAIN = 2.2;         // s between snorts while still pushing
+const capyWALL_DIP   = 0.16;        // rad of nose-down at the peak of the dip
+const capyWALL_DIP_T = 0.45;        // s the dip lasts
+let capyWallT = 0, capyWallDipT = 0, capyWallDip = 0, capyWallSaidIn = '';
 let capyStepUsed = 0;               // m of step assist spent on this blockage
 let capyStepX = 0, capyStepZ = 0;   // where this blockage started
 let capyAirPose = 0;                // 0..1 render blend into the tuck
@@ -2654,6 +2745,11 @@ function capySurfacePitch(game, env, x, z, y) {
     if (y > 0.9 && x > -13.5 && x < 13.5 && z > -12.5 && z < 7.5) return capySurf(1.0, 'stone');
     // the boardwalk and the ferry wharf are timber
     if (z < -7 && z > -25) return capySurf(1.22, 'timber');
+    // ...and the walks are paved (L7, E2 / audio 6): the promenade runs past
+    // the spawn and the audio drive heard one material in this chapter for
+    // 2.5 min because nothing here knew where the paths were. environment.js
+    // answers off the polylines it draws them from.
+    if (env && typeof env.onPath === 'function' && env.onPath(x, z)) return capySurf(1.0, 'stone');
     return capySurf(0.82, 'grass');
   }
   if (b.isActive('quay')) {
@@ -3075,6 +3171,10 @@ export function createCapybara(game) {
   // the pad carries its own authored colours and the coat must not paint over
   // them. See capyPadGeo.
   const mNosePad = matSelf(PALETTE.capyNose, { vertexColors: true });
+  // ...and all seven take THE CHARACTER KEY (L7, E4): one program between
+  // them, one compile, no draw call. See capyKeyWrap.
+  capyKeyWrap(mFur); capyKeyWrap(mFurWet); capyKeyWrap(mBelly); capyKeyWrap(mBellyWet);
+  capyKeyWrap(mDark); capyKeyWrap(mDarkWet); capyKeyWrap(mNosePad);
   // ...AND AN EIGHTH, FOR THE CATCHLIGHT (L6, E2): the one part of the animal
   // that is a light. See the eye below. Foam is the palette's white.
   const mCatch = matEmit(PALETTE.foam, 1);
@@ -4498,6 +4598,8 @@ export function createCapybara(game) {
       return { armed: capyPutN, done: capyPutDone, holdT: capyPutT,
                target: capyPutTgt ? capyPutTgt.type : null };
     },
+    /** THE CHARACTER KEY's live numbers (L7, E4), for a probe. */
+    keyInfo: capyKeyInfo,
     animAudit: function () {
       return { speed: capySpeedSm, legPhase: capyLegPhase, gaitRate: capyGaitRate,
                // THE FOOT PLANTS (L3, E2): the swing lift per leg, and the shin
@@ -6463,6 +6565,36 @@ export function createCapybara(game) {
       capyStallT = 0; capyStepUsed = 0; capyStepX = px; capyStepZ = pz;
     }
 
+    // ---- THE SILENT WALL (L7, E5 / play 6) ----------------------------------
+    // MEASURED: nose-first into the jacaranda trunk for 1.1 s, the last 3 s
+    // of a 9 s run into the gardens' stone wall, 15 m of sliding along the
+    // quay kerb — no sound, no cue, nothing. The bonk above needs 3.9 m/s of
+    // IMPACT; leaning on a wall at a walk is under it, and the step-up has
+    // given up by then. A movement key held and the ground speed under
+    // capyWALL_V for capyWALL_HOLD is a wall: the snort, a nose-dip (render
+    // only, added into the head like the landing's), and once a chapter the
+    // words. Re-armed every capyWALL_AGAIN while the key is still down, so a
+    // player who keeps pushing keeps hearing it and not every frame.
+    if (wantsIt && effGround && !hauling && !capySwimming && !capyClinging &&
+        !carried && !capy.atHelm && !capy.sliding && groundSpeed < capyWALL_V) {
+      capyWallT += dt;
+      if (capyWallT > capyWALL_HOLD) {
+        capyWallT = capyWALL_HOLD - capyWALL_AGAIN;
+        capyWallDipT = capyWALL_DIP_T;
+        capySfxAt.volume = 0.34; capySfxAt.pitch = 0.92;
+        game.sfx('snort', capySfxAt);
+        const wbio = game.biome ? (game.biome.current || '') : '';
+        if (capyWallSaidIn !== wbio && typeof game.toast === 'function') {
+          capyWallSaidIn = wbio;
+          game.toast("that's a wall.");
+        }
+      }
+    } else capyWallT = 0;
+    if (capyWallDipT > 0) {
+      capyWallDipT -= dt;
+      capyWallDip = capyWALL_DIP * Math.sin(Math.PI * clamp(1 - capyWallDipT / capyWALL_DIP_T, 0, 1));
+    } else capyWallDip = 0;
+
     // ---- THE SHAKE-DRY (see capySHAKE_DUR / capySHAKE_DELAY / capyWET_FAST)
     // The three constants at the top of this file that were referenced nowhere,
     // and the beat the comment beside the rain floor had been claiming existed.
@@ -7793,7 +7925,7 @@ export function createCapybara(game) {
     head.rotation.x = capyHeadPitch + capyGazePitch + capyIdlePitch + capyHeadNod +
                       capyNap * capyNAP_HEAD +
                       capyINHALE_HEAD * capyInhaleW + capyLandDip - capyAIR_HEAD_K * capyAirPitch +
-                      capyRegardPitch;
+                      capyRegardPitch + capyWallDip;    // ...and the wall's nose-dip (L7, E5)
     head.rotation.z = clamp(-capyYawRate * 0.05, -0.2, 0.2);
     // the look-around (see the idle beat) plus whatever is worth looking at.
     // Nothing else writes the head's yaw, and the mouth anchor is derived from

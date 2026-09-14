@@ -1043,6 +1043,9 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   'uniform vec3  uSpillC[' + MAIN_SPILL_N + '];',
   'uniform float uSpillOn;',
   'uniform float uSpillN;',
+  // THE WATER'S TINT (L7, E3): rgb the sysSUB row's colour, a the lens's own
+  // "how far under" scalar. One uniform, one line, see below.
+  'uniform vec4  uSub;',
   'const vec3 MAIN_LUMA = vec3(0.2126, 0.7152, 0.0722);',
   MAIN_POST_DEPTH_FN,
   // FOUR OPPOSED PAIRS. Index 2i and 2i+1 are the same axis in opposite
@@ -1272,6 +1275,18 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   '      lin += mainAirLight(d, vUv) * uAirLitK;',
   '    }',
   '  }',
+  // ---- UNDER THE WATER (L7, E3) ------------------------------------------
+  // Before the bloom, because it is light on its way to the lens and not the
+  // lens's doing. The frame goes to the water's colour multiplicatively —
+  // a beige quay under green water is green-beige, not beige — with a
+  // little of the colour ADDED, brighter toward the top of the frame, which
+  // is the surface's light coming down through it. The fog has already done
+  // this to the far field; this is the near field and the sky dome (which
+  // is fog:false) agreeing with it.
+  '  if (uSub.a > 0.001) {',
+  '    vec3 wc = lin * (0.25 + 0.75 * uSub.rgb * 1.6) + uSub.rgb * (0.03 + 0.05 * vUv.y);',
+  '    lin = mix(lin, wc, uSub.a * 0.85);',
+  '  }',
   '  lin += texture(tBloom, vUv).rgb * uBloom;',
   // THE SECOND OCTAVE. See the header: the tight one is the glow ON a light,
   // this is the air AROUND it, and a lamp without it is a white sticker.
@@ -1460,6 +1475,9 @@ function mainMakePost(game) {
       airGnd: 0.0, farDark: 0.0, farDist0: 30, farDist1: 160,
       // v48. Light IN the air rather than on the things in it.
       airLight: 0.0,
+      // (L7, E3) the water's tint over the whole frame when the lens is
+      // under: the sysSUB row's colour and the lens's own scalar. 0 is off.
+      sub: 0.0, subR: 0, subG: 0, subB: 0,
       crease: 0.0,
       creaseWide: 1,     // the wide octave's on/off; the governor's rung 3 writes 0
     },
@@ -1575,6 +1593,7 @@ function mainMakePost(game) {
       uAirCol: { value: new THREE.Vector3(1, 1, 1) },
       uCreaseK: { value: 0 },
       uAirLitK: { value: 0 }, uAirLitFar: { value: MAIN_AIRLIT_FAR },
+      uSub: { value: new THREE.Vector4(0, 0, 0, 0) },     // (L7, E3)
       uCamPos: { value: new THREE.Vector3() },
       uRayBL: { value: new THREE.Vector3() },
       uRayDX: { value: new THREE.Vector3() },
@@ -1672,6 +1691,9 @@ function mainMakePost(game) {
                        p.airLight > 0.0005);
     const cu = matComp.uniforms;
     cu.uDepthOn.value = wantDepth ? 1 : 0;
+    // the water's tint (L7, E3): outside the depth branch, because it is
+    // not a depth term and a chapter with no depth row can still be dived in
+    cu.uSub.value.set(p.subR || 0, p.subG || 0, p.subB || 0, p.sub || 0);
     // Bound unconditionally. uDepthOn already stops it being READ, and a
     // sampler left null is a sampler three binds its own empty texture to —
     // which works, and which means a genuinely unbound depth texture and a

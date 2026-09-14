@@ -1,0 +1,165 @@
+{
+ "biome": "palawan",
+ "samples": [
+  {
+   "t": 3.8,
+   "biome": "palawan",
+   "x": 0,
+   "y": 2.6,
+   "z": 46,
+   "paper": "the big one hereTHE MANTA RIDEGrab the manta ray and ride itthe lagoon drop-off · 60 mpart 1 of 3THE ISLANDAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat whiteSteal the pi",
+   "err": null
+  },
+  {
+   "t": 25.6,
+   "biome": "palawan",
+   "x": -11,
+   "y": 1.1,
+   "z": 25,
+   "paper": "the big one hereTHE MANTA RIDEGrab the manta ray and ride itthe lagoon drop-off · 50 mpart 1 of 3THE ISLANDAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat whiteSteal the pi",
+   "err": null
+  },
+  {
+   "t": 44.1,
+   "biome": "palawan",
+   "x": -26.7,
+   "y": 0.2,
+   "z": 12.5,
+   "paper": "0 of 13 · Wash up on a beach, for once on purposethe lagoon drop-off · 38 mthe big one hereTHE MANTA RIDEGrab the manta ray and ride itthe lagoon drop-off · 31 mpart 1 of 3THE ISLANDAnnounce yourself ",
+   "err": null
+  },
+  {
+   "t": 60.3,
+   "biome": "palawan",
+   "x": -21.4,
+   "y": -0.2,
+   "z": 16.8,
+   "paper": "0 of 13 · Wash up on a beach, for once on purposethe lagoon drop-off · 38 mthe big one hereTHE MANTA RIDEGrab the manta ray and ride itover the lagoon, hold E to dive. at its front edge, press Ethe la",
+   "err": null
+  },
+  {
+   "t": 90.3,
+   "biome": "palawan",
+   "x": -24.4,
+   "y": 0.5,
+   "z": 26,
+   "paper": "2 of 13 · Wash up on a beach, for once on purposethe lagoon drop-off · 34 mthe big one hereTHE MANTA RIDEGrab the manta ray and ride itthe lagoon drop-off · 60 mpart 1 of 3THE ISLANDAnnounce yourself ",
+   "err": null
+  },
+  {
+   "t": 110.9,
+   "biome": "palawan",
+   "x": -34.2,
+   "y": 0.5,
+   "z": 18.6,
+   "paper": "2 of 13 · Wash up on a beach, for once on purposethe lagoon drop-off · 46 mthe big one hereTHE MANTA RIDEGrab the manta ray and ride itthe lagoon drop-off · 39 mpart 1 of 3THE ISLANDAnnounce yourself ",
+   "err": null
+  }
+ ],
+ "ticks": [
+  [
+   57.6,
+   "first-dive"
+  ],
+  [
+   85.3,
+   "the-bloom"
+  ]
+ ],
+ "imp": [
+  {
+   "cause": "the manta",
+   "t": 67.04479999999586,
+   "v": 5.6,
+   "src": false
+  },
+  {
+   "cause": "the manta",
+   "t": 71.96840000000459,
+   "v": 5.2,
+   "src": false
+  }
+ ],
+ "arrivalTicks": [],
+ "events": [
+  [
+   1.5,
+   "toast",
+   "that bar is your puff. a run spends it; stand still and it comes back."
+  ],
+  [
+   28.7,
+   "toast",
+   "“ Did you see what went past? ” — somebody on the jetty"
+  ],
+  [
+   47.9,
+   "toast",
+   "top left is the paper. the star is the big thing here; F moves the arrow."
+  ],
+  [
+   60.3,
+   "toast",
+   "“ The manta was at the drop-off again. Same one. ” — somebody on the jetty"
+  ],
+  [
+   70.4,
+   "toast",
+   "hold E. you have gills in all but name."
+  ],
+  [
+   72.2,
+   "toast",
+   "ticked  ·  Remember what you are"
+  ],
+  [
+   82.7,
+   "toast",
+   "twelve chapters of paddling about on the top of it. finally."
+  ],
+  [
+   92.5,
+   "toast",
+   "the water has gone cloudy. that is not sand."
+  ],
+  [
+   103.4,
+   "toast",
+   "it is the plankton. it does this when something moves."
+  ],
+  [
+   125.8,
+   "toast",
+   "that was the manta"
+  ],
+  [
+   134.2,
+   "toast",
+   "that was the manta"
+  ],
+  [
+   159.4,
+   "toast",
+   "“ Nets are in. Half a basket. Half a basket is fine. ” — somebody on the jetty"
+  ]
+ ],
+ "done": [
+  "first-dive",
+  "the-bloom"
+ ],
+ "shove": [
+  [
+   125.8,
+   "that was the manta"
+  ],
+  [
+   134.2,
+   "that was the manta"
+  ]
+ ],
+ "shoveUnnamed": 0,
+ "impUnsrc": 2,
+ "voids": 0,
+ "tickN": 2,
+ "firstNonFree": 57.6
+}

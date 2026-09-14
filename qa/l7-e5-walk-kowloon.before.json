@@ -1,0 +1,185 @@
+{
+ "biome": "kowloon",
+ "samples": [
+  {
+   "t": 6.3,
+   "biome": "kowloon",
+   "x": 0,
+   "y": 0.3,
+   "z": 34,
+   "paper": "the big one hereTHE HELICOPTERFly the helicopter through the eight ringsthe helicopter on the scaffold roof · 49 m · 74 spart 1 of 3MONG KOKAnnounce yourself (wheek)Steal a tourist’s hatMake someone s",
+   "err": null
+  },
+  {
+   "t": 30.5,
+   "biome": "kowloon",
+   "x": -9.3,
+   "y": 0.8,
+   "z": 17.2,
+   "paper": "the big one hereTHE HELICOPTERFly the helicopter through the eight ringsthe helicopter on the scaffold roof · 30 m · 50 spart 1 of 3MONG KOKAnnounce yourself (wheek)Steal a tourist’s hatMake someone s",
+   "err": null
+  },
+  {
+   "t": 49.7,
+   "biome": "kowloon",
+   "x": -9.1,
+   "y": 0.4,
+   "z": 23.5,
+   "paper": "the big one hereTHE HELICOPTERFly the helicopter through the eight ringsthe helicopter on the scaffold roof · 36 m · 30 spart 1 of 3MONG KOKAnnounce yourself (wheek)Steal a tourist’s hatMake someone s",
+   "err": null
+  },
+  {
+   "t": 63.4,
+   "biome": "kowloon",
+   "x": -9.2,
+   "y": 1.2,
+   "z": 22.7,
+   "paper": "the big one hereTHE HELICOPTERFly the helicopter through the eight ringsthe helicopter on the scaffold roof · 36 m · 16 spart 1 of 3MONG KOKAnnounce yourself (wheek)Steal a tourist’s hatMake someone s",
+   "err": null
+  },
+  {
+   "t": 87,
+   "biome": "kowloon",
+   "x": -7.3,
+   "y": 0.3,
+   "z": 19.1,
+   "paper": "the big one hereTHE HELICOPTERFly the helicopter through the eight ringsthe helicopter on the scaffold roof · 33 m · happening nowpart 1 of 3MONG KOKAnnounce yourself (wheek)Steal a tourist’s hatMake ",
+   "err": null
+  },
+  {
+   "t": 91.6,
+   "biome": "kowloon",
+   "x": -9.1,
+   "y": 0.4,
+   "z": 20.7,
+   "paper": "the big one hereTHE HELICOPTERFly the helicopter through the eight ringsthe helicopter on the scaffold roof · 34 m · happening nowpart 1 of 3MONG KOKAnnounce yourself (wheek)Steal a tourist’s hatMake ",
+   "err": null
+  }
+ ],
+ "ticks": [
+  [
+   89.6,
+   "egg-tart"
+  ]
+ ],
+ "imp": [
+  {
+   "cause": "something back there",
+   "t": 51.110599999971065,
+   "v": 11.1,
+   "src": false
+  },
+  {
+   "cause": "something back there",
+   "t": 56.34699999993952,
+   "v": 6.7,
+   "src": false
+  }
+ ],
+ "arrivalTicks": [],
+ "events": [
+  [
+   24.6,
+   "toast",
+   "that bar is your puff. a run spends it; stand still and it comes back."
+  ],
+  [
+   39,
+   "toast",
+   "top left is the paper. the star is the big thing here; F moves the arrow."
+  ],
+  [
+   50.4,
+   "toast",
+   "“ Everybody all right? ” — somebody in the market"
+  ],
+  [
+   67.5,
+   "toast",
+   "“ It did not even look. ” — somebody in the market"
+  ],
+  [
+   84.2,
+   "toast",
+   "“ Siu sam! That is a fresh batch. ” — somebody in the market"
+  ],
+  [
+   100,
+   "toast",
+   "you were supposed to be on it."
+  ],
+  [
+   101.6,
+   "toast",
+   "ticked  ·  Rob the bakery on Fa Yuen Street"
+  ],
+  [
+   111.4,
+   "toast",
+   "“ Wah — mind the bamboo. ” — somebody in the market"
+  ],
+  [
+   113.2,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   124.8,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   138,
+   "toast",
+   "still warm. that is the whole trick with those."
+  ],
+  [
+   152.1,
+   "toast",
+   "somebody saw that. three things in front of people is AN INCIDENT, five is A SCENE — unles"
+  ],
+  [
+   165.9,
+   "toast",
+   "eight o’clock. the other side of the water is about to show off."
+  ],
+  [
+   170.7,
+   "toast",
+   "“ You and I are going to have a word. ” — somebody in the market"
+  ],
+  [
+   181,
+   "toast",
+   "it has started. get up the bamboo — you have about half a minute."
+  ],
+  [
+   195.1,
+   "toast",
+   "you were supposed to be on it."
+  ],
+  [
+   199.3,
+   "toast",
+   "“ The Star Ferry is two-eighty now. Nobody has noticed. ” — somebody in the market"
+  ]
+ ],
+ "done": [
+  "egg-tart"
+ ],
+ "shove": [
+  [
+   113.2,
+   "that was something back there"
+  ],
+  [
+   124.8,
+   "that was something back there"
+  ]
+ ],
+ "shoveUnnamed": 2,
+ "impUnsrc": 2,
+ "voids": 0,
+ "tickN": 1,
+ "firstNonFree": 89.6
+}

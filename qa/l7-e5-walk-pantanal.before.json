@@ -1,0 +1,340 @@
+{
+ "biome": "pantanal",
+ "samples": [
+  {
+   "t": 15.7,
+   "biome": "pantanal",
+   "x": 0,
+   "y": 2.1,
+   "z": 62,
+   "paper": "the big one hereTHE HERD CROSSINGLead the herd across the river, past O Grandãothe river crossing · 120 mpart 1 of 2THE NEIGHBOURSAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their",
+   "err": null
+  },
+  {
+   "t": 41,
+   "biome": "pantanal",
+   "x": -36.3,
+   "y": 1.6,
+   "z": 74.8,
+   "paper": "the big one hereTHE HERD CROSSINGLead the herd across the river, past O Grandãothe river crossing · 130 mpart 1 of 2THE NEIGHBOURSAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their",
+   "err": null
+  },
+  {
+   "t": 63.5,
+   "biome": "pantanal",
+   "x": -56.3,
+   "y": 1.2,
+   "z": 93.6,
+   "paper": "2 of 13 · Come home, apparentlythe river crossing · 130 mthe big one hereTHE HERD CROSSINGLead the herd across the river, past O Grandãothe river crossing · 150 mpart 1 of 2THE NEIGHBOURSAnnounce your",
+   "err": null
+  },
+  {
+   "t": 80.6,
+   "biome": "pantanal",
+   "x": -43.4,
+   "y": 1.1,
+   "z": 99.8,
+   "paper": "2 of 13 · Come home, apparentlythe river crossing · 130 mthe big one hereTHE HERD CROSSINGLead the herd across the river, past O Grandãothe river crossing · 150 mpart 1 of 2THE NEIGHBOURSAnnounce your",
+   "err": null
+  },
+  {
+   "t": 108.1,
+   "biome": "pantanal",
+   "x": -55.8,
+   "y": 1.8,
+   "z": 105,
+   "paper": "2 of 13 · Come home, apparentlythe river crossing · 130 mthe big one hereTHE HERD CROSSINGLead the herd across the river, past O Grandãothe river crossing · 160 mpart 1 of 2THE NEIGHBOURSAnnounce your",
+   "err": null
+  },
+  {
+   "t": 134.4,
+   "biome": "pantanal",
+   "x": -89.6,
+   "y": 1.7,
+   "z": 104.4,
+   "paper": "2 of 13 · Come home, apparentlythe river crossing · 130 mthe big one hereTHE HERD CROSSINGLead the herd across the river, past O Grandãothe river crossing · 170 mpart 1 of 2THE NEIGHBOURSAnnounce your",
+   "err": null
+  },
+  {
+   "t": 153.8,
+   "biome": "pantanal",
+   "x": -122.9,
+   "y": 0.9,
+   "z": 109.1,
+   "paper": "2 of 13 · Come home, apparentlythe river crossing · 170 mthe big one hereTHE HERD CROSSINGLead the herd across the river, past O Grandãothe river crossing · 180 mpart 1 of 2THE NEIGHBOURSAnnounce your",
+   "err": null
+  }
+ ],
+ "ticks": [
+  [
+   11.1,
+   "the-locals"
+  ],
+  [
+   23.8,
+   "cowbird"
+  ]
+ ],
+ "imp": [
+  {
+   "cause": "something back there",
+   "t": 19.79519999999559,
+   "v": 7
+  },
+  {
+   "cause": "something back there",
+   "t": 25.43039999999861,
+   "v": 7
+  },
+  {
+   "cause": "something back there",
+   "t": 34.94879999999707,
+   "v": 6.8
+  },
+  {
+   "cause": "something back there",
+   "t": 68.10939999994567,
+   "v": 7.3
+  },
+  {
+   "cause": "something back there",
+   "t": 73.54089999990829,
+   "v": 7.3
+  },
+  {
+   "cause": "something back there",
+   "t": 83.41069999990516,
+   "v": 7.5
+  },
+  {
+   "cause": "something back there",
+   "t": 91.198199999905,
+   "v": 7.4
+  },
+  {
+   "cause": "something back there",
+   "t": 95.26999999990943,
+   "v": 3.9
+  },
+  {
+   "cause": "something back there",
+   "t": 100.5397999999212,
+   "v": 4
+  },
+  {
+   "cause": "something back there",
+   "t": 116.86599999991627,
+   "v": 7.3
+  },
+  {
+   "cause": "something back there",
+   "t": 125.97089999992194,
+   "v": 7
+  },
+  {
+   "cause": "something back there",
+   "t": 132.9075999999255,
+   "v": 6.9
+  },
+  {
+   "cause": "something back there",
+   "t": 140.40799999995482,
+   "v": 7.4
+  },
+  {
+   "cause": "something back there",
+   "t": 145.88189999999142,
+   "v": 7.4
+  }
+ ],
+ "arrivalTicks": [],
+ "events": [
+  [
+   1.2,
+   "toast",
+   "be a menace."
+  ],
+  [
+   9.8,
+   "toast",
+   "saved — you can close this and come back"
+  ],
+  [
+   16.1,
+   "toast",
+   "that bar is your puff. a run spends it; stand still and it comes back."
+  ],
+  [
+   17.7,
+   "toast",
+   "“ Morning. ” — somebody at the pen"
+  ],
+  [
+   19.9,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   25.5,
+   "toast",
+   "ticked  ·  Meet the neighbours"
+  ],
+  [
+   27.7,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   34.5,
+   "toast",
+   "it does not even look up."
+  ],
+  [
+   36.3,
+   "toast",
+   "ticked  ·  Give a cowbird a lift"
+  ],
+  [
+   39.2,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   43.2,
+   "toast",
+   "drawing a little less to keep up"
+  ],
+  [
+   51.1,
+   "toast",
+   "wheek at it. see what happens."
+  ],
+  [
+   81.2,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   87.4,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   98.1,
+   "toast",
+   "that is a good one  ·  carried it for 70.0 s"
+  ],
+  [
+   100.5,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   109.4,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   113.9,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   120.2,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   144.8,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   156.5,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   165.1,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   175.9,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   184,
+   "toast",
+   "that was something back there"
+  ]
+ ],
+ "done": [
+  "the-locals",
+  "cowbird"
+ ],
+ "shove": [
+  [
+   19.9,
+   "that was something back there"
+  ],
+  [
+   27.7,
+   "that was something back there"
+  ],
+  [
+   39.2,
+   "that was something back there"
+  ],
+  [
+   81.2,
+   "that was something back there"
+  ],
+  [
+   87.4,
+   "that was something back there"
+  ],
+  [
+   100.5,
+   "that was something back there"
+  ],
+  [
+   109.4,
+   "that was something back there"
+  ],
+  [
+   113.9,
+   "that was something back there"
+  ],
+  [
+   120.2,
+   "that was something back there"
+  ],
+  [
+   144.8,
+   "that was something back there"
+  ],
+  [
+   156.5,
+   "that was something back there"
+  ],
+  [
+   165.1,
+   "that was something back there"
+  ],
+  [
+   175.9,
+   "that was something back there"
+  ],
+  [
+   184,
+   "that was something back there"
+  ]
+ ],
+ "shoveUnnamed": 14,
+ "impUnsrc": 14,
+ "voids": 0,
+ "tickN": 2,
+ "firstNonFree": 11.1
+}

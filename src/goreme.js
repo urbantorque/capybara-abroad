@@ -194,6 +194,21 @@ let gorSunMet = false;       // this dawn's rim crossing has filed its altitude 
 let gorSunDoves = false;     // the flock round the basket, once per sunrise
 let gorAboard = false, gorAboardT = 0, gorFlown = false;
 let gorBoardTold = false;
+// ---- THE ASK (L7, E6 / writing A) ------------------------------------------
+// The traveller's arc was four cameos in which they speak and the animal looks
+// away; the middle was the same beat three times. This is the one turn: they
+// stand on the launch field with a ticket they cannot use, and if the animal
+// boards with them in reach they get in too — npc.js's `carried` state puts
+// the figure at gorTravSeat every frame, THE SEAT's rule for a floor that
+// moves, applied to a person. Three lines: getting in, the height, getting
+// out. `gorTravUp` is read by the notebook (nbFacts) and never cleared.
+let gorTravUp = false;       // they have ridden in the basket, this session
+let gorTravIn = false;       // ...and are in it right now
+let gorTravSaid = 0;         // the height line, once per ride
+const gorTravSeat = { x: 0, y: 0, z: 0 };
+const gorTRAV_AT = { x: -5.4, z: 0.2 };  // where they stand on the field: 5.8 m
+                                          // from the basket, the chief on the other side
+const gorASK_R = 7;          // m from the basket they have to be to get in
 let gorCarry = { x: 0, z: 0 };
 let gorCarrying = false;
 let gorGroundedT = 0, gorEmptyT = 0;
@@ -327,7 +342,9 @@ function gorMerger() {
  */
 function gorVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.42, amount: 0.09, warp: 0.55, near: 0.38, nearScale: 6, contact: 1, broad: 0.1, broadM: 18 });
+               // `rock` (L7, E4): the tuff cones and the valley wall take the
+               // broad octave on their own plane. See the wall block in grain().
+               { scale: 0.42, amount: 0.09, warp: 0.55, near: 0.38, nearScale: 6, contact: 1, broad: 0.1, broadM: 18, rock: 0.08 });
 }
 /**
  * THE SAME THING, BUT NOBODY ELSE HAS IT.
@@ -4394,6 +4411,52 @@ function gorFlushPeak(game) {
   gorPeakAlt = 0;
 }
 
+/** The traveller's seat in the basket: a corner, so the animal has the rest. */
+function gorTravSeatAt() {
+  gorTravSeat.x = gorBalX - 0.95; gorTravSeat.y = gorBalY + 0.12; gorTravSeat.z = gorBalZ + 0.95;
+  return gorTravSeat;
+}
+/** A line from the traveller, said now. localLine's tail, without the bag. */
+function gorTravSay(t, line) {
+  t.cd = t.cool; t.last = line; t.gest = 1.5 + line.length * 0.045;
+  if (t.anchor && t.anchor.speak) t.anchor.speak(line);
+}
+/** Put them down beside the basket (or back on the field) and let go. */
+function gorTravOut(t, x, z) {
+  t.carried = null; gorTravIn = false;
+  t.x = t.ax = t.tx = x; t.z = t.az = t.tz = z;
+  t.y = t.baseY = gorTerrain(x, z);
+  if (t.group) t.group.position.set(x, t.y, z);
+  if (t.anchor && t.anchor.group) t.anchor.group.position.set(x, t.y + 1.35, z);
+}
+/** THE ASK, per frame. See the block above gorTravUp. */
+function gorAskStep(game, wasAboard, groundY) {
+  const t = gorLocals.trav;
+  if (!t || !t.group) return;
+  if (!gorTravIn) {
+    // Getting in: the animal has just boarded with the basket on the ground
+    // and the traveller in reach of it. Once boarded they are the chapter's
+    // to move; npc.js keeps their mouth, their face and their pose.
+    if (gorAboard && !wasAboard && gorBalY - groundY < 1.5 &&
+        Math.hypot(t.x - gorBalX, t.z - gorBalZ) < gorASK_R) {
+      gorTravIn = true; gorTravUp = true; gorTravSaid = 0;
+      t.carried = gorTravSeatAt;
+      gorTravSay(t, 'Right. No. Yes. Move over.');
+    }
+    return;
+  }
+  const alt = gorBalY - groundY;
+  if (gorTravSaid < 1 && alt > 40) {
+    gorTravSaid = 1;
+    gorTravSay(t, 'I booked this. I am not going to say who with.');
+  }
+  // Getting out: the basket is down and the animal has left it.
+  if (!gorAboard && alt < 1.5) {
+    gorTravOut(t, gorBalX + 2.6, gorBalZ + 1.0);
+    if (gorTravSaid >= 1) gorTravSay(t, 'I am not going to explain that to anybody.');
+  }
+}
+
 function gorUpdateBalloon(game, dt) {
   if (!gorBasketBody) return;
   const capy = game.capy;
@@ -4426,6 +4489,7 @@ function gorUpdateBalloon(game, dt) {
     }
   }
   if (gorAboard) gorAboardT += dt; else gorAboardT = 0;
+  gorAskStep(game, wasAboard, groundY);
   // ---- AND WHEN THE FLIGHT IS OVER, THE FLIGHT IS REPORTED ---------------
   // Stepping out of the basket ends a flight just as surely as touching down,
   // and either way the number the player earned is the peak they reached, said
@@ -5574,6 +5638,9 @@ export function createGoreme(game) {
       gorEnvOn = -1; gorMouthT = 0;
       // Anything stateful that could hold the player, cleared on the way out.
       gorAboard = false; gorAboardT = 0; gorEmptyT = 0; gorCarrying = false;
+      // ...and a traveller left mid-air is put back on the field (L7, E6):
+      // the figure's y would otherwise be the basket's altitude on re-entry.
+      if (gorTravIn && gorLocals.trav) gorTravOut(gorLocals.trav, gorTRAV_AT.x, gorTRAV_AT.z);
       if (game.capy) game.capy.floorVY = 0;   // the basket is not under it any more
       // A declared frame that survives travel is a capybara in Antarctica
       // being driven sideways by a horse in Cappadocia.
@@ -5675,6 +5742,9 @@ export function createGoreme(game) {
     seenSun() { return gorSeenSun; },
     flown() { return gorFlown; },
     aboard() { return gorAboard; },
+    /** THE ASK (L7, E6): the traveller has ridden in the basket. nbFacts reads it. */
+    travUp() { return gorTravUp; },
+    travIn() { return gorTravIn; },
     burner() { return gorBalBurn; },
     /** How high the basket is over the ground it is over, right now. */
     altitude() { return gorBalY - gorTerrain(gorBalX, gorBalZ); },
@@ -6166,13 +6236,18 @@ function gorBuild(game) {
     // radius, so ten metres out from the middle it has only got two thirds of
     // the way there. Ask the function.
     // ---- ...AND AGAIN (P6). See THE TRAVELLER in npc.js. ---------------
+    // ...ON THE LAUNCH FIELD, NOT THE PLAZA (L7, E6 / writing A): THE ASK
+    // needs them in reach of the basket: 5.8 m west of where it launches, the
+    // chief on the east side, with the ticket they cannot use. See gorAskStep.
     if (typeof game.addTraveller === 'function') {
       gorLocals.trav = game.addTraveller({ biome: 'goreme',
-        x: gorPLAZA.x + 3.2, y: gorPLAZA.y, z: gorPLAZA.z - 5.5, face: 0.4,
+        x: gorTRAV_AT.x, y: gorTerrain(gorTRAV_AT.x, gorTRAV_AT.z), z: gorTRAV_AT.z, face: 1.9,
         lines: ['Of course. Of course you are here.',
                 'I have stopped asking. I have genuinely stopped asking.',
-                'I booked this three months ago. You just turned up.',
-                { t: 'You were in the balloon, were you not. I saw a shape.', after: 'sunrise' }],
+                'I booked this three months ago. The ticket is on my phone. The phone is in a taxi in Marrakech.',
+                { t: 'You were in the balloon, were you not. I saw a shape.', after: 'sunrise',
+                  when: function () { return !gorTravUp; } },
+                { t: 'We do not talk about the basket.', when: function () { return gorTravUp; } }],
         wheek: ['There it is. Every time.'] });
     }
     gorLocals.tea = game.addLocal({ biome: 'goreme', x: gorPLAZA.x - 8.4,

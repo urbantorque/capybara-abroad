@@ -1,0 +1,32 @@
+async page => {
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await page.addInitScript(() => { try { localStorage.clear() } catch (e) {} })
+  await page.goto('http://localhost:5190/', { waitUntil: 'domcontentloaded', timeout: 120000 }); await page.waitForTimeout(9000)
+  await page.evaluate(() => { document.querySelector('.capyui-go').click() })
+  await page.waitForTimeout(6000)
+  const ev = async (f, a) => page.evaluate(f, a)
+  const card = () => ev(() => { const pl = document.querySelector('.capyui-place'); return pl ? (pl.innerText || '').replace(/\s+/g, ' ').trim() : '' })
+  const out = { started: await ev(() => window.__capy.state.started) }
+  // four rows in Sydney, and the regular warmed once (tier 1)
+  await ev(() => { for (const t of ['bin-chicken', 'ball-harbour', 'swim', 'cafe-table']) window.__capy.completeTask(t, true) })
+  await ev(() => window.__capy.events.emit('pal:warm'))
+  await page.waitForTimeout(500)
+  out.sydDone = await ev(() => window.__capy.hud.tasksDone())
+  out.palBefore = await ev(() => window.__capy.palAudit())
+  // out, and back
+  await ev(() => window.__capy.hud.cross('venice')); await page.waitForTimeout(9000)
+  out.veniceCard = await card()
+  out.veniceLive = await ev(() => window.__capy.biome.current)
+  await ev(() => window.__capy.hud.cross('sydney')); await page.waitForTimeout(3000)
+  out.sydCardEarly = await card()
+  await page.waitForTimeout(6000)
+  out.sydCard = await card()
+  out.sydLive = await ev(() => window.__capy.biome.current)
+  out.palAfter = await ev(() => window.__capy.palAudit())
+  await page.screenshot({ path: 'qa/l7-e6-again.png' })
+  // a return with NOTHING done: Venice, left at the arrival tick only — the rumour, not the again
+  await ev(() => window.__capy.hud.cross('venice')); await page.waitForTimeout(9000)
+  out.venice2Card = await card()
+  out.err = await ev(() => window.__capy.state.lastError ? String(window.__capy.state.lastError) : null)
+  await page.evaluate(o => fetch('/shot?name=l7-e6-again.json', { method: 'POST', body: btoa(unescape(encodeURIComponent(JSON.stringify(o, null, 1)))) }), out)
+}

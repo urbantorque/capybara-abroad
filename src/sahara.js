@@ -1189,6 +1189,12 @@ function sahBuildSquare(game, root) {
   // third stall carries a striped tarp over the cream, which is the other
   // thing the real ones have.
   const awn = [PALETTE.sahCanvas, PALETTE.sahAwning, PALETTE.sahTileWhite];
+  // ...and the SLABS themselves a sixth darker (L7, E4 / art #6): 15.4 % of
+  // the resting frame was over luma 230 and all of it was these fourteen
+  // planes, 0.88 linear under a 61° sun at 3.6× albedo. 0.74 linear now; the
+  // valance and the number board keep the creams, so a stall is still white
+  // canvas from across the square without being the one thing that clips.
+  const awnSlab = [PALETTE.sahCanvasAwn, PALETTE.sahAwningAwn, PALETTE.sahCreamAwn];
   const trim = [PALETTE.sahDye1, PALETTE.sahDye2, PALETTE.sahDye3, PALETTE.sahDye4,
                 PALETTE.sahTileGreen, PALETTE.sahBrass, PALETTE.sahMint];
   // The lamps hang in their own merged mesh under an emissive material: a
@@ -1213,7 +1219,7 @@ function sahBuildSquare(game, root) {
     // every one of them, which is also what stops the square's brightest object
     // being one unbroken value.
     for (let s2 = -1; s2 <= 1; s2 += 2) {
-      M.box(x, 2.62, z + s2 * 0.88, 4.3, 0.09, 1.85, awn[i % 3], s2 * 0.13, 0, 0);
+      M.box(x, 2.62, z + s2 * 0.88, 4.3, 0.09, 1.85, awnSlab[i % 3], s2 * 0.13, 0, 0);
     }
     const tc = trim[i % trim.length];
     M.box(x, 2.80, z, 4.35, 0.12, 0.34, tc);          // the ridge, in the pitch's colour
@@ -1827,6 +1833,7 @@ const sahNOT_WHEEK_K = 2.4;    // ...and multiplies it by this
 // halqa does not swing their whole body at you; they turn from the waist.
 const sahNOT_TURN = [1.0, 0.55, 0.5];   // STAND, SIT, PLAY
 let sahNotWheek = 0;
+let sahHeadDone = false;       // the answering row, ticked once (L7, E5)
 
 // 15, not 14: index 14 is the damped notice above.
 // 16, not 15: index 15 is M4's shove, and see the note above index 14.
@@ -2174,6 +2181,9 @@ function sahUpdatePeople(dt) {
       const want = nd2 < notR2 ? clamp((notR - Math.sqrt(nd2)) / sahNOT_EDGE, 0, 1) : 0;
       not = damp(not, want, sahNOT_L, dt);
       sahPplData[o + 14] = not;
+      // THE ANSWERING ROW (L7, E5 / design 2.2): a wheek that turns a head in
+      // a halqa is the first thing this square does back. Once.
+      if (!sahHeadDone && ring > 0 && sahNotWheek > 0 && not > 0.5) { sahHeadDone = true; sahTask('square-head'); }
       if (not > 0.004) {
         let dy = Math.atan2(ndx, ndz) - yaw;
         while (dy > Math.PI) dy -= Math.PI * 2;

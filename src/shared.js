@@ -440,6 +440,14 @@ export const PALETTE = {
   sahAwning:    0xd9c9a4,
   sahLamp:      0xffdc9a,      // the pressure lamp over every food stall on the square
   sahCanvas:    0xe4d5b8,
+  // THE AWNING CANVAS, a sixth darker (L7, E4 / art #6): the three creams the
+  // stall awnings are struck in, each at 0.84 of its linear value (0.925 in
+  // sRGB), so the brightest object in the square sits under the tone curve's
+  // knee instead of on the clip. Only the awning slabs use them; the number
+  // board and the valance keep the originals.
+  sahCanvasAwn: 0xd3c5aa,
+  sahAwningAwn: 0xc9ba98,
+  sahCreamAwn:  0xe0dacf,
   sahRope:      0xb09a72,
   // the erg
   sahSand:      0xe8bf87,      // the dunes, lit
@@ -1613,9 +1621,26 @@ varying float vLensFade;`;
 // its own (systems.js lifts it in onBeforeRender, the reach's trick) and a
 // per-instance attribute for a walker in an instanced crowd; a geometry that
 // carries no aLensFade reads the generic attribute, which is zero.
+// ...AND THE INSTANCE MATRIX (L7, E3). This read `modelMatrix * transformed`
+// for every mesh, and on an InstancedMesh `transformed` is still the
+// prototype's own space — three applies instanceMatrix in project_vertex,
+// after this include. So every instanced thing in the game (bollards,
+// pilings, lamp posts, the canopies, the crowds) carried its PROTOTYPE'S
+// position and normal into the rim, the spill, the bounce, the contact and
+// the cloud shadow: a row of forty bollards was lit as if all forty stood at
+// the origin. Found because the capsule below is a world-space test and
+// the first pole it was asked about was an instance.
 const _RIM_VS_BEGIN = `#include <begin_vertex>
-vRimW = (modelMatrix * vec4(transformed, 1.0)).xyz;
-vRimN = normalize(mat3(modelMatrix) * objectNormal);
+{
+  vec4 rW = vec4(transformed, 1.0);
+  vec3 rN0 = objectNormal;
+  #ifdef USE_INSTANCING
+  rW = instanceMatrix * rW;
+  rN0 = mat3(instanceMatrix) * rN0;
+  #endif
+  vRimW = (modelMatrix * rW).xyz;
+  vRimN = normalize(mat3(modelMatrix) * rN0);
+}
 vLensFade = uLensFade;
 #ifdef USE_INSTANCING
 vLensFade = max(vLensFade, aLensFade);
@@ -1623,6 +1648,82 @@ vLensFade = max(vLensFade, aLensFade);
 const _lensFadeU = { value: 0 };
 /** The uniform the per-mesh fade is written through. See vLensFade. */
 export function lensFadeUniform() { return _lensFadeU; }
+// ---- THE CAPSULE (L7, E3 / art #2, play #3) --------------------------------
+// The crowd fade above opens a PERSON between the lens and the animal, and a
+// person is a body the camera's ray can find. A pole, a bollard, an awning, a
+// termite mound, a merged street and a bus are not: measured on the 300-
+// sample loop, half or more of the animal's window was behind world geometry
+// in 12 % of samples (Cali 15/60, Kowloon 10/60) and `lensFade` read 0 in
+// all 300, because a canopy has no body — it is only ever a mesh.
+//
+// So this is a WORLD-SPACE TEST and not a per-object flag: two points (the
+// rendered eye and the animal's chest) and a radius, written once a frame by
+// systems.js, and any fragment on any rimmed material whose distance to that
+// segment is under the radius, at a parameter short of the animal's end,
+// takes the same ordered-dither discard the crowd does. Merged statics,
+// instanced canopies, bollards, awnings, mounds and the bus all get it with
+// no bookkeeping, because the rim is already compiled into all of them.
+//
+// Three exemptions, all in the shader: the animal itself (matSelf binds
+// uLensCapOn = 0 — same program, different uniform, the rim's own trick);
+// emissive and transparent materials never took the rim hook at all; and an
+// UPWARD face below the chest, which is a floor, a deck or a lawn under the
+// boom on a slope and not a thing in the way — an awning's top face is
+// above the chest and still opens. Soft-edged over the outer 0.25 m so a
+// pole entering the capsule ghosts in rather than switching.
+const _lensCapA = { value: new THREE.Vector3(0, -9999, 0) };   // the eye
+const _lensCapB = { value: new THREE.Vector3(0, -9999, 0) };   // the chest
+const _lensCapR = { value: 0 };                                // 0 = off
+const _lensCapOnW = { value: 1 };                              // the world's materials
+const _lensCapOff = { value: 0 };                              // the animal's
+/** Write the capsule for this frame. r <= 0 switches it off. */
+export function lensCapTick(ax, ay, az, bx, by, bz, r) {
+  _lensCapA.value.set(ax, ay, az);
+  _lensCapB.value.set(bx, by, bz);
+  _lensCapR.value = r > 0 ? r : 0;
+}
+export function lensCapInfo() { return { r: _lensCapR.value, a: _lensCapA.value, b: _lensCapB.value }; }
+/**
+ * The same test in a DEPTH material, so a faded canopy does not cast: the
+ * only custom depth material in the game is swayMesh's, and a canopy over
+ * the animal is exactly the thing that sways. Three's depth vertex shader
+ * applies instanceMatrix inside project_vertex, so the world position is
+ * taken there and the discard sits at the top of main().
+ */
+function _lensCapDepth(shader) {
+  shader.uniforms.uLensCapA = _lensCapA;
+  shader.uniforms.uLensCapB = _lensCapB;
+  shader.uniforms.uLensCapR = _lensCapR;
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vCapW;')
+    .replace('#include <project_vertex>', [
+      '{',
+      '  vec4 cW = vec4(transformed, 1.0);',
+      '  #ifdef USE_INSTANCING',
+      '  cW = instanceMatrix * cW;',
+      '  #endif',
+      '  vCapW = (modelMatrix * cW).xyz;',
+      '}',
+      '#include <project_vertex>'].join('\n'));
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vCapW;\nuniform vec3 uLensCapA;\nuniform vec3 uLensCapB;\nuniform float uLensCapR;')
+    .replace('#include <clipping_planes_fragment>', [
+      '#include <clipping_planes_fragment>',
+      'if (uLensCapR > 0.0) {',
+      '  vec3 cAB = uLensCapB - uLensCapA;',
+      '  float cL2 = max(dot(cAB, cAB), 0.0001);',
+      '  float cT = dot(vCapW - uLensCapA, cAB) / cL2;',
+      '  if (cT > 0.0 && cT < max(0.85, 1.0 - 0.9 * inversesqrt(cL2))) {',
+      '    float cD = length(vCapW - (uLensCapA + cAB * cT));',
+      '    float cK = 0.8 * (1.0 - smoothstep(uLensCapR - 0.25, uLensCapR, cD));',
+      '    vec2 lp = floor(mod(gl_FragCoord.xy, 4.0));',
+      '    vec2 l2 = mod(lp, 2.0);',
+      '    vec2 l4 = floor(lp * 0.5);',
+      '    float lb = 4.0 * (2.0 * l2.x + 3.0 * l2.y - 4.0 * l2.x * l2.y) + (2.0 * l4.x + 3.0 * l4.y - 4.0 * l4.x * l4.y);',
+      '    if ((lb + 0.5) / 16.0 < cK) discard;',
+      '  }',
+      '}'].join('\n'));
+}
 // ---------------------------------------------------------------------------
 // SPILL — AND IT IS DELIBERATELY NOT A PointLight.
 //
@@ -1964,6 +2065,10 @@ uniform float uWetK;
 uniform vec4 uCloudP;
 uniform vec2 uCloudS;
 varying float vLensFade;
+uniform vec3 uLensCapA;
+uniform vec3 uLensCapB;
+uniform float uLensCapR;
+uniform float uLensCapOn;
 ${_CLOUD_GLSL}`;
 // ADDED TO outgoingLight, NOT to diffuseColor. Multiplying the diffuse would
 // make the rim take the object's own colour and its own lighting, which is a
@@ -1971,17 +2076,32 @@ ${_CLOUD_GLSL}`;
 // light, it is the sky's colour, and it survives the object standing in shadow
 // — which is exactly where a thing most needs separating from what is behind it.
 const _RIM_FS_OUT = `{
+  vec3 rN = normalize(vRimN);
+  if (!gl_FrontFacing) rN = -rN;
   // THE CROWD IN THE LENS (L6, E1): a 4x4 ordered dither, the person between
   // the lens and the animal opened up over a quarter second. See vLensFade.
-  if (vLensFade > 0.001) {
+  float lensK = vLensFade;
+  // ...AND THE CAPSULE (L7, E3): anything else between them. See _lensCapA.
+  if (uLensCapR > 0.0 && uLensCapOn > 0.5) {
+    vec3 cAB = uLensCapB - uLensCapA;
+    float cL2 = max(dot(cAB, cAB), 0.0001);
+    float cT = dot(vRimW - uLensCapA, cAB) / cL2;
+    // the animal's end is exempt for 0.9 m (a held prop, a hat, the ground), or 15 % of a short boom —
+    // measured: at 0.85 of an 11 m boom a bollard 1.4 m from the animal, and at 1.2 m a Kowloon street sign 1.1 m from it,
+    // was left standing in front of it
+    float cEnd = max(0.85, 1.0 - 0.9 * inversesqrt(cL2));
+    if (cT > 0.0 && cT < cEnd && !(rN.y > 0.7 && vRimW.y < uLensCapB.y + 0.3)) {
+      float cD = length(vRimW - (uLensCapA + cAB * cT));
+      lensK = max(lensK, 0.8 * (1.0 - smoothstep(uLensCapR - 0.25, uLensCapR, cD)));
+    }
+  }
+  if (lensK > 0.001) {
     vec2 lp = floor(mod(gl_FragCoord.xy, 4.0));
     vec2 l2 = mod(lp, 2.0);
     vec2 l4 = floor(lp * 0.5);
     float lb = 4.0 * (2.0 * l2.x + 3.0 * l2.y - 4.0 * l2.x * l2.y) + (2.0 * l4.x + 3.0 * l4.y - 4.0 * l4.x * l4.y);
-    if ((lb + 0.5) / 16.0 < vLensFade) discard;
+    if ((lb + 0.5) / 16.0 < lensK) discard;
   }
-  vec3 rN = normalize(vRimN);
-  if (!gl_FrontFacing) rN = -rN;
   if (uRimK > 0.0005) {
     vec3 rD = cameraPosition - vRimW;
     float rL = length(rD);
@@ -2112,10 +2232,15 @@ const _RIM_FS_OUT = `{
 // binds the animal's pair instead of the world's, and the program is bit for
 // bit the one every wall in the chapter is already using. The capybara does not
 // gain a rim here. It stops sharing the scenery's.
-function _rimInjectWith(kU, cU) {
+function _rimInjectWith(kU, cU, capOnU) {
   return function (shader) {
     shader.uniforms.uRimK = kU;
     shader.uniforms.uRimC = cU;
+    // the capsule (L7, E3): the world's materials open, the animal's do not
+    shader.uniforms.uLensCapA = _lensCapA;
+    shader.uniforms.uLensCapB = _lensCapB;
+    shader.uniforms.uLensCapR = _lensCapR;
+    shader.uniforms.uLensCapOn = capOnU;
     shader.uniforms.uShadowSky = _skyOcc;
     shader.uniforms.uShadeC = _shadeC;
     shader.uniforms.uShadeSun = _shadeSun;
@@ -2149,10 +2274,10 @@ function _rimInjectWith(kU, cU) {
     }
   };
 }
-const _rimInject = _rimInjectWith(_rimK, _rimC);
+const _rimInject = _rimInjectWith(_rimK, _rimC, _lensCapOnW);
 const _selfK = { value: 0 };
 const _selfC = { value: new THREE.Color(1, 1, 1) };
-const _selfInject = _rimInjectWith(_selfK, _selfC);
+const _selfInject = _rimInjectWith(_selfK, _selfC, _lensCapOff);
 /**
  * How hard the rim is ON THE ANIMAL, and in what colour. systems.js calls this
  * from the same place it calls rimTick, off the same hemisphere — see sysSELF.
@@ -3432,6 +3557,17 @@ export const TASKS = [
 //           written first and the facts were added to it, never the reverse.
 //           Third person, "it": the traveller does not know its name, and
 //           the notebook never answers the title's question.
+//
+//   again   THE PLACE ANSWERS BACK (L7, E6 / writing B): the place card's
+//           `news` line on a RETURN — a crossing into a chapter the file has
+//           already stood in with at least one real row done there. The
+//           board offers return trips and the paper said nothing different
+//           on one; this is the one sentence a place says only to somebody
+//           it has seen before. Same register as `news`: lower case, the
+//           card's voice, never a score. It outranks the rumour and the
+//           Pantanal's own `news`, and yields to the stowaway (one crossing).
+//           Read in biomeFadeTo, where the predicate is measured BEFORE
+//           biome:enter marks the chapter seen.
 export const CHAPTERS = [
   { n: 1, biome: 'sydney',  name: 'Sydney',          sub: 'the gardens, unsupervised',
     // door: the count that opens the way on (L4, F4), overriding the seventy
@@ -3456,6 +3592,7 @@ export const CHAPTERS = [
       { kick: 'THE FORECOURT', line: 'the white sails, and the water under them.' },
       { kick: 'THE PROMENADE', line: 'north, past the buskers. the ferry goes from the end.' },
     ],
+    again: 'the gardeners have been warned. they are pretending they were not.',
     left: 'Nobody in these gardens had finished thinking about you. You left them to it.',
     // Written before the two of them have met: see the Quay's page.
     nb: ['Sydney. Something the size of a labrador got on the ferry. I was on it.',
@@ -3463,7 +3600,7 @@ export const CHAPTERS = [
          { if: 'inc>=1&inc<3', t: 'One of the gardeners was shouting at it. Not for the first time, I gathered.' },
          { if: 'wow', t: 'It had apparently been on the Opera House steps. In front of people. On purpose.' },
          { if: 'pho>=3', t: 'It was photographed {pho} times that I saw. It faces the camera. I do not know how it knows to.' },
-         { if: 'tier>=3', t: 'A waiter has it down as {call}. I did not ask.' },
+         { if: 'tier>=3', t: 'A waiter has it down as {call}. I left it there.' },
          'I start in the morning. West, everybody says.'],
     note: 'Nobody in these gardens had ever had to think about a rodent this size. Several of them do now.' },
   { n: 2, biome: 'pasto',   name: 'Pasto, Nariño',   sub: '2 527 metres up, and no better behaved',
@@ -3471,8 +3608,12 @@ export const CHAPTERS = [
     hint: '2 527 m up, and a condor',                 open: 'two thousand five hundred metres up, and nobody told them.', way: 'the crater on Galeras',
     keep: 'a condor’s flight feather', win: 3,
     marquee: { x: -40, z: -70, up: 26, say: 'the sky over the volcano' },
+    again: 'the bird is still up. the broom is still out. neither has forgotten.',
     left: 'The bird was still up there when you went. It is up there now.',
-    nb: ['Pasto. Two and a half thousand metres up, and it was up here before I was.',
+    // ONE SENTENCE PER SURFACE (L7, E6 / writing W1): the notebook opens on
+    // something only the traveller saw — a bus, a room, their own feet —
+    // never on the place card's sub again. qa/l7-echo.mjs holds the line.
+    nb: ['Pasto. Nine hours on a bus that stopped once, for a goat. It was in the plaza before me, eating something off a stall.',
          { if: 'wow', t: 'There is a condor. It has had a passenger.',
            else: 'There is a condor. It circles the whole town and lands on nothing.' },
          { if: 'inc>=2', t: 'A woman with a broom followed it round the plaza for most of the afternoon.' },
@@ -3511,12 +3652,13 @@ export const CHAPTERS = [
     hint: 'a boat, and Manly somewhere north',        open: 'find the wheel.', way: 'up the Corso at Manly',
     keep: 'an unpunched ferry ticket', win: 3,
     marquee: { x: 6.6, z: 6, up: 4, say: 'the ferry at the wharf' },
-    left: 'She sails when you say she sails. You said it early.',
+    again: 'the man who drives her saw you on the wharf. he has gone to stand by the wheel.',
+    left: 'The ferry was back on the timetable an hour after you stepped off her. The wharf pretended nothing had happened.',
     // The first of the four places the traveller is actually standing in.
     // `met` is npc.js's set (npcTravMet): stood in front of them, or not.
     nb: ['Circular Quay. Six months, a very bad map, and it walked past me on the wharf.',
          { if: 'met', t: 'I said hello. It looked at me the way it looks at everything, which is not much.',
-           else: 'It did not see me. It was going somewhere.' },
+           else: 'It walked past me. It was going somewhere.' },
          { if: 'wow', t: 'It took the ferry. I do not mean it rode on it.' },
          { if: 'par', t: 'Alongside at Manly on the first go, according to the man who used to drive her.' },
          { if: 'tier>=3', t: 'The platform guard has it down as {call}. Nobody has reported it yet.' },
@@ -3532,8 +3674,9 @@ export const CHAPTERS = [
     hint: 'ten thousand gates and a lot of tea',      open: 'four hundred years of arrangement, and you.', way: 'the bridge at Uji',
     keep: 'a tea whisk, slightly chewed',
     marquee: { x: 4, z: 128, up: 3, say: 'the river, off the shrine bay' },
+    again: 'everything has been put back. very carefully. they know.',
     left: 'Four hundred years of arrangement, and you gave it the one afternoon.',
-    nb: ['Kyoto. Four hundred years of arrangement. I was here two days and it was here for one.',
+    nb: ['Kyoto. I took my shoes off nine times before lunch. It went through the same doors and took nothing off.',
          { if: 'wow', t: 'It went down the Uji. The whole river heard about it.' },
          { if: 'keep', t: 'It has a tea whisk now. The man at the mill is still not pleased.' },
          { if: 'tier>=3', t: 'The step-sweeper calls it {call}, and sweeps around it.' },
@@ -3550,14 +3693,15 @@ export const CHAPTERS = [
     hint: 'the salsa capital of the world',           open: 'listen first.', way: 'the bridge over the Río Cali',
     keep: 'a stick of sugarcane',
     marquee: { x: 30, z: 40, up: 3, say: 'the party bus' },
+    again: 'the beat never stopped. it did move over slightly when you walked in.',
     left: 'The beat was still going when you left. It did not need you to stay.',
     nb: ['Cali. Everything here is on top of the same beat, and I was on the wrong side of it.',
          { if: 'wow', t: 'It got on the party bus. The party bus went up the hill with it on the roof.' },
-         { if: 'inc>=2', t: '{inc} incidents, and the music did not stop for any of them.' },
+         { if: 'inc>=2', t: '{inc} incidents, and the music went on through all of them.' },
          { if: 'tier>=3', t: 'The lulada man calls it {call}. Con hielo. No charge.' },
          { if: 'fed>=2', t: 'People kept giving it things. It kept taking them.' },
          'I could not find the beat. It could. That is my whole note on Cali.'],
-    note: 'You got the timing right some while before you understood what you were counting.',
+    note: 'Everybody in Cali counts to eight without knowing it. By the second night, so did you.',
     acts: [
       { kick: 'THE CITY', line: 'listen first. everything here is on top of the same beat.' },
       { kick: 'THE CHIVA', line: 'the party bus goes up the hill. be on it.' },
@@ -3573,13 +3717,14 @@ export const CHAPTERS = [
     // the whistle brings the bird down. rio.js publishes `marqueeAt`, so this
     // point is only what the arrow shows BEFORE a fragata is in the air.
     marquee: { x: -62, z: -26, up: 11, say: 'Arpoador, at the west end' },
+    again: 'the bateria has moved down the avenue. the frigatebirds have not moved at all.',
     left: 'The drums were still on the avenue when you went. They had not noticed you arrive either.',
     nb: ['Rio. The bateria was already moving when I got off the bus and it had not stopped when I got back on.',
          { if: 'wow', t: 'Something with a two-metre wingspan came down to it on the rock at Arpoador. It whistled. That was all it did.' },
          { if: 'keep', t: 'It has a tile off Selarón’s steps. Somebody is going to notice.' },
          { if: 'tier>=3', t: 'The Globo man calls it {call}. Sweet. He is not wrong.' },
          { if: 'pho>=3', t: 'It was photographed {pho} times on the beach that I counted.' },
-         'I got sunburnt. It did not.'],
+         'I got sunburnt. It got the shade.'],
     note: 'The bateria did not slow down for you, and you did not ask it to.',
     acts: [
       { kick: 'COPACABANA', line: 'four kilometres of pavement with a pattern in it.' },
@@ -3601,8 +3746,9 @@ export const CHAPTERS = [
     // rendered half past eleven at night, and the local on the pavement has
     // always said it does not get darker than this until October, which is now
     // the truth rather than a contradiction.
-    left: 'The dark had only just come back. You did not stay for the sky.',
-    nb: ['Iceland. Late August, and the dark has only just come back. I stayed up for it.',
+    again: 'still late august. the pylsa man has put a second plate out and is not saying why.',
+    left: 'The sky did its thing at about one in the morning, over an empty hot pool.',
+    nb: ['Iceland. Nine thousand krónur for a hot dog and a room with no curtain. I stayed up. So did it.',
          { if: 'wow', t: 'The sky did the thing. The animal was in the hot pool when it did.' },
          { if: 'par', t: 'It went down the glacier at a speed the pylsa man described as not right.' },
          { if: 'inc=1', t: 'One incident, in a town where nobody was out.' },
@@ -3620,10 +3766,11 @@ export const CHAPTERS = [
     hint: 'a maze, and then no maze at all',          open: 'a thousand people in this square and every one of them is working.', way: 'the fire at the desert camp',
     keep: 'an orange off the cart',
     marquee: { x: 275, z: 55, up: 4, say: 'the jetpack at the top of the staked track, on the big dune' },
+    again: 'the square knows the face now. the orange man has moved the cart.',
     left: 'The square was still learning your face. You did not give it the second evening.',
-    nb: ['Marrakech, and forty minutes east of it, nothing at all.',
+    nb: ['Marrakech. A boy sold me a map of the souk and then, for the same money, the way out of it.',
          { if: 'met', t: 'It was in the square. I said Sydney, the gardens, and it looked at me as if I was the one who had followed it.',
-           else: 'It was in the square. I did not get near enough to say so.' },
+           else: 'It was in the square. I was three stalls away, and then I was four.' },
          { if: 'wow', t: 'It has been up the big dune on a jetpack. I have been on four buses.' },
          { if: 'inc>=2', t: 'The orange cart has been robbed. More than once, by the sound of it.' },
          { if: 'tier>=3', t: 'The orange man calls it {call}. Because it has never once paid it.' },
@@ -3639,8 +3786,9 @@ export const CHAPTERS = [
     hint: 'no ground to speak of, and a wind',        open: 'nobody is entirely sure how you got up here, you included.', way: 'the lantern plinth, once it is lit',
     keep: 'a seed-head, still trying to leave',
     marquee: { x: 36, z: -190, up: 8, say: 'the plinth at the top' },
+    again: 'the wind is where you left it. the fisherman looked up, which is new.',
     left: 'There was no floor, and you went and found one somewhere else.',
-    nb: ['The Drift. Nobody is entirely sure how it got up here. Nobody is entirely sure how I did.',
+    nb: ['The Drift. I held a railing for most of the afternoon. It held nothing, and stayed up longer.',
          { if: 'wow', t: 'The lantern on the plinth is lit. I was told it had not been for years.' },
          { if: 'ln>=20', t: 'It held a line of {ln} metres in that wind. I held a railing.' },
          { if: 'tier>=3', t: 'The ice fisherman calls it {call}. Eleven years alone, and then that.' },
@@ -3656,6 +3804,7 @@ export const CHAPTERS = [
     hint: 'the floor is negotiable',                  open: 'the ground here is a negotiation with the sea, and the sea is early.', way: 'the two columns on the Molo',
     keep: 'a pigeon feather from the Piazza',
     marquee: { x: -4, z: -35, up: 7, say: 'St Mark’s Square' },
+    again: 'the water has been in and out twice since. the paving remembers you.',
     left: 'The water was coming in. You did not wait for it.',
     nb: ['Venice. The water was coming in and I was standing in it, holding the map.',
          { if: 'wow', t: 'The siren went four times and it was in the square for the fourth.' },
@@ -3677,14 +3826,15 @@ export const CHAPTERS = [
     // qa/MF-kowloon.png, which framed black. The subject is the roof you have
     // to be standing on and the wall of neon under it, not the air above both.
     marquee: { x: -20.5, z: -11, up: 34, say: 'the helicopter on the scaffold roof' },
-    left: 'Up is a direction here, and you had a look at it from the ground.',
-    nb: ['Hong Kong. Up is a direction here, and it went there.',
+    again: 'the tray came out as you did. the baker says that is a coincidence.',
+    left: 'The scaffold went on being a staircase. The one animal on the street that could have used it stayed at street level.',
+    nb: ['Hong Kong. My room was on the twenty-sixth floor. From the window I could see it, on a roof, higher.',
          { if: 'wow', t: 'A helicopter on a scaffold roof. It was on the roof. I was on the pavement, in the way.' },
          { if: 'ln>=20', t: '{ln} metres in a straight line, on a street where nothing is at ground level.' },
          { if: 'tier>=3', t: 'The egg tart baker calls it {call}. It turns up when the tray comes out.' },
          { if: 'pho>=3', t: 'It has been photographed {pho} times here. It is on a wall somewhere by now.' },
          'I took the tram. I looked up. That is my whole account of it.'],
-    note: 'You spent most of this chapter above the people who live in it.',
+    note: 'The city goes up because it has nowhere else to go. For a week, so did you.',
     acts: [
       { kick: 'MONG KOK', line: 'nothing on this street is at ground level.' },
       { kick: 'UP', line: 'the scaffold is a staircase. everybody here already knows that.' },
@@ -3700,14 +3850,15 @@ export const CHAPTERS = [
     // palawan.js publishes `marqueeAt`, so once you are in the water the arrow
     // tracks her rather than a patch of sea.
     marquee: { x: -4, z: -17, up: 1, say: 'the lagoon drop-off' },
-    left: 'The interesting half was underneath. You stayed on the top of it.',
-    nb: ['Palawan. The interesting half is underneath, they said, and it went there.',
+    again: 'the manta is still doing her laps. the clam has shut.',
+    left: 'The manta did her laps of the drop-off all afternoon, and nothing semi-aquatic came down to see.',
+    nb: ['Palawan. The boat out cost more than the room. The boatman pointed at the water the whole way and I looked at the boat.',
          { if: 'wow', t: 'It went under with a manta the size of a car. I watched from the jetty.' },
          { if: 'keep', t: 'It has a pearl out of the giant clam. The clam has not been consulted.' },
          { if: 'tier>=3', t: 'The net mender calls it {call}. Here, apparently, that is an honour.' },
          { if: 'par', t: 'Longer under the water than a semi-aquatic rodent has any business being.' },
          'I do not swim. I sat on the jetty and wrote this.'],
-    note: 'Eleven chapters of paddling about on the surface, and the whole thing was underneath.',
+    note: 'A whole life spent on top of the water, and the manta showed you the rest of it in an afternoon.',
     acts: [
       { kick: 'THE ISLAND', line: 'a beach, a jetty, and a boat that goes out to the good part.' },
       { kick: 'UNDER', line: 'you are a semi-aquatic rodent. act like one.' },
@@ -3718,14 +3869,21 @@ export const CHAPTERS = [
     hint: 'no steering. only up and down.',           open: 'the wind goes a different way at every height. that is the whole game.', way: 'the landing plain, once you have flown',
     keep: 'a scrap of balloon envelope',
     marquee: { x: 0, z: -40, up: 12, say: 'the launch field' },
+    again: 'eighty envelopes filling, and the tea maker has put out a second glass.',
     left: 'Eighty balloons go up at dawn. You were on a different plan.',
+    // THE ASK (L7, E6 / writing A): `travUp` is the one fact on this page
+    // that the traveller made themselves — they were in the basket. The
+    // page is written from the launch field either way; what changes is
+    // whether they watched the balloon or rode in it.
     nb: ['Cappadocia. Of course. Of course it was here.',
-         { if: 'met', t: 'I have stopped asking. I said so, to its face, and it looked past me at the balloons.',
-           else: 'I saw it across the square. I did not go over. I have some pride left.' },
-         { if: 'wow', t: 'It went up at dawn. Eighty balloons, and I could tell which one.' },
+         { if: 'travUp', t: 'I was in the basket. I am not going to explain how.' },
+         { if: '!travUp&met', t: 'I have stopped asking. I said so, to its face, and it looked past me at the balloons.' },
+         { if: '!travUp&!met', t: 'I saw it across the launch field. I stayed where I was. I have some pride left.' },
+         { if: 'wow&!travUp', t: 'It went up at dawn. Eighty balloons, and I could tell which one.' },
+         { if: 'wow&travUp', t: 'Eighty balloons went up at dawn and I was in one of them, next to it, holding a rope that was tied to nothing.' },
          { if: 'tier>=3', t: 'The tea maker calls it {call}. It is the tea now, he says.' },
          { if: 'inc>=1', t: 'Something happened at the dovecote. The whole cliff went up.' },
-         'No steering wheel. It did not seem to want one.'],
+         'No steering. You choose a height, the man said. It chose one.'],
     note: 'You could not steer, and it turned out that was never the problem.',
     acts: [
       { kick: 'THE VALLEY', line: 'soft rock, and everybody who ever lived here dug into it.' },
@@ -3737,8 +3895,9 @@ export const CHAPTERS = [
     hint: 'the sea has a shape here',                 open: 'this is the side of the peninsula that faces the whole Pacific.', way: 'between the red and yellow flags',
     keep: 'a Norfolk pine cone',
     marquee: { x: 0, z: -23.8, up: 1, say: 'out the back, past the break' },
-    left: 'The sea here has a shape, and you left it the argument.',
-    nb: ['Manly. The other side of the Corso, and it is not the harbour. The sea has a shape.',
+    again: 'the gulls have reconvened. the lifeguard has moved the flags a little.',
+    left: 'The big set came through at four, as it does. The lifeguard wrote the wave down and nothing else.',
+    nb: ['Manly. I took the ferry. It was on the ferry. I no longer find this remarkable.',
          { if: 'wow', t: 'It went out the back, past the break, and came in on a wave. On it.' },
          { if: 'tier>=3', t: 'The lifeguard calls it {call}. It has never once been between them.' },
          { if: 'pas', t: 'Something rode in on its back. Through surf.' },
@@ -3764,6 +3923,7 @@ export const CHAPTERS = [
     // on the one card every arrival reads. The rumour's headline yields to
     // it here and nowhere else — see notoHeadline.
     news: 'you are from here. nobody is going to mention it.',
+    again: 'back, then. nobody looked up the first time either.',
     left: 'You are from here, and you left the way you came. Nobody looked up for that either.',
     nb: ['The Pantanal. It is from here. Nobody mentioned it. Nobody looked up.',
          { if: 'wow', t: 'It crossed the river at the crossing, with the others, and nothing in the water objected.' },
@@ -3781,13 +3941,14 @@ export const CHAPTERS = [
     hint: 'no light in here but yours',               open: 'nine kilometres of it, and no light that you did not bring.', way: 'the slot of daylight at the far end',
     keep: 'a cave pearl', win: 2,
     marquee: { x: 4, z: -48, up: 40, say: 'the hole in the roof' },
+    again: 'the dark is the same dark. the rope man has got a longer rope out.',
     left: 'Nine kilometres of dark, and you lit a little of the front of it.',
-    nb: ['Sơn Đoòng. Nine kilometres of dark, and the only light in it was the noise it made.',
+    nb: ['Sơn Đoòng. The rope man asked how far I meant to go. I said the second chamber, and he wrote it down.',
          { if: 'wow', t: 'It dropped through the hole in the roof when the light came down it. I have a photograph. It is a photograph of a hole.' },
          { if: 'tier>=3', t: 'The rope man calls it {call}. The best thing he can call anybody.' },
          { if: 'inc>=1', t: 'Something went over in the dark. In there, it went over for a long time.' },
          { if: 'keep', t: 'It has a cave pearl. It should not have a cave pearl.' },
-         'I did not go past the second chamber. It did.'],
+         'I stopped at the second chamber, as written down. It kept going.'],
     note: 'You made the only light there was, and it went out every few seconds.',
     acts: [
       { kick: 'THE MOUTH', line: 'wheek. it is the only way to see anything.' },
@@ -3799,8 +3960,9 @@ export const CHAPTERS = [
     hint: 'too cold to walk. take the boat.',         open: 'the orange boat at the end of the jetty. that is the chapter.', way: 'the head of the station jetty',
     keep: 'the station’s enamel mug', win: 3,
     marquee: { x: 14.3, z: -169.5, up: 2, say: 'the channel, where the blows are' },
-    left: 'Nothing on this continent had an opinion about you, and you did not stay long enough to change that.',
-    nb: ['Antarctica. Too cold to walk, and nothing here had any opinion about it whatsoever.',
+    again: 'the base has counted you in. that is two things it has counted this winter.',
+    left: 'The whales came up in the channel at the usual time. The base logged four blows and nothing else.',
+    nb: ['Antarctica. Two days of open sea and I was sick for both. The station has a bar, a jetty and a rule about mugs.',
          { if: 'wow', t: 'It took the orange boat out to the channel, where the blows are, and the whales came up beside it.' },
          { if: 'tier>=3', t: 'The base bar calls it {call}. It has never once come at six.' },
          { if: 'par', t: 'Four rocks, eleven hundred metres apart, and a time the base does not believe.' },
@@ -3818,12 +3980,13 @@ export const CHAPTERS = [
     way: 'the steps of the Casino',
     keep: 'a mother-of-pearl plaque', win: 3,
     marquee: { x: 14, z: -96, up: 4, say: 'the red car on the grid, in front of the stand' },
-    left: 'Somebody in there was going to mind. You did not stay to find out who.',
-    nb: ['Monte Carlo. The first place in the world that minded. Somebody in there was always going to.',
+    again: 'the doorman recognised you. that is not the same as letting you in.',
+    left: 'The doorman logged it, the deckhand denied it, and the grid was swept before the next car was on it.',
+    nb: ['Monte Carlo. I was asked to leave a lobby before I had finished walking into it. The uniform was very good.',
          { if: 'wow', t: 'It was on the grid, in the red car, in front of the stand. In front of the stand.' },
          { if: 'inc>=1', t: 'It has been escorted from somewhere. Politely, in a uniform.' },
          { if: 'tier>=3', t: 'The deckhand calls it {call}. He has decided it is the owner now.' },
-         { if: 'keep', t: 'It has a mother-of-pearl plaque. It did not win it.' },
+         { if: 'keep', t: 'It has a mother-of-pearl plaque. Nobody at the table handed it one.' },
          'They minded me too. I was wearing the wrong shoes.'],
     note: 'The first place in the world that asked what you thought you were doing.',
     acts: [
@@ -3837,13 +4000,14 @@ export const CHAPTERS = [
     way: 'the head of the Long Biên bridge',
     keep: 'a plastic stool, slightly cracked', win: 3,
     marquee: { x: 6.0, z: 15.5, up: 3, say: 'the pho stall’s scooter, on Hang Ngang' },
-    left: 'The road was not going to stop for you. You did not make it try.',
+    again: 'the tea lady kept the stool. the road kept nothing.',
+    left: 'Six lanes, two hundred and forty riders, and not one of them had to touch a brake on your account.',
     nb: ['Hanoi. Right. I am not even going to write it down.',
          { if: 'met', t: 'Four countries. Four. I have counted, and I said so, and it sat down on a stool.',
            else: 'I saw it across six lanes of mopeds. I was not going to cross for it. Nobody crosses.' },
          { if: 'wow', t: 'It took the pho scooter round. Three deliveries. Two hundred and forty riders in the way.' },
          { if: 'tier>=3', t: 'The tea lady calls it {call}. The whole street does now, she says. Her fault.' },
-         { if: 'err', t: 'It carried a bowl of pho up the frontage to me. I did not order it. I ate it.' },
+         { if: 'err', t: 'It carried a bowl of pho up the frontage to me. Nobody had ordered one. I ate it.' },
          'I fly home on Thursday. I would put money on where it is going.'],
     note: 'You crossed six lanes without stopping and the road never noticed you were there.',
     acts: [
@@ -4753,6 +4917,17 @@ const _grainFresK = { value: 1 };
 export function skyTick(color) { if (color) _grainSkyC.value.copy(color); }
 /** A multiplier on every Fresnel strength in the game: 1 to play, 0 to cut. */
 export function fresnelTick(k) { _grainFresK.value = k > 0 ? (k < 3 ? k : 3) : 0; }
+// THE REFLECTION's own switch (L7, E4) — the A/B's hand on the columns a sea
+// draws under its lamps and its hulls; 1 in every frame the game plays.
+const _grainMirK = { value: 1 };
+export function mirrorTick(k) { _grainMirK.value = k > 0 ? (k < 3 ? k : 3) : 0; }
+// THE WALL's own switch (L7, E4) — the wall weight is multiplied by this, so
+// at 0 every wall draws the sheared floor field it drew before the pass and
+// the courses and the rock go with it. 1 in every frame the game plays; the
+// A/B (qa/l7-e4-ab.js) reads the same pixels both ways in one session, which
+// is the only honest before when the lens moved under the pass.
+const _grainTriK = { value: 1 };
+export function triTick(k) { _grainTriK.value = k > 0 ? (k < 1 ? k : 1) : 0; }
 // The pale-ground gate's own switch — see `nearPale` in grain(). 1 to play,
 // 0 to cut (the gate collapses to its no-op and the near octave is what it
 // was before the pass), so an A/B can read the term away in one session.
@@ -5162,8 +5337,8 @@ export function swayMesh(mesh, opts) {
     const hi = o.hi === undefined ? 1 : o.hi;
     const stiff = o.stiff === undefined ? 1.6 : o.stiff;
     const hz = o.hz === undefined ? 1 : o.hz;
-    d.onBeforeCompile = function (shader) { _swayInject(shader, amount, axis, lo, hi, stiff, hz); };
-    d.customProgramCacheKey = function () { return 'swayD' + amount + axis + lo + hi + stiff + hz; };
+    d.onBeforeCompile = function (shader) { _swayInject(shader, amount, axis, lo, hi, stiff, hz); _lensCapDepth(shader); };
+    d.customProgramCacheKey = function () { return 'swayD' + amount + axis + lo + hi + stiff + hz + 'c'; };
     mesh.customDepthMaterial = d;
   }
   return mesh;
@@ -5364,6 +5539,45 @@ export function grain(m, opts) {
   const midColor = o.midColor === undefined ? 0xffffff : o.midColor;
   const midBase = o.midBase === undefined ? 0xffffff : o.midBase;
   const midHue = o.midHue === undefined ? 0.6 : o.midHue;
+  // ---------------------------------------------------------------------
+  // THE WALL — TRIPLANAR, COURSES, ROCK (L7, E4 / art #3).
+  //
+  // Every octave above samples `vGrainW.xz`, or `gq`, which is xz sheared
+  // by y. On a floor that is the field. On a WALL it is the field seen edge
+  // on: x (or z) is a constant across the whole face, so the base and near
+  // octaves collapse to a strip stretched three to four times up the wall
+  // (the `warp` shear is all that moves them) and the broad and mid octaves
+  // collapse to one value up its whole height — "which is what a wall does",
+  // the note on `broad` says, and it is not: a wall is the surface with the
+  // most frame in the chapters that have walls. MEASURED (review-art #3,
+  // qa/l7r-art-cave-rest.png): the doline wall is 60 % of the frame, 91 % of
+  // its 8×8 blocks have sd < 2, the luma range p01–p99 is 83, the edge
+  // density 0.4 %; the Venice calle, Cali's concrete and Mong Kok's
+  // shopfront panels the same.
+  //
+  // TRIPLANAR: the world normal (`vGrainN`, already a varying on every
+  // non-water build for the wet gate) gives weights |n|^4, normalised, and
+  // where the up-weight is under 0.8 the base, near and mid octaves are
+  // taken again on the zy and xy planes — the plane a wall actually lies in,
+  // at full scale and with no shear — and blended in by the wall weight.
+  // The floor path is bit-for-bit what it was: the branch is on the weight,
+  // and a floor never enters it. A 35-degree bank does, a little.
+  //
+  //   tri     on by default on every non-water build; `tri: false` opts out
+  //   course  ±fraction of a horizontal band on world y at 0.55 m — the
+  //           courses of a stone building. Off by default; Venice asks.
+  //   rock    ±fraction of the BROAD octave (`broadM` wavelength) taken on
+  //           the wall projection — the big light-and-dark of a rock face,
+  //           which a cave wall has and a rendered plane does not. Off by
+  //           default; the cave, Göreme and Iceland ask.
+  const tri = (o.wetOnly === true || (o.sparkle !== undefined && o.sparkle > 0) || o.tri === false) ? 0 : 1;
+  const course = (tri === 0 || o.course === undefined) ? 0 : o.course;
+  const rock = (tri === 0 || o.rock === undefined) ? 0 : o.rock;
+  // ---------------------------------------------------------------------
+  // THE REFLECTION (L7, E4 / art #7) — see the block above `mirror` in the
+  // fragment. On by default on every sea (`sparkle > 0`); `mirror: 0` opts
+  // out. A strength, so a chapter can tune what its lamps do to its water.
+  const mirror = (o.wetOnly === true || !(o.sparkle > 0)) ? 0 : (o.mirror === undefined ? 1 : o.mirror);
   // cloud shadows: a multiplier on the shared uniform, 1 by default (see _cloudK)
   const cloud = o.wetOnly === true ? 0 : (o.cloud === undefined ? 1 : o.cloud);
   // How the per-channel gain splits. Red rises fastest and blue slowest, so
@@ -5458,7 +5672,8 @@ export function grain(m, opts) {
               '|' + shoreTint + '|' + shoreTintC + '|' + shoreCol + '|' + shoreScale +
               '|' + fres + '|' + fresPow + '|' + nearPale +
               '|' + speck + '|' + speckScale + '|' + speckCut + '|' + speckCol + '|' + cloud +
-              '|' + mid + '|' + midM + '|' + midColor + '|' + midBase + '|' + midHue;
+              '|' + mid + '|' + midM + '|' + midColor + '|' + midBase + '|' + midHue +
+              '|' + tri + '|' + course + '|' + rock + '|' + mirror;
   const hit = _grainCache.get(key);
   if (hit) return hit;
 
@@ -5518,6 +5733,24 @@ export function grain(m, opts) {
       shader.uniforms.uGrSkyC = _grainSkyC;
       shader.uniforms.uGrFresK = _grainFresK;
     }
+    // THE REFLECTION (L7, E4): the sea reads the same two pools the rim
+    // binds — the spill's emitters and the bounce's big saturated things —
+    // under grain's own names. A sea has no rim (rimHere is false on every
+    // sparkling build), so the objects are bound here or not at all.
+    if (tri > 0) shader.uniforms.uGrTriK = _grainTriK;
+    if (mirror > 0) {
+      shader.uniforms.uGrSpP = _spillP;
+      shader.uniforms.uGrSpC = _spillC;
+      shader.uniforms.uGrSpN = _spillN;
+      shader.uniforms.uGrSpOn = _spillOn;
+      shader.uniforms.uGrBnP = _bounceP;
+      shader.uniforms.uGrBnC = _bounceC;
+      shader.uniforms.uGrBnN = _bounceN;
+      shader.uniforms.uGrBnOn = _bounceOn;
+      shader.uniforms.uGrSkyC = _grainSkyC;
+      shader.uniforms.uGrMirK = _grainMirK;
+      shader.uniforms.uGrainT = _grainTime;
+    }
     if (!wetOnly && near > 0 && nearPale !== 1) shader.uniforms.uGrPaleK = _grainPaleK;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>',
@@ -5549,8 +5782,19 @@ export function grain(m, opts) {
         !rimHere ? 'uniform vec4 uGrCloudP;' : '',
         !rimHere ? 'uniform vec2 uGrCloudS;' : '',
         !rimHere ? _CLOUD_GLSL : '',
-        fres > 0 ? 'uniform vec3 uGrSkyC;' : '',
+        (fres > 0 || mirror > 0) ? 'uniform vec3 uGrSkyC;' : '',
         fres > 0 ? 'uniform float uGrFresK;' : '',
+        // THE REFLECTION (L7, E4): the pools, under grain's names.
+        mirror > 0 ? 'uniform vec4 uGrSpP[' + _SPILL_N + '];' : '',
+        mirror > 0 ? 'uniform vec3 uGrSpC[' + _SPILL_N + '];' : '',
+        mirror > 0 ? 'uniform float uGrSpN;' : '',
+        mirror > 0 ? 'uniform float uGrSpOn;' : '',
+        mirror > 0 ? 'uniform vec4 uGrBnP[' + _BOUNCE_N + '];' : '',
+        mirror > 0 ? 'uniform vec3 uGrBnC[' + _BOUNCE_N + '];' : '',
+        mirror > 0 ? 'uniform float uGrBnN;' : '',
+        mirror > 0 ? 'uniform float uGrBnOn;' : '',
+        mirror > 0 ? 'uniform float uGrMirK;' : '',
+        tri > 0 ? 'uniform float uGrTriK;' : '',
         (!wetOnly && near > 0 && nearPale !== 1) ? 'uniform float uGrPaleK;' : '',
         // Nothing samples the noise field in the wet-only build, so the helpers
         // do not go in either — the shader is the wet gate and nothing else.
@@ -5623,6 +5867,9 @@ export function grain(m, opts) {
         (wetOnly || broad <= 0) ? '' : '  vec2 gbq = vGrainW.xz * ' + (1 / broadM).toFixed(5) + ' + 7.13;',
         (wetOnly || broad <= 0) ? '' : '  gbq += gn * 0.8;',
         (wetOnly || broad <= 0) ? '' : '  float gb = (grNoise(gbq) - 0.5) * ' + broad.toFixed(4) + ';',
+        // ...and a rock face with no broad octave on the floor still wants
+        // one on the wall (L7, E4): the slot exists either way.
+        (wetOnly || broad > 0 || rock <= 0) ? '' : '  float gb = 0.0;',
         // ---- THE MID OCTAVE (L6, E6). See the note on `mid` above. Two
         // octaves (the second at 2.3x, a third of the weight, in a frame
         // turned a radian) warped by `gn`, so an eight-metre lattice is
@@ -5632,6 +5879,71 @@ export function grain(m, opts) {
         (wetOnly || mid <= 0) ? '' : '  gmq += gn * 1.1;',
         (wetOnly || mid <= 0) ? '' : '  vec2 gmq2 = vec2(gmq.x * 0.5403 - gmq.y * 0.8415, gmq.x * 0.8415 + gmq.y * 0.5403) * 2.3 + 17.9;',
         (wetOnly || mid <= 0) ? '' : '  float gm = (grNoise(gmq) - 0.5) * 0.68 + (grNoise(gmq2) - 0.5) * 0.32;',
+        // ---- THE WALL (L7, E4 / art #3). See the note on `tri` above. -----
+        // The floor's fields are all computed by now; this takes them again
+        // on the two planes a wall lies in and blends them in by the wall
+        // weight, so a floor fragment never enters the branch and a wall
+        // fragment gets the same octaves at the same scale, unsheared.
+        //
+        // THE DERIVATIVES ARE OUTSIDE THE BRANCH, and the taps are inside it.
+        // fwidth in non-uniform control flow is undefined in GLSL ES, so the
+        // near octave's footprint fade is measured on the UNWARPED wall
+        // coordinate before the branch (the warp adds a cell and a half of
+        // slow drift and does not move the footprint), and every hash — the
+        // only thing that costs — waits for the weight to say it is wanted.
+        //
+        // TWO PLANES, WEIGHTED, NOT ONE PICKED: a cave wall is a cylinder,
+        // and a hard switch at the 45-degree azimuth is a seam running the
+        // height of the doline. Each plane is tapped only where its own
+        // weight is worth it, so a box's face — every wall in the built
+        // chapters — pays for one.
+        tri > 0 ? [
+          '  vec3 tw = abs(vGrainN); tw *= tw; tw *= tw; tw /= (tw.x + tw.y + tw.z + 1e-5);',
+          '  float wallK = 0.0;',
+          '  vec2 gqA = vGrainW.zy * ' + scale.toFixed(4) + ';',
+          '  vec2 gqB = vGrainW.xy * ' + scale.toFixed(4) + ';',
+          near > 0 ? '  vec2 gnqA = vec2(gqA.x * 0.8776 - gqA.y * 0.4794, gqA.x * 0.4794 + gqA.y * 0.8776) * ' + nearScale.toFixed(4) + ' + 41.7;' : '',
+          near > 0 ? '  vec2 gnqB = vec2(gqB.x * 0.8776 - gqB.y * 0.4794, gqB.x * 0.4794 + gqB.y * 0.8776) * ' + nearScale.toFixed(4) + ' + 41.7;' : '',
+          near > 0 ? '  float nfwA = max(fwidth(gnqA.x), fwidth(gnqA.y));' : '',
+          near > 0 ? '  float nfwB = max(fwidth(gnqB.x), fwidth(gnqB.y));' : '',
+          course > 0 ? '  float cyF = clamp(1.0 - fwidth(vGrainW.y) * 3.6, 0.0, 1.0);' : '',
+          '  if (tw.y < 0.8) {',
+          '    wallK = clamp((0.8 - tw.y) * 2.0, 0.0, 1.0) * uGrTriK;',
+          '    float kA = tw.x / (tw.x + tw.z + 1e-5);',
+          '    float gnW = 0.0;',
+          near > 0 ? '    float gnrW = 0.0;' : '',
+          mid > 0 ? '    float gmW = 0.0;' : '',
+          rock > 0 ? '    float gbW = 0.0;' : '',
+          // one plane, as a template: the base pair, the near pair with the
+          // fade, the mid pair, the rock tap — the floor's own numbers
+          '    for (int tp = 0; tp < 2; tp++) {',
+          '      float kP = tp == 0 ? kA : 1.0 - kA;',
+          '      if (kP < 0.02) continue;',
+          '      vec2 gqP = tp == 0 ? gqA : gqB;',
+          '      float gnP = grNoise(gqP) * 0.64 + grNoise(gqP * 2.83 + 19.31) * 0.36 - 0.5;',
+          '      gnW += gnP * kP;',
+          near > 0 ? '      vec2 gnqP = (tp == 0 ? gnqA : gnqB) + gnP * 3.0;' : '',
+          near > 0 ? '      float nfwP = tp == 0 ? nfwA : nfwB;' : '',
+          near > 0 ? '      vec2 gnqP2 = vec2(gnqP.x * 0.5403 - gnqP.y * 0.8415, gnqP.x * 0.8415 + gnqP.y * 0.5403) * 2.17 + 11.3;' : '',
+          near > 0 ? '      gnrW += ((grNoise(gnqP) - 0.5) * 0.62 * clamp(1.0 - nfwP * 2.00, 0.0, 1.0)' : '',
+          near > 0 ? '              + (grNoise(gnqP2) - 0.5) * 0.38 * clamp(1.0 - nfwP * 4.34, 0.0, 1.0)) * ' + near.toFixed(4) + ' * kP;' : '',
+          mid > 0 ? '      vec2 gmqP = (tp == 0 ? vGrainW.zy : vGrainW.xy) * ' + (1 / midM).toFixed(5) + ' + 3.71 + gnP * 1.1;' : '',
+          mid > 0 ? '      vec2 gmqP2 = vec2(gmqP.x * 0.5403 - gmqP.y * 0.8415, gmqP.x * 0.8415 + gmqP.y * 0.5403) * 2.3 + 17.9;' : '',
+          mid > 0 ? '      gmW += ((grNoise(gmqP) - 0.5) * 0.68 + (grNoise(gmqP2) - 0.5) * 0.32) * kP;' : '',
+          // THE ROCK: the broad wavelength on the wall, at ±rock — the one
+          // octave a cliff has that a floor's grain never gave a wall
+          rock > 0 ? '      vec2 gbqP = (tp == 0 ? vGrainW.zy : vGrainW.xy) * ' + (1 / broadM).toFixed(5) + ' + 7.13 + gnP * 0.8;' : '',
+          rock > 0 ? '      gbW += (grNoise(gbqP) - 0.5) * ' + (2 * rock).toFixed(4) + ' * kP;' : '',
+          '    }',
+          '    gn = mix(gn, gnW, wallK);',
+          // the pale gate again, so a pale wall is treated as the pale floor is
+          (near > 0 && nearPale !== 1) ? '    gnrW *= mix(1.0, ' + nearPale.toFixed(4) + ', uGrPaleK * smoothstep(0.24, 0.52, ' +
+            'dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722))));' : '',
+          near > 0 ? '    gnr = mix(gnr, gnrW, wallK);' : '',
+          mid > 0 ? '    gm = mix(gm, gmW, wallK);' : '',
+          rock > 0 ? '    gb += gbW * wallK;' : '',
+          '  }',
+        ].join('\n') : '',
         // ---- CLOUD SHADOWS (L3, E2). See _cloudK. Two octaves of the same
         // value noise at ~12 m and ~5 m, drifting at about half a metre a
         // second, thresholded so a cloud is a SHAPE with an edge and not a
@@ -5668,10 +5980,17 @@ export function grain(m, opts) {
                        ((!wetOnly && near > 0) ? ' + gnr' : '') +
                        // ±mid at the field's extremes (gm is ~±0.4, so 2.5x)
                        ((!wetOnly && mid > 0) ? ' + gm * ' + (mid * 2.5).toFixed(4) : '') + ')' +
-                       ((!wetOnly && broad > 0)
+                       ((!wetOnly && (broad > 0 || rock > 0))
                          ? ' + gb * vec3(' + _BROAD_K[0].toFixed(3) + ', ' +
                            _BROAD_K[1].toFixed(3) + ', ' + _BROAD_K[2].toFixed(3) + ')'
                          : '') + ';',
+        // ---- THE COURSES (L7, E4). A band on world y at 0.55 m, ±course,
+        // wavering by the base field so no two courses are the same line;
+        // only on the wall (by wallK) and dying on its own footprint so a
+        // palazzo across the Bacino does not moiré. A sine rather than a
+        // thresholded line: a course is a soft shadow under a ledge, and a
+        // hard line at this scale is a stripe.
+        course > 0 ? '  diffuseColor.rgb *= 1.0 + ' + course.toFixed(4) + ' * sin(vGrainW.y * 11.424 + gn * 1.5) * cyF * wallK;' : '',
         // the hue drift, on the half of the field the pair's lumas chose; a
         // luma-neutral ratio, so it compounds with nothing above it
         (wetOnly || mid <= 0) ? '' :
@@ -5791,6 +6110,76 @@ export function grain(m, opts) {
           '    fF = clamp(fF, 0.0, 1.0);',
           '    diffuseColor.rgb = mix(diffuseColor.rgb, uGrSkyC, fF);',
           m.transparent ? '    diffuseColor.a = mix(diffuseColor.a, 1.0, fF);' : '',
+          '  }',
+        ].join('\n') : '',
+        mirror > 0 ? [
+          // ---- THE REFLECTION (L7, E4 / art #7) ------------------------------
+          // A sea in this game reflected a COLOUR — the sky at the horizon,
+          // through the Fresnel above — and never a thing. MEASURED
+          // (qa/l7r-art-quay-rest.png): a pier, six piles, two palms and a
+          // hull stand beside 40 % of the frame that is water and none of
+          // them is in it; the sea band's sd (44) is the sparkle alone.
+          // Kowloon's harbour, the canals, Monaco's basin the same. A planar
+          // reflection is a second scene draw and was held; this is the
+          // thing a reflection on RIPPLED water actually looks like, which is
+          // not a mirror image but a COLUMN — a vertical smear of the source's
+          // colour running from its foot on the water toward the viewer — and
+          // it is drawn from the two pools the game already ranks every
+          // frame: the spill's emitters by night, the bounce's big saturated
+          // things (hulls, pylons, awnings) by day.
+          //
+          // THE GEOMETRY IS THE REAL ONE. A water fragment at horizontal
+          // distance `mA` from the eye along the line to a source's foot (at
+          // `mL`) mirrors a height of He·(mL − mA)/mA above that foot, He
+          // being the eye's height over the water: so a column runs from the
+          // foot (reflected height 0) toward the lens, fading as the mirrored
+          // height climbs past the source — exp(−y/1.4h), h the source's
+          // height — and falls off across the line with the source's own
+          // reach. One noise tap, shared by every column, breaks it into the
+          // bands a chop makes: a column that is a clean stripe is a
+          // reflection of nothing.
+          //
+          // AFTER THE FRESNEL, on purpose and against the roadmap's word
+          // "before": the Fresnel mixes the sea toward the sky at grazing
+          // angles, and grazing is exactly where a reflection is strongest —
+          // added before it, a lamp's column is mixed away by the very term
+          // that says the water is a mirror here. Added after, the column
+          // replaces the sky in the water the way the lamp replaces the sky
+          // behind it. The day column SUBTRACTS: a hull is darker than the
+          // sky it stands against, so its reflection is a hole in the sky's
+          // reflection, mixed toward the sky's complement.
+          '  if (uGrMirK > 0.001 && (uGrSpOn > 0.5 || uGrBnOn > 0.5)) {',
+          '    float mHe = max(cameraPosition.y - vGrainW.y, 0.4);',
+          '    vec2 mQ = vGrainW.xz - cameraPosition.xz;',
+          '    float mJ = 0.55 + 0.9 * grNoise(vec2(vGrainW.x * 1.9 + uGrainT * 0.13, vGrainW.z * 0.55 - uGrainT * 0.21));',
+          '    vec3 mAcc = vec3(0.0);',
+          '    float mDark = 0.0;',
+          '    for (int mi = 0; mi < ' + (_SPILL_N + _BOUNCE_N) + '; mi++) {',
+          '      vec4 sp; vec3 sc; float mW;',
+          '      if (mi < ' + _SPILL_N + ') {',
+          '        if (float(mi) >= uGrSpN || uGrSpOn < 0.5) { if (uGrBnOn < 0.5) break; else continue; }',
+          '        sp = uGrSpP[mi]; sc = uGrSpC[mi]; mW = sp.w * 0.30;',
+          '      } else {',
+          '        if (float(mi - ' + _SPILL_N + ') >= uGrBnN || uGrBnOn < 0.5) break;',
+          '        sp = uGrBnP[mi - ' + _SPILL_N + ']; sc = uGrBnC[mi - ' + _SPILL_N + ']; mW = 2.4;',
+          '      }',
+          '      float h = sp.y - vGrainW.y;',
+          '      if (h < 0.3) continue;',
+          '      vec2 mD = sp.xz - cameraPosition.xz;',
+          '      float mL = length(mD);',
+          '      if (mL < 0.5) continue;',
+          '      vec2 mDh = mD / mL;',
+          '      float mA = dot(mQ, mDh);',
+          '      if (mA < 0.5 || mA > mL) continue;',
+          '      float mC = abs(mQ.x * mDh.y - mQ.y * mDh.x);',
+          '      float yr = mHe * (mL - mA) / mA;',
+          '      float col = exp(-yr / (1.4 * h)) * exp(-mC / mW) * mJ;',
+          '      if (mi < ' + _SPILL_N + ') mAcc += sc * col; else mDark = max(mDark, col * (sc.r + sc.g + sc.b) * 6.0);',
+          '    }',
+          '    diffuseColor.rgb += mAcc * ' + (0.55 * mirror).toFixed(4) + ' * uGrMirK;',
+          '    float mDay = smoothstep(0.12, 0.35, dot(uGrSkyC, vec3(0.2126, 0.7152, 0.0722)));',
+          '    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * (vec3(1.0) - uGrSkyC * 0.75),',
+          '                           clamp(mDark, 0.0, 1.0) * ' + (0.5 * mirror).toFixed(4) + ' * mDay * uGrMirK);',
           '  }',
         ].join('\n') : '',
         spark > 0 ? [

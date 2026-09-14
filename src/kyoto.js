@@ -1510,7 +1510,8 @@ function kyoUpdateHeron(game, dt) {
       kyoHeronPhase = 1; kyoHeronT = 0;
       // A heron's alarm call is a single harsh bark and it is genuinely the
       // ugliest noise in this garden, which is the point of putting one here.
-      if (game.sfx) game.sfx('gull', { volume: 0.55, pitch: 0.44 });
+      // ...and it is a heron's croak, not a gull at 0.44 (L7, E2): see sfxHeron
+      if (game.sfx) game.sfx('heron', { volume: 0.7, pitch: 1.0 });
       // ---- ...AND THE WINGS THAT GO WITH IT (A3) ------------------------
       // ONE BIRD, so `spread` is 0: this is not a flock crossing the frame, it
       // is four slow heavy beats where it stood. The garden's own note says the
@@ -1531,7 +1532,7 @@ function kyoUpdateHeron(game, dt) {
   // this chapter where two of its set pieces are in the same shot.
   if (kyoHeronSpooked && kyoHeronPhase === 1 && kyoHeronT > 0.34) {
     kyoHeronSpooked = 0;
-    if (game.sfx) game.sfx('gull', { volume: 0.8, pitch: 0.40 });
+    if (game.sfx) game.sfx('heron', { volume: 0.95, pitch: 0.92 });
   }
 
   // ---- THE WINDOW (L6, F2): `heron-lift` — a wheek inside the ring while

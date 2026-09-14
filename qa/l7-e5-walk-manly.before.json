@@ -1,0 +1,251 @@
+{
+ "biome": "manly",
+ "samples": [
+  {
+   "t": 16.5,
+   "biome": "manly",
+   "x": 0,
+   "y": 2.9,
+   "z": 46,
+   "paper": "the big one hereTHE BIG WAVESurf the biggest wave of the set to the sandout the back, past the break · 70 mpart 1 of 3THE BEACHAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their fl",
+   "err": null
+  },
+  {
+   "t": 43.9,
+   "biome": "manly",
+   "x": -22.2,
+   "y": 1.7,
+   "z": 29.6,
+   "paper": "the big one hereTHE BIG WAVESurf the biggest wave of the set to the sandout the back, past the break · 60 mpart 1 of 3THE BEACHAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their fl",
+   "err": null
+  },
+  {
+   "t": 67.4,
+   "biome": "manly",
+   "x": -34.4,
+   "y": 1.9,
+   "z": 34,
+   "paper": "the big one hereTHE BIG WAVESurf the biggest wave of the set to the sandout the back, past the break · 70 mpart 1 of 3THE BEACHAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their fl",
+   "err": null
+  },
+  {
+   "t": 88.3,
+   "biome": "manly",
+   "x": -37.5,
+   "y": 2.7,
+   "z": 39.5,
+   "paper": "the big one hereTHE BIG WAVESurf the biggest wave of the set to the sandout the back, past the break · 70 mpart 1 of 3THE BEACHAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their fl",
+   "err": null
+  },
+  {
+   "t": 119.2,
+   "biome": "manly",
+   "x": -57.8,
+   "y": 2.1,
+   "z": 28.4,
+   "paper": "the big one hereTHE BIG WAVESurf the biggest wave of the set to the sandout the back, past the break · 80 mpart 1 of 3THE BEACHAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their fl",
+   "err": null
+  },
+  {
+   "t": 142.9,
+   "biome": "manly",
+   "x": -49,
+   "y": 0.5,
+   "z": 21,
+   "paper": "the big one hereTHE BIG WAVESurf the biggest wave of the set to the sandout the back, past the break · 70 mpart 1 of 3THE BEACHAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their fl",
+   "err": null
+  },
+  {
+   "t": 146.9,
+   "biome": "manly",
+   "x": -41.9,
+   "y": 0.5,
+   "z": 24.8,
+   "paper": "the big one hereTHE BIG WAVESurf the biggest wave of the set to the sandout the back, past the break · 60 mpart 1 of 3THE BEACHAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their fl",
+   "err": null
+  }
+ ],
+ "ticks": [
+  [
+   10.4,
+   "pine-cone"
+  ]
+ ],
+ "imp": [
+  {
+   "cause": "something back there",
+   "t": 17.309799999982165,
+   "v": 7.1
+  },
+  {
+   "cause": "something back there",
+   "t": 22.15770000001052,
+   "v": 7.5
+  },
+  {
+   "cause": "the wave",
+   "t": 59.33980000002602,
+   "v": 7.2
+  },
+  {
+   "cause": "something back there",
+   "t": 88.58110000011901,
+   "v": 7.9
+  },
+  {
+   "cause": "something back there",
+   "t": 94.1531000001113,
+   "v": 6.8
+  },
+  {
+   "cause": "something back there",
+   "t": 99.50670000014242,
+   "v": 6.9
+  },
+  {
+   "cause": "something back there",
+   "t": 132.5519000001898,
+   "v": 6.8
+  },
+  {
+   "cause": "something back there",
+   "t": 141.18780000019672,
+   "v": 7.8
+  }
+ ],
+ "arrivalTicks": [],
+ "events": [
+  [
+   1.6,
+   "toast",
+   "be a menace."
+  ],
+  [
+   9.9,
+   "toast",
+   "saved — you can close this and come back"
+  ],
+  [
+   11.5,
+   "toast",
+   "“ Right. Noted. ” — somebody on the beach"
+  ],
+  [
+   16.7,
+   "toast",
+   "that bar is your puff. a run spends it; stand still and it comes back."
+  ],
+  [
+   18.4,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   24.9,
+   "toast",
+   "ticked  ·  Bring down a Norfolk pine cone"
+  ],
+  [
+   26.5,
+   "toast",
+   "“ Not against the rules. Not covered by the rules either. ” — somebody on the beach"
+  ],
+  [
+   28.1,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   37.5,
+   "toast",
+   "top left is the paper. the star is the big thing here; F moves the arrow."
+  ],
+  [
+   45.2,
+   "toast",
+   "drawing a little less to keep up"
+  ],
+  [
+   78.3,
+   "toast",
+   "that was the wave"
+  ],
+  [
+   115.6,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   124.2,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   132,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   178.1,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   179.7,
+   "toast",
+   "“ Feel that? ” — somebody on the beach"
+  ],
+  [
+   186.5,
+   "toast",
+   "somebody saw that. three things in front of people is AN INCIDENT, five is A SCENE — unles"
+  ],
+  [
+   188.1,
+   "toast",
+   "that was something back there"
+  ]
+ ],
+ "done": [
+  "pine-cone"
+ ],
+ "shove": [
+  [
+   18.4,
+   "that was something back there"
+  ],
+  [
+   28.1,
+   "that was something back there"
+  ],
+  [
+   78.3,
+   "that was the wave"
+  ],
+  [
+   115.6,
+   "that was something back there"
+  ],
+  [
+   124.2,
+   "that was something back there"
+  ],
+  [
+   132,
+   "that was something back there"
+  ],
+  [
+   178.1,
+   "that was something back there"
+  ],
+  [
+   188.1,
+   "that was something back there"
+  ]
+ ],
+ "shoveUnnamed": 7,
+ "impUnsrc": 8,
+ "voids": 0,
+ "tickN": 1,
+ "firstNonFree": 10.4
+}

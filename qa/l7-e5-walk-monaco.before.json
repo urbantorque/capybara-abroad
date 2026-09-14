@@ -1,0 +1,124 @@
+{
+ "biome": "monaco",
+ "samples": [
+  {
+   "t": 5.1,
+   "biome": "monaco",
+   "x": 10,
+   "y": 2.9,
+   "z": -80,
+   "paper": "the big one hereTHE GRAND PRIXDrive the red car one lap and pass the packthe red car on the grid by the harbour stand: press E at its doorthe red car on the grid, in front of the stand · 16 mpart 1 of",
+   "err": null
+  },
+  {
+   "t": 27.3,
+   "biome": "monaco",
+   "x": 20.6,
+   "y": -0.2,
+   "z": -61.5,
+   "paper": "the big one hereTHE GRAND PRIXDrive the red car one lap and pass the packthe red car on the grid, in front of the stand · 35 mpart 1 of 3THE PORTAnnounce yourself (wheek)Steal a tourist’s hatMake some",
+   "err": null
+  },
+  {
+   "t": 48.2,
+   "biome": "monaco",
+   "x": 33,
+   "y": -0.4,
+   "z": -66.5,
+   "paper": "the big one hereTHE GRAND PRIXDrive the red car one lap and pass the packthe red car on the grid, in front of the stand · 35 mpart 1 of 3THE PORTAnnounce yourself (wheek)Steal a tourist’s hatMake some",
+   "err": null
+  },
+  {
+   "t": 64.4,
+   "biome": "monaco",
+   "x": 28.3,
+   "y": -0.2,
+   "z": -71.9,
+   "paper": "the big one hereTHE GRAND PRIXDrive the red car one lap and pass the packthe red car on the grid by the harbour stand: press E at its doorthe red car on the grid, in front of the stand · 28 mpart 1 of",
+   "err": null
+  },
+  {
+   "t": 88.3,
+   "biome": "monaco",
+   "x": 33.5,
+   "y": -0.4,
+   "z": -67.8,
+   "paper": "the big one hereTHE GRAND PRIXDrive the red car one lap and pass the packthe red car on the grid, in front of the stand · 34 mpart 1 of 3THE PORTAnnounce yourself (wheek)Steal a tourist’s hatMake some",
+   "err": null
+  },
+  {
+   "t": 110.6,
+   "biome": "monaco",
+   "x": 19.5,
+   "y": -1.1,
+   "z": -72.4,
+   "paper": "the big one hereTHE GRAND PRIXDrive the red car one lap and pass the packthe red car on the grid by the harbour stand: press E at its doorthe red car on the grid, in front of the stand · 24 mpart 1 of",
+   "err": null
+  },
+  {
+   "t": 112.6,
+   "biome": "monaco",
+   "x": 16.7,
+   "y": 0.5,
+   "z": -74,
+   "paper": "the big one hereTHE GRAND PRIXDrive the red car one lap and pass the packthe red car on the grid by the harbour stand: press E at its doorthe red car on the grid, in front of the stand · 22 mpart 1 of",
+   "err": null
+  }
+ ],
+ "ticks": [
+  [
+   0,
+   "to-monaco"
+  ],
+  [
+   9.2,
+   "superyacht"
+  ]
+ ],
+ "imp": [],
+ "arrivalTicks": [
+  "to-monaco"
+ ],
+ "events": [
+  [
+   1.2,
+   "toast",
+   "that bar is your puff. a run spends it; stand still and it comes back."
+  ],
+  [
+   9.8,
+   "toast",
+   "ticked  ·  Turn up somewhere that will mind"
+  ],
+  [
+   23.1,
+   "toast",
+   "ticked  ·  Board a boat nobody invited you onto"
+  ],
+  [
+   37.1,
+   "toast",
+   "nobody has asked to see anything."
+  ],
+  [
+   48,
+   "toast",
+   "top left is the paper. the star is the big thing here; F moves the arrow."
+  ],
+  [
+   94.2,
+   "toast",
+   "the arrow, then."
+  ]
+ ],
+ "done": [
+  "to-monaco",
+  "superyacht"
+ ],
+ "shove": [],
+ "shoveUnnamed": 0,
+ "impUnsrc": 0,
+ "voids": 0,
+ "tickN": 1,
+ "firstNonFree": 9.2
+}

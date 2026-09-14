@@ -1,0 +1,190 @@
+{
+ "biome": "rio",
+ "samples": [
+  {
+   "t": 7.4,
+   "biome": "rio",
+   "x": 0,
+   "y": 0.3,
+   "z": 0,
+   "paper": "the big one hereTHE FRIGATEBIRDHang from the frigatebird over SugarloafArpoador, at the west end · 70 mpart 1 of 3COPACABANAAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat ",
+   "err": null
+  },
+  {
+   "t": 30.3,
+   "biome": "rio",
+   "x": -15,
+   "y": -0.1,
+   "z": -20,
+   "paper": "the big one hereTHE FRIGATEBIRDHang from the frigatebird over SugarloafQ again to bring it lower, then hold E under itArpoador, at the west end · you are herepart 1 of 3COPACABANAAnnounce yourself (wh",
+   "err": null
+  },
+  {
+   "t": 50.3,
+   "biome": "rio",
+   "x": -20.6,
+   "y": -0.7,
+   "z": -17.7,
+   "paper": "1 of 15 · Arrive in Rio, loudlyArpoador, at the west end · you are herethe big one · nowTHE FRIGATEBIRDHang from the frigatebird over Sugarloafhanging on · 1 s · 0 m up · Space to rollhold on · A/D st",
+   "err": null
+  },
+  {
+   "t": 64.9,
+   "biome": "rio",
+   "x": -23.6,
+   "y": -5.7,
+   "z": -50.5,
+   "paper": "1 of 15 · Arrive in Rio, loudlyArpoador, at the west end · you are herethe big one hereTHE FRIGATEBIRDHang from the frigatebird over SugarloafQ again to bring it lower, then hold E under itArpoador, a",
+   "err": null
+  },
+  {
+   "t": 89.7,
+   "biome": "rio",
+   "x": -51.6,
+   "y": -12.9,
+   "z": -104.6,
+   "paper": "1 of 15 · Arrive in Rio, loudlyArpoador, at the west end · you are herethe big one · nowTHE FRIGATEBIRDHang from the frigatebird over Sugarloafhanging on · 0 s · 1 m up · Space to rollhold on · A/D st",
+   "err": null
+  },
+  {
+   "t": 106.4,
+   "biome": "rio",
+   "x": -59.2,
+   "y": -10,
+   "z": -114.2,
+   "paper": "1 of 15 · Arrive in Rio, loudlyArpoador, at the west end · you are herethe big one hereTHE FRIGATEBIRDHang from the frigatebird over SugarloafQ again to bring it lower, then hold E under itArpoador, a",
+   "err": null
+  }
+ ],
+ "ticks": [
+  [
+   32.9,
+   "fragata"
+  ]
+ ],
+ "imp": [
+  {
+   "cause": "the swell",
+   "t": 21.04849999997776,
+   "v": 6.6,
+   "src": false
+  },
+  {
+   "cause": "something back there",
+   "t": 38.21759999998651,
+   "v": 7.1,
+   "src": false
+  }
+ ],
+ "arrivalTicks": [],
+ "events": [
+  [
+   18.4,
+   "toast",
+   "that bar is your puff. a run spends it; stand still and it comes back."
+  ],
+  [
+   28.5,
+   "toast",
+   "“ Globo is five reais. Was four on Monday. ” — somebody on the sand"
+  ],
+  [
+   41.6,
+   "toast",
+   "top left is the paper. the star is the big thing here; F moves the arrow."
+  ],
+  [
+   43.2,
+   "toast",
+   "that was the swell"
+  ],
+  [
+   47.7,
+   "toast",
+   "ticked  ·  Call down a fragata"
+  ],
+  [
+   57.7,
+   "toast",
+   "something enormous turns overhead"
+  ],
+  [
+   70.2,
+   "toast",
+   "whistle again to bring it down"
+  ],
+  [
+   73.7,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   82.8,
+   "toast",
+   "hold on"
+  ],
+  [
+   105.1,
+   "toast",
+   "hold on"
+  ],
+  [
+   120.7,
+   "toast",
+   "hold on"
+  ],
+  [
+   123.3,
+   "toast",
+   "personal best  ·  carried up to 4 m"
+  ],
+  [
+   132.3,
+   "toast",
+   "hold on"
+  ],
+  [
+   146.6,
+   "toast",
+   "hold on"
+  ],
+  [
+   159.7,
+   "toast",
+   "hold on"
+  ],
+  [
+   177.1,
+   "toast",
+   "hold on"
+  ],
+  [
+   186.1,
+   "toast",
+   "hold on"
+  ],
+  [
+   194.7,
+   "toast",
+   "hold on"
+  ]
+ ],
+ "done": [
+  "fragata"
+ ],
+ "shove": [
+  [
+   43.2,
+   "that was the swell"
+  ],
+  [
+   73.7,
+   "that was something back there"
+  ]
+ ],
+ "shoveUnnamed": 1,
+ "impUnsrc": 2,
+ "voids": 0,
+ "tickN": 1,
+ "firstNonFree": 32.9
+}

@@ -195,6 +195,7 @@ let hanBikeData = null;           // lane, s, dir, off, offWant, v, vWant, colou
 const hanBIKE_STRIDE = 10;
 let hanSwerved = 0;               // how many have had to go round you, this crossing
 let hanSwervedBest = 0;
+let hanFirstSwerve = false;       // the answering row, ticked once (L7, E5)
 let hanBumpT = 0;
 let hanHornT = 0;
 let hanCrossFrom = 0;             // which side of the lane the crossing started on
@@ -1329,10 +1330,16 @@ const hanBACK_REGIONS = [
   // reads as the next quarter, and — being bodied — it is a wall you can see
   // over rather than a sentence, which is what block 7 learned on Sydney's
   // north lawn.
-  { x0: -148, x1: 148, z0: -152, z1: -18, n: 220, w: [7, 11], h: [7, 17], clear: 3,
+  // ...and it runs on PAST the edge of the world (L7, E5 / design 2.6): the
+  // bounds stop the animal at z = -158 and the quarter used to stop at -152,
+  // so the frame at the wall was a white plain. Four more rows of French
+  // Quarter south of the line are a wall you can see over — a back wall the
+  // finale did not have. (The bodies are pooled like the rest; nothing here
+  // is walked to.)
+  { x0: -148, x1: 148, z0: -196, z1: -18, n: 300, w: [7, 11], h: [7, 17], clear: 3,
     grid: 11.5, street: 3, laneMin: 46 },
 ];
-const hanBACK_N = 460;
+const hanBACK_N = 560;
 let hanBackMesh = null;
 function hanBuildBackdrop(game, root) {
   const geo = new THREE.BoxGeometry(1, 1, 1);
@@ -2047,6 +2054,9 @@ function hanUpdateBikes(game, dt) {
           // ONE PER RIDER, on the rising edge. See hanBIKE_STRIDE.
           if (ahead > 0 && ahead < 12 && hanBikeData[o + 9] < 0.5) {
             hanBikeData[o + 9] = 1; hanSwerved++;
+            // THE ANSWERING ROW (L7, E5 / design 2.2): the first rider that
+            // goes round you is the first thing this city does back. Once.
+            if (!hanFirstSwerve) { hanFirstSwerve = true; hanTask('first-swerve'); }
           }
           // ---- AND IF THEY CANNOT GET ROUND, THEY STOP -------------------
           //
@@ -4292,7 +4302,8 @@ function hanUpdateAmbience(game, dt) {
   const r = Math.random();
   if (inAlley && hanTrainS < 0) {
     // the quietest place in the chapter, and it is nine metres from the loudest
-    if (r < 0.4) hanCue('tick', p.x + rand(-8, 8), p.y + 2, p.z + rand(-4, 4), rand(0.05, 0.10), rand(1.8, 2.6));
+    // a bicycle bell, which is a bell (L7, E2) — it was `tick` at 1.8–2.6
+    if (r < 0.4) hanCue('bell', p.x + rand(-8, 8), p.y + 2, p.z + rand(-4, 4), rand(0.05, 0.10), rand(0.9, 1.15));
     else if (r < 0.75) hanCue('rustle', p.x + rand(-9, 9), p.y, p.z + rand(-4, 4), rand(0.05, 0.10), rand(1.1, 1.6));
     else hanCue('pop', p.x + rand(-10, 10), p.y, p.z + rand(-4, 4), rand(0.04, 0.09), rand(1.4, 2.2));
     hanAmbT = rand(2.2, 5.5);
@@ -4303,13 +4314,21 @@ function hanUpdateAmbience(game, dt) {
     else hanCue('chime', hanNGOC.x, hanGROUND + 5, hanNGOC.z, rand(0.05, 0.10), rand(0.8, 1.1));
     hanAmbT = rand(3, 8);
   } else if (inMkt) {
-    if (r < 0.5) hanCue('bark', p.x + rand(-16, 16), p.y + 1, p.z + rand(-10, 10), rand(0.06, 0.12), rand(1.2, 1.9));
-    else if (r < 0.8) hanCue('rustle', p.x + rand(-14, 14), p.y, p.z + rand(-9, 9), rand(0.06, 0.12), rand(1.0, 1.5));
+    // a moped's horn, which is a horn (L7, E2) — it was `bark` at 1.2–1.9
+    if (r < 0.5) hanCue('moped', p.x + rand(-16, 16), p.y + 1, p.z + rand(-10, 10), rand(0.06, 0.12), rand(0.9, 1.2));
+    // ...and the market is "all voices" (the header above), so the other
+    // half of it is the crowd from the next aisle and the pho stall's
+    // kettle (L7, E2) — the two Hanoi voices nothing had a call site for
+    else if (r < 0.72) hanCue('crowd', p.x + rand(-14, 14), p.y, p.z + rand(-9, 9), rand(0.10, 0.18), rand(0.92, 1.1));
+    else if (r < 0.88) hanCue('kettle', p.x + rand(-8, 8), p.y, p.z + rand(-6, 6), rand(0.07, 0.13), rand(0.95, 1.08));
     else hanCue('pop', p.x + rand(-12, 12), p.y, p.z + rand(-9, 9), rand(0.05, 0.10), rand(1.6, 2.4));
     hanAmbT = rand(1.4, 3.6);
   } else {
-    if (r < 0.30) hanCue('bark', p.x + rand(-20, 20), p.y + 1, p.z + rand(-20, 20), rand(0.05, 0.11), rand(1.3, 2.1));
-    else if (r < 0.56) hanCue('tick', p.x + rand(-16, 16), p.y + 3, p.z + rand(-16, 16), rand(0.04, 0.09), rand(2.0, 3.0));
+    // the street: a horn and a bell in their own voices (L7, E2); they were
+    // `bark` at 1.3–2.1 and `tick` at 2.0–3.0, and the drive counted them at
+    // 458 of the chapter's 1 398 calls
+    if (r < 0.30) hanCue('moped', p.x + rand(-20, 20), p.y + 1, p.z + rand(-20, 20), rand(0.05, 0.11), rand(0.85, 1.2));
+    else if (r < 0.56) hanCue('bell', p.x + rand(-16, 16), p.y + 3, p.z + rand(-16, 16), rand(0.04, 0.09), rand(0.9, 1.2));
     else if (r < 0.80) hanCue('rustle', p.x + rand(-16, 16), p.y, p.z + rand(-16, 16), rand(0.05, 0.10), rand(1.0, 1.6));
     else hanCue('pop', p.x + rand(-18, 18), p.y, p.z + rand(-18, 18), rand(0.05, 0.10), rand(1.5, 2.3));
     hanAmbT = rand(1.6, 4.2);

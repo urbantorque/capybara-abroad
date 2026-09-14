@@ -1,0 +1,406 @@
+{
+ "biome": "pasto",
+ "samples": [
+  {
+   "t": 15.9,
+   "biome": "pasto",
+   "x": 0,
+   "y": 0.3,
+   "z": 26,
+   "paper": "the big one hereTHE CONDOR RIDEHang from the condor over the volcanothe sky over the volcano · 100 mpart 1 of 3PASTOAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat whiteSte",
+   "err": null
+  },
+  {
+   "t": 43.4,
+   "biome": "pasto",
+   "x": -14.5,
+   "y": 3.5,
+   "z": 33.6,
+   "paper": "the big one · nowTHE CONDOR RIDEHang from the condor over the volcanohanging on · 0 s · 4 m up · Space to rollhold on · A/D steer · Shift to tuck · Space to rollthe sky over the volcano · you are here",
+   "err": null
+  },
+  {
+   "t": 66.8,
+   "biome": "pasto",
+   "x": -3.5,
+   "y": 0.3,
+   "z": 7.2,
+   "paper": "2 of 12 · Emigrate (somehow)the sky over the volcano · you are herethe big one · nowTHE CONDOR RIDEHang from the condor over the volcanohanging on · 2 s · 0 m up · Space to rollhold on · A/D steer · S",
+   "err": null
+  },
+  {
+   "t": 86.8,
+   "biome": "pasto",
+   "x": -14.1,
+   "y": 0.3,
+   "z": 2.6,
+   "paper": "2 of 12 · Emigrate (somehow)the sky over the volcano · you are herethe big one hereTHE CONDOR RIDEHang from the condor over the volcanohold E — grab the talonsthe sky over the volcano · you are herepa",
+   "err": null
+  },
+  {
+   "t": 115.6,
+   "biome": "pasto",
+   "x": -2.7,
+   "y": 1.5,
+   "z": -4,
+   "paper": "2 of 12 · Emigrate (somehow)the sky over the volcano · you are herethe big one · nowTHE CONDOR RIDEHang from the condor over the volcanohanging on · 0 s · 2 m up · Space to rollhold on · A/D steer · S",
+   "err": null
+  },
+  {
+   "t": 142.2,
+   "biome": "pasto",
+   "x": 4.9,
+   "y": 0.5,
+   "z": -11.1,
+   "paper": "2 of 12 · Emigrate (somehow)the sky over the volcano · you are herethe big one · nowTHE CONDOR RIDEHang from the condor over the volcanohanging on · 1 s · 0 m up · Space to rollQ again to bring it low",
+   "err": null
+  },
+  {
+   "t": 152.9,
+   "biome": "pasto",
+   "x": -5.4,
+   "y": 1.2,
+   "z": -15.7,
+   "paper": "2 of 12 · Emigrate (somehow)the sky over the volcano · you are herethe big one · nowTHE CONDOR RIDEHang from the condor over the volcanohanging on · 2 s · 0 m up · Space to rollhold on · A/D steer · S",
+   "err": null
+  }
+ ],
+ "ticks": [
+  [
+   14.7,
+   "market-chaos"
+  ],
+  [
+   29.5,
+   "whistle-condor"
+  ]
+ ],
+ "imp": [
+  {
+   "cause": "something back there",
+   "t": 16.988700000010457,
+   "v": 6.5
+  },
+  {
+   "cause": "something back there",
+   "t": 21.554000000014945,
+   "v": 7.1
+  },
+  {
+   "cause": "something back there",
+   "t": 26.27868000004297,
+   "v": 7.4
+  },
+  {
+   "cause": "something back there",
+   "t": 36.325650000037236,
+   "v": 7.4
+  },
+  {
+   "cause": "something back there",
+   "t": 58.65314000000226,
+   "v": 6.7
+  },
+  {
+   "cause": "something back there",
+   "t": 72.61774000003315,
+   "v": 6.5
+  },
+  {
+   "cause": "something back there",
+   "t": 87.0250400000521,
+   "v": 7.6
+  },
+  {
+   "cause": "something back there",
+   "t": 97.54284000005623,
+   "v": 6.6
+  },
+  {
+   "cause": "something back there",
+   "t": 117.9311400000453,
+   "v": 8.3
+  },
+  {
+   "cause": "something back there",
+   "t": 122.08114000003773,
+   "v": 7.4
+  },
+  {
+   "cause": "something back there",
+   "t": 126.55734000003307,
+   "v": 10.9
+  },
+  {
+   "cause": "something back there",
+   "t": 130.685040000014,
+   "v": 14.7
+  },
+  {
+   "cause": "something back there",
+   "t": 144.2596400000321,
+   "v": 7.1
+  }
+ ],
+ "arrivalTicks": [],
+ "events": [
+  [
+   1.7,
+   "toast",
+   "be a menace."
+  ],
+  [
+   9.1,
+   "toast",
+   "saved — you can close this and come back"
+  ],
+  [
+   16.6,
+   "toast",
+   "that bar is your puff. a run spends it; stand still and it comes back."
+  ],
+  [
+   18.2,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   21,
+   "toast",
+   "“ Walk, then. I will still get there. ” — the woman with the broom"
+  ],
+  [
+   23.2,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   26.1,
+   "toast",
+   "ticked  ·  Bring down a market stall"
+  ],
+  [
+   31.5,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   37.4,
+   "toast",
+   "“ Ask the woman with the broom. She knows everything. ” — a churchgoer"
+  ],
+  [
+   43.5,
+   "toast",
+   "ticked  ·  Call down a condor"
+  ],
+  [
+   45.8,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   49,
+   "toast",
+   "“ Look at the size of that thing. ” — a churchgoer"
+  ],
+  [
+   50.6,
+   "toast",
+   "drawing a little less to keep up"
+  ],
+  [
+   58,
+   "toast",
+   "whistle again to bring it down"
+  ],
+  [
+   62.9,
+   "toast",
+   "personal best  ·  top speed 14.4 m/s"
+  ],
+  [
+   64.8,
+   "toast",
+   "“ Look! Up there! ” — a churchgoer"
+  ],
+  [
+   67.5,
+   "toast",
+   "so close  ·  0.8 m/s off your best"
+  ],
+  [
+   74.8,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   82.5,
+   "toast",
+   "hold on"
+  ],
+  [
+   89,
+   "toast",
+   "“ Ay, no. No, no, no. ” — a churchgoer"
+  ],
+  [
+   92.1,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   101.6,
+   "toast",
+   "“ ¡El cóndor! ” — a churchgoer"
+  ],
+  [
+   109,
+   "toast",
+   "hold on"
+  ],
+  [
+   111.1,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   116.1,
+   "toast",
+   "“ A condor. An actual condor. ” — a vendor"
+  ],
+  [
+   124.8,
+   "toast",
+   "hold on"
+  ],
+  [
+   126.6,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   136.8,
+   "toast",
+   "hold on"
+  ],
+  [
+   139.4,
+   "toast",
+   "“ Nobody is going to believe me. ” — a vendor"
+  ],
+  [
+   149.3,
+   "toast",
+   "so close  ·  0.8 m/s off your best"
+  ],
+  [
+   151.5,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   155,
+   "toast",
+   "“ The chigüiro is flying. ” — a churchgoer"
+  ],
+  [
+   156.6,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   160.4,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   163.8,
+   "toast",
+   "personal best  ·  top speed 20.0 m/s"
+  ],
+  [
+   165.9,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   168.2,
+   "toast",
+   "“ Do you see it too? Say you see it. ” — a vendor"
+  ],
+  [
+   175.9,
+   "toast",
+   "hold on"
+  ],
+  [
+   183,
+   "toast",
+   "that was something back there"
+  ]
+ ],
+ "done": [
+  "market-chaos",
+  "whistle-condor"
+ ],
+ "shove": [
+  [
+   18.2,
+   "that was something back there"
+  ],
+  [
+   23.2,
+   "that was something back there"
+  ],
+  [
+   31.5,
+   "that was something back there"
+  ],
+  [
+   45.8,
+   "that was something back there"
+  ],
+  [
+   74.8,
+   "that was something back there"
+  ],
+  [
+   92.1,
+   "that was something back there"
+  ],
+  [
+   111.1,
+   "that was something back there"
+  ],
+  [
+   126.6,
+   "that was something back there"
+  ],
+  [
+   151.5,
+   "that was something back there"
+  ],
+  [
+   156.6,
+   "that was something back there"
+  ],
+  [
+   160.4,
+   "that was something back there"
+  ],
+  [
+   165.9,
+   "that was something back there"
+  ],
+  [
+   183,
+   "that was something back there"
+  ]
+ ],
+ "shoveUnnamed": 13,
+ "impUnsrc": 13,
+ "voids": 0,
+ "tickN": 2,
+ "firstNonFree": 14.7
+}

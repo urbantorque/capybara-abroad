@@ -1,0 +1,322 @@
+{
+ "biome": "goreme",
+ "samples": [
+  {
+   "t": 12.6,
+   "biome": "goreme",
+   "x": 0,
+   "y": 7.3,
+   "z": 34,
+   "paper": "the big one hereTHE BALLOON SUNRISEFly the balloon up to meet the sunrisethe launch field · 70 m · 61 spart 1 of 3THE VALLEYAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat ",
+   "err": null
+  },
+  {
+   "t": 42.4,
+   "biome": "goreme",
+   "x": 0.7,
+   "y": 9,
+   "z": 50.3,
+   "paper": "the big one hereTHE BALLOON SUNRISEFly the balloon up to meet the sunrisethe launch field · 90 m · 31 spart 1 of 3THE VALLEYAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat ",
+   "err": null
+  },
+  {
+   "t": 66.2,
+   "biome": "goreme",
+   "x": 4.4,
+   "y": 9.3,
+   "z": 62,
+   "paper": "0 of 12 · Be in the valley before it gets lightthe launch field · 100 m · 29 sthe big one hereTHE BALLOON SUNRISEFly the balloon up to meet the sunrisethe launch field · 100 m · 8 spart 1 of 3THE VALL",
+   "err": null
+  },
+  {
+   "t": 86.7,
+   "biome": "goreme",
+   "x": 8.2,
+   "y": 9.2,
+   "z": 52.9,
+   "paper": "0 of 12 · Be in the valley before it gets lightthe launch field · 100 m · 29 sthe big one hereTHE BALLOON SUNRISEFly the balloon up to meet the sunrisethe launch field · 90 m · happening nowpart 1 of ",
+   "err": null
+  },
+  {
+   "t": 117.4,
+   "biome": "goreme",
+   "x": 2,
+   "y": 9.9,
+   "z": 53.6,
+   "paper": "0 of 12 · Be in the valley before it gets lightthe launch field · 100 m · 29 sthe big one hereTHE BALLOON SUNRISEFly the balloon up to meet the sunrisethe launch field · 90 m · 112 spart 1 of 3THE VAL",
+   "err": null
+  },
+  {
+   "t": 142.5,
+   "biome": "goreme",
+   "x": 79.6,
+   "y": -2.3,
+   "z": -52.6,
+   "paper": "0 of 12 · Be in the valley before it gets lightthe launch field · 100 m · 29 sthe big one hereTHE BALLOON SUNRISEFly the balloon up to meet the sunrisethe launch field · 80 m · 88 spart 1 of 3THE VALL",
+   "err": null
+  },
+  {
+   "t": 162.4,
+   "biome": "goreme",
+   "x": 93.4,
+   "y": -2.3,
+   "z": -67,
+   "paper": "0 of 12 · Be in the valley before it gets lightthe launch field · 90 m · 85 sthe big one hereTHE BALLOON SUNRISEFly the balloon up to meet the sunrisethe launch field · 100 m · 67 spart 1 of 3THE VALL",
+   "err": null
+  }
+ ],
+ "ticks": [],
+ "imp": [
+  {
+   "cause": "something back there",
+   "t": 13.613399999991085,
+   "v": 7.4
+  },
+  {
+   "cause": "something back there",
+   "t": 22.30460000000902,
+   "v": 7.3
+  },
+  {
+   "cause": "something back there",
+   "t": 45.60306000001865,
+   "v": 6.4
+  },
+  {
+   "cause": "something back there",
+   "t": 57.57666000004224,
+   "v": 6.2
+  },
+  {
+   "cause": "something back there",
+   "t": 75.8190600000255,
+   "v": 6.7
+  },
+  {
+   "cause": "something back there",
+   "t": 84.38746000000887,
+   "v": 6.7
+  },
+  {
+   "cause": "something back there",
+   "t": 110.39986000000685,
+   "v": 7.4
+  },
+  {
+   "cause": "something back there",
+   "t": 128.072860000014,
+   "v": 7
+  },
+  {
+   "cause": "something back there",
+   "t": 133.40235999998487,
+   "v": 6.4
+  },
+  {
+   "cause": "something back there",
+   "t": 141.1854600000022,
+   "v": 6.7
+  }
+ ],
+ "arrivalTicks": [],
+ "events": [
+  [
+   2.1,
+   "toast",
+   "be a menace."
+  ],
+  [
+   12.4,
+   "toast",
+   "saved — you can close this and come back"
+  ],
+  [
+   16.6,
+   "toast",
+   "that bar is your puff. a run spends it; stand still and it comes back."
+  ],
+  [
+   18.2,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   22.3,
+   "toast",
+   "“ Not for you. ” — somebody in the valley"
+  ],
+  [
+   27.6,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   34.6,
+   "toast",
+   "top left is the paper. the star is the big thing here; F moves the arrow."
+  ],
+  [
+   42.1,
+   "toast",
+   "the balonlar are inflating. twenty minutes to the sun."
+  ],
+  [
+   43.7,
+   "toast",
+   "“ Oh — ” — somebody in the valley"
+  ],
+  [
+   45.4,
+   "toast",
+   "drawing a little less to keep up"
+  ],
+  [
+   52,
+   "toast",
+   "they were waiting for something. apparently that was it."
+  ],
+  [
+   54.8,
+   "toast",
+   "“ Ten minutes. If you are going up, go up NOW. ” — somebody in the valley"
+  ],
+  [
+   56.6,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   64.2,
+   "toast",
+   "every cat in the square. not one of them got up."
+  ],
+  [
+   70.1,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   76.8,
+   "toast",
+   "that one is going. yours is the one that is still on the ground."
+  ],
+  [
+   83.3,
+   "toast",
+   "every burner in the valley, all at once. it is coming."
+  ],
+  [
+   84.9,
+   "toast",
+   "“ Oh — ” — somebody in the valley"
+  ],
+  [
+   90.1,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   93.8,
+   "toast",
+   "noticed  ·  Was down in the town when the sun came up, instead of up in it"
+  ],
+  [
+   99.7,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   119.2,
+   "toast",
+   "“ I have been hit by worse. Not today. ” — somebody in the valley"
+  ],
+  [
+   128.7,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   130.8,
+   "toast",
+   "“ Is that thing going up as well? ” — somebody in the valley"
+  ],
+  [
+   146.7,
+   "toast",
+   "somebody saw that. three things in front of people is AN INCIDENT, five is A SCENE — unles"
+  ],
+  [
+   148.3,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   150.3,
+   "toast",
+   "“ I have been hit by worse. Not today. ” — somebody in the valley"
+  ],
+  [
+   155.9,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   166.6,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   192.6,
+   "toast",
+   "somebody else is steering"
+  ]
+ ],
+ "done": [],
+ "shove": [
+  [
+   18.2,
+   "that was something back there"
+  ],
+  [
+   27.6,
+   "that was something back there"
+  ],
+  [
+   56.6,
+   "that was something back there"
+  ],
+  [
+   70.1,
+   "that was something back there"
+  ],
+  [
+   90.1,
+   "that was something back there"
+  ],
+  [
+   99.7,
+   "that was something back there"
+  ],
+  [
+   128.7,
+   "that was something back there"
+  ],
+  [
+   148.3,
+   "that was something back there"
+  ],
+  [
+   155.9,
+   "that was something back there"
+  ],
+  [
+   166.6,
+   "that was something back there"
+  ]
+ ],
+ "shoveUnnamed": 10,
+ "impUnsrc": 10,
+ "voids": 0,
+ "tickN": 0,
+ "firstNonFree": null
+}

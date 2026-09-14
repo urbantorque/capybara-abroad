@@ -1,0 +1,217 @@
+{
+ "biome": "kyoto",
+ "samples": [
+  {
+   "t": 10.1,
+   "biome": "kyoto",
+   "x": -16,
+   "y": 0.3,
+   "z": 52,
+   "paper": "the big one hereTHE RIVER RUNRide the Uji rapids down to the millthe river, off the shrine bay · 80 mpart 1 of 2KYOTOAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat whiteSt",
+   "err": null
+  },
+  {
+   "t": 33.5,
+   "biome": "kyoto",
+   "x": -2.9,
+   "y": 1,
+   "z": 47,
+   "paper": "the big one hereTHE RIVER RUNRide the Uji rapids down to the millthe river, off the shrine bay · 80 mpart 1 of 2KYOTOAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat whiteSt",
+   "err": null
+  },
+  {
+   "t": 56.4,
+   "biome": "kyoto",
+   "x": -5.2,
+   "y": 0.2,
+   "z": 40.8,
+   "paper": "the big one hereTHE RIVER RUNRide the Uji rapids down to the millthe river, off the shrine bay · 90 mpart 1 of 2KYOTOAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat whiteSt",
+   "err": null
+  },
+  {
+   "t": 76.4,
+   "biome": "kyoto",
+   "x": -3.2,
+   "y": 0.3,
+   "z": 47.3,
+   "paper": "the big one hereTHE RIVER RUNRide the Uji rapids down to the millthe river, off the shrine bay · 80 mpart 1 of 2KYOTOAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat whiteSt",
+   "err": null
+  },
+  {
+   "t": 104.4,
+   "biome": "kyoto",
+   "x": -15.8,
+   "y": 1.4,
+   "z": 52.5,
+   "paper": "0 of 12 · Get off the train at Kyotothe river, off the shrine bay · 70 mthe big one hereTHE RIVER RUNRide the Uji rapids down to the millthe river, off the shrine bay · 80 mpart 1 of 2KYOTOAnnounce yo",
+   "err": null
+  },
+  {
+   "t": 125.5,
+   "biome": "kyoto",
+   "x": -20.7,
+   "y": 0.3,
+   "z": 47.2,
+   "paper": "0 of 12 · Get off the train at Kyotothe river, off the shrine bay · 70 mthe big one hereTHE RIVER RUNRide the Uji rapids down to the millthe river, off the shrine bay · 80 mpart 1 of 2KYOTOAnnounce yo",
+   "err": null
+  }
+ ],
+ "ticks": [],
+ "imp": [
+  {
+   "cause": "the river",
+   "t": 11.125199999988103,
+   "v": 7.4
+  },
+  {
+   "cause": "the river",
+   "t": 18.64790000000607,
+   "v": 6.7
+  },
+  {
+   "cause": "the river",
+   "t": 79.15029999988404,
+   "v": 7.5
+  },
+  {
+   "cause": "the river",
+   "t": 107.61099999987086,
+   "v": 7
+  },
+  {
+   "cause": "the river",
+   "t": 112.18499999987064,
+   "v": 7.4
+  },
+  {
+   "cause": "the river",
+   "t": 117.90489999984656,
+   "v": 6.8
+  }
+ ],
+ "arrivalTicks": [],
+ "events": [
+  [
+   2.2,
+   "toast",
+   "be a menace."
+  ],
+  [
+   12.8,
+   "toast",
+   "saved — you can close this and come back"
+  ],
+  [
+   16.9,
+   "toast",
+   "that bar is your puff. a run spends it; stand still and it comes back."
+  ],
+  [
+   18.7,
+   "toast",
+   "that was the river"
+  ],
+  [
+   33.7,
+   "toast",
+   "top left is the paper. the star is the big thing here; F moves the arrow."
+  ],
+  [
+   35.3,
+   "toast",
+   "that was the river"
+  ],
+  [
+   41,
+   "toast",
+   "“ It will pass. ” — somebody on the path"
+  ],
+  [
+   64,
+   "toast",
+   "drawing a little less to keep up"
+  ],
+  [
+   90.5,
+   "toast",
+   "“ Is it four o’clock? ” — somebody on the path"
+  ],
+  [
+   109,
+   "toast",
+   "“ It did not even look. ” — somebody on the path"
+  ],
+  [
+   125.9,
+   "toast",
+   "“ What? ” — somebody on the path"
+  ],
+  [
+   127.5,
+   "toast",
+   "that was the river"
+  ],
+  [
+   150.1,
+   "toast",
+   "“ Hm. ” — somebody on the path"
+  ],
+  [
+   169.6,
+   "toast",
+   "that was the river"
+  ],
+  [
+   173.8,
+   "toast",
+   "“ There is an animal in the lane. ” — somebody on the path"
+  ],
+  [
+   177.8,
+   "toast",
+   "that was the river"
+  ],
+  [
+   185.5,
+   "toast",
+   "that was the river"
+  ],
+  [
+   194.3,
+   "toast",
+   "“ Where does it all come from? ” — somebody on the path"
+  ]
+ ],
+ "done": [],
+ "shove": [
+  [
+   18.7,
+   "that was the river"
+  ],
+  [
+   35.3,
+   "that was the river"
+  ],
+  [
+   127.5,
+   "that was the river"
+  ],
+  [
+   169.6,
+   "that was the river"
+  ],
+  [
+   177.8,
+   "that was the river"
+  ],
+  [
+   185.5,
+   "that was the river"
+  ]
+ ],
+ "shoveUnnamed": 0,
+ "impUnsrc": 6,
+ "voids": 0,
+ "tickN": 0,
+ "firstNonFree": null
+}

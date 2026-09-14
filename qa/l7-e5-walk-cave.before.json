@@ -1,0 +1,196 @@
+{
+ "biome": "cave",
+ "samples": [
+  {
+   "t": 10.3,
+   "biome": "cave",
+   "x": 0,
+   "y": 3,
+   "z": 62,
+   "paper": "the big one hereTHE DROP INTO THE LIGHTClimb the column and drop through the daylightthe hole in the roof · 110 mpart 1 of 3THE MOUTHAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill th",
+   "err": null
+  },
+  {
+   "t": 36.5,
+   "biome": "cave",
+   "x": -30.9,
+   "y": 2.7,
+   "z": 48.1,
+   "paper": "the big one hereTHE DROP INTO THE LIGHTClimb the column and drop through the daylightthe hole in the roof · 100 mpart 1 of 3THE MOUTHAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill th",
+   "err": null
+  },
+  {
+   "t": 56.5,
+   "biome": "cave",
+   "x": -33.3,
+   "y": 2.4,
+   "z": 51.3,
+   "paper": "the big one hereTHE DROP INTO THE LIGHTClimb the column and drop through the daylightthe hole in the roof · 110 mpart 1 of 3THE MOUTHAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill th",
+   "err": null
+  },
+  {
+   "t": 73.4,
+   "biome": "cave",
+   "x": -23.3,
+   "y": 2.3,
+   "z": 49.8,
+   "paper": "the big one hereTHE DROP INTO THE LIGHTClimb the column and drop through the daylightthe hole in the roof · 100 mpart 1 of 3THE MOUTHAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill th",
+   "err": null
+  },
+  {
+   "t": 98.2,
+   "biome": "cave",
+   "x": -29.3,
+   "y": 3.3,
+   "z": 46.8,
+   "paper": "the big one hereTHE DROP INTO THE LIGHTClimb the column and drop through the daylightthe hole in the roof · 100 mpart 1 of 3THE MOUTHAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill th",
+   "err": null
+  },
+  {
+   "t": 118.9,
+   "biome": "cave",
+   "x": -29.2,
+   "y": 2.3,
+   "z": 49.5,
+   "paper": "0 of 14 · Get inside the mountainthe hole in the roof · 100 mthe big one hereTHE DROP INTO THE LIGHTClimb the column and drop through the daylightthe hole in the roof · 100 mpart 1 of 3THE MOUTHAnnoun",
+   "err": null
+  }
+ ],
+ "ticks": [],
+ "imp": [
+  {
+   "cause": "something back there",
+   "t": 13.557699999988124,
+   "v": 6.7
+  },
+  {
+   "cause": "something back there",
+   "t": 17.78799999996283,
+   "v": 7.4
+  },
+  {
+   "cause": "something back there",
+   "t": 30.24449999992573,
+   "v": 7.5
+  },
+  {
+   "cause": "something back there",
+   "t": 66.62709999992587,
+   "v": 8.1
+  },
+  {
+   "cause": "something back there",
+   "t": 79.61409999992532,
+   "v": 7.9
+  },
+  {
+   "cause": "something back there",
+   "t": 101.35650000000483,
+   "v": 7.1
+  },
+  {
+   "cause": "something back there",
+   "t": 106.55460000002097,
+   "v": 6.8
+  }
+ ],
+ "arrivalTicks": [],
+ "events": [
+  [
+   1.6,
+   "toast",
+   "be a menace."
+  ],
+  [
+   12.6,
+   "toast",
+   "saved — you can close this and come back"
+  ],
+  [
+   20.4,
+   "toast",
+   "that bar is your puff. a run spends it; stand still and it comes back."
+  ],
+  [
+   22,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   27.1,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   36.4,
+   "toast",
+   "top left is the paper. the star is the big thing here; F moves the arrow."
+  ],
+  [
+   47,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   55.9,
+   "toast",
+   "drawing a little less to keep up"
+  ],
+  [
+   115.1,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   137.7,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   170.1,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   177.3,
+   "toast",
+   "that was something back there"
+  ]
+ ],
+ "done": [],
+ "shove": [
+  [
+   22,
+   "that was something back there"
+  ],
+  [
+   27.1,
+   "that was something back there"
+  ],
+  [
+   47,
+   "that was something back there"
+  ],
+  [
+   115.1,
+   "that was something back there"
+  ],
+  [
+   137.7,
+   "that was something back there"
+  ],
+  [
+   170.1,
+   "that was something back there"
+  ],
+  [
+   177.3,
+   "that was something back there"
+  ]
+ ],
+ "shoveUnnamed": 7,
+ "impUnsrc": 7,
+ "voids": 0,
+ "tickN": 0,
+ "firstNonFree": null
+}

@@ -1,0 +1,295 @@
+{
+ "biome": "venice",
+ "samples": [
+  {
+   "t": 8.9,
+   "biome": "venice",
+   "x": -3.8,
+   "y": 1.3,
+   "z": 13,
+   "paper": "the big one hereTHE ACQUA ALTAStand in St Mark’s Square as the sea floods itSt Mark’s Square · 48 m · 77 spart 1 of 2LOW WATERAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their fla",
+   "err": null
+  },
+  {
+   "t": 35.3,
+   "biome": "venice",
+   "x": -30.1,
+   "y": 1.8,
+   "z": 16,
+   "paper": "the big one hereTHE ACQUA ALTAStand in St Mark’s Square as the sea floods itSt Mark’s Square · 60 m · 34 spart 1 of 2LOW WATERAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their fla",
+   "err": null
+  },
+  {
+   "t": 58.4,
+   "biome": "venice",
+   "x": -23.9,
+   "y": -0.6,
+   "z": 18,
+   "paper": "1 of 14 · Step off onto a wet pavementSt Mark’s Square · 70 m · 23 sthe big one hereTHE ACQUA ALTAStand in St Mark’s Square as the sea floods itSt Mark’s Square · 60 m · 11 spart 1 of 2LOW WATERAnnoun",
+   "err": null
+  },
+  {
+   "t": 73.4,
+   "biome": "venice",
+   "x": -27.3,
+   "y": 1.3,
+   "z": 11.5,
+   "paper": "1 of 14 · Step off onto a wet pavementSt Mark’s Square · 70 m · 23 sthe big one hereTHE ACQUA ALTAStand in St Mark’s Square as the sea floods itSt Mark’s Square · 50 m · happening nowpart 1 of 2LOW WA",
+   "err": null
+  },
+  {
+   "t": 98,
+   "biome": "venice",
+   "x": -10.2,
+   "y": 2.9,
+   "z": 9.2,
+   "paper": "1 of 14 · Step off onto a wet pavementSt Mark’s Square · 70 m · 23 sthe big one hereTHE ACQUA ALTAStand in St Mark’s Square as the sea floods itSt Mark’s Square · 45 m · happening nowpart 1 of 2LOW WA",
+   "err": null
+  },
+  {
+   "t": 119.8,
+   "biome": "venice",
+   "x": -18.5,
+   "y": 1.3,
+   "z": 0.5,
+   "paper": "1 of 14 · Step off onto a wet pavementSt Mark’s Square · 70 m · 23 sthe big one hereTHE ACQUA ALTAStand in St Mark’s Square as the sea floods itSt Mark’s Square · 45 m · happening nowpart 1 of 2LOW WA",
+   "err": null
+  },
+  {
+   "t": 123.1,
+   "biome": "venice",
+   "x": -18.6,
+   "y": 1.3,
+   "z": -1.6,
+   "paper": "1 of 14 · Step off onto a wet pavementSt Mark’s Square · 70 m · 23 sthe big one hereTHE ACQUA ALTAStand in St Mark’s Square as the sea floods itSt Mark’s Square · 45 m · happening nowpart 1 of 2LOW WA",
+   "err": null
+  }
+ ],
+ "ticks": [
+  [
+   25.4,
+   "pigeon-storm"
+  ],
+  [
+   114.7,
+   "acqua-alta"
+  ]
+ ],
+ "imp": [
+  {
+   "cause": "something back there",
+   "t": 14.440900000006023,
+   "v": 7.4
+  },
+  {
+   "cause": "something back there",
+   "t": 24.150900000028486,
+   "v": 7.3
+  },
+  {
+   "cause": "something back there",
+   "t": 65.68560000006777,
+   "v": 7.7
+  },
+  {
+   "cause": "something back there",
+   "t": 71.82836000009293,
+   "v": 7.4
+  },
+  {
+   "cause": "something back there",
+   "t": 79.74556000007321,
+   "v": 7.4
+  },
+  {
+   "cause": "something back there",
+   "t": 88.906559639408,
+   "v": 8.2
+  },
+  {
+   "cause": "something back there",
+   "t": 101.56835963941938,
+   "v": 7.1
+  },
+  {
+   "cause": "something back there",
+   "t": 109.42925963941762,
+   "v": 5.2
+  },
+  {
+   "cause": "something back there",
+   "t": 117.3381596394307,
+   "v": 4.6
+  }
+ ],
+ "arrivalTicks": [],
+ "events": [
+  [
+   2.9,
+   "toast",
+   "be a menace."
+  ],
+  [
+   13.9,
+   "toast",
+   "saved — you can close this and come back"
+  ],
+  [
+   21.8,
+   "toast",
+   "that bar is your puff. a run spends it; stand still and it comes back."
+  ],
+  [
+   27.2,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   37.3,
+   "toast",
+   "top left is the paper. the star is the big thing here; F moves the arrow."
+  ],
+  [
+   41.8,
+   "toast",
+   "ticked  ·  Put up every pigeon in the piazza"
+  ],
+  [
+   44.2,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   46.7,
+   "toast",
+   "“ Boards out in ninety seconds. Move the boat. ” — somebody on the Molo"
+  ],
+  [
+   56.1,
+   "toast",
+   "personal best  ·  put up 79 pigeons at once"
+  ],
+  [
+   62.5,
+   "toast",
+   "drawing a little less to keep up"
+  ],
+  [
+   75.9,
+   "toast",
+   "the water in this city is not a backdrop. keep an eye on it."
+  ],
+  [
+   84.6,
+   "toast",
+   "that is the siren. the water is about forty seconds out."
+  ],
+  [
+   108.7,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   112.7,
+   "toast",
+   "that is a good one  ·  put up 180 pigeons at once"
+  ],
+  [
+   117.5,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   126,
+   "toast",
+   "san marco is going under. if you want to be in it, go now."
+  ],
+  [
+   128.9,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   141.9,
+   "toast",
+   "you are in it. now stay in it — it wants you out through the Molo."
+  ],
+  [
+   146.6,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   155.5,
+   "toast",
+   "the whole square, and you in the middle of it. nobody is surprised but you."
+  ],
+  [
+   165.3,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   174.8,
+   "toast",
+   "“ Forecast says one ten. ” — somebody on the Molo"
+  ],
+  [
+   178.1,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   190.6,
+   "toast",
+   "that was something back there"
+  ]
+ ],
+ "done": [
+  "pigeon-storm",
+  "acqua-alta"
+ ],
+ "shove": [
+  [
+   27.2,
+   "that was something back there"
+  ],
+  [
+   44.2,
+   "that was something back there"
+  ],
+  [
+   108.7,
+   "that was something back there"
+  ],
+  [
+   117.5,
+   "that was something back there"
+  ],
+  [
+   128.9,
+   "that was something back there"
+  ],
+  [
+   146.6,
+   "that was something back there"
+  ],
+  [
+   165.3,
+   "that was something back there"
+  ],
+  [
+   178.1,
+   "that was something back there"
+  ],
+  [
+   190.6,
+   "that was something back there"
+  ]
+ ],
+ "shoveUnnamed": 9,
+ "impUnsrc": 9,
+ "voids": 0,
+ "tickN": 2,
+ "firstNonFree": 25.4
+}

@@ -5,10 +5,11 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY, cloudSet,
-         rimTick, cloudTick, skyTick, fresnelTick, paleTick, shadeTick, bounceSlots, bounceTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
+         rimTick, cloudTick, skyTick, fresnelTick, paleTick, triTick, mirrorTick, shadeTick, bounceSlots, bounceTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo, keyDomeTick, keyDomeInfo, skyDomeLit,
-         exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt, lensFadeUniform } from './shared.js';
+         exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt, lensFadeUniform, lensCapTick } from './shared.js';
+import { capyKeyTick } from './capybara.js';   // THE CHARACTER KEY (L7, E4)
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -65,6 +66,8 @@ const sysIMP_TAU    = 0.15;    // s — the window
 const sysIMP_JUMP_T = 0.45;    // s after a jump press the gain is the hop's
 const sysIMP_COOL   = 4.0;     // s between pills
 const sysIMP_FRESH  = 0.6;     // s a thrower's label stays the answer
+const sysIMP_RUN_MAX = 7.6;    // m/s — a grounded gain ending under this is a sprint (capyRUN 7.4) (L7, E5)
+const sysIMP_RUN_COS = 0.866;  // cos 30° — ...if it is going where the stick points
 const sysIMPULSE_BY = {
   sydney: { wet: "the ferry's wake" }, quay: { wet: "the ferry's wake" },
   iceland: { dry: 'the geyser', wet: 'the whale' },
@@ -497,7 +500,17 @@ const sysSHADE_WHITE = new THREE.Color(1, 1, 1);
 // sprint dolly below is trimmed to match so the running lens stays at the
 // validated 16, and the rest lens (sysREST_W of the way to the arrival
 // pitch) lands at ~18 instead of ~20.
-const sysCAM_PITCH = 24 * Math.PI / 180;
+// ---- 24 -> 19 (L7, E3 / art #8) -------------------------------------------
+// Measured on twelve walking frames (qa/l7r-art-shots.json.png): the animal
+// was 84-122 px tall at 11 m, centred at y 0.54-0.56 with the horizon at
+// 0.04-0.21 from the top — the bottom two thirds of every walking frame was
+// ground, and in Goreme 65 % of the picture was paving. The dolly takes
+// 5 degrees off at a walk, so 19 here is 14 at a walk and 11 at a sprint;
+// with the look point 0.4 m higher (sysLOOK_RAISE) and the boom a metre and
+// a half shorter (sysCAM_DEF) the animal lands larger and lower in the frame
+// and the horizon comes down to the top third. The rest lens rides the same
+// number through the crane blend and lands a degree flatter than it did.
+const sysCAM_PITCH = 19 * Math.PI / 180;
 // The rig sits ~7.4 m above the animal; the vertical half-FOV is 24; so at the
 // old 41 the top edge of the frame pointed 17 degrees BELOW horizontal and met
 // flat ground 24 m out. Every biome was said to be fine with that, because
@@ -533,7 +546,13 @@ const sysSHOT_DIST_MIN = 3.0;
 // metre lower over the animal; a metre longer keeps the eye where it was
 // (10.5 * sin 24 = 4.3 m, against 9.5 * sin 34 = 5.3) without the nose
 // filling the frame.
-const sysCAM_DEF   = 10.5;
+// 10.5 -> 8.0 (L7, E3): the walking boom is this plus 0.7 m of speed dolly
+// plus 0.85 m of flow (sysFLOW_DOLLY) — measured 10.8 m at 9.0 here with the
+// animal 103 px tall under the walk's 57.6-degree FOV, against the review's
+// 99 at 11.3; 120 px needs 9.3 m, so 8.0. The standing boom is 8 m for the
+// second it takes the rest lens to open, and the rest lens (0.8 of the way
+// to sysSKY_DIST) lands at 12.0 instead of 12.5. See sysCAM_PITCH.
+const sysCAM_DEF   = 7.5;
 // How far back ALONG THE TORII PATH the eye rides. 5.2 m is three gates: near
 // enough to keep the animal large, far enough that the gates read as a tunnel.
 const sysTORII_BACK = 5.2;
@@ -610,6 +629,16 @@ const sysLENS_HOLD = 0.3;   // s the fade outlives the last hit
 const sysLENS_N    = 6;     // people handled at once; the seventh is drawn
 const sysLENS_UP   = 0.6;   // m — the bias, where a person cannot fade
 const sysLENS_OUT  = 12 * Math.PI / 180;
+// ---- ...AND EVERYTHING THAT IS NOT A PERSON (L7, E3 / art #2) ------------
+// The ray above finds bodies. A pole, an awning, a canopy, a mound and a bus
+// are meshes with no body the lens can ask, and measured on the loop they
+// were through the animal in 12 % of samples. shared.js's rim carries a
+// world-space capsule from the rendered eye to the chest — see _lensCapA —
+// and these are its two numbers. 0.7 m is the animal's own half-width plus
+// a hand: a pole within it is over the animal on screen; one outside it is
+// beside it. `game.state.noLensCap` is the A/B switch.
+const sysLENS_CAP_R     = 0.7;
+const sysLENS_CAP_CHEST = 0.45;
 const sysLensU     = lensFadeUniform();
 const sysLensFrom  = new CANNON.Vec3(), sysLensTo = new CANNON.Vec3();
 const sysLensSlots = [];
@@ -693,6 +722,61 @@ const sysCAM_CLEAR_OUT = 3.2;   // how fast it lets the boom back out once clear
 // gets less occluded and the boom simply moves faster. Most of the 5.3 is the
 // desired point rounding the column and would be there anyway.
 const sysCAM_CUT_LAMBDA = 12;
+// ---- THE CUT BOOM ORBITS INSTEAD OF DIVING (L7, E3 / art #1) --------------
+// The block above shortens the boom along the line the rest of the rig chose,
+// and shortening a 24-degree boom toward an anchor a metre over the animal's
+// feet is a STEEPER lens every time: measured on the 300-sample walk-stop-
+// turn loop, the horizon was inside the top 6 % of the frame or off it in 29 %
+// of samples (Venice 32/60, Cali 30/60), and at the end of Venice's loop the
+// rendered pitch was 35.9 degrees at `clear` 0.30 — grey walls, a top-down
+// animal, no sky and no piazza. A cut is a fact about ONE bearing; the rig
+// never asked whether another one was clear.
+//
+// So when the boom has been cut under sysORBIT_CUT for sysORBIT_DWELL, five
+// bearings off the current one (±30, ±60, 180) are rayed with sysCamClear at
+// the driving boom, and the yaw spring is swung to the clearest — only if it
+// is clearer by sysORBIT_GAIN, so a place where every bearing is equally
+// tight keeps the one it has. The chosen bearing HOLDS until the animal has
+// moved sysORBIT_MOVE from where it was chosen, the hand takes the rig, or
+// a further dwell finds a better one: without the hold the idle tidy-up would
+// swing straight back behind the animal, be cut, orbit, and breathe like that
+// for as long as the player stood there — the exact oscillation the rest
+// latch below was written against. And the latch itself clears on a bearing
+// change: the place is being asked from a different side, which is a
+// different answer.
+//
+// WITH THE STICK HELD, ONLY THE NEAR PAIR. Movement is camera-relative, so a
+// swing of 180 degrees under a held W walks the animal back toward the lens.
+// ±30/±60 while moving, at the walking spring's own rate; the reverse only
+// when the stick is at rest.
+const sysORBIT_CUT   = 0.6;    // camClearF under this is "cut" for the dwell
+const sysORBIT_DWELL = 0.4;    // s cut before a probe
+const sysORBIT_EVERY = 0.25;   // s between probes while still cut
+const sysORBIT_GAIN  = 0.25;   // a bearing must beat the current by this much
+const sysORBIT_MOVE  = 3.0;    // m of travel that releases a chosen bearing
+const sysORBIT_L     = 2.2;    // lambda the spring is swung at
+const sysORBIT_STEPS = [0.5236, -0.5236, 1.0472, -1.0472, Math.PI];   // ±30, ±60, 180
+// ---- ...AND THE RENDERED PITCH IS CAPPED WHILE IT IS CUT ------------------
+// Whatever the orbit finds, a boom cut to two metres is a lens two metres
+// from an anchor a metre up, and the look point (cut with the boom, P1) is
+// below it: the rendered pitch goes to 36 and past. The cap RAISES THE LOOK
+// POINT on the frame's own scratch vector — never the eye, which the ray has
+// placed, and never sysLook, which is a filter — until the eye-to-look angle
+// is sysORBIT_PITCH_MAX. Blended in over the first sysORBIT_PITCH_IN of cut
+// so an uncut boom at its natural 19-26 degrees is untouched to the bit and
+// the cap arrives with the cut rather than snapping at 0.999.
+const sysORBIT_PITCH_MAX = 22 * Math.PI / 180;
+const sysORBIT_PITCH_IN  = 0.25;    // how much cut brings the cap fully in
+// ---- THE SWIM LENS (L7, E3 / play #4) -------------------------------------
+// Swimming, the rig was the walking rig — 11 m at 26 degrees rendered — and
+// measured off the Molo the lower 65 % of the frame was one flat teal plane
+// with an animal's head in the middle of it. A CAP, not a rig: the boom may
+// not be longer than sysSWIM_DIST nor the pitch steeper than sysSWIM_PITCH
+// while `capy.swimming`, weighted down by a chapter's own rig (Manly's ride
+// asks for 12.5 m and gets it) and gone the frame the animal hauls out.
+const sysSWIM_DIST  = 7.0;
+const sysSWIM_PITCH = 20 * Math.PI / 180;
+const sysSWIM_L     = 2.0;
 // m up the animal that hud.canopyAudit() aims its ray at: the shoulder, which
 // is what a lens is actually trying to see past a hedge.
 const sysAUDIT_SHOULDER = 0.45;
@@ -856,7 +940,11 @@ const sysLOOK_LEADMAX= 2.5;
 // Look target sits above the capybara, which pushes it DOWN the frame. Measured from
 // live capture: 1.1 put it only ~33% up with dead grass filling the bottom third.
 // 0.6 lands it around 43% up, leaving the world it walks into in the upper two thirds.
-const sysLOOK_RAISE  = 0.6;
+// 0.6 -> 1.0 (L7, E3): with the boom at 19 degrees instead of 24 the eye is
+// a metre lower, and the look point comes up with it so the animal sits at
+// about 0.60 of the frame rather than 0.55 and the horizon in the top third.
+// See sysCAM_PITCH.
+const sysLOOK_RAISE  = 1.0;
 // --- A CHAPTER MAY FRAME ITS OWN MARQUEE — `game.frameShot` (v26) ----------
 // The four channels of "that landed" are framed, lit, audible, acknowledged,
 // and until now FRAMED was the one no biome could opt into: `rig()` can ask for
@@ -1105,6 +1193,10 @@ const sysPUNCH_SPLASH = 0.045; // ...and it is a third of a bin going over
 const sysDIP_SPRING = 190;
 const sysDIP_OMEGA  = 13.784;  // sqrt(sysDIP_SPRING)
 const sysDIP_DAMP   = 27.568;  // 2 * omega
+// ...and the longest step either spring is integrated at (L7, E3). At 0.02 s
+// c * h is 0.55 for the dip and 0.49 for the punch: well inside stability
+// and the shape the two constants above were tuned to at 60 Hz.
+const sysSPRING_H   = 0.02;
 const sysDIP_V0     = 6.5;     // m/s of descent below which nothing happens
 const sysDIP_K      = 0.19;    // metres of look-target drop per m/s over it.
 const sysDIP_MAX    = 1.40;    // ...and the cap, which is about eight degrees
@@ -1160,9 +1252,22 @@ const sysWOW_SLOW_T  = 0.75;
 const sysWOW_LIVE_STALE = 0.7;   // s since the last wowLive() before it closes
 const hkROOF_HINT = 30;          // m: above this in Hong Kong you are on the roof (X2)
 // ---- THE MIX, MEASURED (S2). See qa/s1-spectrum.js and qa/s1-sfx.js. ------
+// ---- ...AND THE LID, LIFTED (L7, E1 / audio #4) -----------------------------
+// Measured (qa/l7r-audio-states.js): the master had 0.04–0.15 % of its energy
+// above 5 kHz in the first chapter; a film mix sits at 3–8. S2's shelf and
+// ceiling were a cap put on four noise voices (cicada, geyser, rustle, hiss)
+// and paid by every footstep, bell and bird on the bus. −2 dB and 14 kHz on
+// the bus; the four culprits carry their own 9 kHz lowpass (sysSFX_CULPRIT_HZ)
+// so the cap is on the voices that earned it.
 const sysSFX_SHELF_HZ = 5500;   // the sfx bus: a shelf from here...
-const sysSFX_SHELF_DB = -5;     // ...this far down
-const sysSFX_TOP_HZ   = 11000;  // ...and nothing above this
+const sysSFX_SHELF_DB = -2;     // ...this far down (was −5, S2)
+const sysSFX_TOP_HZ   = 14000;  // ...and nothing above this (was 11000, S2)
+const sysSFX_CULPRIT_HZ = 9000; // the four S2 voices' own ceiling
+// A contact CLICK under the hard one-shots — thud, clink, pop, stone/ice/metal
+// footfalls: 2 ms of noise in the 4–8 kHz band, sysSFX_CLICK_K under the body.
+// The transient that makes a hit a hit; at −18 dB it is felt, not heard.
+const sysSFX_CLICK_K  = 0.126;  // −18 dB
+const sysSFX_CLICK_HZ = 6000;   // the band's centre; Q 0.7 spans about 4–8 kHz
 const sysMUS_SUB_HZ   = 38;     // the score: nothing under this (Antarctica's loudest bin was 23 Hz)
 const sysMUS_LIFT_K   = 0.72;   // the lift figure, against the bed: it peaked 8 dB over it
 const sysWOW_LIVE_BED   = 0.55;  // how far the live bed lifts the score at t = 1
@@ -1656,14 +1761,14 @@ const sysAMB_AT = {
   // The mountain, and the church. Galeras hisses and grumbles from Galeras;
   // the banda is behind the church and the church is where the bell is.
   pasto:     { hiss: { get: 'craterCentre', dy: 40 }, thunder: { get: 'craterCentre', dy: 40 },
-               banda: { get: 'bell' }, chime: { get: 'bell' } },
+               banda: { get: 'bell' }, chime: { get: 'bell' }, farbell: { get: 'bell' } },
   // A ship's horn on the harbour comes off the harbour bridge, which is the
   // one thing in chapter 3 you can see from everywhere in it.
   quay:      { horn: { get: 'bridge', dy: 40 } },
   // The bonshō is the great bell — the chapter has one, on a rope, and pulling
   // it is a task. The shishi-odoshi is the deer-scarer in the zen garden.
   kyoto:     { bonsho: { get: 'bell', dy: 3 }, shishi: { get: 'zen' },
-               splash: { get: 'pond' } },
+               splash: { get: 'pond' }, heron: { get: 'pond' } },
   // The cheer is the dance floor, and the horn is the road over the river.
   cali:      { cheer: { get: 'floor', dy: 1 }, horn: { get: 'bridge', dy: 1 } },
   // A cheer on Copacabana is a volleyball point; the bell is on the mountain.
@@ -1674,7 +1779,7 @@ const sysAMB_AT = {
                gull: { get: 'cliff', dy: 10 },
                // ...and the two that are the chapter's own (F4). The geyser IS
                // Strokkur; a berg groans on the lagoon and nowhere else.
-               geyser: { get: 'strokkur', dy: 2 }, berg: { get: 'lagoon' } },
+               geyser: { get: 'strokkur', dy: 2 }, berg: { get: 'lagoon' }, lap: { get: 'lagoon' } },
   // The far bell is the one under the crown, which is the island you can see
   // from the shelf and cannot reach yet — and the crown is also the biggest
   // thing up here hanging off nothing, so it is what groans (F4). The fluff is
@@ -1690,7 +1795,7 @@ const sysAMB_AT = {
   palawan:   { splash: { get: 'reef' } },
   // Twenty burners in a field before dawn, and they are the only sound and the
   // only light in the valley.
-  goreme:    { burner: { get: 'field', dy: 6 }, bark: { get: 'town' } },
+  goreme:    { burner: { get: 'field', dy: 6 }, bark: { get: 'town' }, farbell: { get: 'town', dy: 12 } },
   // THE ONE THIS TABLE WAS WRITTEN FOR. The Koutoubia's minaret is 77 m of
   // sandstone at the end of the square and the call came from a random bearing.
   sahara:    { muezzin: { get: 'koutoubia', dy: 62 }, cart: { get: 'cart' } },
@@ -1700,7 +1805,9 @@ const sysAMB_AT = {
   pantanal:  { bark: { get: 'fazenda', dy: 1 } },
   // Ten thousand of them, all in one place, all shouting.
   antarctic: { bark: { get: 'colony' }, hiss: { get: 'glacierToe', dy: 12 },
-               splash: { get: 'berg' } },
+               splash: { get: 'berg' },
+               // ...in their own voices (L7, E2): the colony brays, the sea swells
+               penguin: { get: 'colony' }, swell: { get: 'berg' }, calve: { get: 'glacierToe', dy: 12 } },
   // The market, the pho stall, and the line the train comes down.
   hanoi:     { vendor: { get: 'market' }, bowls: { get: 'pho' }, tick: { get: 'rails' } },
   // The rooms, and a cork on a boat.
@@ -1710,6 +1817,42 @@ const sysAMB_AT = {
   // going anywhere.
   cave:      { splash: { get: 'river' } },
 };
+// ---- THE SIGNATURE (L7, E2 / audio 6) ---------------------------------------
+// One sound per chapter that IS the chapter, guaranteed inside sysAMB_SIG_FIRST
+// of arrival and every sysAMB_SIG_EVERY after, off the same ladder (anchored
+// where sysAMB_AT has a place for it). The random ladder fired nine rungs in
+// Sydney's first 164 s and the third minute was nine names; a player decides
+// what a place sounds like in the first three minutes and the one sound they
+// should have heard by then was on a coin. Two or three voices to a row,
+// fired together: the ferry's horn and the gulls it puts up are one event.
+// `[name, volume, pitch]`, and the second pair a beat after the first.
+// Read by ambSig() below; the exit-zone cue (E2, cues) plays the DESTINATION's
+// row at −12 dB, which is the only time a chapter's signature sounds outside
+// the chapter.
+const sysAMB_SIG = {
+  sydney:    [['horn', 0.16, 0.5], ['gull', 0.12, 1.1], ['lorikeet', 0.08, 1.0]],
+  quay:      [['horn', 0.16, 0.45], ['gull', 0.12, 1.2]],
+  pasto:     [['banda', 0.14, 1.0], ['farbell', 0.10, 1.0]],
+  kyoto:     [['shishi', 0.16, 1.0], ['higurashi', 0.08, 1.0]],
+  cali:      [['horn', 0.14, 1.7], ['cheer', 0.08, 1.1]],
+  rio:       [['swell', 0.18, 1.0], ['gull', 0.10, 1.2]],
+  iceland:   [['geyser', 0.2, 1.0]],
+  sahara:    [['muezzin', 0.14, 1.0]],
+  drift:     [['farbell', 0.14, 1.0], ['fluff', 0.6, 1.0]],
+  venice:    [['campanile', 0.14, 1.0], ['pigeons', 0.10, 1.0]],
+  kowloon:   [['tram', 0.12, 1.0], ['mahjong', 0.08, 1.0]],
+  palawan:   [['swell', 0.14, 1.0], ['gull', 0.10, 1.3]],
+  goreme:    [['burner', 0.22, 1.0], ['farbell', 0.08, 1.0]],
+  manly:     [['swell', 0.18, 0.95], ['whistle', 0.08, 1.6]],
+  pantanal:  [['gull', 0.12, 0.7], ['pop', 0.10, 2.6]],
+  cave:      [['drip', 0.2, 1.0], ['pop', 0.07, 3.4]],
+  antarctic: [['penguin', 0.14, 1.0], ['swell', 0.12, 0.9]],
+  monaco:    [['horn', 0.10, 1.3], ['gull', 0.10, 1.1]],
+  hanoi:     [['bell', 0.10, 1.0], ['moped', 0.10, 1.0], ['vendor', 0.06, 1.0]],
+};
+const sysAMB_SIG_FIRST_A = 12, sysAMB_SIG_FIRST_B = 38;   // s after arrival, the first
+const sysAMB_SIG_EVERY_A = 80, sysAMB_SIG_EVERY_B = 100;  // ...and every one after
+const sysAMB_FRESH = 120;                                 // s of ×2 on the ladder's clock after arrival
 // An anchored voice's distance law. NEAR is wide because the things in this
 // table are landmarks and a landmark is not a footstep; FAR is long because
 // four hundred metres is a normal distance to a mountain and the alternative
@@ -2334,6 +2477,14 @@ const sysCloudSkyTmp    = new THREE.Color();
 //
 // It must never become a line. CONTRACT.md forbids outlines, and 0.26 is where
 // these were photographed.
+// ---- THE CHARACTER KEY (L7, E4 / art #5) -----------------------------------
+// The other half of the animal's separation from its ground: a fill from the
+// lens side, 35° up, at 0.35 of the key, on the animal alone (see capyKeyWrap
+// for why it is a term and not a light). Scratch for the once-a-frame write.
+const sysKEY_K = 0.35;
+const sysKEY_TAN35 = Math.tan(35 * Math.PI / 180);
+const sysKeyDir = new THREE.Vector3();
+const sysKeyC = new THREE.Color();
 const sysSELF_DEF = 0.14;
 const sysSELF = {
   // gained: the animal reads brighter than what is behind her here
@@ -3009,6 +3160,15 @@ const sysEXPOSURE = {
   // (l3-antarctic.png, far mean 186 of 255 on a 1.2 albedo). A third of a
   // stop up gets the snow white and leaves the shade blue.
   antarctic: 1.08,
+  // ...and the Sahara (L7, E4 / art #6), on Palawan's precedent. MEASURED
+  // (qa/l7r-art-sahara-rest.png): 15.4 % of the resting frame over luma 230,
+  // p95 = p99 = 254 — the stall awnings under a 61° sun at 2.19 + 1.46 plus
+  // hemi 0.76 and ambient 0.19, about 3.6× their albedo. The header above
+  // says ">253 is 0.00 % in all nineteen"; the frame it was measured on has
+  // moved. A tenth of a stop down, with the awning canvas itself taken from
+  // 0.88 to 0.74 linear in sahara.js, is the pair that brings the top decile
+  // back to a range instead of a clip.
+  sahara: 0.90,
 };
 // PASTO IS DELIBERATELY NOT IN HERE, and it was in the first draft of this
 // table. It reads 6.62% over 235, which is second worst in the game and looks
@@ -4322,7 +4482,24 @@ const sysMUS_XFADE  = 4.0;             // seconds — long enough to hide the ch
 const sysMUS_XFADE2 = 6.5;             // chapter change: reads as a drift, not a cut
 const sysMUS_LOOK   = 2.0;             // scheduler lookahead, seconds
 const sysMUS_TICK   = 240;             // scheduler period, ms
-const sysMUS_BUS    = 0.17;            // music sits UNDER the sfx
+// 0.17 → 0.14 (L7, E1 / audio #2): the comment said "under the sfx" and the
+// drive probe measured the score 9–13 dB OVER the whole world while walking.
+// This is Sydney's pad bus (the other palettes carry their own); the rest of
+// the inversion is the sidechain and the flow in the pad writer — see
+// sysMUS_SIDE.
+const sysMUS_BUS    = 0.14;            // music sits UNDER the sfx
+// ---- THE WORLD SIDECHAINS THE PAD (L7, E1 / audio #2) ----------------------
+// An envelope of the world's one-shots — every sfx() call that passes the
+// throttle bumps `musWorldEnv` by its delivered volume × `bump`, capped at 1;
+// it falls with τ `out` on the frame clock — and the pad ducks × (1 − depth ·
+// env) on its own gain node (musSideG, in series after musPad; one writer, per
+// frame, τ `in` down and `out` up) and closes its filter by `cut` · env in the
+// block. The beds do not feed it: a bed is the floor, the transients are what
+// the score makes room for. `flowPad` / `flowPluck`: the flow (a clean run)
+// takes the pad DOWN 3 dB and puts +3 dB on the plucks, so walking thins the
+// score instead of swelling it.
+const sysMUS_SIDE = { bump: 0.7, depth: 0.5, cut: 500, in: 0.05, out: 0.6, flowPad: 0.29, flowPluck: 0.41 };
+const sysMUS_FLINCH_CUT = 300;   // Hz a startle takes off the pad filter for a block (L7, E1)
 // THE ENSEMBLE. See the note in musicStart. Two taps at 0.46 add
 // sqrt(1 + 2*0.46^2) = 1.19 to the bus, so the trim is 1/1.19.
 const sysMUS_ENS_MIX  = 0.46;
@@ -4403,7 +4580,10 @@ const sysMUS_VOICE = {
 // setTargetAtTime only ever gets most of the way in one block, and the next
 // block is already asking for less. 0.38 with a 0.10 s attack bottoms near
 // 0.64 (−3.9 dB); the 0.6 s release has it within a decibel by 1.4 s.
-const sysMUS_WORLD = { sting: 0.38, lift: 0.20, card: 0.35, floor: 0.30, attack: 0.10, release: 0.6 };
+// ...floor 0.30 → 0.38 (L7, E1): +2 dB on the deepest the world is ever
+// ducked. The score ducks for the world in one way and the world for the
+// score in four; the inversion starts with the floor.
+const sysMUS_WORLD = { sting: 0.38, lift: 0.20, card: 0.35, floor: 0.38, attack: 0.10, release: 0.6 };
 // ---- ...AND SO DOES THE PAD (L6, E3 / audio #5) ----------------------------
 // The world ducked for a sting and the pad did not: measured with the world
 // muted (qa/l6r-audio-theme.js, Sydney), the bed at −23.9 dBFS and `record` —
@@ -5267,6 +5447,17 @@ const sysMUS_PHRASE = [
 const sysMUS_SKYCUT = { 7: 60, 16: 0 };
 // `scale` (L6, F3) is the tune's colour here — one of sysMUS_SCALES — and
 // roots[0] is its tonic. Nothing else about a row reads either.
+// ---- A CHASE PER PALETTE (L7, E2 / audio 3) --------------------------------
+// `chase: { inst, bpm }` is what the chase pulse plays HERE. It was one
+// bendir-and-clap at 118 in thirteen chapters (Kyoto's chase was the Sahara's
+// was Iceland's), and the states probe said why that cannot work: the same
+// pulse under a koto palette measured +1.1 dB and under a bowed one +1.3,
+// against +5.9 where the frame drum fits (Sydney). A row with no `chase`
+// gets sysMUS_CHASE_DEF, which is the bendir exactly as it was. The
+// instruments are musChaseStroke's cases; the bands do not read this — a
+// band's chase is a change of material in its own bar writer (see `brk`
+// and `chase` in musSambaBar and the five beside it).
+const sysMUS_CHASE_DEF = { inst: 'bendir', bpm: 118 };
 const sysMUS_PAL = [
   // 0 — Sydney. Felt mallets over a wide, slow pad: a hot afternoon in a public
   // garden where nothing is in a hurry.
@@ -5313,6 +5504,8 @@ const sysMUS_PAL = [
   { chords: sysMUS_CHORDS5, roots: sysMUS_ROOTS5, next: sysMUS_NEXT5,
     dwellA: 13, dwellB: 21, pluckA: 2.6, pluckB: 6.0, cut: 520, bus: 0.145, bass: 0.22,
     lead: 'koto', xfade: 5.0, rhythm: null, shaku: true, scale: 'minor',
+    // A shime and a taiko at 132 (L7, E2): the pair every matsuri runs on.
+    chase: { inst: 'taiko', bpm: 132 },
     // The river down to the mill. The ONE figure in the game that mostly
     // descends: a koto run pouring downstream and a single note left ringing
     // above where it started. Every other place celebrates by going up; the
@@ -5359,6 +5552,8 @@ const sysMUS_PAL = [
   { chords: sysMUS_CHORDS8, roots: sysMUS_ROOTS8, next: sysMUS_NEXT8,
     dwellA: 11, dwellB: 18, pluckA: 3.0, pluckB: 7.0, cut: 470, bus: 0.155, bass: 0.245,
     lead: 'bow', xfade: 5.5, rhythm: null, choir: true, scale: 'minor',
+    // A bowed tremolo on the bass at 96 (L7, E2): nothing struck, out there.
+    chase: { inst: 'tremolo', bpm: 96 },
     // Bringing the sky down. Five bowed notes over three seconds — by a distance
     // the SLOWEST lift here, and it has to be: iceland.js holds
     // game.music.swell() for the twelve seconds the aurora is climbing, so this
@@ -5388,7 +5583,9 @@ const sysMUS_PAL = [
   // above middle C. The crossfade is the longest in the game (7 s) because at
   // this dwell there is nothing for it to collide with.
   { chords: sysMUS_CHORDS10, roots: sysMUS_ROOTS10, next: sysMUS_NEXT10,
-    dwellA: 15, dwellB: 26, pluckA: 3.4, pluckB: 8.5, cut: 1250, bus: 0.15, bass: 0.20,
+    // bus 0.15 -> 0.11 (L7, E1): at rest −20.3 dBFS, the second loudest —
+    // the brightest cut in the game through the tilt's two shelves.
+    dwellA: 15, dwellB: 26, pluckA: 3.4, pluckB: 8.5, cut: 1250, bus: 0.11, bass: 0.20,
     lead: 'glass', xfade: 7.0, rhythm: null, scale: 'major',
     // Lighting the lantern at the top of the world. Six glass notes, each of
     // which rings for ten seconds, so by the fourth one they are a chord and by
@@ -5444,6 +5641,8 @@ const sysMUS_PAL = [
     // instrument — see the note under it — and that argument has nothing to do
     // with the one being fixed here.
     lead: 'kulintang', xfade: 4.6, rhythm: null, scale: 'major',
+    // A kulintang ostinato at 126 (L7, E2): the gongs, in a hurry.
+    chase: { inst: 'kulintang', bpm: 126 },
     // Being under when the water lights up. Glass rather than the palette's own
     // mallet, and quiet: bioluminescence does not announce itself, it is ALREADY
     // THERE when you notice it. Eighteen notes is the densest figure in the game
@@ -5491,6 +5690,8 @@ const sysMUS_PAL = [
     // major sevenths, its 820 cut and its five-second crossfade were all asking
     // for something warm and sustained rather than for something bowed.
     lead: 'caipira', xfade: 5.0, rhythm: null, scale: 'major',
+    // A rasgueado on the ten strings at 112 (L7, E2): the same instrument, hit.
+    chase: { inst: 'caipira', bpm: 112 },
     // The whole herd going over at sundown. Seven notes opening out on the
     // bowed voice — the 'soar' shape again, and deliberately: this and the
     // condor are the two moments in the game where the animal is not doing
@@ -5509,8 +5710,12 @@ const sysMUS_PAL = [
   // the glass lead is the hottest voice in the table and this row put the
   // loudest bass under it. The room stays 6.5 s; the size is not the level.
   { chords: sysMUS_CHORDS17, roots: sysMUS_ROOTS17, next: sysMUS_NEXT17,
-    dwellA: 14.0, dwellB: 22.0, pluckA: 5.0, pluckB: 11.0, cut: 560, bus: 0.14, bass: 0.28,
+    // bass 0.28 -> 0.20 (L7, E1): at rest −22.1 dBFS with the bus already at
+    // 0.14 — it is the bass and the 6.5 s room, not the pad.
+    dwellA: 14.0, dwellB: 22.0, pluckA: 5.0, pluckB: 11.0, cut: 560, bus: 0.14, bass: 0.20,
     lead: 'glass', xfade: 7.0, rhythm: null, scale: 'pent',
+    // A dripping double-time on the plucks (L7, E2): water, faster.
+    chase: { inst: 'drip', bpm: 118 },
     // Standing in the shaft. Eight glass notes, wide apart, two octaves up —
     // the only bright thing in the chapter, arriving in the only bright place
     // in it. cave.js holds the swell for the whole walk into the light, so
@@ -5524,8 +5729,14 @@ const sysMUS_PAL = [
   // one with no thirds in it. It moves about once every fifteen seconds,
   // which is roughly how often anything happens down there.
   { chords: sysMUS_CHORDS18, roots: sysMUS_ROOTS18, next: sysMUS_NEXT18,
-    dwellA: 12.0, dwellB: 19.0, pluckA: 4.5, pluckB: 10.0, cut: 900, bus: 0.26, bass: 0.28,
+    // bus 0.26 -> 0.18 (L7, E1): the loudest rest in the game at −20.5 dBFS
+    // (qa/l7-e1-still.js) over a colony and a wind bed at −31; the widest,
+    // emptiest pad should not be the one that buries the place.
+    dwellA: 12.0, dwellB: 19.0, pluckA: 4.5, pluckB: 10.0, cut: 900, bus: 0.18, bass: 0.28,
     lead: 'glass', xfade: 6.0, rhythm: null, scale: 'major',
+    // The bowed tremolo again, slower (L7, E2): its second voice is a bow, and
+    // a frame drum on the ice was the Sahara's chase in a parka.
+    chase: { inst: 'tremolo', bpm: 84 },
     // Six orcas on the quarters at twelve metres a second. 'soar' again, and
     // for the third time in this table it is the shape used for the same
     // idea: the animal is not doing anything clever, it is being carried
@@ -5565,6 +5776,9 @@ const sysMUS_PAL = [
   { chords: sysMUS_CHORDS20, roots: sysMUS_ROOTS20, next: sysMUS_NEXT20,
     dwellA: 9.0, dwellB: 15.0, pluckA: 2.4, pluckB: 5.6, cut: 640, bus: 0.135, bass: 0.26,
     lead: 'danbau', xfade: 4.4, rhythm: null, tranh: true, scale: 'pent',
+    // The song loan at 126 (L7, E2): the wooden clapper that already keeps
+    // this palette's time, doubled — a chase here is a thing with no engine.
+    chase: { inst: 'songloan', bpm: 126 },
     // A train, forty-five centimetres away, at eleven metres a second, while
     // you stand still. 'arch' — up and back down — because the whole of that
     // moment is a thing ARRIVING and then being gone, and a figure that climbs
@@ -8005,7 +8219,10 @@ function sysBuildCSS() {
 '.capyui-jrrow:focus{outline:none;}',
 '.capyui-jrrow:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
 '.capyui-jrrow.here{border-color:' + accent + ';}',
-'.capyui-jrrow.locked{opacity:.36;}',
+// .36 -> .6 (L7, E5 / writing W5): the sub-line measured 1.5:1 at 11 px, the
+// game's best short lines unreadable on fifteen of nineteen rows. A locked
+// place should look shut, not erased.
+'.capyui-jrrow.locked{opacity:.6;}',
 '.capyui-jrn{position:relative;display:block;width:44px;height:26px;}',
 '.capyui-jrmark{position:absolute;inset:0;display:block;overflow:hidden;border-radius:' + rSm + ';',
   'border:1px solid ' + rule + ';}',
@@ -8096,6 +8313,10 @@ function sysBuildCSS() {
    chapter stood in and not yet left is a ruled blank line under its date.
    Same fold as the repertoire, for the reason given there. */
 '.capyui-nb{padding:2px 4px 0;}',
+/* the summary pulses once when a page has been written since the last open
+   (L7, E5); the fold above the rows has no top rule, the rows draw their own */
+'.capyui-jrnb{margin-top:6px;border-top:0;padding-top:4px;margin-bottom:6px;}',
+'.capyui-jrnb summary.fresh{animation:capyui-blink .9s ease 2;}',
 '.capyui-nbe{padding:7px 0 9px;border-bottom:1px solid ' + inkFaint + ';}',
 '.capyui-nbe:last-child{border-bottom:0;}',
 '.capyui-nbd{font-size:' + tSm + ';color:' + accentInk + ';font-weight:700;',
@@ -10069,6 +10290,17 @@ function sysBuildCSS() {
   'font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;',
   'text-overflow:ellipsis;opacity:0;transition:opacity ' + dMed + ' ease;}',
 '.capyui-mapdist.show{opacity:1;}',
+/* THE MACHINE'S NOTICES GO IN THE MAP CORNER (L7, E5 / writing W4). The save
+   notice and the governor's apology were pills in the narrator's slot — two of
+   the first three sentences a new player read were about the software. A 3 s
+   badge under the chart, at the N's weight, is where a note about the machine
+   belongs. Absent, not zeroed, when it has nothing to say. */
+'.capyui-mapnote{position:absolute;left:50%;bottom:-16px;transform:translateX(-50%);',
+  'padding:1px 7px;border-radius:999px;background:' + sysRgba(PALETTE.sail, 0.86) + ';',
+  'font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;line-height:1.5;',
+  'color:' + inkSoft + ';white-space:nowrap;opacity:0;transition:opacity ' + dMed + ' ease;}',
+'.capyui-mapnote.show{opacity:1;}',
+'@media (hover:none) and (pointer:coarse){.capyui-mapnote{bottom:auto;top:calc(100% + 4px);}}',
 '.capyui-mapdist i{flex:0 0 auto;width:6px;height:6px;border-radius:50%;',
   'background:' + accent + ';text-decoration:none;}',
 
@@ -12755,6 +12987,38 @@ export function createSystems(game) {
     ns.start(t + 0.42); ns.stop(t + 0.64);
   }
 
+  /**
+   * THE CONTACT CLICK (L7, E1 / audio #4). Two milliseconds of noise in the
+   * 4–8 kHz band under a hard one-shot, sysSFX_CLICK_K below the body's peak.
+   * A thud, a clink, a pop and a foot on stone all start with the same thing —
+   * the instant two hard surfaces meet — and none of them had it: the master
+   * carried 0.04 % of its energy above 5 kHz in Sydney. Three nodes, and only
+   * from the voices that name it. `out` is where the body goes.
+   */
+  function sfxContactClick(out, t, body) {
+    const n = noiseSrc();
+    const f = ac.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = sysSFX_CLICK_HZ; f.Q.value = 0.7;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, body * sysSFX_CLICK_K), t + 0.0006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.0026);
+    n.connect(f); f.connect(g); g.connect(out);
+    n.start(t); n.stop(t + 0.006);
+  }
+  /** The four S2 culprits' own ceiling (L7, E1): one lowpass at sysSFX_CULPRIT_HZ
+   *  between a voice's last node and `out`, so the bus can give the top back. */
+  function sfxCulpritLP(out) {
+    // ...and the three decibels the bus gave back, taken off HERE, so these
+    // four arrive at the master exactly as S2 capped them (−5 dB over 5.5
+    // kHz, nothing past the lid) while every other voice gets its top back.
+    const sh = ac.createBiquadFilter();
+    sh.type = 'highshelf'; sh.frequency.value = sysSFX_SHELF_HZ; sh.gain.value = -5 - sysSFX_SHELF_DB;
+    const f = ac.createBiquadFilter();
+    f.type = 'lowpass'; f.frequency.value = sysSFX_CULPRIT_HZ; f.Q.value = 0.5;
+    sh.connect(f); f.connect(out);
+    return sh;
+  }
   function sfxThud(vol, pitch) {
     const t = ac.currentTime;
     const v = rand(0.86, 1.16) * pitch;
@@ -12767,6 +13031,7 @@ export function createSystems(game) {
     env(g, t, 0.46 * vol, 0.006, 0.19);
     ns.connect(lp); lp.connect(g); g.connect(acMaster);
     ns.start(t); ns.stop(t + 0.26);
+    sfxContactClick(acMaster, t, 0.46 * vol);   // the click under it (L7, E1)
     const o = ac.createOscillator(); o.type = 'sine';
     o.frequency.setValueAtTime(126 * v, t);
     o.frequency.exponentialRampToValueAtTime(48 * v, t + 0.17);
@@ -13155,6 +13420,7 @@ export function createSystems(game) {
     env(g, t, 0.3 * vol, 0.004, 0.09);
     o.connect(g); g.connect(acMaster);
     o.start(t); o.stop(t + 0.12);
+    sfxContactClick(acMaster, t, 0.3 * vol);   // (L7, E1)
   }
 
   // ---- FOOTFALL ------------------------------------------------------------
@@ -13293,6 +13559,7 @@ export function createSystems(game) {
       sfxStepBurst(out, t, 'lowpass', 700 * v, 0.7, 0.03 * vol, 0.006, 0.05);
     } else if (mat === 'stone') {
       sfxStepBurst(out, t, 'bandpass', 1700 * v, 1.1, 0.085 * vol, 0.004, toe ? 0.07 : 0.10);
+      if (!toe) sfxContactClick(out, t, 0.085 * vol);   // the click of a hard foot (L7, E1)
     } else if (mat === 'timber') {
       sfxStepBurst(out, t, 'bandpass', 240 * v, 3.2, 0.14 * vol, 0.005, toe ? 0.07 : 0.19);
       if (!toe) {
@@ -13326,6 +13593,7 @@ export function createSystems(game) {
       o.start(t); o.stop(t + 0.14); o2.start(t); o2.stop(t + 0.09);
       sfxStepBurst(out, t, 'bandpass', f0, 2.0, 0.06 * vol, 0.004, 0.045 * k);
       sfxStepBurst(out, t, 'lowpass', 420 * v, 0.8, 0.05 * vol, 0.005, 0.04);
+      if (!toe) sfxContactClick(out, t, 0.06 * vol);   // (L7, E1)
     } else if (mat === 'snow') {
       // Snow CRUNCHES and then it CREAKS. The crunch is a band from 1.8 to
       // 7 kHz (a highpass alone is a hiss to 20 kHz and blows the S2 shelf);
@@ -13369,6 +13637,9 @@ export function createSystems(game) {
       sfxStepBurst(out, t, 'bandpass', 2900 * v, 5, 0.40 * vol, 0.002, toe ? 0.025 : 0.032);
       const sc = sfxStepBurst(out, t + 0.004, 'lowpass', 1400 * v, 1.15, 0.008 * vol, 0.012, toe ? 0.045 : 0.07);
       sc.frequency.exponentialRampToValueAtTime(600 * v, t + 0.07);
+      // the body here is a Q-5 band at 0.40, a fiftieth of the power of a
+      // wide one (its own note above): the click is judged against 0.085
+      if (!toe) sfxContactClick(out, t, 0.085 * vol);   // (L7, E1)
     } else {
       sfxStepBurst(out, t, 'bandpass', 1700 * v, 1.1, 0.085 * vol, 0.004, 0.10);
     }
@@ -13461,6 +13732,7 @@ export function createSystems(game) {
     env(ng, t, 0.075 * vol, 0.002, 0.03);
     ns.connect(hp); hp.connect(ng); ng.connect(acMaster);
     ns.start(t); ns.stop(t + 0.06);
+    sfxContactClick(acMaster, t, 0.15 * vol);   // under the first partial (L7, E1)
   }
 
   function sfxRustle(vol, pitch) {
@@ -13476,7 +13748,7 @@ export function createSystems(game) {
       gg.exponentialRampToValueAtTime(0.02 * vol, t + 0.065 + i * 0.07);
     }
     gg.exponentialRampToValueAtTime(0.0001, t + 0.34);
-    ns.connect(hp); hp.connect(g); g.connect(acMaster);
+    ns.connect(hp); hp.connect(g); g.connect(sfxCulpritLP(acMaster));   // its own 9 kHz lid (L7, E1)
     ns.start(t); ns.stop(t + 0.38);
   }
 
@@ -13722,7 +13994,7 @@ export function createSystems(game) {
     bp.frequency.setValueAtTime(2400 * v, t + 0.3);
     bp.frequency.exponentialRampToValueAtTime(4300 * v, t + 0.66);
     bp.frequency.exponentialRampToValueAtTime(2200 * v, t + 1.05);
-    ns.connect(hp); hp.connect(bp); bp.connect(g); g.connect(acMaster);
+    ns.connect(hp); hp.connect(bp); bp.connect(g); g.connect(sfxCulpritLP(acMaster));   // (L7, E1)
     ns.start(t); ns.stop(t + 1.1);
   }
 
@@ -14494,7 +14766,7 @@ export function createSystems(game) {
     g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk), t + dur * 0.35);
     g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk * 0.85), t + dur * 0.72);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    ns.connect(bp); bp.connect(amGate); amGate.connect(g); g.connect(acMaster);
+    ns.connect(bp); bp.connect(amGate); amGate.connect(g); g.connect(sfxCulpritLP(acMaster));   // (L7, E1)
     ns.start(t); ns.stop(t + dur + 0.1);
     lfo.start(t); lfo.stop(t + dur + 0.1);
   }
@@ -14890,7 +15162,7 @@ export function createSystems(game) {
     sg.gain.setValueAtTime(0.0001, t + lead + 0.02);
     sg.gain.linearRampToValueAtTime(0.13 * vol, t + lead + 0.22);
     sg.gain.exponentialRampToValueAtTime(0.0001, t + lead + 2.6);
-    sn.connect(shp); shp.connect(sg); sg.connect(acMaster);
+    sn.connect(shp); shp.connect(sg); sg.connect(sfxCulpritLP(acMaster));   // the steam's own lid (L7, E1)
     sn.start(t + lead + 0.02); sn.stop(t + lead + 2.7);
   }
 
@@ -15278,6 +15550,287 @@ export function createSystems(game) {
     ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.62 * S);
     ns.connect(nb); nb.connect(ng); ng.connect(acMaster);
     ns.start(t); ns.stop(t + 0.64 * S);
+  }
+
+  // ===========================================================================
+  // EIGHT VOICES THE PLACES WERE BORROWING (L7, E2 / audio 5)
+  //
+  // The audio review counted the call sites: Hanoi's 2.5-minute drive was 722
+  // of 1 398 calls on three Sydney generics transposed — `tick` at 1.8–3.0 as
+  // a bicycle bell, `bark` at 1.2–2.1 as a horn, `hiss` for the traffic — and
+  // the two voices the chapter owned were 1.4 % of it. Antarctica's sea and
+  // its calving were `splash` at 0.30–0.50, its colony `bark` at 1.5–2.3;
+  // Kyoto's heron was `gull` at 0.44. The ear knows a slowed hiss is not a
+  // penguin and a fast tick is not a bell. These are the eight things those
+  // call sites were trying to say, written as what they are. Same rules as
+  // the seventeen above them: `sfxArg` defaults, `env` for the short ones,
+  // acMaster at the tail so the sfx() door can place them, and a gap in
+  // sfxGap past each one's own length.
+  // ===========================================================================
+
+  /** A BICYCLE BELL. Two inharmonic partials — a small steel dome rings at
+   *  about 1 : 1.62 — and it is the beat between them that says "bell" rather
+   *  than "sine". Ninety milliseconds, a click of the thumb lever at the
+   *  front, and the second partial dies first. Twice, most of the time: a
+   *  rider rings a bell and then rings it again. */
+  function sfxBell(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.94, 1.08) * pitch;
+    const n = Math.random() < 0.6 ? 2 : 1;
+    for (let k = 0; k < n; k++) {
+      const st = t + k * rand(0.13, 0.19);
+      const parts = [[2100, 1.0, 0.09], [3400, 0.55, 0.06], [5150, 0.18, 0.035]];
+      for (let i = 0; i < parts.length; i++) {
+        const o = ac.createOscillator(); o.type = 'sine';
+        o.frequency.value = parts[i][0] * v * rand(0.995, 1.005);
+        const g = ac.createGain();
+        env(g, st, 0.09 * parts[i][1] * vol * (k ? 0.85 : 1), 0.002, parts[i][2]);
+        o.connect(g); g.connect(acMaster);
+        o.start(st); o.stop(st + 0.14);
+      }
+      // the lever
+      const ns = noiseSrc();
+      const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3000;
+      const ng = ac.createGain();
+      env(ng, st, 0.035 * vol, 0.001, 0.008);
+      ns.connect(hp); hp.connect(ng); ng.connect(acMaster);
+      ns.start(st); ns.stop(st + 0.02);
+    }
+  }
+
+  /** A MOPED HORN, which is a two-tone square through a small horn's
+   *  resonance — the "meep" every Honda Cub in the Old Quarter makes — over
+   *  a fifty-hertz exhaust burst, because the horn is never pressed by a
+   *  bike that is standing still. Two tones a fifth apart, the second a
+   *  hair late, and a bandpass at 1.1 kHz so it is a horn and not an organ. */
+  function sfxMoped(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.92, 1.1) * pitch;
+    const dur = rand(0.16, 0.3);
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.value = 1100 * v; bp.Q.value = 1.4;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.11 * vol, t + 0.012);
+    g.gain.setValueAtTime(0.11 * vol, t + dur);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.05);
+    const hz = [440, 660];
+    for (let i = 0; i < 2; i++) {
+      const o = ac.createOscillator(); o.type = 'square';
+      o.frequency.value = hz[i] * v;
+      const og = ac.createGain(); og.gain.value = i ? 0.55 : 0.8;
+      o.connect(og); og.connect(bp);
+      o.start(t + i * 0.008); o.stop(t + dur + 0.08);
+    }
+    bp.connect(g); g.connect(acMaster);
+    // the exhaust: a fifty-hertz burst, lowpassed, under it and a little past
+    const ns = noiseSrc();
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 160; lp.Q.value = 2.0;
+    const ex = ac.createOscillator(); ex.type = 'sawtooth'; ex.frequency.value = 50 * v;
+    const eg = ac.createGain();
+    eg.gain.setValueAtTime(0.0001, t);
+    eg.gain.exponentialRampToValueAtTime(0.06 * vol, t + 0.03);
+    eg.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.25);
+    ns.connect(lp); ex.connect(lp); lp.connect(eg); eg.connect(acMaster);
+    ns.start(t); ex.start(t); ns.stop(t + dur + 0.3); ex.stop(t + dur + 0.3);
+  }
+
+  /** A PENGUIN. A gentoo's call is a BRAY — a glottal pulse at 80–110 Hz,
+   *  which is the babble's source, pushed through two formants at 600 and
+   *  1900 Hz instead of a mouth's, and it rises: three or four pulses that
+   *  each start higher than the last and the whole thing over in half a
+   *  second. The formants are the bird; the same pulse through 730/1090 is
+   *  a person saying "ah". */
+  function sfxPenguin(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.12) * pitch;
+    const n = randInt(3, 4);
+    const f1 = ac.createBiquadFilter(); f1.type = 'bandpass'; f1.frequency.value = 600 * v; f1.Q.value = 5;
+    const f2 = ac.createBiquadFilter(); f2.type = 'bandpass'; f2.frequency.value = 1900 * v; f2.Q.value = 6;
+    const g = ac.createGain();
+    const gg = g.gain;
+    gg.setValueAtTime(0.0001, t);
+    let st = t;
+    const o = ac.createOscillator(); o.type = 'sawtooth';
+    const fr = o.frequency;
+    fr.setValueAtTime(80 * v, t);
+    for (let i = 0; i < n; i++) {
+      const dur = rand(0.09, 0.14);
+      const hz = (84 + i * 9) * v;
+      fr.setValueAtTime(hz * 0.9, st);
+      fr.exponentialRampToValueAtTime(hz * 1.15, st + dur * 0.6);
+      fr.exponentialRampToValueAtTime(hz * 0.95, st + dur);
+      gg.exponentialRampToValueAtTime(0.16 * vol * (0.7 + i * 0.1), st + 0.012);
+      gg.exponentialRampToValueAtTime(0.02 * vol, st + dur);
+      st += dur + rand(0.02, 0.04);
+    }
+    gg.exponentialRampToValueAtTime(0.0001, st + 0.06);
+    const g1 = ac.createGain(); g1.gain.value = 1.0;
+    const g2 = ac.createGain(); g2.gain.value = 0.6;
+    o.connect(f1); o.connect(f2); f1.connect(g1); f2.connect(g2); g1.connect(g); g2.connect(g);
+    g.connect(acMaster);
+    o.start(t); o.stop(st + 0.1);
+  }
+
+  /** A HERON, which makes exactly one noise and it is a croak: pulsed noise
+   *  at about 12 Hz through a bandpass at 900, a hundred and eighty
+   *  milliseconds, and it falls a little at the end. Genuinely the ugliest
+   *  sound in a Kyoto garden, which is the point of putting one there. */
+  function sfxHeron(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.1) * pitch;
+    const dur = rand(0.16, 0.22);
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(980 * v, t);
+    bp.frequency.exponentialRampToValueAtTime(760 * v, t + dur);
+    bp.Q.value = 2.2;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.2 * vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.03);
+    // the pulse: a square LFO at 12 Hz gating the noise, which is the croak
+    const lfo = ac.createOscillator(); lfo.type = 'square'; lfo.frequency.value = rand(11, 13.5);
+    const lg = ac.createGain(); lg.gain.value = 0.5;
+    const gate = ac.createGain(); gate.gain.value = 0.5;
+    lfo.connect(lg); lg.connect(gate.gain);
+    ns.connect(bp); bp.connect(gate); gate.connect(g); g.connect(acMaster);
+    ns.start(t); lfo.start(t); ns.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+  }
+
+  /** ICE CALVING. A thirty-millisecond crack at 3 kHz — the face letting go —
+   *  and then a 60 Hz rumble for a second and a half that arrives a beat
+   *  behind it and bends down as it goes, because a million tonnes of ice
+   *  reaching the sea is slower than the sound of it starting to. */
+  function sfxCalve(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.92, 1.08) * pitch;
+    // the crack
+    const cn = noiseSrc();
+    const cb = ac.createBiquadFilter(); cb.type = 'bandpass'; cb.frequency.value = 3000 * v; cb.Q.value = 1.8;
+    const cg = ac.createGain();
+    env(cg, t, 0.22 * vol, 0.002, 0.03);
+    cn.connect(cb); cb.connect(cg); cg.connect(acMaster);
+    cn.start(t); cn.stop(t + 0.06);
+    // the rumble, a beat behind
+    const t1 = t + rand(0.12, 0.2);
+    const dur = rand(1.3, 1.7);
+    const o = ac.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(64 * v, t1);
+    o.frequency.exponentialRampToValueAtTime(42 * v, t1 + dur);
+    const rn = noiseSrc();
+    const rl = ac.createBiquadFilter(); rl.type = 'lowpass'; rl.frequency.value = 140; rl.Q.value = 1.2;
+    const rg = ac.createGain();
+    rg.gain.setValueAtTime(0.0001, t1);
+    rg.gain.linearRampToValueAtTime(0.16 * vol, t1 + 0.18);
+    rg.gain.exponentialRampToValueAtTime(0.0001, t1 + dur);
+    const og = ac.createGain(); og.gain.value = 0.7;
+    o.connect(og); og.connect(rg); rn.connect(rl); rl.connect(rg); rg.connect(acMaster);
+    o.start(t1); rn.start(t1); o.stop(t1 + dur + 0.05); rn.stop(t1 + dur + 0.05);
+  }
+
+  /** A CROWD, FAR. Six of the babble's throats at once with no words in
+   *  them — six sawtooths at six pitches through the two mouth formants,
+   *  each on its own slow wobble — for a second and a half, lowpassed at 2 kHz
+   *  because it is across the square. It is walla, and it is what a market
+   *  sounds like from the next street. */
+  function sfxCrowd(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.94, 1.06) * pitch;
+    const dur = rand(1.2, 1.8);
+    const f1 = ac.createBiquadFilter(); f1.type = 'bandpass'; f1.frequency.value = 640 * v; f1.Q.value = 3;
+    const f2 = ac.createBiquadFilter(); f2.type = 'bandpass'; f2.frequency.value = 1400 * v; f2.Q.value = 4;
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2000;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.05 * vol, t + dur * 0.3);
+    g.gain.setValueAtTime(0.05 * vol, t + dur * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    for (let i = 0; i < 6; i++) {
+      const o = ac.createOscillator(); o.type = 'sawtooth';
+      const hz = rand(95, 210) * v;
+      o.frequency.value = hz;
+      const lfo = ac.createOscillator(); lfo.frequency.value = rand(2.5, 5.5);
+      const lg = ac.createGain(); lg.gain.value = hz * rand(0.04, 0.09);
+      lfo.connect(lg); lg.connect(o.frequency);
+      const og = ac.createGain(); og.gain.value = 0.35;
+      o.connect(og); og.connect(f1); og.connect(f2);
+      o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+    }
+    f1.connect(lp); f2.connect(lp); lp.connect(g); g.connect(acMaster);
+  }
+
+  /** A KETTLE — the pho stall's steam: a hiss highpassed at 2 kHz with a
+   *  400 Hz whistle riding up out of it and a lid rattling at 9 Hz under
+   *  both. Two seconds. The whistle is what a `hiss` at 1.3 was reaching for
+   *  and could not have, because a hiss has no pitch in it. */
+  function sfxKettle(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.94, 1.08) * pitch;
+    const dur = rand(1.6, 2.4);
+    const ns = noiseSrc();
+    const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2000 * v;
+    const ng = ac.createGain();
+    ng.gain.setValueAtTime(0.0001, t);
+    ng.gain.linearRampToValueAtTime(0.07 * vol, t + 0.3);
+    ng.gain.setValueAtTime(0.07 * vol, t + dur * 0.7);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    // the lid, which rattles the hiss at nine hertz
+    const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = rand(8, 10);
+    const lg = ac.createGain(); lg.gain.value = 0.03 * vol;
+    lfo.connect(lg); lg.connect(ng.gain);
+    ns.connect(hp); hp.connect(ng); ng.connect(acMaster);
+    ns.start(t); lfo.start(t); ns.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+    // the whistle, up out of it
+    const o = ac.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(380 * v, t + 0.3);
+    o.frequency.exponentialRampToValueAtTime(420 * v, t + dur * 0.8);
+    const o2 = ac.createOscillator(); o2.type = 'sine'; o2.frequency.value = 2 * 400 * v * 1.01;
+    const og = ac.createGain();
+    og.gain.setValueAtTime(0.0001, t + 0.3);
+    og.gain.exponentialRampToValueAtTime(0.045 * vol, t + dur * 0.55);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const o2g = ac.createGain(); o2g.gain.value = 0.25;
+    o.connect(og); o2.connect(o2g); o2g.connect(og); og.connect(acMaster);
+    o.start(t + 0.3); o2.start(t + 0.3); o.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+  }
+
+  /** A SWELL — the sea, arriving. A two-second lowpassed noise surge whose
+   *  filter opens with its level and closes ahead of it, so it is a mass of
+   *  water going past rather than a thing falling into water, which is what
+   *  `splash` is and what the pod, the escort and the wake were all using. */
+  function sfxSwell(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.1) * pitch;
+    const dur = rand(1.7, 2.3);
+    const ns = noiseWideSrc();
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.7;
+    lp.frequency.setValueAtTime(220 * v, t);
+    lp.frequency.exponentialRampToValueAtTime(1400 * v, t + dur * 0.38);
+    lp.frequency.exponentialRampToValueAtTime(260 * v, t + dur);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.18 * vol, t + dur * 0.42);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    ns.connect(lp); lp.connect(g); g.connect(acMaster);
+    ns.start(t); ns.stop(t + dur + 0.05);
+    // the foam on the top of it, briefly, at the crest
+    const fn = noiseSrc();
+    const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2400;
+    const fg = ac.createGain();
+    fg.gain.setValueAtTime(0.0001, t + dur * 0.3);
+    fg.gain.linearRampToValueAtTime(0.03 * vol, t + dur * 0.48);
+    fg.gain.exponentialRampToValueAtTime(0.0001, t + dur * 0.9);
+    fn.connect(hp); hp.connect(fg); fg.connect(acMaster);
+    fn.start(t + dur * 0.3); fn.stop(t + dur * 0.92);
   }
 
   function ambientStart() {
@@ -15889,7 +16442,8 @@ export function createSystems(game) {
     // A shoreline. The whole of a break is its PERIOD, and a period that
     // repeats is a machine — so two incommensurate swells, whose beat wanders
     // and never comes round, exactly as the ensemble's delays do.
-    surf: { level: 0.14, near: 40, far: 220, bed: true,
+    // makeup 2.2 (L7, E1): Manly's break live at 0.156 measured −39 dBFS.
+    surf: { level: 0.14, near: 40, far: 220, bed: true, makeup: 2.2,
       build: function (m, out) {
         m.am = sysMoverAM(m, out, 0.42, 0.11, 0.45, 0.083);
         m.lo = sysMoverNoise(m, m.am.am, 'lowpass', 1100, 0.6, 0.75);
@@ -15902,7 +16456,8 @@ export function createSystems(game) {
     // Moving water, which is a BAND and not a hiss: the top of it is the
     // surface and the bottom is the volume of it, and the centre wanders
     // because a river is never doing the same thing twice in the same place.
-    river: { level: 0.12, near: 20, far: 120, bed: true,
+    // makeup 1.6 (L7, E1): the cave's river live at 0.132 measured −42.5 dBFS.
+    river: { level: 0.12, near: 20, far: 120, bed: true, makeup: 1.6,
       build: function (m, out) {
         m.mid = sysMoverNoise(m, out, 'bandpass', 1400, 0.6, 0.70);
         m.low = sysMoverNoise(m, out, 'bandpass', 380, 0.9, 0.30);
@@ -15927,7 +16482,7 @@ export function createSystems(game) {
     // still window still measured 9.3 dB under the score (qa/l6-mix-still.js)
     // — the same lesson the marsh taught, a Q-1.2 band at 0.55 is not 0.55 of
     // anything. Kyoto's leaves and the marsh both meet the window; this did not.
-    lap: { level: 0.10, near: 12, far: 80, bed: true,
+    lap: { level: 0.10, near: 12, far: 80, bed: true, makeup: 3.5,   // (L7, E1): −10.9 dB under the score at 1.6, −12.5 at 2.4
       build: function (m, out) {
         m.low = sysMoverNoise(m, out, 'bandpass', 280, 1.2, 1.0);
         m.mid = sysMoverNoise(m, out, 'bandpass', 900, 0.8, 0.32);
@@ -15953,7 +16508,7 @@ export function createSystems(game) {
     // still window came out 11 dB under the score): a band-passed noise at
     // gain 1 is a fraction of the level a broadband one is, and `level` is
     // meant to be what arrives.
-    leaves: { level: 0.10, near: 20, far: 90, bed: true,
+    leaves: { level: 0.10, near: 20, far: 90, bed: true, makeup: 1.3,   // (L7, E1)
       build: function (m, out) {
         m.am = sysMoverAM(m, out, 0.85, 0.07, 0.30, 0.19);
         m.hi = sysMoverNoise(m, m.am.am, 'bandpass', 3200, 0.7, 0.90);
@@ -15969,7 +16524,7 @@ export function createSystems(game) {
     // A lagoon: the lap recipe an octave up and slower, because there is no
     // quay for the water to hit — it is the whole bay breathing, with a
     // little of the reef's fizz on top of it.
-    lagoon: { level: 0.10, near: 24, far: 120, bed: true,
+    lagoon: { level: 0.10, near: 24, far: 120, bed: true, makeup: 1.3,   // (L7, E1)
       build: function (m, out) {
         m.low = sysMoverNoise(m, out, 'bandpass', 420, 1.0, 1.0);
         m.hi = sysMoverNoise(m, out, 'bandpass', 2600, 0.6, 0.30);
@@ -15986,7 +16541,7 @@ export function createSystems(game) {
     // still window measured 10–13 dB under the score. A wetland at dusk is
     // frogs and insects — two narrow bands, each under its own slow pulse,
     // at different rates so the chorus never lines up.
-    marsh: { level: 0.10, near: 24, far: 110, bed: true,
+    marsh: { level: 0.10, near: 24, far: 110, bed: true, makeup: 1.2,   // (L7, E1)
       build: function (m, out) {
         // Gains over 1 because a Q-2.5 band of noise carries a tenth of the
         // energy the river's Q-0.6 band does at the same number; measured at
@@ -16000,7 +16555,7 @@ export function createSystems(game) {
         sysAudioSet(m.frog.g.gain, Math.max(0.0001, 2.2 * k), now, 1.6);
         sysAudioSet(m.bug.g.gain, Math.max(0.0001, 1.4 * k), now, 1.6);
       } },
-    steam: { level: 0.07, near: 14, far: 90, bed: true,
+    steam: { level: 0.07, near: 14, far: 90, bed: true, makeup: 2.5,   // (L7, E1)
       build: function (m, out) {
         m.hi = sysMoverNoise(m, out, 'bandpass', 2400, 0.5, 0.60);
         m.low = sysMoverNoise(m, out, 'lowpass', 140, 0.7, 0.35);
@@ -16014,7 +16569,9 @@ export function createSystems(game) {
       } },
     // A lot of people, none of whom you can make out. A crowd is not a level,
     // it is a thing that keeps almost arriving somewhere.
-    crowd: { level: 0.12, near: 30, far: 180, bed: true,
+    // makeup 3.0 (L7, E1): Pasto's plaza live at 0.127 measured the world bus
+    // at −46 dBFS — see the colony.
+    crowd: { level: 0.12, near: 30, far: 180, bed: true, makeup: 3.0,
       build: function (m, out) { sysMoverVoiced(m, out, [300, 600, 1200, 2400], 3.0); },
       throttle: function (m, k, now) { sysMoverVoicedSet(m, k, now); } },
     // A street with everything on it at once. Three saws at non-harmonic
@@ -16038,13 +16595,162 @@ export function createSystems(game) {
       } },
     // Ten thousand birds. The crowd graph an octave and a half up, with a
     // flutter on it, because a colony is a crowd that never takes a breath.
-    colony: { level: 0.12, near: 40, far: 300, bed: true,
+    // RE-LEVELLED AT THE ANIMAL (L7, E1 / audio #7): four Q-3.4 bands under
+    // an AM of 0.78 measured −39.6 dBFS on the bus from the Antarctic spawn
+    // with the row live at 0.07–0.12 — the lagoon lesson again, a band-passed
+    // noise at gain 1 is not level 1. See `makeup` in sysMoverBuild.
+    colony: { level: 0.12, near: 40, far: 300, bed: true, makeup: 3.0,
       build: function (m, out) {
         m.am = sysMoverAM(m, out, 0.78, 4.3, 0.25, 3.1);
         sysMoverVoiced(m, m.am.am, [700, 1400, 2100, 2800], 3.4);
       },
       throttle: function (m, k, now) { sysMoverVoicedSet(m, k, now); } },
+    // ---- A BED AT REST IN EVERY CHAPTER (L7, E1 / audio #7) ---------------
+    // Nine chapters had the score as their only continuous sound standing
+    // still (Rio's world 18 dB under it, Iceland's 19, Antarctica's 18). Four
+    // recipes, placed AT the animal by sysBedsAtTick from sysBEDS_AT — the
+    // grove/lagoon pattern — so `near` is a formality and the calm's rise is
+    // their dynamic. Levels are what ARRIVES, measured on the bus.
+    //
+    // The sea, for Rio: the surf recipe lower and slower — a beach a street
+    // away rather than a break at your feet.
+    // makeup (all three): measured (qa/l7-e1-bedcal.js) a wind bed live at
+    // 0.138 delivered about −39 dBFS on the bus; the still target is −30.
+    sea: { level: 0.10, near: 30, far: 160, bed: true, makeup: 3.2,
+      build: function (m, out) {
+        m.am = sysMoverAM(m, out, 0.42, 0.071, 0.42, 0.047);
+        m.lo = sysMoverNoise(m, m.am.am, 'lowpass', 700, 0.6, 1.1);
+        m.hi = sysMoverNoise(m, m.am.am, 'bandpass', 1800, 0.5, 0.20);
+      },
+      throttle: function (m, k, now) {
+        sysAudioSet(m.am.lg.gain, 0.26 + 0.22 * k, now, 1.4);
+        sysAudioSet(m.hi.g.gain, 0.10 + 0.12 * k, now, 1.4);
+      } },
+    // The wind, for Iceland, Antarctica, the Sahara and Göreme: broadband,
+    // under two incommensurate swells (0.05–0.2 Hz), with a SWAY band whose
+    // centre walks 1.5–6 kHz on a third — the top of a gust is what moves.
+    // `k` is the weather's wind with a floor: a place with a westerly in it
+    // is audible standing still, and the gust is the change.
+    wind: { level: 0.10, near: 30, far: 140, bed: true, makeup: 3.8,
+      build: function (m, out) {
+        m.am = sysMoverAM(m, out, 0.62, 0.083, 0.30, 0.171);
+        m.body = sysMoverNoise(m, m.am.am, 'bandpass', 900, 0.30, 0.95);
+        m.sway = sysMoverNoise(m, m.am.am, 'bandpass', 3000, 0.9, 0.34);
+        const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.061;
+        const lg = ac.createGain(); lg.gain.value = 1400;
+        lfo.connect(lg); lg.connect(m.sway.f.frequency); lfo.start(); m.src.push(lfo);
+      },
+      throttle: function (m, k, now) {
+        sysAudioSet(m.body.g.gain, Math.max(0.0001, 0.95 * (0.55 + 0.45 * k)), now, 1.2);
+        sysAudioSet(m.sway.g.gain, Math.max(0.0001, 0.34 * (0.35 + 0.65 * k)), now, 1.2);
+        sysAudioSet(m.sway.f.frequency, 2400 + 2200 * k, now, 1.2);
+        sysAudioSet(m.am.lg.gain, 0.20 + 0.22 * k, now, 1.2);
+      } },
+    // The city, for Rio, Monaco and Cali: the crowd recipe far, under the
+    // traffic recipe filtered — a place with people and engines in it that
+    // you cannot see from here.
+    city: { level: 0.10, near: 30, far: 160, bed: true, makeup: 3.2,
+      build: function (m, out) {
+        const vlp = ac.createBiquadFilter();
+        vlp.type = 'lowpass'; vlp.frequency.value = 520; vlp.Q.value = 0.7;
+        m.o1 = sysMoverOsc(m, vlp, 'sawtooth', 90, 0, 0.14);
+        m.o2 = sysMoverOsc(m, vlp, 'sawtooth', 103, 9, 0.11);
+        m.o3 = sysMoverOsc(m, vlp, 'sawtooth', 118, -7, 0.09);
+        m.am = sysMoverAM(m, out, 0.70, 2.7, 0.20, 1.9);
+        vlp.connect(m.am.am);
+        m.rr = sysMoverNoise(m, out, 'lowpass', 420, 0.7, 0.34);
+        const far = ac.createGain(); far.gain.value = 0.70;
+        far.connect(out);
+        sysMoverVoiced(m, far, [300, 600, 1200, 2400], 3.0);
+        m.vlp = vlp;
+      },
+      throttle: function (m, k, now) {
+        sysAudioSet(m.vlp.frequency, 440 + 500 * k, now, 1.2);
+        sysAudioSet(m.rr.g.gain, Math.max(0.0001, 0.34 * (0.5 + 0.5 * k)), now, 1.2);
+        sysMoverVoicedSet(m, 0.6 + 0.4 * k, now);
+      } },
+    // ---- AIR (L7, E1 / audio #4) -------------------------------------------
+    // The room tone every film has and this game did not: highpassed noise,
+    // 6 kHz to a ceiling the chapter's openness sets (8–12 kHz), under the
+    // wind's slow AM, at a level you would not name if asked. The master
+    // carried 0.04 % of its energy above 5 kHz in Sydney; the pink-noise
+    // reference for the top two octaves is ~20 %, a film mix 3–8. `k` is the
+    // chapter's openness (sysAIR_K): wide on the ice and the erg, narrow in
+    // the cave.
+    air: { level: 0.025, near: 40, far: 200, bed: true,
+      build: function (m, out) {
+        m.am = sysMoverAM(m, out, 0.80, 0.089, 0.18, 0.031);
+        const n = noiseSrc();
+        const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 6000; hp.Q.value = 0.5;
+        const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 10000; lp.Q.value = 0.5;
+        const g = ac.createGain(); g.gain.value = 1.0;
+        n.connect(hp); hp.connect(lp); lp.connect(g); g.connect(m.am.am);
+        n.start();
+        m.src.push(n);
+        m.rate.push({ p: n.playbackRate, base: n.playbackRate.value, osc: false });
+        m.hi = { n: n, f: lp, g: g };
+      },
+      throttle: function (m, k, now) {
+        sysAudioSet(m.hi.f.frequency, 8000 + 4000 * k, now, 1.5);
+      } },
   };
+  // Which chapters get which bed at the animal, and how open each one's air
+  // is. A row is { kind, amp }; the handles are made once and live on the row.
+  // The roadmap named Rio, Iceland, Antarctica, the Sahara, Göreme, Monaco
+  // and Cali; the nineteen-chapter instrument (qa/l7-e1-still.js, before:
+  // 7/19) added the Quay (−13 dB), Pasto (−23), the Drift (−20), Manly (−11)
+  // and the cave (−25) — a chapter with no bed, or one with a bed the
+  // make-up could not carry alone.
+  const sysBEDS_AT = {
+    rio:       [{ kind: 'sea', amp: 1.0, h: null }, { kind: 'city', amp: 0.7, h: null }],
+    quay:      [{ kind: 'sea', amp: 1.0, h: null }, { kind: 'city', amp: 0.8, h: null }],
+    iceland:   [{ kind: 'wind', amp: 1.0, h: null }],
+    antarctic: [{ kind: 'wind', amp: 1.0, h: null }],
+    sahara:    [{ kind: 'wind', amp: 0.85, h: null }],
+    goreme:    [{ kind: 'wind', amp: 1.0, h: null }],
+    drift:     [{ kind: 'wind', amp: 1.0, h: null }],
+    cave:      [{ kind: 'wind', amp: 1.0, h: null }],
+    manly:     [{ kind: 'wind', amp: 0.9, h: null }],
+    monaco:    [{ kind: 'city', amp: 0.85, h: null }],
+    cali:      [{ kind: 'city', amp: 1.0, h: null }],
+    pasto:     [{ kind: 'city', amp: 0.9, h: null }],
+    venice:    [{ kind: 'city', amp: 0.8, h: null }],   // the Piazzetta under the lap: −12.5 dB at rest with the lap alone, −8.2 at 0.6
+  };
+  const sysAIR_K = {
+    antarctic: 1.0, sahara: 1.0, iceland: 1.0, goreme: 0.9, manly: 0.9, palawan: 0.85, pantanal: 0.8, drift: 0.9,
+    sydney: 0.6, quay: 0.6, rio: 0.6, kyoto: 0.6, cali: 0.6, pasto: 0.6, venice: 0.5, monaco: 0.5, hanoi: 0.5, kowloon: 0.4,
+    cave: 0.25,
+  };
+  const sysAirAt = Object.create(null);   // biome -> the air handle, made once
+  const sysMOVER_BEDS = 4;   // beds' own budget: a bed is three noise nodes and no room slot (L7, E1)
+  /**
+   * Place this chapter's beds at the animal (L7, E1). Called from the mover
+   * tick, before the delivered gains are worked out. Nothing here allocates
+   * after a chapter's first frame: the rows carry their handles.
+   */
+  function sysBedsAtTick(live) {
+    const cp = game.capy && game.capy.position;
+    if (!cp || !live) return;
+    const rows = sysBEDS_AT[live];
+    let windK = 0.5;
+    if (rows) {
+      const W = game.weather;
+      if (W && typeof W.bed === 'function') {
+        const wb = W.bed();
+        const w = wb ? wb.wind : 0;
+        windK = (w === w) ? clamp(w, 0, 1) : 0.5;
+      }
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        if (!r.h) { r.h = sfxMover(r.kind, { key: 'bed:' + live + ':' + r.kind, biome: live }); r.h.amp(r.amp); }
+        r.h.at(cp.x, cp.y + 2.5, cp.z);
+        r.h.set(r.kind === 'wind' ? windK : 0.6);
+      }
+    }
+    let air = sysAirAt[live];
+    if (!air) { air = sysAirAt[live] = sfxMover('air', { key: 'bed:' + live + ':air', biome: live }); air.set(sysAIR_K[live] !== undefined ? sysAIR_K[live] : 0.6); }
+    air.at(cp.x, cp.y + 2.5, cp.z);
+  }
 
   /**
    * ASK FOR A MOVER. Returns a handle that is safe to hold for the life of the
@@ -16075,7 +16781,7 @@ export function createSystems(game) {
       // '' means everywhere; anything else is silent outside its own chapter.
       biome: (opts && opts.biome !== undefined) ? opts.biome
              : ((game.biome && game.biome.current) || ''),
-      src: [], rate: [], bands: null, g: null, pan: null, lp: null,
+      src: [], rate: [], bands: null, g: null, pan: null, lp: null, mk: null,
       want: 0, wantPan: 0, wantBack: 0, wantUp: 0, d: 9999, rateNow: 1,
       parkedT: 0, live: false, dead: false,
     };
@@ -16127,7 +16833,16 @@ export function createSystems(game) {
     m.lp.type = 'lowpass'; m.lp.frequency.value = 20000; m.lp.Q.value = 0.4;
     m.pan = ac.createStereoPanner ? ac.createStereoPanner() : null;
     m.g = ac.createGain(); m.g.gain.value = sysMOVER_PARK;
-    if (m.pan) { m.lp.connect(m.pan); m.pan.connect(m.g); } else m.lp.connect(m.g);
+    // ---- THE MAKE-UP (L7, E1 / audio #7): `level` is meant to be what
+    // arrives, and a recipe of narrow bands at gain 1 is a fraction of a
+    // broadband one at the same number — the lagoon lesson, measured again
+    // for the crowd (Pasto's plaza live at 0.127 and the bus at −46 dBFS),
+    // the colony, the surf and the river. One fixed gain per recipe in the
+    // shared tail, so the audit's `gain` stays the authored delivered
+    // fraction and `m.g` keeps its one writer.
+    m.mk = ac.createGain(); m.mk.gain.value = m.rec.makeup || 1;
+    m.lp.connect(m.mk);
+    if (m.pan) { m.mk.connect(m.pan); m.pan.connect(m.g); } else m.mk.connect(m.g);
     // See note 2: the room is for the things with a transient in them.
     // ---- ...AND HOW MUCH OF IT, BY DISTANCE (L4, audio #6) ---------------
     // The same curve the placed one-shot gets in sfx(): the bus carries
@@ -16152,12 +16867,13 @@ export function createSystems(game) {
       try { m.src[i].disconnect(); } catch (e) {}
     }
     try { if (m.lp) m.lp.disconnect(); } catch (e) {}
+    try { if (m.mk) m.mk.disconnect(); } catch (e) {}
     try { if (m.pan) m.pan.disconnect(); } catch (e) {}
     try { if (m.g) m.g.disconnect(); } catch (e) {}
     try { if (m.dry) m.dry.disconnect(); } catch (e) {}
     try { if (m.send) m.send.disconnect(); } catch (e) {}
     m.src.length = 0; m.rate.length = 0;
-    m.g = null; m.pan = null; m.lp = null; m.bands = null; m.dry = null; m.send = null;
+    m.g = null; m.pan = null; m.lp = null; m.mk = null; m.bands = null; m.dry = null; m.send = null;
     m.live = false; m.parkedT = 0;
   }
   function sysMoverCmp(a, b) { return b.want - a.want; }
@@ -16168,6 +16884,8 @@ export function createSystems(game) {
     const playing = game.state.started && !game.state.paused && !document.hidden && !muted;
     const live = (game.biome && game.biome.current) || '';
     audioEar();
+    // ---- 0. this chapter's beds, at the animal (L7, E1) ------------------
+    if (playing) sysBedsAtTick(live);
     // ---- 1. what each one WOULD deliver, before any graph work ------------
     for (let i = 0; i < sysMovers.length; i++) {
       const m = sysMovers[i];
@@ -16190,9 +16908,15 @@ export function createSystems(game) {
     }
     // ---- 2. the four loudest get a graph ---------------------------------
     sysMovers.sort(sysMoverCmp);
+    // ...the four loudest DISCRETE movers and the four loudest BEDS (L7, E1):
+    // a bed is three noise nodes with no room slot and no Doppler, and an
+    // air bed at 0.025 in Hanoi would otherwise lose its slot to the third
+    // scooter every frame. Two counters over the one sorted list.
+    let nDisc = 0, nBed = 0;
     for (let i = 0; i < sysMovers.length; i++) {
       const m = sysMovers[i];
-      const on = i < sysMOVER_MAX && m.want > sysSFX_CULL;
+      const on = (m.bed ? nBed < sysMOVER_BEDS : nDisc < sysMOVER_MAX) && m.want > sysSFX_CULL;
+      if (on) { if (m.bed) nBed++; else nDisc++; }
       if (on && !m.g) { try { sysMoverBuild(m); } catch (e) { sysMoverTear(m); continue; } }
       m.live = on && !!m.g;
       if (!m.g) continue;
@@ -16361,6 +17085,18 @@ export function createSystems(game) {
   // Separate from musChaseT, which is how long the chase lasts — this is the
   // moment it began, and it is over in about a second and a half.
   let musChaseHit = 0;
+  // ---- THE MIX, INVERTED (L7, E1) ------------------------------------------
+  // `musWorldEnv`: the world's transient envelope (see sysMUS_SIDE), bumped
+  // by sfx() and decayed per frame in the block that reads it. `musSideG`: the
+  // pad's sidechain gain, in series after musPad — its one writer is the
+  // per-frame line beside the chase decay. `musFlinch`: a startle's 40 ms on
+  // the pad filter (audio #1) — a startle is no longer scored as a chase.
+  // `musArrivePend`: an arrival that could not fire (the context still
+  // suspended on Begin, or a marquee still lifting) waits here for its moment
+  // instead of being dropped (audio #9); `musArrivePendT` is how long it has.
+  let musWorldEnv = 0, musSideG = null, musSideLast = 1, musFlinch = 0;
+  let musArrivePend = false, musArrivePendT = 0;
+  const sysMUS_ARRIVE_WAIT = 12;   // s an arrival may wait for the lift to fall
   // ---- THE CHASE, SCORED (L4, F3 / audio #2) -----------------------------
   // Measured (qa/l4r-audio-states.js, before): a chase made the score
   // DARKER — the pad lost thirty per cent, the filter opened 780 Hz on a bed
@@ -16403,6 +17139,11 @@ export function createSystems(game) {
   const sysMUS_CHASE_BASS = 0.05;
   const sysMUS_CHASE_DBL = 0.6;     // intensity over which the lead is doubled up
   let musChaseBeatAt = 0, musChaseBeatN = 0, musChaseHits = 0, musChaseDbl = 0;
+  // THE BANDS' STROKES, COUNTED (L7, E2): every stroke the six bar writers
+  // schedule. A band's chase is a change of material, not a louder bar —
+  // Rio measured +1.0 dB with the velocity term alone — so what the states
+  // probe reads is density: this over the window's bars, chase against walk.
+  let musBandHits = 0;
   // THE SLEEP (L6, E3): 0 awake, 1 gone. Integrated per frame from sysNapNow
   // with the two time constants above, read by the one writer, the pluck
   // scheduler and the beds. `musSleepOn` is the latch the wake fires from.
@@ -17068,6 +17809,15 @@ export function createSystems(game) {
     // twice. Kept as a row so `gap`/`vel`/`pan` still live in the one table.
     arrive: { deg: [0, 1, 2, 1], dur: [2, 1, 1, 3],
               gap: 0.19, oct: 0, vel: 0.70, pan: 0.18, theme: true },
+    // ---- THE CUES (L7, E2 / audio 8) -------------------------------------
+    // Two more figures on the same lead, same fold, same key by construction.
+    //   open  — ONE note, the chord's fifth an octave up: the window is open.
+    //           A window is a fact, not a sentence, so it is one note.
+    //   armed — the tune's first two notes (`themeN`): the marquee is ready
+    //           and this is the phrase it will finish with when you take it.
+    open:   { deg: [4],          gap: 0.200, oct: 12, vel: 0.95, pan: 0.10 },
+    armed:  { deg: [0, 1], dur: [2, 1],
+              gap: 0.19, oct: 0, vel: 0.80, pan: 0.18, theme: true, themeN: 2 },
   };
   let musStingAt = 0;
   // THE TUNE'S COUNTERS (L6, F3), for musAudit: arrivals that said it,
@@ -17276,13 +18026,16 @@ export function createSystems(game) {
     if (s.theme) {
       const base = musThemeBase(s.oct + (ph && ph.oct ? ph.oct : 0));
       const gap = s.gap * (ph && ph.gap > 0 ? ph.gap : 1);
-      for (let i = 0; i < sysMUS_THEME.length; i++) {
+      // `themeN` (L7, E2): the first N notes only — the armed cue quotes the
+      // tune, it does not say it, and it is not counted as an arrival
+      const nN = s.themeN > 0 ? Math.min(s.themeN, sysMUS_THEME.length) : sysMUS_THEME.length;
+      for (let i = 0; i < nN; i++) {
         const step = gap * sysMUS_THEME_DUR[i];
         musLiftNote(inst, when + t, base + musThemeOff(i), (i % 2 ? s.pan : -s.pan), 0.115 * s.vel * g, step);
         t += step;
       }
-      musThemeSaid++;
-      return sysMUS_THEME.length;
+      if (!(s.themeN > 0)) musThemeSaid++;
+      return nN;
     }
     for (let i = 0; i < s.deg.length; i++) {
       const d = s.deg[i];
@@ -17580,7 +18333,14 @@ export function createSystems(game) {
   // src reads it; the harness does. See the note at its call site.
   let musSecondN = 0;
   function musVel(v) {
-    return v * musSkyVel * (1 + (Math.random() + Math.random() - 1) * sysMUS_VEL_H);
+    const out = v * musSkyVel * (1 + (Math.random() + Math.random() - 1) * sysMUS_VEL_H);
+    // ---- THE RAMP'S TARGET IS GUARDED HERE (L7, E1) ------------------------
+    // Every struck note's gain ramp takes its target from this one function,
+    // and `exponentialRampToValueAtTime` throws on a non-finite or a zero.
+    // One NaN upstream (a NaN body → a NaN flow → intensity; a NaN sky term)
+    // reached ~200 ramp sites through here and stood the score down for the
+    // run. A bad velocity is a silent note, not a dead scheduler.
+    return (out === out && out !== Infinity) ? Math.max(1e-4, out) : 1e-4;
   }
 
   // =========================================================================
@@ -18396,6 +19156,262 @@ export function createSystems(game) {
     ns.start(when + 0.004); ns.stop(when + 0.3);
   }
 
+  // ---- THE CHASE, IN THIS PALETTE'S HANDS (L7, E2 / audio 3) --------------
+  //
+  // Two drums the table did not have, and one dispatcher. A SHIME-DAIKO is a
+  // small rope-tensioned drum tuned so high it is nearly a click — a short
+  // sine at 380 Hz under a bright noise slap with almost no tail; a TAIKO is
+  // the opposite thing, a sine that starts at twice its pitch and falls to
+  // 70 Hz in sixty milliseconds, and rings for half a second with a slap of
+  // hide over it. Both on the drum bus, like the bendir and the clap.
+  function musShime(when, vel) {
+    const o = ac.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(760, when);
+    o.frequency.exponentialRampToValueAtTime(380, when + 0.012);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0004, vel * 0.55), when + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.07);
+    o.connect(g); g.connect(musDrum); g.connect(musSend);
+    o.start(when); o.stop(when + 0.1);
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = rand(2600, 3400); bp.Q.value = 1.3;
+    const ng = ac.createGain();
+    env(ng, when, vel * 0.7, 0.002, rand(0.03, 0.05));
+    ns.connect(bp); bp.connect(ng); ng.connect(musDrum); ng.connect(musSend);
+    ns.start(when); ns.stop(when + 0.09);
+  }
+  function musTaiko(when, vel) {
+    const hz = rand(66, 76);
+    const o = ac.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(hz * 2.6, when);
+    o.frequency.exponentialRampToValueAtTime(hz, when + 0.06);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0004, vel), when + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + rand(0.42, 0.6));
+    o.connect(g); g.connect(musDrum); g.connect(musSend);
+    o.start(when); o.stop(when + 0.75);
+    // the hide: a broad slap, darker than the bendir's snare
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = rand(700, 1100); bp.Q.value = 0.8;
+    const ng = ac.createGain();
+    env(ng, when + 0.002, vel * 0.35, 0.003, rand(0.05, 0.09));
+    ns.connect(bp); bp.connect(ng); ng.connect(musDrum); ng.connect(musSend);
+    ns.start(when + 0.002); ns.stop(when + 0.2);
+  }
+  /**
+   * ONE BEAT OF THE CHASE, on the instrument the palette's `chase` row names.
+   * `n` is the beat index since the chase began (four to a bar), `beat` the
+   * beat length, `lvl` the velocity the pulse has already worked out (see the
+   * note on sysMUS_CHASE_VEL at the call). Every case counts what it schedules
+   * into musChaseHits, because that number is the instrument the states probe
+   * reads. The pitched cases read the live chord the way the second voice does.
+   */
+  function musChaseStroke(inst, t, n, beat, lvl) {
+    const b4 = n % 4, bar = Math.floor(n / 4);
+    const chord = musCurChord;
+    const root = musPal.roots[musIdx];
+    switch (inst) {
+      case 'taiko': {
+        // the taiko on one and three, the shime on the rest of the eighths,
+        // and a shime roll into every other bar — a matsuri, not a march
+        // 0.17/0.13 measured +2.5 dB over rest (l7-e2-states, second run)
+        // against Iceland's +4.0 on the tremolo: the taiko is a 70 Hz sine
+        // and the pad's mids outweigh it; a third more on both drums.
+        if (b4 === 0 || b4 === 2) { musTaiko(t, musVel((b4 ? 0.17 : 0.23) * lvl)); musChaseHits++; }
+        musShime(t + (b4 === 0 || b4 === 2 ? beat * 0.5 : 0), musVel(0.17 * lvl)); musChaseHits++;
+        if (b4 === 1 || b4 === 3) { musShime(t + beat * 0.5, musVel(0.11 * lvl)); musChaseHits++; }
+        if (bar % 2 === 1 && b4 === 3) {
+          for (let k = 0; k < 3; k++) { musShime(t + beat * (0.55 + k * 0.15), musVel(0.05 * lvl)); musChaseHits++; }
+        }
+        return;
+      }
+      case 'tremolo': {
+        // a bowed tremolo on the bass root: two short strokes a beat, the one
+        // on the beat harder, an octave up on the third beat of odd bars
+        const m = root + (bar % 2 === 1 && b4 === 2 ? 12 : 0);
+        musCello(t, m, musVel(1.35 * lvl), beat * 0.52); musChaseHits++;
+        musCello(t + beat * 0.5, m, musVel(0.85 * lvl), beat * 0.5); musChaseHits++;
+        return;
+      }
+      case 'kulintang': {
+        // an eight-note ostinato over the chord tones, two to a beat, the
+        // downbeat on the lowest gong and the whole thing an octave up
+        if (!chord) return;
+        for (let k = 0; k < 2; k++) {
+          const step = (b4 * 2 + k) % 8;
+          const idx = sysMUS_CHASE_KUL[step] % chord.length;
+          const m = musFold(chord[idx] + 12, 67, 91);
+          musKulintang(t + k * beat * 0.5, m, (step % 3 - 1) * 0.35,
+                       musVel((step === 0 ? 0.105 : 0.07) * lvl)); musChaseHits++;
+        }
+        return;
+      }
+      case 'drip': {
+        // the plucks in double time, two octaves up, seven in ten — water
+        // falling faster than it did, on the same string
+        if (!chord) return;
+        for (let k = 0; k < 2; k++) {
+          if (k === 1 && Math.random() > 0.7) continue;
+          const m = musFold(chord[randInt(0, chord.length - 1)] + 24, 72, 96);
+          musPluck(t + k * beat * 0.5, m, rand(-0.7, 0.7), musVel((k ? 0.045 : 0.068) * lvl)); musChaseHits++;
+        }
+        return;
+      }
+      case 'songloan': {
+        // the clapper on every eighth, accented on the beat, a triplet into
+        // the bar line every other bar
+        musSongLoan(t, musVel(3.4 * lvl)); musChaseHits++;
+        musSongLoan(t + beat * 0.5, musVel(2.0 * lvl)); musChaseHits++;
+        if (bar % 2 === 1 && b4 === 3) { musSongLoan(t + beat * 0.67, musVel(1.2 * lvl)); musSongLoan(t + beat * 0.84, musVel(1.2 * lvl)); musChaseHits += 2; }
+        return;
+      }
+      case 'caipira': {
+        // a rasgueado: down through the chord on one and three, up through
+        // two of it on the off-beats, the courses twelve milliseconds apart
+        if (!chord) return;
+        if (b4 === 0 || b4 === 2) {
+          for (let k = 0; k < chord.length; k++) {
+            musCaipira(t + k * 0.012, musFold(chord[k], 52, 76), (k - 2) * 0.2, musVel(0.075 * lvl)); musChaseHits++;
+          }
+        } else {
+          for (let k = 0; k < 2; k++) {
+            musCaipira(t + beat * 0.5 + k * 0.012, musFold(chord[chord.length - 1 - k], 52, 76), (1 - k) * 0.3, musVel(0.055 * lvl)); musChaseHits++;
+          }
+        }
+        return;
+      }
+      default: {
+        // the bendir on one and three, the clap on two and four, and a second
+        // clap on the and-of-four half the time — the L4 pulse, verbatim
+        if (b4 === 0 || b4 === 2) { musBendir(t, musVel((b4 ? 0.09 : 0.11) * lvl)); musChaseHits++; }
+        else { musClap(t, musVel(0.085 * lvl)); musChaseHits++; if (bar % 2 && b4 === 3 && Math.random() < 0.5) musClap(t + beat * 0.5, musVel(0.05 * lvl)); }
+        return;
+      }
+    }
+  }
+  // the kulintang ostinato's chord-tone indices, one per eighth of a bar
+  const sysMUS_CHASE_KUL = [0, 2, 1, 3, 0, 2, 4, 2];
+
+  // ===========================================================================
+  // THE CUES (L7, E2 / audio 8): the ear learns it before the paper says it
+  //
+  // The cue census (l7r-audio-border) fired the eight things the HUD tells you
+  // with a number and found one of them had a sound before the text (the
+  // denial's snort — and even that was the animal, not the score). A window
+  // opening was a gull at 0.44 or a line of text; a countdown was a countdown.
+  // Four cues on the score's grid, in key by construction like the stings:
+  //
+  //   the TICK    the marquee's last ten seconds, once a second, on the
+  //               palette's own percussion (musCuePerc) — through musSnap, so
+  //               on a band it lands on the quaver grid. Only inside
+  //               sysMUS_CUE_TICK_R of the marquee point: a clock you can hear
+  //               from the other end of the chapter is an alarm.
+  //   the OPEN    one note on the lead (sysMUS_STING.open) as `nextIn` crosses
+  //               to under a second, inside sysMUS_CUE_OPEN_R.
+  //   the ARMED   the tune's first two notes (sysMUS_STING.armed), once per
+  //               marquee, the first time the player is at the point with
+  //               the window open — the phrase the marquee will finish.
+  //   the DENIAL  a flat second on the bass under the snort (musCueDenied):
+  //               the one interval the harmony tables never use, half a
+  //               second, on `npc:caught`.
+  //   the EXIT    the destination's signature rung at −12 dB on entering the
+  //               exit zone (ambSig, in the home block) — the place heard
+  //               before it is seen. F2's J-cut owns the crossing itself.
+  //
+  // The marquee point is asked at most every two seconds and kept as two
+  // numbers: sysMarqueePoint() allocates, and this runs on the score's timer.
+  // ===========================================================================
+  const sysMUS_CUE_TICK_R = 60;    // m from the marquee point the tick is audible
+  const sysMUS_CUE_OPEN_R = 150;   // ...and the window's note
+  const sysMUS_CUE_ARM_R  = 12;    // ...and the arm, which is being AT it (sysWHY_R + 2)
+  let musCueSec = -1, musCueOpen = false, musCueArmedId = '', musCueId = '';
+  let musCueMpAt = -99, musCueMpX = 0, musCueMpZ = 0, musCueMpOk = false;
+  let musCueTickN = 0, musCueOpenN = 0, musCueArmedN = 0, musCueDeniedN = 0, musCueExitN = 0;
+  /** One stroke on whatever this palette keeps time with, at `k` of a chase stroke. */
+  function musCuePerc(t, k) {
+    const vel = musVel(0.11 * k * sysMUS_CHASE_VEL);
+    if (musPal.band) {
+      switch (musPal.band) {
+        case 'salsa':   musClave(t, vel * 4); return;
+        case 'samba':   musTamborim(t, vel * 4); return;
+        case 'gnawa':   musQraqeb(t, vel * 4); return;
+        case 'hk':      musHkHat(t, vel * 4, false); return;
+        case 'bond':    musRide(t, vel * 4); return;
+        default:        musCello(t, musPal.roots[musIdx], vel * 4, 0.16); return;
+      }
+    }
+    const inst = (musPal.chase || sysMUS_CHASE_DEF).inst;
+    const chord = musCurChord;
+    switch (inst) {
+      case 'taiko':     musShime(t, vel); return;
+      case 'tremolo':   musCello(t, musPal.roots[musIdx] + 12, vel * 4, 0.16); return;
+      case 'kulintang': if (chord) musKulintang(t, musFold(chord[0] + 12, 67, 91), 0, vel * 0.5); return;
+      case 'drip':      if (chord) musPluck(t, musFold(chord[0] + 24, 72, 96), 0, vel * 0.3); return;
+      case 'songloan':  musSongLoan(t, vel * 12); return;
+      case 'caipira':   if (chord) musCaipira(t, musFold(chord[0], 52, 76), 0, vel * 0.35); return;
+      default:          musBendir(t, vel * 0.8); return;
+    }
+  }
+  /** The flat second: root + 1 on the bass, half a second, into musBassGain. */
+  function musCueDenied() {
+    if (!ac || !musVol || ac.state !== 'running' || musMuted || !musBassGain || !musPal) return;
+    const now = ac.currentTime;
+    const when = musSnap(now + 0.03);
+    const hz = sysMidiHz(musPal.roots[musIdx] + 1);
+    for (let k = 0; k < 2; k++) {
+      const o = ac.createOscillator(); o.type = k ? 'triangle' : 'sine';
+      o.frequency.value = hz * (k ? 2 : 1);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.linearRampToValueAtTime(k ? 0.12 : 0.5, when + 0.03);
+      g.gain.setValueAtTime(k ? 0.12 : 0.5, when + 0.32);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + 0.55);
+      o.connect(g); g.connect(musBassGain);
+      o.start(when); o.stop(when + 0.6);
+    }
+    musCueDeniedN++;
+  }
+  /** The clock, the window and the arm — called from musTickBody. */
+  function musCueTick(now) {
+    if (!marqId || (taskRec[marqId] && taskRec[marqId].done) || !game.capy || !game.capy.position || wowLiveOn) {
+      musCueSec = -1; musCueOpen = false; return;
+    }
+    if (marqId !== musCueId) { musCueId = marqId; musCueSec = -1; musCueOpen = false; musCueMpAt = -99; }
+    if (now - musCueMpAt > 2) {
+      musCueMpAt = now;
+      const mp = sysMarqueePoint();
+      musCueMpOk = !!mp;
+      if (mp) { musCueMpX = mp.x; musCueMpZ = mp.z; }
+    }
+    if (!musCueMpOk) return;
+    const p = game.capy.position;
+    const dx = p.x - musCueMpX, dz = p.z - musCueMpZ;
+    const d2 = dx * dx + dz * dz;
+    const nx = todoNextIn(marqId);
+    // the window: open is `nextIn` under a second; a chapter with no clock
+    // (nx < 0) has its window open whenever you are at the point
+    const open = nx >= 0 ? nx < 1 : d2 < sysMUS_CUE_ARM_R * sysMUS_CUE_ARM_R;
+    if (nx > 0 && nx <= 10) {
+      const s = Math.ceil(nx);
+      if (s !== musCueSec) {
+        musCueSec = s;
+        if (d2 < sysMUS_CUE_TICK_R * sysMUS_CUE_TICK_R) { musCuePerc(musSnap(now + 0.06), s <= 3 ? 1.0 : 0.7); musCueTickN++; }
+      }
+    } else musCueSec = -1;
+    if (open && !musCueOpen && nx >= 0 && d2 < sysMUS_CUE_OPEN_R * sysMUS_CUE_OPEN_R) {
+      if (musSting('open', 1)) musCueOpenN++;
+    }
+    musCueOpen = open;
+    if (open && musCueArmedId !== marqId && d2 < sysMUS_CUE_ARM_R * sysMUS_CUE_ARM_R) {
+      musCueArmedId = marqId;
+      if (musSting('armed', 1)) musCueArmedN++;
+    }
+  }
+
   /**
    * THE VIOLA CAIPIRA. A ten-string steel guitar in five COURSES, and the
    * courses are the instrument: the top three are unisons and the bottom two are
@@ -18807,19 +19823,35 @@ export function createSystems(game) {
     const lvl = 0.80 + musIntensity * 0.30;
     const root = musPal.roots[musIdx];
     const nextRoot = musPal.roots[musPal.next[musIdx][0]];
+    // ---- THE MAMBO (L7, E2 / audio 3) -----------------------------------
+    // A chase on this palette was +25 % on every stroke and nothing else,
+    // which a bateria and a salsa band both measured as one decibel. A band
+    // does not play harder when something happens; it goes to the next
+    // SECTION. Here that is the mambo: the montuno up an octave, the campana
+    // on every eighth instead of the quarters, and the brass on every bar.
+    // The clave, the congas and the tumbao are what they were — the section
+    // changes over them, which is what makes it a section and not a fill.
+    const chase = musChaseT > 0;
 
     // --- clave. Absolute eighths over the two-bar cycle, so this bar takes the
     //     strokes that fall inside its own eight.
     for (let i = 0; i < sysMUS_CLAVE.length; i++) {
       const e = sysMUS_CLAVE[i] - half * sysMUS_SALSA_BAR;
       if (e >= 0 && e < sysMUS_SALSA_BAR) {
-        musClave(musFeel(t0 + e * E, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b), musVel(lvl));
+        musClave(musFeel(t0 + e * E, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b), musVel(lvl)); musBandHits++;
       }
     }
     // --- congas
     for (let i = 0; i < sysMUS_CONGA.length; i++) {
       const c = sysMUS_CONGA[i];
-      musConga(musFeel(t0 + c.t * E, sysMUS_F_HAND.s, sysMUS_F_HAND.b), c.k, musVel(c.v * lvl));
+      musConga(musFeel(t0 + c.t * E, sysMUS_F_HAND.s, sysMUS_F_HAND.b), c.k, musVel(c.v * lvl)); musBandHits++;
+    }
+    // --- ...and in the mambo the timbalero comes off the bell onto the
+    //     shell: the cáscara, on the off-eighths, on the clave's wood
+    if (chase) {
+      for (let e = 1; e < sysMUS_SALSA_BAR; e += 2) {
+        musClave(musFeel(t0 + e * E, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b), musVel(0.42 * lvl)); musBandHits++;
+      }
     }
     // --- campana on the quarters, accented on 1 and 3
     // ---- ...EXCEPT ONE BAR IN EIGHT (F3b) ---------------------------------
@@ -18843,9 +19875,9 @@ export function createSystems(game) {
     // `salsa-dance` is scored on `game.music.off()` (capybara.js:4015) and a
     // break that moved the clock would fail the chapter's own task.
     if (!brk)
-    for (let e = 0; e < sysMUS_SALSA_BAR; e += 2) {
+    for (let e = 0; e < sysMUS_SALSA_BAR; e += (chase ? 1 : 2)) {
       musCampana(musFeel(t0 + e * E, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b),
-                 musVel((e % 4 === 0 ? 0.9 : 0.55) * lvl));
+                 musVel((e % 4 === 0 ? 0.9 : e % 2 === 0 ? 0.55 : 0.42) * lvl)); musBandHits++;
     }
     // --- tumbao. The beat-4 note anticipates the next chord, which is the
     //     entire feel of a salsa bassline — and it stops with the campana.
@@ -18854,20 +19886,24 @@ export function createSystems(game) {
       const b = sysMUS_TUMBAO[i];
       const useNext = b.a && half === 1;
       musTumbaoNote(musFeel(t0 + b.t * E, sysMUS_F_BASS.s, sysMUS_F_BASS.b),
-                    (useNext ? nextRoot : root) + (b.a ? 12 : 0), musVel(b.v * lvl));
+                    (useNext ? nextRoot : root) + (b.a ? 12 : 0), musVel(b.v * lvl)); musBandHits++;
+      // the mambo's pick-up: the and-of-four into the next bar, a fifth up
+      if (chase && b.a) { musTumbaoNote(musFeel(t0 + 7 * E, sysMUS_F_BASS.s, sysMUS_F_BASS.b), (useNext ? nextRoot : root) + 7, musVel(0.6 * lvl)); musBandHits++; }
     }
-    // --- montuno guajeo, in octaves off the chord tones
+    // --- montuno guajeo, in octaves off the chord tones — an octave higher
+    //     in the mambo, which is where a pianist goes when the section does
     for (let i = 0; i < sysMUS_MONTUNO.length; i++) {
       const m = sysMUS_MONTUNO[i];
       musMontunoNote(musFeel(t0 + m.t * E, sysMUS_F_COMP.s, sysMUS_F_COMP.b),
-                     chord[m.d] + 12, musVel(m.v * lvl * 0.9));
+                     chord[m.d] + (chase ? 24 : 12), musVel(m.v * lvl * 0.9)); musBandHits++;
     }
     // --- brass: one stab per cycle, on the last clave stroke, and only when
     //     something is actually going on. Sparse is the point — a section that
-    //     plays every bar is a fanfare, not a band.
-    if (half === 1 && (musIntensity > 0.25 || Math.random() < 0.22)) {
-      musBrassStab(musFeel(t0 + 6 * E, sysMUS_F_LEAD.s, sysMUS_F_LEAD.b), chord,
-                   musVel((0.55 + musIntensity * 0.6) * lvl));
+    //     plays every bar is a fanfare, not a band... until the mambo, where
+    //     the section plays every bar, because that is what a mambo is.
+    if (chase || (half === 1 && (musIntensity > 0.25 || Math.random() < 0.22))) {
+      musBrassStab(musFeel(t0 + (chase && half === 0 ? 3 : 6) * E, sysMUS_F_LEAD.s, sysMUS_F_LEAD.b), chord,
+                   musVel((0.55 + musIntensity * 0.6) * lvl)); musBandHits++;
     }
   }
 
@@ -18880,6 +19916,30 @@ export function createSystems(game) {
     const lvl = 0.80 + musIntensity * 0.30;
     const root = musPal.roots[musIdx];
     const nextRoot = musPal.roots[musPal.next[musIdx][0]];
+    // ---- THE BREAK IS THE CHASE (L7, E2 / audio 3) ----------------------
+    // Rio measured still −24.2 / walk −24.0 / chase −23.2 dBFS: the bateria
+    // played the same pattern at the same tempo one decibel louder while a
+    // man chased you down the steps. What a bateria does when something
+    // happens is a BREAK — the surdo drops out, the caixa goes to a roll,
+    // the cuica talks on every bar — and the paradinha below (`brk`) is
+    // already the mechanism, so a chase is that, for as long as it lasts.
+    // ...FOR THE FIRST BAR AND A HALF. Measured with the surdo out for the
+    // whole chase (l7-e2-states, first cut): the drum stem fell 20 dB and the
+    // chase read −6.5 dB under rest — the surdo IS the drum bus, and a break
+    // that lasts seven seconds is not a break, it is the section leaving.
+    // So the paradinha opens the chase (`early`: the first ~1.6 s of the
+    // 7 s tail, and again each time a second person joins and re-latches
+    // it) and then the bateria comes back in HOT: the surdo open on the
+    // "and"s as well as the two, the caixa still rolling, the cuica on every
+    // bar — which is what a bateria does after a break. The bar still
+    // marches: `musBarAt` and `musBeatLen` are not touched, and rio.js's
+    // floor is scored against that clock.
+    // `musChaseHit` is set to 1 only when a chase BEGINS (npc:chase, latched)
+    // and decays at 1.6/s, so `early` is the first six tenths of a second of
+    // a chase and not of every re-latch — one bar's paradinha, once.
+    const chase = musChaseT > 0;
+    const early = chase && musChaseHit > 0;
+    const out = brk || early;
 
     // --- the surdo. The chapter, in two strokes.
     // ---- ...EXCEPT ONE BAR IN SIXTEEN (F3) ------------------------------
@@ -18898,48 +19958,66 @@ export function createSystems(game) {
     // untouched, so `game.music.beats()` goes on ticking through it. Rio's
     // whole floor is scored against that clock and the samba is in 2/4 on the
     // two; a break that moved the beat would break the chapter's marquee.
-    if (!brk)
+    if (!out)
     for (let i = 0; i < sysMUS_SURDO.length; i++) {
       const u = sysMUS_SURDO[i];
-      musSurdo(musFeel(t0 + u.t * S, sysMUS_F_KICK.s, sysMUS_F_KICK.b), u.k, musVel(u.v * lvl));
+      musSurdo(musFeel(t0 + u.t * S, sysMUS_F_KICK.s, sysMUS_F_KICK.b), u.k, musVel(u.v * lvl)); musBandHits++;
+      // the virada: after the break the surdo answers itself on the "and"
+      if (chase) { musSurdo(musFeel(t0 + (u.t + 2) * S, sysMUS_F_KICK.s, sysMUS_F_KICK.b), 1, musVel(0.72 * lvl)); musBandHits++; }
     }
-    // --- caixa, every sixteenth
+    // --- caixa, every sixteenth — and in the break, every thirty-second: the
+    //     roll, with the accents where they were and the off-strokes under
     for (let e = 0; e < sysMUS_SAMBA_BAR; e++) {
       musCaixa(musFeel(t0 + e * S, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b),
-               musVel(sysMUS_CAIXA[e] * lvl));
+               musVel(sysMUS_CAIXA[e] * lvl)); musBandHits++;
+      if (chase) {
+        musCaixa(musFeel(t0 + (e + 0.5) * S, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b),
+                 musVel(sysMUS_CAIXA[e] * 0.6 * lvl)); musBandHits++;
+      }
     }
-    // --- tamborim, the two-bar teleco-teco
+    // --- tamborim, the two-bar teleco-teco — and after the break the second
+    //     tamborim comes in with the OTHER half of it, so both bars carry both
     const tp = sysMUS_TAMB[half];
     for (let i = 0; i < tp.length; i++) {
       musTamborim(musFeel(t0 + tp[i] * S, sysMUS_F_HAND.s, sysMUS_F_HAND.b),
-                  musVel((i === 0 ? 0.9 : 0.7) * lvl));
+                  musVel((i === 0 ? 0.9 : 0.7) * lvl)); musBandHits++;
+    }
+    if (chase && !early) {
+      const tq = sysMUS_TAMB[1 - half];
+      for (let i = 0; i < tq.length; i++) {
+        if (tp.indexOf(tq[i]) >= 0) continue;
+        musTamborim(musFeel(t0 + tq[i] * S, sysMUS_F_HAND.s, sysMUS_F_HAND.b), musVel(0.55 * lvl)); musBandHits++;
+      }
     }
     // --- agogo
     for (let i = 0; i < sysMUS_AGOGO.length; i++) {
       const a = sysMUS_AGOGO[i];
-      musAgogo(musFeel(t0 + a.t * S, sysMUS_F_HAND.s, sysMUS_F_HAND.b), a.h, musVel(a.v * lvl));
+      musAgogo(musFeel(t0 + a.t * S, sysMUS_F_HAND.s, sysMUS_F_HAND.b), a.h, musVel(a.v * lvl)); musBandHits++;
     }
     // --- bass, with the surdo — and it stops with the surdo (see `brk`)
-    if (!brk)
+    if (!out)
     for (let i = 0; i < sysMUS_SAMBA_BASS.length; i++) {
       const b = sysMUS_SAMBA_BASS[i];
       const useNext = b.a && half === 1;
       musSambaBassNote(musFeel(t0 + b.t * S, sysMUS_F_BASS.s, sysMUS_F_BASS.b),
-                       useNext ? nextRoot : root, musVel(b.v * lvl));
+                       useNext ? nextRoot : root, musVel(b.v * lvl)); musBandHits++;
     }
     // --- cavaquinho, off the beat
     for (let i = 0; i < sysMUS_CAVACO.length; i++) {
       const c = sysMUS_CAVACO[i];
       musCavaco(musFeel(t0 + c.t * S, sysMUS_F_COMP.s, sysMUS_F_COMP.b),
-                chord, musVel(c.v * lvl * 0.9));
+                chord, musVel(c.v * lvl * 0.9)); musBandHits++;
     }
     // --- the cuica, sparingly. It is a voice, and a voice that talks over every
-    //     bar stops being funny by the second one.
-    if (half === 1 && (musIntensity > 0.3 || Math.random() < 0.3)) {
+    //     bar stops being funny by the second one... except in the break, where
+    //     it is the only voice left with a pitch and it says so on every bar.
+    if (chase || (half === 1 && (musIntensity > 0.3 || Math.random() < 0.3))) {
       musCuica(musFeel(t0 + 6 * S, sysMUS_F_LEAD.s, sysMUS_F_LEAD.b),
-               musVel((0.6 + musIntensity * 0.5) * lvl), 1);
+               musVel((0.6 + musIntensity * 0.5) * lvl), half); musBandHits++;
+      // ...and it answers itself on the two, the other way up
+      if (chase && !early) { musCuica(musFeel(t0 + 2 * S, sysMUS_F_LEAD.s, sysMUS_F_LEAD.b), musVel(0.5 * lvl), 1 - half); musBandHits++; }
     } else if (half === 0 && Math.random() < 0.12) {
-      musCuica(musFeel(t0 + 2 * S, sysMUS_F_LEAD.s, sysMUS_F_LEAD.b), musVel(0.45 * lvl), 0);
+      musCuica(musFeel(t0 + 2 * S, sysMUS_F_LEAD.s, sysMUS_F_LEAD.b), musVel(0.45 * lvl), 0); musBandHits++;
     }
   }
 
@@ -19423,6 +20501,11 @@ export function createSystems(game) {
     const heat = musBondHeat;
     const lvl = (0.72 + musIntensity * 0.30) * (0.80 + heat * 0.34);
     const root = musPal.roots[musIdx];
+    // ---- THE STABS (L7, E2 / audio 3): a chase on this palette is the brass
+    // going from a line every eight bars to a STAB on two and four of every
+    // bar — the whole chord, short — over the riff, and the ride doubled.
+    // It is the section the idiom keeps for exactly this.
+    const chase = musChaseT > 0;
 
     // --- the riff, once a bar, on the guitar.
     // IT USED TO SAY `half < 2` AND IT PLAYED THE SAME BAR TWICE. The offset
@@ -19450,36 +20533,47 @@ export function createSystems(game) {
       const r = sysMUS_BOND_RIFF[i];
       musTwang(musFeel(t0 + r.t * S, sysMUS_F_COMP.s, sysMUS_F_COMP.b),
                root + 24 + r.d, ((i % 3) - 1) * 0.22,
-               musVel(r.v * lvl * 1.65), heat > 0.5 ? r.trem + 1 : r.trem);
+               musVel(r.v * lvl * 1.65), heat > 0.5 ? r.trem + 1 : r.trem); musBandHits++;
     }
     // --- the upright
     for (let i = 0; i < sysMUS_BOND_BASS.length; i++) {
       const b = sysMUS_BOND_BASS[i];
       musUpright(musFeel(t0 + b.t * S, sysMUS_F_BASS.s, sysMUS_F_BASS.b),
-                 root + b.d, musVel(b.v * lvl));
+                 root + b.d, musVel(b.v * lvl)); musBandHits++;
       // the chromatic approach into the next bar, which is the whole feel
       if (b.t === 12 && Math.random() < 0.55 + heat * 0.3) {
         musUpright(musFeel(t0 + 14 * S, sysMUS_F_BASS.s, sysMUS_F_BASS.b),
-                   root + 11, musVel(0.52 * lvl));
+                   root + 11, musVel(0.52 * lvl)); musBandHits++;
       }
     }
     // --- the ride, and the brushes under it
     for (let i = 0; i < sysMUS_BOND_RIDE.length; i++) {
       const r = sysMUS_BOND_RIDE[i];
-      musRide(musFeel(t0 + r.t * S, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b), musVel(r.v * lvl));
+      musRide(musFeel(t0 + r.t * S, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b), musVel(r.v * lvl)); musBandHits++;
+      // the chase doubles the ride: the skip on every beat, not two and four
+      if (chase && (r.t === 0 || r.t === 8)) { musRide(musFeel(t0 + (r.t + 3) * S, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b), musVel(0.44 * lvl)); musBandHits++; }
     }
     const FB = sysMUS_F_HAND;
     musBrush(musFeel(t0 + 4 * S, FB.s, FB.b), musVel(0.9 * lvl), false);
     musBrush(musFeel(t0 + 12 * S, FB.s, FB.b), musVel(0.9 * lvl), false);
     musBrush(musFeel(t0, FB.s, FB.b), musVel(0.7 * lvl), true);
-    if (heat > 0.45) {
+    musBandHits += 3;
+    if (heat > 0.45 || chase) {
       musBrush(musFeel(t0 + 8 * S, FB.s, FB.b), musVel(0.6 * lvl), true);
       musBrush(musFeel(t0 + 6 * S, FB.s, FB.b), musVel(0.5 * lvl), false);
+      musBandHits += 2;
+    }
+    // --- the stabs (L7, E2): the chord on two and four, short, every bar
+    if (chase) {
+      for (let q = 4; q < 16; q += 8) {
+        const st = musFeel(t0 + q * S, sysMUS_F_LEAD.s, sysMUS_F_LEAD.b);
+        for (let i = 1; i < chord.length; i++) { musBondHorn(st, chord[i] + 12, musVel(0.42 * lvl)); musBandHits++; }
+      }
     }
     // --- and the horns, which are the reason for all of the above
     let bondHornT = 0;
     const every = heat > 0.5 ? 4 : 8;
-    if (bar % every === every - 1) {
+    if (!chase && bar % every === every - 1) {
       for (let i = 0; i < sysMUS_BOND_HORN.length; i++) {
         const h = sysMUS_BOND_HORN[i];
         // A section breathes together, so the WHOLE line takes one draw rather
@@ -19650,12 +20744,24 @@ export function createSystems(game) {
     const lvl = 0.85 + musIntensity * 0.25;
     const root = musPal.roots[musIdx];
     const tide = musVenTide;
+    // ---- RUNNING QUAVERS (L7, E2 / audio 3): a chase on this palette is
+    // the cello going from crotchets to quavers — the same line, with a
+    // passing note between every pair, which is what a continuo does when
+    // the movement gets faster and the one change a baroque bass can make.
+    const chase = musChaseT > 0;
 
     for (let i = 0; i < sysMUS_CONTINUO.length; i++) {
       const c = sysMUS_CONTINUO[i];
       const midi = musFold(chord[c.d % chord.length], root + 5, root + 21);
       musCello(musFeel(t0 + c.t * Q, sysMUS_F_BASS.s, sysMUS_F_BASS.b), midi,
-               musVel(c.v * lvl * (1 - tide * 0.18)), Q * 1.85);
+               musVel(c.v * lvl * (1 - tide * 0.18)), chase ? Q * 0.95 : Q * 1.85); musBandHits++;
+      if (chase) {
+        // the passing note: a chord tone between this one and the next
+        const nx = sysMUS_CONTINUO[(i + 1) % sysMUS_CONTINUO.length];
+        const m2 = musFold(chord[(c.d + nx.d + 1) % chord.length], root + 5, root + 21);
+        musCello(musFeel(t0 + (c.t + 1) * Q, sysMUS_F_BASS.s, sysMUS_F_BASS.b), m2,
+                 musVel(c.v * 0.72 * lvl * (1 - tide * 0.18)), Q * 0.95); musBandHits++;
+      }
     }
     // the harpsichord is what the water takes away
     if (tide < 0.92) {
@@ -19666,12 +20772,12 @@ export function createSystems(game) {
         // it is why the velocity here is not humanised, only the timing. What a
         // continuo player varies is when the chord arrives, not how hard.
         musCembalo(musFeel(t0 + c.t * Q, sysMUS_F_COMP.s, sysMUS_F_COMP.b),
-                   chord, c.v * lvl * (1 - tide * 0.55));
+                   chord, c.v * lvl * (1 - tide * 0.55)); musBandHits++;
       }
     }
     // ...and the organ is what it brings
     if (tide > 0.22) {
-      musOrganPedal(t0, root - 12, (tide - 0.22) * 1.3 * lvl, Q * sysMUS_BAR_QN);
+      musOrganPedal(t0, root - 12, (tide - 0.22) * 1.3 * lvl, Q * sysMUS_BAR_QN); musBandHits++;
     }
   }
 
@@ -19692,28 +20798,40 @@ export function createSystems(game) {
     const lvl = 0.85 + musIntensity * 0.25;
     const show = musHkShow;
     const root = musPal.roots[musIdx];
+    // ---- THE KIT GOES TO THE RIDE (L7, E2 / audio 3): a chase on this
+    // palette is the drummer moving off the closed hat onto the ride — every
+    // eighth, and the hats filled in on every sixteenth under it — and the
+    // kick on all four. The same track with the drummer standing up.
+    const chase = musChaseT > 0;
 
     for (let i = 0; i < sysMUS_HK_KICK.length; i++) {
       const k = sysMUS_HK_KICK[i];
-      musHkKick(t0 + k.t * S, k.v * lvl);
+      musHkKick(t0 + k.t * S, k.v * lvl); musBandHits++;
     }
+    if (chase) { musHkKick(t0 + 4 * S, 0.8 * lvl); musHkKick(t0 + 12 * S, 0.8 * lvl); musBandHits += 2; }
     for (let i = 0; i < sysMUS_HK_SNARE.length; i++) {
       const k = sysMUS_HK_SNARE[i];
-      musHkSnare(t0 + k.t * S, k.v * lvl * (0.9 + show * 0.3));
+      musHkSnare(t0 + k.t * S, k.v * lvl * (0.9 + show * 0.3)); musBandHits++;
+      // the ghost a sixteenth before it, which is the drummer standing up
+      if (chase) { musHkSnare(t0 + (k.t - 1) * S, 0.35 * lvl); musBandHits++; }
     }
     for (let e = 0; e < sysMUS_HK_BAR; e++) {
       const v = sysMUS_HK_HAT[e];
-      if (v > 0) musHkHat(t0 + e * S, v * lvl, e === 14);
-      else if (show > 0.5 && e % 2 === 1) musHkHat(t0 + e * S, 0.3 * lvl * show, false);
+      if (v > 0) { musHkHat(t0 + e * S, v * lvl, e === 14); musBandHits++; }
+      else if (chase || (show > 0.5 && e % 2 === 1)) { musHkHat(t0 + e * S, 0.3 * lvl * (chase ? 1 : show), false); musBandHits++; }
+      if (chase && e % 2 === 0) { musRide(t0 + e * S, musVel((e % 4 === 0 ? 0.8 : 0.5) * lvl)); musBandHits++; }
     }
     for (let i = 0; i < sysMUS_HK_BASS.length; i++) {
       const b = sysMUS_HK_BASS[i];
-      musHkBass(t0 + b.t * S, root + b.o, b.v * lvl);
+      musHkBass(t0 + b.t * S, root + b.o, b.v * lvl); musBandHits++;
+      // ...and in the chase the octave answers every root, which is the one
+      // thing a synth bass in this idiom does when the track lifts
+      if (chase && b.o === 0) { musHkBass(t0 + (b.t + 1) * S, root + 12, 0.5 * lvl); musBandHits++; }
     }
     for (let e = 0; e < sysMUS_HK_BAR; e++) {
       const step = sysMUS_HK_ARP[(e + bar * 3) % sysMUS_HK_ARP.length];
       const midi = musFold(root + 24 + sysMUS_HK_YU[step], 62, 86);
-      musHkArp(t0 + e * S, midi, musVel((e % 2 === 0 ? 1 : 0.62) * lvl), show);
+      musHkArp(t0 + e * S, midi, musVel((e % 2 === 0 ? 1 : 0.62) * lvl), show); musBandHits++;
     }
     // ---- AND THE MACHINE STAYS ON THE GRID (v41) -------------------------
     // Every other band in this table gets a feel — see musFeel — and this one
@@ -19760,17 +20878,24 @@ export function createSystems(game) {
     const build = musGnawaBuild;
     const lvl = (0.78 + musIntensity * 0.28) * (0.55 + build * 0.55);
     const root = musPal.roots[musIdx];
+    // ---- THE IRON DOUBLES (L7, E2 / audio 3): a chase on this palette is
+    // the second pair of hands the fire circle already brings — the qraqeb
+    // on every half-pulse — and the tbel's pick-up on every cell. The
+    // guembri does not change: in gnawa the bass is the thing that never
+    // hurries, and the trance is the iron getting faster over it.
+    const chase = musChaseT > 0;
+    const dbl = chase ? 1 : build;
 
     // --- the iron. Never stops, and in the storm it is all there is.
     for (let e = 0; e < sysMUS_GNAWA_CELL; e++) {
       musQraqeb(musFeel(t0 + e * P, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b),
-                musVel(sysMUS_QRAQEB[e] * (0.62 + build * 0.5) * (0.7 + strip * 0.5)));
+                musVel(sysMUS_QRAQEB[e] * (0.62 + build * 0.5) * (0.7 + strip * 0.5))); musBandHits++;
       // at full build they double, which is what a gnawa group does when the
       // thing they are playing for starts to work. The doubling is a SECOND
       // PAIR OF HANDS, so it gets the hand feel rather than the iron's.
-      if (build > 0.5 && e % 2 === 1) {
+      if (dbl > 0.5 && (chase || e % 2 === 1)) {
         musQraqeb(musFeel(t0 + (e + 0.5) * P, sysMUS_F_HAND.s, sysMUS_F_HAND.b),
-                  musVel(sysMUS_QRAQEB[e] * 0.34 * build));
+                  musVel(sysMUS_QRAQEB[e] * 0.34 * dbl)); musBandHits++;
       }
     }
     if (open < 0.05) return;
@@ -19779,15 +20904,15 @@ export function createSystems(game) {
     for (let i = 0; i < sysMUS_GUEMBRI.length; i++) {
       const gq = sysMUS_GUEMBRI[i];
       musGuembri(musFeel(t0 + gq.t * P, sysMUS_F_BASS.s, sysMUS_F_BASS.b),
-                 root + sysMUS_GUEMBRI_P[gq.d], musVel(gq.v * lvl * open));
+                 root + sysMUS_GUEMBRI_P[gq.d], musVel(gq.v * lvl * open)); musBandHits++;
     }
     // --- the drum
     for (let i = 0; i < sysMUS_TBEL.length; i++) {
       const tb = sysMUS_TBEL[i];
-      musTbel(musFeel(t0 + tb.t * P, sysMUS_F_KICK.s, sysMUS_F_KICK.b), musVel(tb.v * lvl * open));
-      if (build > 0.45 && tb.t === 0) {
+      musTbel(musFeel(t0 + tb.t * P, sysMUS_F_KICK.s, sysMUS_F_KICK.b), musVel(tb.v * lvl * open)); musBandHits++;
+      if (dbl > 0.45 && tb.t === 0) {
         musTbel(musFeel(t0 + 3 * P, sysMUS_F_KICK.s, sysMUS_F_KICK.b),
-                musVel(tb.v * 0.55 * build * open));
+                musVel(tb.v * 0.55 * dbl * open)); musBandHits++;
       }
     }
     // --- and the hands, only when something is going on
@@ -19858,22 +20983,27 @@ export function createSystems(game) {
       musChordAt += dw;
     }
     // ---- THE CHASE PULSE (L4, F3) --------------------------------------
+    // ...AND IT READS THE PALETTE'S ROW (L7, E2). `chase` on sysMUS_PAL names
+    // the instrument and the tempo; the stroke itself is musChaseStroke, one
+    // case per instrument, and a row without one is the bendir at 118 to the
+    // sample. The beat index and the lookahead are untouched.
     if (musChaseT > 0 && !musPal.band && musDrum && musSleep < 0.5) {
-      const beat = 60 / sysMUS_CHASE_BPM;
+      const chRow = musPal.chase || sysMUS_CHASE_DEF;
+      const beat = 60 / chRow.bpm;
       if (musChaseBeatAt < now - beat) { musChaseBeatAt = musSnap(now + 0.05); musChaseBeatN = 0; }
       let cg = 0;
       while (musChaseBeatAt < horizon && cg++ < 16) {
-        const b4 = musChaseBeatN % 4, bar = Math.floor(musChaseBeatN / 4);
         // ×sysMUS_CHASE_VEL on every stroke (L6, E3): at 0.09–0.11 the pulse
         // landed ten decibels under the pad and the chase measured as darker
         // than rest. The review asked ×2.5; it is 2.0, and the table says why.
         const lvl = (0.7 + musIntensity * 0.5) * sysMUS_CHASE_VEL;
-        if (b4 === 0 || b4 === 2) { musBendir(musChaseBeatAt, musVel((b4 ? 0.09 : 0.11) * lvl)); musChaseHits++; }
-        else { musClap(musChaseBeatAt, musVel(0.085 * lvl)); musChaseHits++; if (bar % 2 && b4 === 3 && Math.random() < 0.5) musClap(musChaseBeatAt + beat * 0.5, musVel(0.05 * lvl)); }
+        musChaseStroke(chRow.inst, musChaseBeatAt, musChaseBeatN, beat, lvl);
         musChaseBeatAt += beat;
         musChaseBeatN++;
       }
     }
+    // ---- THE CUES (L7, E2): the clock, the window, the arm ---------------
+    if (musSleep < 0.5) musCueTick(now);
     // ---- THE PROGRESS PULSE (L6, E3): the third layer -------------------
     // Past half a chapter, on the pad palettes, a slow soft dum on the frame
     // drum — one every 2.4 s at the gate, closing to 1.6 by the end — so a
@@ -20528,7 +21658,14 @@ export function createSystems(game) {
     // image moves.
     musWide = ac.createGain();
     musWide.gain.value = 1;
-    musPad.connect(musWide);
+    // ---- THE SIDECHAIN (L7, E1): one gain in series after the pad, before
+    // the ensemble and the send, so the world ducks the pad wet AND dry and
+    // nothing else on the wide bus (shimmer, choir, lift). musPad.gain keeps
+    // its one writer in the block; this node's one writer is per frame.
+    musSideG = ac.createGain();
+    musSideG.gain.value = 1;
+    musPad.connect(musSideG);
+    musSideG.connect(musWide);
     musWide.connect(musSend);                       // the reverb gets it clean
     const musWideDry = ac.createGain();
     musWideDry.gain.value = sysMUS_ENS_TRIM;
@@ -20858,6 +21995,9 @@ export function createSystems(game) {
     blip: sfxBlip,
     // ...and the sentence it became (L6, F5). See sfxBabble.
     babble: sfxBabble,
+    // ...and the eight the places were borrowing (L7, E2). See sfxBell.
+    bell: sfxBell, moped: sfxMoped, penguin: sfxPenguin, heron: sfxHeron,
+    calve: sfxCalve, crowd: sfxCrowd, kettle: sfxKettle, swell: sfxSwell,
   };
   const sfxGap = {
     wheek: 0.16, thud: 0.05, splash: 0.12, gasp: 0.12, pop: 0.05, rustle: 0.08, whistle: 0.2,
@@ -20920,6 +22060,13 @@ export function createSystems(game) {
     // the 0.4 s the caller asks at; the snort's stops a march that catches
     // twice from snorting twice.
     shake: 1.2, chew: 0.3, snort: 0.5, yawn: 3.0,
+    // The eight of E2 (L7), each past its own length by the rule above. The
+    // bell and the moped are the short ones — Hanoi has two hundred and
+    // forty bikes and a horn a second is the chapter — the swell is the long
+    // one, and the penguin's is shorter than a colony would like because the
+    // colony's roll is three calls a second and a half apart.
+    bell: 0.35, moped: 0.5, penguin: 0.6, heron: 1.2,
+    calve: 3.5, crowd: 2.4, kettle: 3.0, swell: 2.6,
   };
 
   // The voice ceiling — see the block inside sfx(). Twelve starts inside a
@@ -21063,6 +22210,14 @@ export function createSystems(game) {
     sysVoiceAt[sysVoiceHead] = now;
     sysVoiceHead = (sysVoiceHead + 1) % sysVOICE_N;
     lastPlay[name] = now;
+    // ---- ...AND THE PAD HEARS IT (L7, E1 / audio #2) -----------------------
+    // Below every gate, so only a sound that will actually play keys the
+    // sidechain, by the volume it will play at (the placed gain is already in
+    // `vol`). A UI sound is not in the world and does not. See sysMUS_SIDE.
+    if (!(opts && opts.ui)) {
+      musWorldEnv += vol * sysMUS_SIDE.bump;
+      if (musWorldEnv > 1) musWorldEnv = 1;
+    }
 
     // ---- ONE SWAP, SEVENTEEN SYNTHS ---------------------------------------
     // Every voice in this file ends its graph with `.connect(acMaster)`, in
@@ -21268,6 +22423,38 @@ export function createSystems(game) {
     opts.at = null;
   }
   const sysAmbBare = { volume: 1, pitch: 1, at: null, near: 0, far: 0 };
+  /**
+   * THE SIGNATURE, SAID (L7, E2). The chapter's sysAMB_SIG row through
+   * sysAmb, the pairs a beat apart, at `k` of the row's level — 1 for the
+   * chapter's own clock, 0.25 (−12 dB) when the exit zone plays the
+   * destination's. The anchor lookup inside sysAmb reads the LIVE chapter, so
+   * a destination's row comes off the ring like any unanchored rung; it is
+   * heard from here, which is right — it is a memory, not a place.
+   * One options object, reused: the ladder builds a literal per rung and this
+   * runs at most once every eighty seconds, but it is inside the frame loop.
+   */
+  const sysAmbSigOpt = { volume: 1, pitch: 1, at: null, near: 0, far: 0 };
+  function ambSig(bio, k) {
+    const row = sysAMB_SIG[bio];
+    if (!row) return false;
+    for (let i = 0; i < row.length; i++) {
+      const r = row[i];
+      sysAmbSigOpt.volume = r[1] * k;
+      sysAmbSigOpt.pitch = r[2];
+      if (i === 0) sysAmb(r[0], sysAmbSigOpt);
+      else ambSigLate(r[0], r[1] * k, r[2], 0.35 + i * 0.4);
+    }
+    return true;
+  }
+  // the second and third voices of a signature, a beat later, so the horn
+  // puts the gulls up rather than sounding with them
+  function ambSigLate(name, vol, pitch, secs) {
+    setTimeout(function () {
+      if (!started || game.state.paused) return;
+      sysAmbSigOpt.volume = vol; sysAmbSigOpt.pitch = pitch;
+      sysAmb(name, sysAmbSigOpt);
+    }, secs * 1000);
+  }
 
   // ===========================================================================
   // THE FLOCK — MOTION OUT OF MANY ONE-SHOTS (A3; ROADMAP-AUDIO.md)
@@ -22445,6 +23632,14 @@ export function createSystems(game) {
     titleTurnT = setTimeout(swap, 130);
   }
   p2El.hidden = true;
+  // ---- THE PICKER, FROM THE PAUSE CARD (L7, E5 / play 2) -----------------
+  // The pause card's "choose a place" flushes the file and reloads with this
+  // flag set; the title then opens on the shelf rather than the front. Session
+  // storage, not the save: it is a note to the next page load, not a fact
+  // about the journey.
+  let pickWanted = false;
+  try { pickWanted = sessionStorage.getItem('capy3.pick') === '1'; sessionStorage.removeItem('capy3.pick'); } catch (e) { pickWanted = false; }
+  if (pickWanted) setTimeout(function () { if (!started) titlePage(2); }, 60);
   // ---- THE ORDER THE PAGE ARRIVES IN (T3) --------------------------------
   // One index per child, written once, because the number of children is not
   // fixed: a file adds the carry-on row and takes the Begin button away.
@@ -22589,6 +23784,17 @@ export function createSystems(game) {
     jrKeys.open = true;
     jrShow(false);
     if (from && from !== document.body) jrReturnFocus = from;
+  });
+  // ---- A SIXTH DOOR: THE SHELF (L7, E5 / play 2). Fifteen minutes in, the
+  // fresh player could not leave and was not told how: the board's rows were
+  // locked and the title's "Choose a place" — which travels anywhere with a
+  // file on it — was a reload away with nothing in play saying so. Same two
+  // flushes quit does, then the title opens on the shelf (see pickWanted).
+  pauseBtn('', 'choose a place', function () {
+    saveFlush();
+    prefsFlush();
+    try { sessionStorage.setItem('capy3.pick', '1'); } catch (e) { /* the title's front, then */ }
+    location.reload();
   });
   const pauseQuitBtn = pauseBtn('warn', 'quit to the title', function () { pauseAskOpen(); });
   pauseSetBtn.setAttribute('aria-expanded', 'false');
@@ -24800,6 +26006,18 @@ export function createSystems(game) {
   mapDistEl.appendChild(mapDistN);
   mapEl.appendChild(mapDistEl);
   let mapDistLast = '', mapDistOn = false;
+  // ---- THE MACHINE'S BADGE (L7, E5). See .capyui-mapnote. -----------------
+  const mapNoteEl = sysEl('div', 'capyui-mapnote', '');
+  mapNoteEl.setAttribute('role', 'status');
+  mapEl.appendChild(mapNoteEl);
+  let mapNoteT = 0;
+  /** A 3 s note about the machine, in the map corner, never a pill. */
+  function mapBadge(text) {
+    mapNoteEl.textContent = String(text);
+    mapNoteEl.classList.add('show');
+    if (mapNoteT) clearTimeout(mapNoteT);
+    mapNoteT = setTimeout(function () { mapNoteEl.classList.remove('show'); mapNoteT = 0; }, 3000);
+  }
   hudRoot.appendChild(mapEl);
   const mapCtx = mapCv.getContext('2d');
   const mapBase = document.createElement('canvas');
@@ -25925,6 +27143,7 @@ export function createSystems(game) {
     placeEl.classList.remove('line');
     placeEl.classList.add('show');
     showPlaceLast = title;
+    sysPlaceCardAt = sysWall();    // a `say` waits sysPLACE_QUIET after this (L7, E5)
     if (placeTimer) clearTimeout(placeTimer);
     placeTimer = setTimeout(function () {
       placeEl.classList.remove('show');
@@ -26160,6 +27379,8 @@ export function createSystems(game) {
     const now = game.state.time;
     if (now - sysToastLastAt < sysFRESH_GAP || now - sysTickLastAt < sysFRESH_TICK_GAP) return;
     const t = sysToastHeld.shift();
+    // a held line from a place since left goes unsaid (L7, E5)
+    if (t.bio && game.biome && game.biome.current && t.bio !== game.biome.current) return;
     sysToastEnqueue(t.text, t.kind, true);
   }
   // ---- ONE VOICE AT A TIME (L6, E4 / writing W3, play 8) ------------------
@@ -26203,12 +27424,22 @@ export function createSystems(game) {
   const sysAMBIENT_GAP = 6.0;    // s between two lines of ambient narration
   let sysToastFloorAt = -1e9, sysToastFloorFor = 0, sysToastFloorKind = '';
   let sysAmbientAt = -1e9;
+  const sysPLACE_QUIET = 6.0;    // s after a chapter card before a 'say' may land (L7, E5)
+  let sysPlaceCardAt = -1e9;
   const sysToastQ = [];
   function sysWall() { return performance.now() * 0.001; }
   function sysToastEnqueue(text, kind, ambient, keep) {
     const t = String(text);
     for (let i = 0; i < sysToastQ.length; i++) if (sysToastQ[i].text === t) return;
-    sysToastQ.push({ text: t, kind: kind, ambient: !!ambient, keep: !!keep, at: sysWall() });
+    // A LINE IN THE GAME'S VOICE BELONGS TO THE PLACE IT WAS RAISED IN (L7,
+    // E5 / writing W2). MEASURED: Marrakech's first two pills were Venice's
+    // ("a hundred and forty of them. the square has gone dark." at 2 s, "san
+    // marco is going under" at 8 s) — E4's queue carried them over the white.
+    // A `say` carries its biome and the drain drops it once the biome has
+    // changed; a `note` is a receipt and belongs to the file, so it carries
+    // none and crosses.
+    const bio = kind === 'say' && game.biome ? (game.biome.current || '') : '';
+    sysToastQ.push({ text: t, kind: kind, ambient: !!ambient, keep: !!keep, at: sysWall(), bio: bio });
     // overflow lets the oldest line that is not `keep` go
     while (sysToastQ.length > sysTOAST_QUEUE) {
       let i = 0;
@@ -26241,9 +27472,12 @@ export function createSystems(game) {
   function sysToastDrainQ() {
     if (!sysToastQ.length) return;
     const now = sysWall();
+    const bioNow = game.biome ? (game.biome.current || '') : '';
     for (let i = 0; i < sysToastQ.length; i++) {
       const e = sysToastQ[i];
       if (e.kind !== 'note' && !e.keep && now - e.at > sysTOAST_STALE) { sysToastQ.splice(i, 1); i--; continue; }
+      // ...and a line from the place you have left goes unsaid (L7, E5)
+      if (e.bio && bioNow && e.bio !== bioNow) { sysToastQ.splice(i, 1); i--; continue; }
     }
     if (!sysToastQ.length) return;
     for (let i = 0; i < sysToastQ.length; i++) {
@@ -26254,6 +27488,9 @@ export function createSystems(game) {
       // the live channel opens, and measured behind the pigeons' remark it
       // waited the whole six seconds as if it were one more of them
       if (e.kind === 'say' && wowLiveOn && sysPlaceLine(e.text)) { sysToastQ.splice(i, 1); return; }
+      // a line in the game's voice never lands inside sysPLACE_QUIET of a
+      // chapter card (L7, E5 / play 7): the card is the sentence, alone
+      if (e.kind === 'say' && now - sysPlaceCardAt < sysPLACE_QUIET) continue;
       if (e.ambient && now - sysAmbientAt < sysAMBIENT_GAP) continue;
       if (!sysToastFloorFree(e.kind)) return;
       sysToastQ.splice(i, 1);
@@ -26280,7 +27517,7 @@ export function createSystems(game) {
     if (k0 === 'say' && sysFreshBudget()) {
       const now = game.state.time;
       if (now - sysToastLastAt < sysFRESH_GAP || now - sysTickLastAt < sysFRESH_TICK_GAP) {
-        sysToastHeld.push({ text: text, kind: k0 });
+        sysToastHeld.push({ text: text, kind: k0, bio: game.biome ? (game.biome.current || '') : '' });
         while (sysToastHeld.length > sysFRESH_HELD) sysToastHeld.shift();
         return;
       }
@@ -27064,6 +28301,8 @@ export function createSystems(game) {
   jrNbDet.appendChild(jrNbList);
   jrNbDet.hidden = true;
   jrCard.appendChild(jrNbDet);
+  // a new page has been written since the card was last opened (L7, E5)
+  let nbFresh = false;
   jrCard.appendChild(jrRepDet);
   jrCard.appendChild(jrKeys);
   jrCard.appendChild(jrFoot);
@@ -27106,6 +28345,11 @@ export function createSystems(game) {
       if (recAtPar(RECORDS[rec.ids[i]], jrRecs[rec.ids[i]])) { f.par = 1; break; }
     }
     try { if (def && typeof game.travMet === 'function' && game.travMet(def.biome)) f.met = 1; } catch (e) { /* older npc.js */ }
+    // THE ASK (L7, E6 / writing A): the traveller rode in the basket. A flag
+    // the chapter publishes while it is live; on the file as a fact like the
+    // rest, so the page stays rewritten across a reload.
+    f.travUp = 0;
+    try { if (def && def.biome === 'goreme' && game.goreme && typeof game.goreme.travUp === 'function' && game.goreme.travUp()) f.travUp = 1; } catch (e) { /* older goreme.js */ }
     return f;
   }
   /** Write (or rewrite) chapter n's page from what is counted right now. */
@@ -27121,6 +28365,8 @@ export function createSystems(game) {
     } else {
       jrNb[n] = { d: nbToday(), f: f };
     }
+    // a page with words on it opens the fold on the next J (L7, E5)
+    if (nbText(n)) nbFresh = true;
     saveSoon();
   }
   /** `if` against the facts: `wow`, `!met`, `inc>=3`, `pho=1`, `a&b`. */
@@ -27130,7 +28376,8 @@ export function createSystems(game) {
       let p = parts[i].trim();
       const neg = p.charAt(0) === '!';
       if (neg) p = p.slice(1);
-      const m = /^([a-z]+)(>=|<=|=|<|>)?(\d+)?$/.exec(p);
+      // A capital in a key is allowed for `travUp` (L7, E6); the rest are lower.
+      const m = /^([a-zA-Z]+)(>=|<=|=|<|>)?(\d+)?$/.exec(p);
       if (!m) return false;
       const v = +f[m[1]] || 0;
       let ok;
@@ -27253,6 +28500,21 @@ export function createSystems(game) {
     const fin = jrNb.fin && jrNb.fin.t ? jrNb.fin : null;
     jrNbDet.hidden = !(count || fin);
     if (jrNbDet.hidden) return;
+    // ---- ABOVE THE ROWS, ONCE THERE IS SOMETHING IN IT (L7, E5 / writing
+    // W5). MEASURED: the fold sat under nineteen rows and two buttons at
+    // ~1500 px of a 660 px window — "the thing on this card most worth
+    // reading" was on the third screen. The fold stays shut; the summary is
+    // the first line under the header, and a page written since the last
+    // open unfolds it once (nbFresh).
+    const firstRow = jrRows.length ? jrRows[0].row : null;
+    if (firstRow && jrNbDet.nextSibling !== firstRow) jrCard.insertBefore(jrNbDet, firstRow);
+    if (nbFresh && jrShown) {
+      nbFresh = false;
+      jrNbDet.open = true;
+      jrNbSum.classList.remove('fresh');
+      void jrNbSum.offsetWidth;    // restart the one pulse
+      jrNbSum.classList.add('fresh');
+    }
     jrNbSumT.nodeValue = 'the notebook  ·  ' + (count + (fin ? 1 : 0)) + (count + (fin ? 1 : 0) === 1 ? ' entry' : ' entries');
     while (jrNbList.firstChild) jrNbList.removeChild(jrNbList.firstChild);
     const here = game.biome ? chapterOf(game.biome.current) : 1;
@@ -27466,8 +28728,23 @@ export function createSystems(game) {
       // left to find. Every other line on this row changes when a chapter
       // fills up; this one is the last one that should.
       if (r.n === here && r.def.way) bits.unshift('the way on: ' + r.def.way);
-      r.rec.textContent = bits.length ? bits.join('  ·  ') : (full ? '' : r.def.sub);
       const open = jrOpen(r.n);
+      // ---- A LOCKED ROW SAYS WHAT UNLOCKS IT (L7, E5 / play 2). The board
+      // at 3 of 20 was nineteen dimmed rows and no word on the gate; the
+      // frontier's own count is the answer for every row behind it.
+      let gate = '';
+      if (!open && !full) {
+        for (let k = 1; k <= chapMax; k++) {
+          if (chapEnough(k)) continue;
+          const fr = chapRec[k];
+          let dn = 0;
+          for (let j = 0; fr && j < fr.ids.length; j++) { const tr = taskRec[fr.ids[j]]; if (tr && tr.done) dn++; }
+          gate = Math.max(1, chapNeed(k) - dn) + ' more ' + (k === here ? 'here' : 'in ' + chapterDef(k).name) + ' first';
+          break;
+        }
+      }
+      r.rec.textContent = bits.length ? bits.join('  ·  ')
+                        : full ? '' : (r.def.sub + (gate ? '  ·  ' + gate : ''));
       r.row.classList.toggle('locked', !open);
       r.row.classList.toggle('go', open && jrDepart);
       r.row.classList.toggle('here', r.n === here);
@@ -28221,7 +29498,9 @@ export function createSystems(game) {
     'acqua-alta':     { clue: function () {
                       const v = game.venice;
                       if (!v) return 'be in the square when the water arrives';
-                      if (v.rising()) return 'get into the square and STAY — swim against the pull to 95%';
+                      // No percentage (L7, E6 / writing W6): the paper says where and
+                      // what, never the game's number. The 95 is the row's own bar.
+                      if (v.rising()) return 'get into the square and STAY — it will try to carry you out. it is nearly there.';
                       if (v.tide() > 0.8) return 'missed it. it comes back — be in the square at the siren';
                       return 'wait for the siren, then stand in the middle of the square';
                     },
@@ -29486,6 +30765,14 @@ export function createSystems(game) {
     const door = def && typeof def.door === 'number' && def.door > 0 ? def.door : 0;
     return door ? Math.min(door, rec.ids.length) : Math.ceil(rec.ids.length * sysCHAP_ENOUGH);
   }
+  /** How many more rows the door out of chapter n wants (L7, E5). */
+  function sysWayNeed(n) {
+    const rec = chapRec[n];
+    if (!rec || !rec.ids.length) return 1;
+    let done = 0;
+    for (let i = 0; i < rec.ids.length; i++) { const r = taskRec[rec.ids[i]]; if (r && r.done) done++; }
+    return Math.max(1, chapNeed(n) - done);
+  }
   function chapEnough(n) {
     const rec = chapRec[n];
     if (!rec || !rec.ids.length) return false;
@@ -30314,7 +31601,7 @@ export function createSystems(game) {
       // progress is safe when it demonstrably is not is the worst of both.
       if (!saveTold) {
         saveTold = true;
-        toast('saved — you can close this and come back', 'note');
+        mapBadge('saved — you can close this and come back');   // the map corner, not a pill (L7, E5)
       }
     } catch (e) {
       // ...AND IF IT THREW, THE PLAYER IS OWED THE OPPOSITE SENTENCE (R3).
@@ -30413,11 +31700,19 @@ export function createSystems(game) {
     // it is not about your last one. It is said ONCE — `parWas` is derived
     // from the stored figure, so nothing new is saved to know it, and a reload
     // cannot make it happen twice.
+    // ---- ...AND ONE SENTENCE PER EVENT (L7, E5 / design 2.7). A site that
+    // still posts per unit (the chips did: 5 / 6 / 7 / 8 in seven seconds)
+    // is filed silently inside sysREC_SAY_GAP of its last pill — the figure
+    // is kept, the ghost is kept, the chime is not spent on a bird landing.
+    const recWall = sysWall();
+    const recQuiet = recWall - (sysRecSaidAt[id] || -1e9) < sysREC_SAY_GAP;
     if (!parWas && recAtPar(def, value)) {
+      sysRecSaidAt[id] = recWall;
       toast('that is a good one  ·  ' + def.label + ' ' + value.toFixed(def.dp) + def.unit, 'note');
       // P4: two notes up, on the chapter's own lead. See sysMUS_STING.
       if (!musSting('record', 1.15)) sfx('chime', { volume: 0.6, pitch: 1.62 });
-    } else if (prev !== undefined) {
+    } else if (prev !== undefined && !recQuiet) {
+      sysRecSaidAt[id] = recWall;
       toast('personal best  ·  ' + def.label + ' ' + value.toFixed(def.dp) + def.unit, 'note');
       // The same figure a shade quieter: beating your own ghost is the same
       // KIND of event as reaching par, and the two must not need telling apart.
@@ -30425,6 +31720,8 @@ export function createSystems(game) {
     }
     return true;
   }
+  const sysREC_SAY_GAP = 30;     // s between two record pills for one id (L7, E5)
+  const sysRecSaidAt = {};
   function recText(id) {
     const def = RECORDS[id];
     if (!def || jrRecs[id] === undefined) return '';
@@ -32222,7 +33519,12 @@ export function createSystems(game) {
     try { if (typeof game.palSet === 'function') game.palSet(t); }
     catch (e) { /* an older npc.js has no regulars */ }
     if (t < 1) return;
-    try { if (typeof game.palArm === 'function') game.palArm(t); }
+    // ...and on a RETURN the greeting is the tier-two line (L7, E6 / writing
+    // B): "Oh. It is you." is the sentence for the day they first warmed to
+    // you; "You again." is the one for coming back. The tier itself is not
+    // touched — the line is armed, not earned. sysAgainLine is the crossing's
+    // own reading, taken before this event marked the chapter seen.
+    try { if (typeof game.palArm === 'function') game.palArm(sysAgainLine && t === 1 ? 2 : t); }
     catch (e) { /* an older npc.js has no regulars */ }
   });
   /** THE HARNESS’S WINDOW ON THE NUMBER. npc.js’s palAudit is the window on
@@ -33340,6 +34642,12 @@ export function createSystems(game) {
   let restIdleT = 0;            // banked stillness, which camIdleT is not. See sysREST_FORGET.
   // ...and whether this SPOT has already refused the wide shot. See restAsk.
   let restBlocked = false;
+  // THE ORBIT (L7, E3). See sysORBIT_CUT: how long the boom has been cut, how
+  // long since the last probe, the bearing chosen (NaN = none held), where the
+  // animal stood when it was chosen, and the swim cap's blend.
+  let camOrbitCutT = 0, camOrbitSinceT = 0, camOrbitYaw = NaN, camOrbitX = 0, camOrbitZ = 0;
+  let swimRigT = 0;
+  const sysOrbitV = new THREE.Vector3();
   let shakeAmt = 0;
   let camInit = false;
   // flight rig: blend 0..1, the heading the rig is chasing, and its damped follow
@@ -33357,6 +34665,9 @@ export function createSystems(game) {
   let flyAltLast = -1, flyAirLast = -1, flyBarLast = -1;
   // the way home
   let homeCount = 0, homeT = 0, homeShown = false, homeHinted = false;
+  // three wheeks near the door but off it (L7, E5)
+  const sysWAY_NEAR = 28;        // m from the way point that counts as "at the door"
+  let wayNearN = 0, wayNearT = 0;
   // ---- THE SLIDE, ASKED FOR ONCE ------------------------------------------
   // `slidEver` is on the save file: a journey that has already put a belly on
   // the ground never hears either line again, however many times it comes back
@@ -33365,6 +34676,7 @@ export function createSystems(game) {
   // inside one session for a player who is ignoring it.
   let slidEver = false, slidT = 0, slidSaid = false;
   let puffEver = false;   // the puff bar has been named on this journey (L6, E4)
+  const sysTutSaid = {};  // the teaching lines said this SESSION, whatever the file says (L7, E5)
   // ...and the same pair for the slip, which is the other half of the same
   // idea: the slide is a verb the player is given and the slip is one the
   // ground takes away. Saved beside it. See sysSLIP_SAY.
@@ -35115,6 +36427,9 @@ export function createSystems(game) {
                 : (typeof game.state.fresnelK === 'number' ? game.state.fresnelK : 1));
     // ...and the pale-ground gate's, the same shape. See `nearPale` in grain().
     paleTick(game.state.noPale ? 0 : 1);
+    // ...and THE WALL's and THE REFLECTION's (L7, E4), the same shape again.
+    triTick(game.state.noTri ? 0 : 1);
+    mirrorTick(game.state.noMirror ? 0 : (typeof game.state.mirrorK === 'number' ? game.state.mirrorK : 1));
 
     // ---- the rim ----------------------------------------------------------
     // Same deal as the wet ground and for the same reason: one float and one
@@ -35209,6 +36524,22 @@ export function createSystems(game) {
     sysColS.copy(sysColR).lerp(sysRIM_WHITE, sysSELF_WHITE);
     selfRimTick(game.state.noSelfRim ? 0
                 : (sysSELF[name] === undefined ? sysSELF_DEF : sysSELF[name]), sysColS);
+    // ---- THE CHARACTER KEY (L7, E4 / art #5). See capyKeyWrap. -------------
+    // From the animal toward the lens's azimuth, raised 35°, in 0.35 of the
+    // key's colour and strength — read here, before the split below, where
+    // `sun.intensity` still holds the SUM the far cascade will take its
+    // share of. Under the same switch as the animal's rim, for the same A/B.
+    if (game.capy && game.capy.group) {
+      const cp = game.capy.group.position;
+      sysKeyDir.set(camera.position.x - cp.x, 0, camera.position.z - cp.z);
+      const kl = sysKeyDir.length();
+      if (kl > 0.001) sysKeyDir.multiplyScalar(1 / kl); else sysKeyDir.set(0, 0, 1);
+      sysKeyDir.y = sysKEY_TAN35;
+      sysKeyDir.normalize();
+      sysKeyC.copy(sun.color).multiplyScalar(Math.max(0, sun.intensity) * sysKEY_K);
+      // `noKey` cuts the key alone, so an A/B can tell its share from the rim's.
+      capyKeyTick(sysKeyDir, sysKeyC, (game.state.noSelfRim || game.state.noKey) ? 0 : 1);
+    }
     // ---- and the light coming THROUGH things ------------------------------
     // See the leaf block in shared.js. The direction is the live sun axis —
     // sunAxes() rebuilds it on every biome change, so a chapter with a 61
@@ -35626,6 +36957,17 @@ export function createSystems(game) {
       pp.saturation += 0.12 * eveK;
       pp.tintR *= 1 + 0.09 * eveK; pp.tintG *= 1 + 0.02 * eveK; pp.tintB *= 1 - 0.09 * eveK;
     }
+    // ---- THE WATER'S TINT (L7, E3 / play #4): one uniform, uSub ----------
+    // The fog, the background and the three lights already go to the sysSUB
+    // row when the lens is under (see subT) — and the sky dome is fog:false,
+    // the emissives are lit and the near things keep their own colour, so a
+    // frame from just under the surface was half sky and a beige slab. The
+    // composite takes the same row's colour and the same scalar and lays it
+    // over EVERYTHING, which is what water does.
+    if (subT > 0.002 && sysSubNow) {
+      pp.sub = subT; pp.subR = sysSubNow.cCol.r; pp.subG = sysSubNow.cCol.g; pp.subB = sysSubNow.cCol.b;
+    } else pp.sub = 0;
+    sysCamInfo.sub = pp.sub;
     photoLens = damp(photoLens, photoOn ? 1 : 0, 2.6, game.state.dt || 0.016);
     if (photoLens > 0.002) {
       const dark = 1 - sysSceneLit;
@@ -35710,6 +37052,9 @@ export function createSystems(game) {
   let skyT = 0;                   // 0..1, how far the rig has craned up
   let dayT = 0;                   // 0..1 completion, heavily damped
   let transBusy = false;
+  // THE PLACE ANSWERS BACK (L7, E6): the chapter's `again` for the crossing in
+  // flight, or ''. Written at the top of biomeFadeTo, read by the card.
+  let sysAgainLine = '';
 
   // Teleporting a cannon body means moving it in FOUR places: the authoritative
   // position, the previous-step position and the interpolated position (or the
@@ -35883,9 +37228,15 @@ export function createSystems(game) {
       setTimeout(function () {
         try {
           // Never over a marquee. The lift is a held moment and this is
-          // punctuation; an arrival cannot be both.
-          if (musLiftNow() > 0.02) return;
-          musSting('arrive', 1);
+          // punctuation; an arrival cannot be both — so it WAITS (L7, E1 /
+          // audio #9): this returned on the lift, and a marquee finished four
+          // seconds before a border silenced the crossing's tune; and on
+          // Begin the context was still suspended at +550 ms and the sting
+          // returned 0, so the one arrival every player hears said nothing.
+          // The frame writer asks every frame until it takes; see
+          // musArrivePend.
+          musArrivePend = true;
+          musArrivePendT = 0;
         } catch (e) {}
       }, 550);
     }
@@ -36008,7 +37359,26 @@ export function createSystems(game) {
       // simply cannot get further. Further than that — a carrier, a launch,
       // a fall — is the rescue as before. Only for a single rectangle: the
       // chapters that publish a rects list are the ones with real edges.
-      if (lost && b && !b.rects && capy.body && isFinite(b.x0 + b.x1 + b.z0 + b.z1)) {
+      // ---- ...AND A LIST OF RECTANGLES HAS A WALL TOO (L7, E5 / design
+      // 2.6). MEASURED: Hanoi's south edge is 80 m from the spawn and the
+      // 180 s naive walk was put back twice — 1.7 m past z0 with "that is not
+      // part of the world". The rescue was the only edge the rects chapters
+      // had. The wall is the rectangle the animal just left: the one whose
+      // edge is nearest. Being walked back is the turn-round the review
+      // asked for — a 6 m carry is what a scooter does to you here.
+      let wb = b;
+      if (lost && b && b.rects && b.rects.length) {
+        let best = null, bd = Infinity;
+        for (let i = 0; i < b.rects.length; i++) {
+          const r = b.rects[i];
+          if (!isFinite(r.x0 + r.x1 + r.z0 + r.z1)) continue;
+          const dd = Math.max(r.x0 - p.x, p.x - r.x1, r.z0 - p.z, p.z - r.z1, 0);
+          if (dd < bd) { bd = dd; best = r; }
+        }
+        wb = best;
+      }
+      if (lost && wb && capy.body && isFinite(wb.x0 + wb.x1 + wb.z0 + wb.z1)) {
+        b = wb;
         const v = capy.body.velocity;
         const ox = p.x < b.x0 - sysVOID_PAD ? -1 : p.x > b.x1 + sysVOID_PAD ? 1 : 0;
         const oz = p.z < b.z0 - sysVOID_PAD ? -1 : p.z > b.z1 + sysVOID_PAD ? 1 : 0;
@@ -36281,6 +37651,13 @@ export function createSystems(game) {
     const bio = game.biome;
     if (!bio || bio.isActive(name)) return false;
     transBusy = true;
+    // ---- THE PLACE ANSWERS BACK (L7, E6 / writing B) --------------------
+    // Measured HERE, before the crossing: biome:enter marks the chapter seen
+    // and by the time the card rises every arrival looks like a return. A
+    // return is a chapter this file has already stood in with a real row
+    // done there — the arrival tick alone is not a visit.
+    const againN = chapterOf(name);
+    sysAgainLine = (jrSeen[againN] && nbDoneHere(againN) >= 1 && chapterDef(againN) && chapterDef(againN).again) || '';
     // ---- what is in the white ---------------------------------------------
     while (fadeMark.firstChild) fadeMark.removeChild(fadeMark.firstChild);
     const cdef = chapterDef(chapterOf(name));
@@ -36297,6 +37674,13 @@ export function createSystems(game) {
     requestAnimationFrame(function () {
       requestAnimationFrame(function () { fadeEl.classList.add('rise'); });
     });
+    // ---- and nothing said here is said there (L7, E5 / writing W2) --------
+    // The held lines and the queued lines in the game's voice are this place's;
+    // the pills already up go out with the white. A `note` (a tick, a record)
+    // is a receipt and stays queued.
+    sysToastHeld.length = 0;
+    for (let i = sysToastQ.length - 1; i >= 0; i--) if (sysToastQ[i].kind !== 'note') sysToastQ.splice(i, 1);
+    sysToastPush(0);
     // ---- and the sound of leaving ------------------------------------------
     musCross(-1);
     setTimeout(function () {
@@ -36334,7 +37718,11 @@ export function createSystems(game) {
         // one line for both. `stowHeadline` clears itself by being read, so the
         // next arrival gets the rumour back.
         if (title) setTimeout(function () {
-          showPlace(title, sub || '', stowHeadline() || notoHeadline(chapterOf(name)));
+          // ...and the return's line beats the rumour (L7, E6): what the
+          // place has heard about you is true anywhere; that it has SEEN you
+          // is true here. `sysAgainLine` was read at the top of the crossing.
+          showPlace(title, sub || '', stowHeadline() || sysAgainLine || notoHeadline(chapterOf(name)));
+          sysAgainLine = '';
         }, sysFADE_CARD_LAG);
         // and the art goes with the white, once it has finished leaving
         setTimeout(function () {
@@ -36417,7 +37805,9 @@ export function createSystems(game) {
   // will not settle in this chapter" was a question nothing could answer. See
   // sysREST_W, which is the second feature to hang off camIdleT.
   const sysCamInfo = { reach: 0, dist: 0, clear: 1, pitch: 0, sky: 0, rest: 0, rig: 0, shot: 0, lift: 0, lift2: 0, floor: 0, idle: 0, hand: 0,
-                       lens: 0, lensUnfaded: 0, lensBias: 0 };
+                       lens: 0, lensUnfaded: 0, lensBias: 0,
+                       // (L7, E3): the orbit held, how many chosen, the capsule's radius, the swim cap, the underwater tint
+                       orbit: 0, orbits: 0, capR: 0, swim: 0, sub: 0 };
   // The callback, the running best and the three things it has to skip all live
   // out here rather than in a closure built per frame — this file's whole
   // premise is that update() allocates nothing.
@@ -37079,6 +38469,10 @@ export function createSystems(game) {
   // number — the governor's fast line. See THE GOVERNOR in the PERF block.
   let fpsAcc = 0, fpsFrames = 0, fps = 60, fpsCeil = 60, perfAcc = 0;
   let ambTimer = rand(5, 12);
+  // THE LADDER, FRESH (L7, E2): the chapter the ladder last ran in, how long
+  // the arrival's ×2 has left, the signature's clock, and how many
+  // signatures have fired (the probe reads it; nothing in src does).
+  let ambLastBio = '', ambFresh = 0, ambSigT = 0, ambSigN = 0;
   // THE CALM (see the block at the top of this file). One number and one list;
   // the list is appended to at build time by whichever chapters have something
   // in them that runs away, and is never removed from — a biome is built once
@@ -37365,6 +38759,14 @@ export function createSystems(game) {
       breath: +musBreath.toFixed(3), intensity: +musIntensity.toFixed(3),
       // THE CHASE, SCORED (L4, F3): the pulse's hits scheduled, the doubles, the tail
       chaseHits: musChaseHits, chaseDbl: musChaseDbl, chaseT: +musChaseT.toFixed(2),
+      // THE CHASE PER PALETTE (L7, E2): the pulse's instrument here, and the
+      // bands' stroke count, which is the density instrument for a band's
+      // change of material.
+      chaseInst: (musPal.chase || sysMUS_CHASE_DEF).inst, bandHits: musBandHits, barN: musBarIndex,
+      // THE CUES (L7, E2): what each has fired this session
+      cueTick: musCueTickN, cueOpen: musCueOpenN, cueArmed: musCueArmedN,
+      cueDenied: musCueDeniedN, cueExit: musCueExitN,
+      nextIn: marqId ? +todoNextIn(marqId).toFixed(2) : -1, marq: marqId,
       // M1. All three are invisible by design and therefore need a way out:
       // a sky term that quietly stops moving, a second voice that never enters
       // and a phrase that fires into the wrong key are all silent failures.
@@ -37402,6 +38804,12 @@ export function createSystems(game) {
       speak: +musSpeak.toFixed(3), speakN: musSpeakN,
       worldDuck: acSfxIn ? v(acSfxIn.gain) : null, stingEnv: +musStingEnv.toFixed(3),
       skyVel: +musSkyVel.toFixed(4),
+      // THE MIX, INVERTED (L7, E1): the world's envelope on the pad, the
+      // sidechain gain as it stands, the flinch, the plucks' bus, and whether
+      // an arrival is waiting for its moment.
+      worldEnv: +musWorldEnv.toFixed(3), side: musSideG ? v(musSideG.gain) : null,
+      flinch: +musFlinch.toFixed(3), pluckDry: musPluckDry ? v(musPluckDry.gain) : null,
+      arrivePend: musArrivePend, flow: +sysFlowNow.toFixed(3), liftNow: +musLiftNow().toFixed(3), liftT: +musLiftT.toFixed(2),
       band: (musPal && musPal.band) || null, bar: musBarIndex,
       // The rhythm GRID, for the crossing hold (F3b). `beatLen` 0 is the
       // published "there is no pulse" that game.music.beats() answers -1 to,
@@ -39468,6 +40876,7 @@ export function createSystems(game) {
   let napSlept = 0;             // s of THIS sleep, for the line on the way out
   let napShots = 0;             // ...and how many were taken during it
   let napWasOn = false;
+  let napBiome = '';            // where the sleep was (L7, E5)
   let napTold = 0;              // s of cooldown on the wake line
   /** Render, then read, in this turn. See the note above. */
   function napShoot() {
@@ -39490,7 +40899,12 @@ export function createSystems(game) {
       // every other remark in the game, and only for a sleep long enough to
       // be worth mentioning — a player who dozes for four seconds between
       // two tasks is not owed a line about it.
-      if (napWasOn && napSlept > sysNAP_TELL && napTold <= 0 &&
+      // ...and only about a sleep in THIS place (L7, E5 / play 7). MEASURED:
+      // "Nothing happened. You did not miss anything." across Venice's
+      // subtitle 4 s after the cross — the doze was Sydney's, the crossing
+      // reset `capy.nap`, and the line landed on the new chapter's card.
+      const napHere = !!(game.biome && game.biome.current === napBiome) && !transBusy;
+      if (napWasOn && napHere && napSlept > sysNAP_TELL && napTold <= 0 &&
           typeof game.sayNear === "function" && capy && capy.position) {
         napTold = 45;
         const mins = napSlept >= 120 ? Math.round(napSlept / 60) + " minutes"
@@ -39506,6 +40920,7 @@ export function createSystems(game) {
       napWasOn = false; napSlept = 0; napShots = 0; napShotT = sysNAP_SHOT;
       return;
     }
+    if (!napWasOn) napBiome = (game.biome && game.biome.current) || '';
     napWasOn = true;
     napSlept += dt;
     napShotT -= dt;
@@ -39989,7 +41404,8 @@ export function createSystems(game) {
         tally[v] = (tally[v] || 0) + 1; n++;
       }
       if (reset) { for (let i = 0; i < sysAMB_LOG; i++) sysAmbLog[i] = undefined; sysAmbLogN = 0; }
-      return { n: n, total: sysAmbLogN, tally: tally };
+      // ...and the fresh clock and the signature count (L7, E2)
+      return { n: n, total: sysAmbLogN, tally: tally, fresh: +ambFresh.toFixed(1), sigN: ambSigN, sigIn: +ambSigT.toFixed(1) };
     },
     /**
      * WHAT IS ON THE BOARD, AND WHAT IS BEING SET RIGHT NOW.
@@ -40505,7 +41921,19 @@ export function createSystems(game) {
     sysSpatial.at = (g && g.position) || null;
     sfx('gasp', sysSpatial);
     sysSpatial.at = null;
-    musChaseT = Math.max(musChaseT, 2.5);
+    // ---- A STARTLE IS NOT A CHASE (L7, E1 / audio #1) --------------------
+    // This wrote `musChaseT = max(·, 2.5)`, and standing at the Sydney spawn
+    // for thirty seconds measured nine gasps, the chase pulse running 57 % of
+    // the time and forty bendir hits with nobody chasing — the "still state
+    // that cannot hold a line" was people noticing you. Only `npc:chase`
+    // writes musChaseT now. A startle keeps a musical shape: the 0.3 s bass
+    // lean the chase onset already has, and a flinch on the pad filter
+    // (−sysMUS_FLINCH_CUT, τ 0.05 down / 0.4 back) — `musApplyT` is pushed
+    // past the block's period so the writer runs on the next frame rather
+    // than up to 300 ms after the gasp.
+    musChaseHit = Math.max(musChaseHit, 0.5);
+    musFlinch = 1;
+    musApplyT = 1;
     game.state.chaos = clamp(game.state.chaos + 0.06, 0, 1);
   });
   // =========================================================================
@@ -40676,8 +42104,8 @@ export function createSystems(game) {
     // The rule was learnt by ear or not at all. One toast, on the save, on
     // the first rung of the first chain: what three is, what five is, and
     // what ends it.
-    if (incN === 1 && !jrIncTold) {
-      jrIncTold = true; saveSoon();
+    if (incN === 1 && !jrIncTold && !sysTutSaid.inc) {
+      jrIncTold = true; sysTutSaid.inc = true; saveSoon();   // once a session too (L7, E5)
       toast('somebody saw that. three things in front of people is AN INCIDENT, five is A SCENE — unless one of them reaches you first.');
     }
     // Q1: ...and WHAT it was. After the same-prop gate and after the
@@ -41401,6 +42829,13 @@ export function createSystems(game) {
   // the hide works, or the hand lands: the pulse stops inside a beat (L4, F3)
   game.events.on('npc:lost', function () { musChaseT = Math.min(musChaseT, 0.6); });
   game.events.on('npc:caught', function () { musChaseT = Math.min(musChaseT, 0.6); });
+  // ---- THE DENIAL HAS A NOTE (L7, E2 / audio 8) ---------------------------
+  // The snort is the animal's (capybara.js, on the same event); this is the
+  // score's: a flat second on the bass under it. `npc:denied` is not a name
+  // anything in src emits — the reviewer's census fires it — and it is bound
+  // here so the census and the game agree on what a denial sounds like.
+  game.events.on('npc:caught', function () { musCueDenied(); });
+  game.events.on('npc:denied', function () { musCueDenied(); });
 
   // --- the emigration ------------------------------------------------------
   // environment.js emits this the moment the capybara is aboard a departing ferry.
@@ -41964,6 +43399,14 @@ export function createSystems(game) {
       camYawTarget = sysDampAngle(camYawTarget, capy.group.rotation.y + Math.PI, sysSAIL_YAW_L, dt);
     } else if (rideYaw === rideYaw && camHandT <= 0) {
       camYawTarget = sysDampAngle(camYawTarget, rideYaw + Math.PI, sysSAIL_YAW_L, dt);
+    // ---- THE CUT BOOM ORBITS (L7, E3). See sysORBIT_CUT. ------------------
+    // Above the tidy-up and the walking recentre on purpose: both of them
+    // want the rig dead astern, which is the bearing the ray has just said
+    // is a wall. The bearing is chosen at the boom block below (it needs the
+    // reach and pitch this frame will use) and held here; the hand, a shot,
+    // a helm and a ride all still win, as they do over everything under them.
+    } else if (started && !mounted && camHandT <= 0 && camOrbitYaw === camOrbitYaw) {
+      camYawTarget = sysDampAngle(camYawTarget, camOrbitYaw, sysORBIT_L, dt);
     // ---- ...AND THE TIDY-UP STANDS DOWN FOR THE ORBIT (N5) -------------
     // MEASURED: the nap drift below was written into `camYawTarget` every
     // frame for twelve minutes and the rendered lens turned **0.003 rad** and
@@ -42090,9 +43533,10 @@ export function createSystems(game) {
     // run yet — which is correct rather than merely acceptable: it is already a
     // damped quantity that only eases outward, and reading it here means the
     // target and the eye are cut by the same number on the same frame.
-    sysLook.y = damp(sysLook.y, r.y + camClearF *
-                                lerp(lerp(lerp(sysLOOK_RAISE, sysSKY_RAISE, skyT),
-                                          sysSAIL_RAISE, sailT), sysFLY_RAISE, flyT), 4, dt);
+    // ...named, because the swim cap below re-scales it (L7, E3)
+    const lookRaiseNow = camClearF * lerp(lerp(lerp(sysLOOK_RAISE, sysSKY_RAISE, skyT),
+                                                sysSAIL_RAISE, sailT), sysFLY_RAISE, flyT);
+    sysLook.y = damp(sysLook.y, r.y + lookRaiseNow, 4, dt);
     sysLook.z = damp(sysLook.z, lz, lookL, dt);
 
     // Speed dolly: in close at a waddle, eased out and DOWN at a full run. In
@@ -42228,7 +43672,12 @@ export function createSystems(game) {
     // a cut it was always going to have. The question this latch asks is not
     // "is the boom cut", it is "is the boom cut BY OPENING OUT", and only a
     // crane that is already half extended can answer it.
-    if (camClearF < 0.48 && skyRestT > sysREST_W * 0.42) restBlocked = true;
+    // ...and not while the orbit is still travelling to a bearing the ray
+    // has said is clearer (L7, E3): the bearings on the way there are the
+    // ones it is leaving, and a latch taken on one of those is the old
+    // answer said twice.
+    const orbitSwing = camOrbitYaw === camOrbitYaw && Math.abs(sysWrapPi(camYaw - camOrbitYaw)) > 0.15;
+    if (camClearF < 0.48 && skyRestT > sysREST_W * 0.42 && !orbitSwing) restBlocked = true;
     const restAsk = (started && !mounted && !sysCalmOn() && !restBlocked &&
                      camHandT <= 0 && restIdleT >= sysREST_T) ? sysREST_W : 0;
     skyRestT = damp(skyRestT, restAsk,
@@ -42344,6 +43793,8 @@ export function createSystems(game) {
     // own rig returns this same `w` off this same formula, is untouched to the
     // character, and a biome that wants the camera more than the dive does
     // (a river, a balloon, a helm) keeps it.
+    // ...the chapter's own ask, before the dive's, for the swim cap below
+    const bioRigW = rigWant;
     if (game.capy && game.capy.diving) {
       const dd2 = game.capy.depth || 0;
       const dw = clamp((dd2 - 0.45) / 1.1, 0, 1) * (1 - Math.max(flyT, sailT));
@@ -42358,6 +43809,29 @@ export function createSystems(game) {
       camReach = lerp(camReach, rigDist, rigT);
       camPitch = lerp(camPitch, rigPitch, rigT);
       sysLook.y = lerp(sysLook.y, r.y + rigRaise, rigT);
+    }
+    // ---- THE SWIM LENS (L7, E3). See sysSWIM_DIST. --------------------------
+    // A cap on the two numbers, not a fourth candidate: min() against the
+    // reach and the pitch the chain above arrived at, so the dive rig (5 m
+    // at 7 degrees) passes through it untouched and a chapter's own ask
+    // weights it down. Blended by its own scalar so hauling out is a move
+    // and not a cut.
+    {
+      const swimAsk = (started && game.capy && game.capy.swimming && !mounted) ? 1 : 0;
+      swimRigT = damp(swimRigT, swimAsk, sysSWIM_L, dt);
+      const sw2 = swimRigT * (1 - Math.max(flyT, sailT)) * (1 - bioRigW);
+      if (sw2 > 0.002) {
+        if (camReach > sysSWIM_DIST) {
+          // ...and the raise comes in with the boom (P1's rule): the rest
+          // crane's 2.1 m over a 7 m boom drops the animal to the bottom of
+          // the frame, and the ratio is what sets the composition
+          // ...lerped to an ABSOLUTE, never scaled in place: sysLook.y is a
+          // filter, and a multiply on it every frame converges on nothing
+          sysLook.y = lerp(sysLook.y, r.y + lookRaiseNow * (sysSWIM_DIST / camReach), sw2);
+          camReach = lerp(camReach, sysSWIM_DIST, sw2);
+        }
+        if (camPitch > sysSWIM_PITCH) camPitch = lerp(camPitch, sysSWIM_PITCH, sw2);
+      }
     }
     // ---- ...AND THE FRAMING LAYER SITS ON TOP OF ALL OF IT (v26) --------
     // Applied last for the same reason it is first in the yaw chain, and
@@ -42614,6 +44088,45 @@ export function createSystems(game) {
     // solid and, more importantly, what does not.
     {
       const f = sysCamClear(sysAnchor, sysDesired);
+      // ---- THE CUT BOOM ORBITS (L7, E3). See sysORBIT_CUT. ----------------
+      // Off LAST frame's damped camClearF for the dwell, and off THIS frame's
+      // ray (`f`, the same one the cut below uses) for the comparison, so a
+      // bearing has to beat the boom as it actually is and not as it was.
+      // Five short rays at most every quarter second, and only while cut.
+      const orbitCan = started && !mounted && sailT < 0.05 && flyT < 0.05 && camHandT <= 0 &&
+                       shotW < 0.002 && titleT < 0.002 && photoLens < 0.002 && !transBusy &&
+                       !(rideYaw === rideYaw) && (diveOn || rigT < 0.5);
+      if (camOrbitYaw === camOrbitYaw) {
+        const omx = r.x - camOrbitX, omz = r.z - camOrbitZ;
+        if (!orbitCan || omx * omx + omz * omz > sysORBIT_MOVE * sysORBIT_MOVE) camOrbitYaw = NaN;
+      }
+      camOrbitCutT = (orbitCan && camClearF < sysORBIT_CUT) ? camOrbitCutT + dt : 0;
+      camOrbitSinceT += dt;
+      if (camOrbitCutT >= sysORBIT_DWELL && camOrbitSinceT >= sysORBIT_EVERY) {
+        camOrbitSinceT = 0;
+        // with the stick held, the near pair only — see the constant's note
+        const nStep = (Math.abs(ix) + Math.abs(iz) >= 0.02) ? 4 : 5;
+        let best = f, bestYaw = NaN;
+        for (let i = 0; i < nStep; i++) {
+          const oy = useYaw + sysORBIT_STEPS[i];
+          sysOrbitV.set(sysAnchor.x + Math.sin(oy) * cp * dd, sysAnchor.y + sn * dd, sysAnchor.z + Math.cos(oy) * cp * dd);
+          let of = sysCamClear(sysAnchor, sysOrbitV);
+          // under water the eye has to be over deep ground as well as clear
+          // of walls, or the orbit swings the lens onto the quay it is
+          // beside — the dive pull-in's own test, on the candidate
+          if (diveOn && diveCeil < Infinity &&
+              sysGroundY(sysOrbitV.x, sysOrbitV.z) + sysDIVE_EYE_CLEAR > Math.min(sysOrbitV.y, diveCeil)) of = 0;
+          if (of > best) { best = of; bestYaw = oy; }
+        }
+        if (bestYaw === bestYaw && best >= f + sysORBIT_GAIN) {
+          camOrbitYaw = bestYaw; camOrbitX = r.x; camOrbitZ = r.z; camOrbitCutT = 0;
+          // ...and the place is asked again from the new side: the latch
+          // (restBlocked, above) was one bearing's answer
+          restBlocked = false;
+          sysCamInfo.orbits = (sysCamInfo.orbits | 0) + 1;
+        }
+      }
+      sysCamInfo.orbit = camOrbitYaw === camOrbitYaw ? 1 : 0;
       // In, immediately: a frame spent inside a wall is a frame the player
       // cannot play. Out, slowly, or every doorway is a lurch.
       camClearF = f < camClearF ? f : damp(camClearF, f, sysCAM_CLEAR_OUT, dt);
@@ -42628,6 +44141,7 @@ export function createSystems(game) {
     sysCamInfo.pitch = camPitch; sysCamInfo.sky = skyT; sysCamInfo.rig = rigT;
     sysCamInfo.shot = shotW; sysCamInfo.rest = skyRestT;
     sysCamInfo.idle = restIdleT; sysCamInfo.hand = camHandT;
+    sysCamInfo.swim = swimRigT;   // (L7, E3)
 
     // The spring is tracked separately from camera.position so the shake offset
     // is never fed back into the smoothing (that is what made shake "swim").
@@ -42738,9 +44252,22 @@ export function createSystems(game) {
       fovSpeed = damp(fovSpeed, want, sysFOV_LAMBDA, dt);
       // The punch: a critically-damped spring, integrated semi-implicitly so it
       // cannot gain energy on a long frame the way an explicit one does.
+      // ...AND SUBSTEPPED (L7, E3). Semi-implicit is stable in the spring
+      // term at any dt under 2/omega; it is NOT stable in the DAMPING term
+      // once c * dt passes 2, and at the 0.1 s frame cap c * dt is 2.45 here
+      // and 2.76 on the dip below. Measured on a 27-minute probe loop with
+      // two to five seconds of raycast per sample: the dip went 18 -> 65 ->
+      // 90 -> -90 degrees on successive frames, then Infinity, then the
+      // camera's matrix was NaN and Monte Carlo rendered as a blank wash.
+      // A real machine sees the same frame after a tab switch or a GC pause
+      // inside the half second after a landing. Twenty-millisecond steps.
       if (fovKick !== 0 || fovKickV !== 0) {
-        fovKickV += (-sysFOV_KICK_K * fovKick - sysFOV_KICK_C * fovKickV) * dt;
-        fovKick += fovKickV * dt;
+        let kn = dt > sysSPRING_H ? Math.ceil(dt / sysSPRING_H) : 1;
+        const kh = dt / kn;
+        for (; kn > 0; kn--) {
+          fovKickV += (-sysFOV_KICK_K * fovKick - sysFOV_KICK_C * fovKickV) * kh;
+          fovKick += fovKickV * kh;
+        }
         if (Math.abs(fovKick) < 0.004 && Math.abs(fovKickV) < 0.04) { fovKick = 0; fovKickV = 0; }
       }
       // ...and the lean-in, off the SLOW-MOTION component and not off the total
@@ -42789,16 +44316,44 @@ export function createSystems(game) {
     // vector rather than by writing sysLook.y, because sysLook is damped toward
     // its target every frame and a write here would leak into that filter and
     // take a second to come back out.
+    // ...substepped (L7, E3): see the fovKick integrator for the measurement
     if (camDip !== 0 || camDipV !== 0) {
-      camDipV += (-sysDIP_SPRING * camDip - sysDIP_DAMP * camDipV) * dt;
-      camDip += camDipV * dt;
+      let dn = dt > sysSPRING_H ? Math.ceil(dt / sysSPRING_H) : 1;
+      const dh = dt / dn;
+      for (; dn > 0; dn--) {
+        camDipV += (-sysDIP_SPRING * camDip - sysDIP_DAMP * camDipV) * dh;
+        camDip += camDipV * dh;
+      }
       if (Math.abs(camDip) < 0.004 && Math.abs(camDipV) < 0.03) { camDip = 0; camDipV = 0; }
     }
     // The look target is never shaken — only the eye moves.
-    if (camDip !== 0) {
-      sysV1.copy(sysLook); sysV1.y += camDip;
-      camera.lookAt(sysV1);
-    } else camera.lookAt(sysLook);
+    sysV1.copy(sysLook); sysV1.y += camDip;
+    // ---- THE RENDERED PITCH IS CAPPED WHILE THE BOOM IS CUT (L7, E3) -----
+    // See sysORBIT_PITCH_MAX. On the frame's scratch vector, the way the dip
+    // is, and off the rendered eye, which is the one the ray placed. Weighted
+    // down by every rig that composes its own pitch — a shot, a chapter's
+    // rig, the helm, the bird, the card — so the only lens this touches is
+    // the walking one, in the one state where it was a top-down of the floor.
+    {
+      const capW = clamp((1 - camClearF) / sysORBIT_PITCH_IN, 0, 1) *
+                   (1 - rigT) * (1 - flyT) * (1 - sailT) * (1 - shotW) * (1 - titleT) * (1 - photoLens);
+      if (capW > 0.001) {
+        const hx = camera.position.x - sysV1.x, hz = camera.position.z - sysV1.z;
+        const hh = Math.sqrt(hx * hx + hz * hz);
+        const dy = camera.position.y - sysV1.y;
+        const dyMax = hh * Math.tan(sysORBIT_PITCH_MAX);
+        if (dy > dyMax) sysV1.y += (dy - dyMax) * capW;
+      }
+    }
+    camera.lookAt(sysV1);
+    // ---- THE CAPSULE (L7, E3). See _lensCapA in shared.js. ----------------
+    // The rendered eye to the animal's chest, 0.7 m, written after the eye
+    // is final and before the photo rig takes it: the photo lens is the one
+    // frame the player has composed on purpose, and it gets what it sees.
+    lensCapTick(camera.position.x, camera.position.y, camera.position.z,
+                r.x, r.y + sysLENS_CAP_CHEST, r.z,
+                (started && !transBusy && photoLens < 0.5 && !game.state.noLensCap) ? sysLENS_CAP_R : 0);
+    sysCamInfo.capR = (started && !transBusy && photoLens < 0.5 && !game.state.noLensCap) ? sysLENS_CAP_R : 0;
     // ---- THE CAMERA (L4, F1a): the orbit, over everything above ----------
     photoTick(game.state.rawDt || 0.016);
     if (photoLens > 0.002) photoRig(photoLens);
@@ -43861,20 +45416,37 @@ export function createSystems(game) {
       sysImpPrev = spd;
       if (input.jump || input.jumpPressed) sysImpJumpT = sysIMP_JUMP_T; else if (sysImpJumpT > 0) sysImpJumpT -= dt;
       if (sysImpCool > 0) sysImpCool -= dt;
-      const own = sysImpJumpT > 0 || mounted || !!(cpy && (cpy.carriedBy || cpy.atHelm || cpy.diving)) ||
+      // ---- ...AND THE SPRINT IS THE ANIMAL'S OWN (L7, E5 / design 2.1) ----
+      // MEASURED: a sprint from standing reaches 7.4 m/s in ~60 ms (0 → 2.7
+      // → 7.1) and the window read it as a shove — 4 of 6 controlled trials,
+      // 7/34, 9/20 and 13/26 of every pill in Sydney, Marrakech and Hanoi
+      // were "that was something back there" on the player's own Shift key.
+      // A grounded gain that ends under the run cap, with the run key down
+      // and the velocity within 30° of what the stick asked for (input.x/z
+      // rotated by camYaw, the three fields capybara.js drives from), is a
+      // run. A gain that is off-axis, airborne, or over the cap is still
+      // somebody else's.
+      let ownRun = false;
+      if (input.run && cpy && cpy.grounded && spd <= sysIMP_RUN_MAX) {
+        const cyw = Math.cos(input.camYaw), syw = Math.sin(input.camYaw);
+        const wdx = input.x * cyw + input.z * syw, wdz = -input.x * syw + input.z * cyw;
+        const wm = Math.sqrt(wdx * wdx + wdz * wdz), hm = Math.sqrt(v.x * v.x + v.z * v.z);
+        if (wm > 0.1 && hm > 0.1) ownRun = (wdx * v.x + wdz * v.z) / (wm * hm) > sysIMP_RUN_COS;
+      }
+      const own = sysImpJumpT > 0 || mounted || ownRun || !!(cpy && (cpy.carriedBy || cpy.atHelm || cpy.diving)) ||
                   !!game.state.sailing || transBusy || !started;
       sysImpWin = own ? 0 : sysImpWin * Math.exp(-dt / sysIMP_TAU) + (gain > 0 ? gain : 0);
       if (sysImpWin > sysIMP_V && sysImpCool <= 0) {
         sysImpCool = sysIMP_COOL; sysImpWin = 0;
-        let cause = null;
-        if (cpy && cpy.impulseSrc && game.state.time - (cpy.impulseT || -1e9) < sysIMP_FRESH) cause = cpy.impulseSrc;
+        let cause = null, src = false;
+        if (cpy && cpy.impulseSrc && game.state.time - (cpy.impulseT || -1e9) < sysIMP_FRESH) { cause = cpy.impulseSrc; src = true; }
         if (!cause) {
           const row = sysIMPULSE_BY[game.biome ? game.biome.current : ''];
           const wet = !!(cpy && cpy.swimming);
           if (row) cause = wet ? (row.wet || row.dry) : (row.dry || null);
           if (!cause) cause = wet ? 'the swell' : 'something back there';
         }
-        game.state.impulseLast = { cause: cause, t: game.state.time, v: +spd.toFixed(1) };   // for the probes
+        game.state.impulseLast = { cause: cause, t: game.state.time, v: +spd.toFixed(1), src: src };   // for the probes
         toast('that was ' + cause, 'note');
       }
     }
@@ -43981,8 +45553,11 @@ export function createSystems(game) {
         // A bar with a word on it is a puzzle to a player who has not been
         // told what the word means. Once a journey, on the save with the
         // slide's and the paper's.
-        if (want && !puffEver && !transBusy) {
-          puffEver = true;
+        // ...and once per SESSION as well as per file (L7, E5 / play 7): the
+        // fresh player saw this line three times in one chapter, and the save
+        // flag alone is one write away from being false on a reload.
+        if (want && !puffEver && !sysTutSaid.puff && !transBusy) {
+          puffEver = true; sysTutSaid.puff = true;
           saveSoon();
           toastKeep('that bar is your puff. a run spends it; stand still and it comes back.');
         }
@@ -44046,7 +45621,12 @@ export function createSystems(game) {
     if (started && !paperEver && !transBusy && !jrShown && !ledShown && !albShown &&
         !pauseShown && !game.state.paused && !hudBare) {
       paperT += dt;
-      if (paperT > 8) {
+      // ...and in a pause in the crowd's talk (L7, E5 / writing W4): the one
+      // line about the HUD must not go up under four bubbles. Eight seconds,
+      // then the first frame with nobody talking, capped at twenty.
+      let busy = false;
+      try { busy = typeof game.bubblesLive === 'function' && game.bubblesLive() > 0; } catch (e) { busy = false; }
+      if (paperT > 8 && (!busy || paperT > 20)) {
         paperEver = true;
         saveSoon();
         toast(sysIsTouch()
@@ -44289,19 +45869,67 @@ export function createSystems(game) {
           // it used to pick for you.
           homeSet(0); homeT = 0;
           homeEl.classList.remove('show'); homeShown = false;
-          // ...and it opens OUT OF the board that is standing there, after half
-          // a second of camera. See boardOpen — every failure of which is this
-          // line as it was.
-          boardOpen();
+          // ---- ...AND UNDER THE GATE IT ANSWERS (L7, E5 / play 2) --------
+          // MEASURED: at 3 of 20 three wheeks at the wharf opened a board of
+          // nineteen dimmed rows, or nothing at all, and the paper's "after 7
+          // more" was the only word on the door. The number and the other
+          // door, as a note — a receipt for the press, so the fresh budget
+          // does not hold it.
+          const hereN = game.biome ? chapterOf(game.biome.current) : 1;
+          if (!chapEnough(hereN)) {
+            toast('not yet — ' + sysWayNeed(hereN) + ' more here, or Choose a place from the title card', 'note');
+          } else {
+            // ...and it opens OUT OF the board that is standing there, after
+            // half a second of camera. See boardOpen — every failure of which
+            // is this line as it was.
+            boardOpen();
+          }
         }
       }
     } else if (homeCount || homeT > 0) {
       homeSet(0); homeT = 0;
     }
+    // ---- THREE WHEEKS NEAR THE DOOR, NOT ON IT (L7, E5 / play 2) ----------
+    // The fresh player stood 4 m from the chart's wharf dot and wheeked three
+    // times to silence: the zone is the deck's seaward third and the dot is
+    // the deck. Inside sysWAY_NEAR of the way point but outside the zone, the
+    // third wheek says where the door actually is, or what the gate wants.
+    if (!homeOk && started && !transBusy && input.whistlePressed) {
+      const wp = wayPoint();
+      if (wp && Math.hypot(wp.x - p.x, wp.z - p.z) < sysWAY_NEAR) {
+        wayNearN = (wayNearT > 0 ? wayNearN : 0) + 1;
+        wayNearT = sysHOME_WINDOW;
+        if (wayNearN >= 3) {
+          wayNearN = 0; wayNearT = 0;
+          const hereN = game.biome ? chapterOf(game.biome.current) : 1;
+          const cd = chapterDef(hereN);
+          toast(!chapEnough(hereN)
+            ? 'not yet — ' + sysWayNeed(hereN) + ' more here, or Choose a place from the title card'
+            : 'closer — the door is ' + ((cd && cd.way) || 'there') + '. three wheeks on it', 'note');
+        }
+      }
+    }
+    if (wayNearT > 0) { wayNearT -= dt; if (wayNearT <= 0) wayNearN = 0; }
     // transBusy flips inside jrTravel() on the way out, which pulls the prompt
     // down on the same frame instead of letting it flash once behind the white-out.
     const homeVis = homeOk && !transBusy;
-    if (homeVis !== homeShown) { homeShown = homeVis; homeEl.classList.toggle('show', homeVis); }
+    if (homeVis !== homeShown) {
+      homeShown = homeVis; homeEl.classList.toggle('show', homeVis);
+      // ---- THE PLACE IS HEARD BEFORE IT IS SEEN (L7, E2 / audio 8) --------
+      // On the rising edge — stepping into the exit zone — the DESTINATION's
+      // signature rung (sysAMB_SIG) at −12 dB: the way on out of here is the
+      // frontier chapter (jrOpen's rule, the first one not yet enough), or
+      // home when this is it. It comes off the ring like any rung, so it is
+      // heard from here, as a memory of somewhere else. Once per entry; the
+      // board's own horn and F2's J-cut own the crossing itself.
+      if (homeVis) {
+        let dest = 1;
+        for (let k = 1; k <= chapMax; k++) { if (!chapEnough(k)) { dest = k; break; } }
+        let ddef = chapterDef(dest);
+        if (ddef && game.biome && game.biome.isActive(ddef.biome)) ddef = chapterDef(dest < chapMax ? dest + 1 : 1);
+        if (ddef && ddef.biome && ambSig(ddef.biome, 0.25)) musCueExitN++;
+      }
+    }
 
     // The door, as an object: planted, turned over and heard. See sysBOARD_DRESS.
     boardFrame(dt);
@@ -44328,7 +45956,30 @@ export function createSystems(game) {
         // who has stopped to listen should hear more of the place, not less.
         // Measured before: Kyoto's ladder fired 5 rungs in two minutes of
         // play and the world bus sat 17 dB under the score at rest.
-        ambTimer -= dt * (1 + sysCalmNow * 0.4);
+        // ---- ...AND THE FIRST TWO MINUTES RUN AT TWICE THE RATE (L7, E2).
+        // Measured (l7r-audio-drive): nine rungs in Sydney's first 164 s,
+        // one every 18 s, and the third minute was nine distinct names. A
+        // new place should talk first. `ambFresh` is sysAMB_FRESH on the
+        // frame the biome changes and the clock runs ×2 until it is gone;
+        // the signature's own clock (sysAMB_SIG) is set on the same edge.
+        const ambBio = game.biome ? game.biome.current : '';
+        if (ambBio !== ambLastBio) {
+          ambLastBio = ambBio;
+          ambFresh = sysAMB_FRESH;
+          ambSigT = rand(sysAMB_SIG_FIRST_A, sysAMB_SIG_FIRST_B);
+          // a fresh chapter should not wait out a 44 s bonshō gap either
+          if (ambTimer > 8) ambTimer = rand(3, 8);
+        }
+        if (ambFresh > 0) ambFresh -= dt;
+        ambTimer -= dt * (1 + sysCalmNow * 0.4) * (ambFresh > 0 ? 2 : 1);
+        // ---- THE SIGNATURE (L7, E2): see sysAMB_SIG ---------------------
+        if (!transBusy) {
+          ambSigT -= dt;
+          if (ambSigT <= 0) {
+            ambSigT = rand(sysAMB_SIG_EVERY_A, sysAMB_SIG_EVERY_B);
+            if (ambSig(ambBio, 1)) ambSigN++;
+          }
+        }
         // ---- ONE SOUNDSCAPE PER PLACE -----------------------------------
         // This used to be "a silver gull, unless you are in the Andes", which
         // was right when there were two biomes and became wrong the moment
@@ -44367,7 +46018,7 @@ export function createSystems(game) {
               else if (r < 0.62) sysAmb('vendor', { volume: rand(0.06, 0.12), pitch: rand(0.9, 1.1) });
               else if (r < 0.80) sysAmb('bark', { volume: rand(0.05, 0.10), pitch: rand(0.8, 1.1) });
               else if (r < 0.92) sysAmb('gull', { volume: rand(0.05, 0.10), pitch: rand(2.0, 2.4) });
-              else sysAmb('chime', { volume: rand(0.05, 0.09), pitch: rand(0.5, 0.62) });
+              else sysAmb('farbell', { volume: rand(0.06, 0.11), pitch: rand(0.9, 1.1) });   // the church's bronze; was `chime` at 0.5–0.62 (L7, E2)
               ambTimer = rand(4, 9);
             } else if (zn('market')) {
               // Under the awnings: people, crates, a radio, and a dog.
@@ -44430,7 +46081,7 @@ export function createSystems(game) {
                 sysAmb('chime', { volume: rand(0.07, 0.13), pitch: rand(0.52, 0.66) });
                 ambTimer = rand(6, 12);
               } else if (r < 0.50) {
-                sysAmb('splash', { volume: rand(0.05, 0.11), pitch: rand(0.44, 0.64) });
+                sysAmb('lap', { volume: rand(0.06, 0.12), pitch: rand(0.85, 1.05) });   // the harbour on the hull; was `splash` at 0.44–0.64 (L7, E2)
                 ambTimer = rand(8, 17);
               } else if (r < 0.80) {
                 sysAmb('gull', { volume: rand(0.06, 0.12), pitch: rand(1.2, 1.7) });
@@ -44464,7 +46115,7 @@ export function createSystems(game) {
             } else if (onRiver) {
               if (r < 0.62) sysAmb('hiss', { volume: rand(0.09, 0.16), pitch: rand(0.85, 1.20) });
               else if (r < 0.86) sysAmb('splash', { volume: rand(0.06, 0.12), pitch: rand(0.7, 1.0) });
-              else sysAmb('gull', { volume: rand(0.04, 0.08), pitch: rand(0.42, 0.56) });
+              else sysAmb('heron', { volume: rand(0.06, 0.11), pitch: rand(0.92, 1.1) });   // was `gull` at 0.42–0.56 (L7, E2)
               ambTimer = rand(4, 9);
             } else if (r < 0.30) {
               // THE BELL IS NOW A BELL. This was 'chime' — the four-note
@@ -44548,12 +46199,13 @@ export function createSystems(game) {
               ambTimer = rand(7, 14);
             } else if (cp && zz < rioAmbSurfZ) {
               // in it, or nearly: the break is the only thing you can hear.
-              if (r < 0.72) sysAmb('splash', { volume: rand(0.12, 0.21), pitch: rand(0.42, 0.62) });
+              // the break is a SWELL, not a splash (L7, E2): was `splash` at 0.42–0.62
+              if (r < 0.72) sysAmb('swell', { volume: rand(0.14, 0.24), pitch: rand(0.85, 1.1) });
               else sysAmb('hiss', { volume: rand(0.07, 0.13), pitch: rand(0.5, 0.75) });
               ambTimer = rand(3.5, 8);
             } else {
               // the sand and the calçadão, which is where the chapter opens.
-              if (r < 0.44) sysAmb('splash', { volume: rand(0.08, 0.14), pitch: rand(0.5, 0.7) });
+              if (r < 0.44) sysAmb('swell', { volume: rand(0.09, 0.16), pitch: rand(0.9, 1.1) });   // was `splash` at 0.5–0.7 (L7, E2)
               else if (r < 0.74) sysAmb('gull', { volume: rand(0.08, 0.14), pitch: rand(1.1, 1.4) });
               else if (r < 0.90) sysAmb('cheer', { volume: rand(0.05, 0.10), pitch: rand(0.9, 1.2) });
               else sysAmb('tick', { volume: rand(0.05, 0.10), pitch: rand(0.5, 0.8) });  // a ball, somewhere
@@ -44572,7 +46224,7 @@ export function createSystems(game) {
             const r = Math.random();
             if (r < 0.30) sysAmb('hiss', { volume: rand(0.09, 0.17), pitch: rand(0.35, 0.5) });
             else if (r < 0.60) sysAmb('berg', { volume: rand(0.10, 0.20), pitch: rand(0.85, 1.15) });
-            else if (r < 0.74) sysAmb('splash', { volume: rand(0.05, 0.10), pitch: rand(0.4, 0.6) });
+            else if (r < 0.74) sysAmb('lap', { volume: rand(0.06, 0.12), pitch: rand(0.85, 1.05) });   // the lagoon on the shore; was `splash` at 0.4–0.6 (L7, E2)
             else if (r < 0.88) sysAmb('gull', { volume: rand(0.06, 0.11), pitch: rand(1.3, 1.7) });
             else sysAmb('geyser', { volume: rand(0.13, 0.22), pitch: rand(0.92, 1.10) });
             ambTimer = rand(13, 28);
@@ -44703,7 +46355,7 @@ export function createSystems(game) {
               }
             } else {
               const r = Math.random();
-              if (r < 0.46) sysAmb('splash', { volume: rand(0.07, 0.14), pitch: rand(0.5, 0.8) });
+              if (r < 0.46) sysAmb('swell', { volume: rand(0.08, 0.15), pitch: rand(0.9, 1.15) });   // the surf; was `splash` at 0.5–0.8 (L7, E2)
               else if (r < 0.74) sysAmb('gull', { volume: rand(0.08, 0.15), pitch: rand(1.1, 1.5) });
               else if (r < 0.90) sysAmb('rustle', { volume: rand(0.06, 0.12), pitch: rand(0.6, 0.9) });
               else sysAmb('pop', { volume: rand(0.04, 0.08), pitch: rand(0.5, 0.7) });
@@ -44759,7 +46411,7 @@ export function createSystems(game) {
               sysAmb('gull', { volume: rand(0.05, 0.10) * gnd, pitch: rand(0.55, 0.8) });
               ambTimer = rand(10, 22);
             } else {
-              sysAmb('chime', { volume: rand(0.07, 0.14) * gnd, pitch: rand(0.45, 0.62) });
+              sysAmb('farbell', { volume: rand(0.08, 0.15) * gnd, pitch: rand(0.9, 1.1) });   // a village bell far off; was `chime` at 0.45–0.62 (L7, E2)
               ambTimer = rand(14, 30) * (1 + sky * 1.6);
             }
           } else if (bio === 'sahara') {
@@ -44885,21 +46537,26 @@ export function createSystems(game) {
             const packK = an ? an.pack() : 0;
             const podK = an ? an.withPod() : 0;
             const rr = Math.random();
+            // ---- ...IN ITS OWN WORDS (L7, E2). The pod was `splash` at
+            // 0.36–0.52, the pack `rustle` at 0.34–0.52, the colony `bark` at
+            // 1.7–2.4: the sea's swell, Iceland's berg (two lumps of ice
+            // touching — the pack is that, everywhere) and a penguin. The
+            // wind stays a hiss: it is one.
             if (podK > 0.35) {
-              if (rr < 0.55) sysAmb('splash', { volume: rand(0.12, 0.22), pitch: rand(0.36, 0.52) });
+              if (rr < 0.55) sysAmb('swell', { volume: rand(0.14, 0.24), pitch: rand(0.8, 1.0) });
               else sysAmb('hiss', { volume: rand(0.10, 0.18), pitch: rand(0.28, 0.40) });
               ambTimer = rand(2.2, 5.0);
             } else if (packK > 0.4) {
-              sysAmb('rustle', { volume: rand(0.07, 0.14), pitch: rand(0.34, 0.52) });
+              sysAmb('berg', { volume: rand(0.08, 0.16), pitch: rand(0.8, 1.1) });
               ambTimer = rand(5, 11);
             } else if (rr < 0.34) {
               sysAmb('hiss', { volume: rand(0.07, 0.14), pitch: rand(0.26, 0.40) });
               ambTimer = rand(12, 26);
             } else if (rr < 0.62) {
-              sysAmb('bark', { volume: rand(0.05, 0.11), pitch: rand(1.7, 2.4) });
+              sysAmb('penguin', { volume: rand(0.06, 0.12), pitch: rand(0.9, 1.2) });
               ambTimer = rand(9, 19);
             } else if (rr < 0.84) {
-              sysAmb('splash', { volume: rand(0.05, 0.10), pitch: rand(0.40, 0.60) });
+              sysAmb('swell', { volume: rand(0.06, 0.12), pitch: rand(0.85, 1.1) });
               ambTimer = rand(10, 21);
             } else {
               sysAmb('gull', { volume: rand(0.05, 0.10), pitch: rand(1.6, 2.1) });
@@ -44923,9 +46580,9 @@ export function createSystems(game) {
             const rr = Math.random();
             if (rr < 0.26) sysAmb('vendor', { volume: rand(0.04, 0.08), pitch: rand(0.9, 1.14) });
             else if (rr < 0.46) sysAmb('bowls', { volume: rand(0.035, 0.07), pitch: rand(0.9, 1.15) });
-            else if (rr < 0.70) sysAmb('bark', { volume: rand(0.03, 0.06), pitch: rand(1.9, 2.8) });
+            else if (rr < 0.70) sysAmb('moped', { volume: rand(0.03, 0.06), pitch: rand(0.9, 1.2) });   // was `bark` at 1.9–2.8 (L7, E2)
             else if (rr < 0.88) sysAmb('hiss', { volume: rand(0.03, 0.06), pitch: rand(0.8, 1.3) });
-            else sysAmb('tick', { volume: rand(0.03, 0.05), pitch: rand(2.2, 3.0) });
+            else sysAmb('bell', { volume: rand(0.03, 0.05), pitch: rand(0.9, 1.2) });                  // was `tick` at 2.2–3.0
             ambTimer = rand(5, 13);
           } else if (bio === 'monaco') {
             // THE ONE CHAPTER WHOSE OWN FILE ALREADY RUNS A FULL POSITIONAL
@@ -44964,7 +46621,7 @@ export function createSystems(game) {
             // silent, it is EMPTY, and the difference between the two is that
             // an empty place lets you hear how big it is.
             const r = Math.random();
-            if (r < 0.44) sysAmb('tick', { volume: rand(0.10, 0.19), pitch: rand(0.35, 0.55) });
+            if (r < 0.44) sysAmb('drip', { volume: rand(0.14, 0.24), pitch: rand(0.8, 1.1) });   // water on stone IS the drip voice; was `tick` at 0.35–0.55 (L7, E2)
             else if (r < 0.70) sysAmb('splash', { volume: rand(0.05, 0.10), pitch: rand(0.4, 0.62) });
             else if (r < 0.88) sysAmb('pop', { volume: rand(0.05, 0.10), pitch: rand(3.0, 4.2) });
             else sysAmb('thud', { volume: rand(0.05, 0.11), pitch: rand(0.28, 0.42) });
@@ -45267,6 +46924,39 @@ export function createSystems(game) {
       musChaseHit -= (game.state.rawDt || dt) * 1.6;
       if (musChaseHit < 0) musChaseHit = 0;
     }
+    // ---- THE WORLD SIDECHAINS THE PAD (L7, E1 / audio #2) ----------------
+    // The envelope sfx() bumps falls here on the raw clock (a footstep under
+    // slow motion is still a footstep that just happened), and the pad's
+    // sidechain gain follows it every frame: τ `in` when the pad is going
+    // down, `out` coming back — the shape of a compressor keyed from the
+    // world, which is what a film mix is. See sysMUS_SIDE.
+    if (musWorldEnv > 0) {
+      musWorldEnv -= musWorldEnv * (game.state.rawDt || dt) / sysMUS_SIDE.out;
+      if (musWorldEnv < 0.005) musWorldEnv = 0;
+    }
+    if (musSideG && ac && ac.state === 'running') {
+      const sideWant = 1 - sysMUS_SIDE.depth * musWorldEnv;
+      sysAudioSet(musSideG.gain, sideWant, ac.currentTime,
+                  sideWant < musSideLast ? sysMUS_SIDE.in : sysMUS_SIDE.out);
+      musSideLast = sideWant;
+    }
+    // ---- THE ARRIVAL WAITS FOR ITS MOMENT (L7, E1 / audio #9) ------------
+    // Begin into Sydney fired the arrive at +550 ms into a context that was
+    // still `suspended` (running by 1.4 s) and musSting returned 0: the one
+    // arrival every player hears never said the tune. And a marquee that
+    // finished on the way to a border silenced the crossing's: the lift gate
+    // RETURNED. Both are a deferral now — the sting is asked for every frame
+    // until it takes (context running, chord set, lift under 0.02), or the
+    // wait runs out. `musSting` itself is unchanged.
+    if (musArrivePend) {
+      // The wait is charged only while the context is running: a context
+      // still suspended on Begin (1.4 s on the reviewer's machine, 12 s+ on
+      // a loaded one) is not a deferral, it is the sting not being possible
+      // yet. The cap is for the lift.
+      if (ac && ac.state === 'running') musArrivePendT += dt;
+      if (musLiftNow() <= 0.02 && musSting('arrive', 1) > 0) musArrivePend = false;
+      else if (musArrivePendT > sysMUS_ARRIVE_WAIT) musArrivePend = false;
+    }
     // The flow leans the band in beside the chaos, on the same writer and for
     // the opposite reason: chaos is the score reacting to trouble, the flow is
     // the score going WITH you. It is deliberately the smallest of the three
@@ -45274,6 +46964,14 @@ export function createSystems(game) {
     const musWant = clamp(game.state.chaos * 0.7 + (musChaseT > 0 ? 0.55 : 0)
                           + musHeat * sysHEAT_MUS + sysFlowNow * sysFLOW_MUS, 0, 1);
     musIntensity = damp(musIntensity, musWant, musChaseT > 0 ? 0.9 : 0.35, dt);
+    // ---- ...AND IT CANNOT CARRY A NaN INTO THE SCORE (L7, E1) ------------
+    // A body teleported to a NaN height (the design probe's podium put) made
+    // the flow, then the chaos, then this NaN; `damp` latched it and every
+    // struck note's velocity through musVel was non-finite for the rest of
+    // the run — `musTick: exponentialRampToValueAtTime` in lastError and the
+    // score standing down in all eighteen chapters after. musVel guards the
+    // target too; this stops the latch.
+    if (!(musIntensity === musIntensity)) musIntensity = 0;
     // ---- THE SLEEP, INTEGRATED (L6, E3) ---------------------------------
     // Per frame, on the game clock, with hysteresis on the nap: over 0.6 the
     // score goes (ten seconds to nothing), under 0.4 it is a wake (a second
@@ -45354,6 +47052,9 @@ export function createSystems(game) {
         const wb = game.weather.bed();
         skyRain = clamp(wb ? wb.rain : 0, 0, 1);
         skyCloud = clamp(typeof game.weather.cloud === 'function' ? game.weather.cloud() : 0, 0, 1);
+        // clamp() passes a NaN through (L7, E1): see musVel's guard
+        if (!(skyRain === skyRain)) skyRain = 0;
+        if (!(skyCloud === skyCloud)) skyCloud = 0;
       }
       const skyCut = skyRain * (sysMUS_SKYCUT[musPalN] === undefined
                                 ? sysMUS_SKY_CUT : sysMUS_SKYCUT[musPalN]);
@@ -45401,10 +47102,24 @@ export function createSystems(game) {
         (1 + (isBand ? sysMUS_LIFT_BAND : sysMUS_LIFT_PAD) * lift));
       // ...×(1 − lift): the calm's cut yields to a marquee (see sysMUS_CALM_BASS).
       const calmYield = 1 - clamp(lift, 0, 1);
+      // ---- WALKING THINS THE SCORE (L7, E1 / audio #2) --------------------
+      // The flow is one more term on the same three writers, the other way
+      // from the lift: the pad DOWN by sysMUS_SIDE.flowPad (−3 dB at a full
+      // flow), the plucks UP by flowPluck (+3 dB) — a long clean run is the
+      // struck notes over the world, not a bigger pad. The intensity's own
+      // flow share (sysFLOW_MUS) stays: that is the plucks' density and the
+      // filter, which is the score going with you; this is its LEVEL.
+      const flowPad = 1 - sysMUS_SIDE.flowPad * clamp(sysFlowNow, 0, 1);
       sysAudioSet(musPad.gain, Math.max(0.0001, musPal.bus * voiceBusK * padUp *
         (1 - clamp(calmLean, 0, 1) * sysMUS_CALM_PAD * calmYield) * musBreath *
-        (1 + skyRain * sysMUS_SKY_BUS) * (1 - 0.18 * musSpeak) * musPadSpecK * stingK * sleepK),
+        (1 + skyRain * sysMUS_SKY_BUS) * (1 - 0.18 * musSpeak) * musPadSpecK * stingK * sleepK * flowPad),
         nowA, padTau);
+      // ...and the plucks' bus, which had exactly one write (at construction)
+      // until now. The flow only ever ADDS here, so every palette keeps the
+      // level nineteen chapters were tuned at when the animal is standing.
+      if (musPluckDry) {
+        sysAudioSet(musPluckDry.gain, sysMUS_VOICE.pluckDry * (1 + sysMUS_SIDE.flowPluck * clamp(sysFlowNow, 0, 1)), nowA, 1.0);
+      }
       // ...and the pad palettes' cut has a floor (sysMUS_VOICE.cutFloor) under
       // the opened value AFTER the calm's lean: measured with the floor
       // before it, the calm closed Sydney's 992 to 575 at rest and the share
@@ -45413,11 +47128,19 @@ export function createSystems(game) {
       // breath, the sky and a voice still close it from there, as before.
       const padCut = isBand ? musPal.cut * (1 - clamp(calmLean, 0, 2) * 0.22)
                    : Math.max(sysMUS_VOICE.cutFloor, musPal.cut * voiceCutK * (1 - clamp(calmLean, 0, 2) * 0.22));
+      // ...minus the world's envelope (sysMUS_SIDE.cut, the sidechain's other
+      // half) and the flinch (sysMUS_FLINCH_CUT: a gasp behind you closes
+      // the pad 300 Hz in 50 ms and it comes back over 0.4 s — L7, E1).
       sysAudioSet(musFilt.frequency, Math.max(180,
         padCut +
         musIntensity * 780 + chaseOn * sysMUS_CHASE_CUT + lift * 760 - br * sysMUS_BREATH_CUT - skyCut - 220 * musSpeak -
-        sysMUS_STING_CUT * musStingPad),
-        nowA, musStingPad > 0.5 ? sysMUS_STING_IN : musStingPad > 0 ? sysMUS_STING_OUT : lift > 0.02 ? 0.7 : 1.4);
+        sysMUS_STING_CUT * musStingPad - sysMUS_SIDE.cut * musWorldEnv - sysMUS_FLINCH_CUT * musFlinch),
+        nowA, musFlinch > 0.5 ? 0.05 : musFlinch > 0 ? 0.4
+            : musStingPad > 0.5 ? sysMUS_STING_IN : musStingPad > 0 ? sysMUS_STING_OUT : lift > 0.02 ? 0.7 : 1.4);
+      // ...and the flinch decays here, in the block that reads it: full on
+      // the first block after the gasp, a quarter on the next, then gone.
+      musFlinch *= 0.25;
+      if (musFlinch < 0.02) musFlinch = 0;
       // `musChaseHit` is P4's chase onset: a lean on the bottom of the band at
       // the moment somebody starts after you. A TERM in the one expression that
       // writes this gain, not a second writer — musBassGain already has exactly
@@ -45651,7 +47374,7 @@ export function createSystems(game) {
       if (!pfSaid && started && pfOnT >= sysPF_SAY_S && sysPerfMode === 0 && sysPerfRung > 0 &&
           game.state.time - sysTickLastAt >= sysPF_TICK_GAP) {
         pfSaid = true;
-        toast('drawing a little less to keep up', 'note');
+        mapBadge('drawing a little less to keep up');    // the map corner, not a pill (L7, E5)
       }
     }
     if (perfOn) {

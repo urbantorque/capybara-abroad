@@ -754,6 +754,30 @@ const envPATHS = [
   [56, 52, 60, 46, 61.5, 39, 60, 32, 56, 27],
 ];
 
+/** Squared distance from (x, z) to the nearest segment of one path (L7, E2). */
+function envPathD2(P, x, z) {
+  let best = 1e9;
+  for (let i = 0; i + 3 < P.length; i += 2) {
+    const ax = P[i], az = P[i + 1], bx = P[i + 2], bz = P[i + 3];
+    const dx = bx - ax, dz = bz - az;
+    const l2 = dx * dx + dz * dz;
+    let t = l2 > 0 ? ((x - ax) * dx + (z - az) * dz) / l2 : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const px = ax + dx * t - x, pz = az + dz * t - z;
+    const d2 = px * px + pz * pz;
+    if (d2 < best) best = d2;
+  }
+  return best;
+}
+/** On one of the gardens' walks, at the width envRibbon draws it plus a kerb. */
+function envOnPath(x, z) {
+  for (let i = 0; i < envPATHS.length; i++) {
+    const half = (i === 2 ? 1.0 : i === 1 ? 2.35 : 1.35) * 0.5 + 0.2;
+    if (envPathD2(envPATHS[i], x, z) < half * half) return true;
+  }
+  return false;
+}
+
 // ------------------------------------------------------------- navigation --
 const envNavC = [];   // cx, cz, r
 const envNavR = [];   // x0, z0, x1, z1
@@ -3849,6 +3873,12 @@ export function createEnvironment(game) {
     waterHeightAt: envWaterHeightAt,
     inZone: envInZone,
     zones: envZONES,
+    // IS THIS SPOT ON A PATH (L7, E2)? The footfall asks, once a stride, so the
+    // gardens' walks read as paving under the animal and the lawn does not —
+    // the audio drive heard one material in 2.5 min here because the surface
+    // table had no path in it. The same polylines envRibbon draws, at the
+    // same widths, plus twenty centimetres of kerb.
+    onPath: envOnPath,
     flowerBeds: envBEDS,
     prizeBed: envBEDS[0],
     pond: envPOND,

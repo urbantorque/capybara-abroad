@@ -1455,9 +1455,31 @@ function hkUpdateCrossing(game, dt) {
 function hkBuildLitPanes(root) {
   if (!hkSHOPLIT.length && !hkFLATLIT.length) return;
   const L = hkMerger();
+  // ---- SOMETHING INSIDE THE LIGHT (L7, E4 / art #6) ------------------------
+  // A lit pane was one value from sill to lintel — an emitter over white
+  // with nothing in it — and the review photographed the shopfront glazing
+  // and the lamp bar as flat rectangles at the top of the range
+  // (qa/l7r-art-occl2-kowloon.png). The counter and the racks in front of
+  // the glass are a silhouette; this is the INTERIOR: a shelf line at 0.30
+  // of the pane and a shadow band under the ceiling at 0.55, the two things
+  // a lit room shows through its window. The material is an unlit
+  // MeshBasicMaterial, so its colour IS its emission, and the two values are
+  // written as bands of the same box — five boxes where there was one, at
+  // build, in the one draw call this mesh always was. Anything under 0.6 m
+  // tall (the mast light, the pier boards) is a lamp, not a room, and stays
+  // whole.
+  const hkPANE_BANDS = [[0, 0.30, 1], [0.30, 0.33, 0.38], [0.33, 0.48, 1], [0.48, 0.62, 0.58], [0.62, 1, 1]];
+  const pc = new THREE.Color();
   const put = (a) => {
     for (let i = 0; i < a.length; i += 7) {
-      L.box(a[i], a[i + 1], a[i + 2], a[i + 3], a[i + 4], a[i + 5], a[i + 6]);
+      const sy = a[i + 4];
+      if (sy < 0.6) { L.box(a[i], a[i + 1], a[i + 2], a[i + 3], sy, a[i + 5], a[i + 6]); continue; }
+      const y0 = a[i + 1] - sy * 0.5;
+      for (let b = 0; b < hkPANE_BANDS.length; b++) {
+        const bd = hkPANE_BANDS[b];
+        pc.set(a[i + 6]).multiplyScalar(bd[2]);
+        L.box(a[i], y0 + sy * (bd[0] + bd[1]) * 0.5, a[i + 2], a[i + 3], sy * (bd[1] - bd[0]), a[i + 5], pc.getHex());
+      }
     }
   };
   put(hkSHOPLIT);

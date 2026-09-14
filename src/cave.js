@@ -292,7 +292,11 @@ function cavMerger() {
 
 function cavVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.32, amount: 0.14, warp: 0.6, near: 0.34, nearScale: 10, contact: 1 });
+               // `rock` (L7, E4): the doline wall is 60 % of the resting frame
+               // and was one value up its whole height; the broad octave on
+               // the wall's own plane at ±8 % is the light-and-dark a rock
+               // face has. See the wall block in grain().
+               { scale: 0.32, amount: 0.14, warp: 0.6, near: 0.34, nearScale: 10, contact: 1, rock: 0.08, broadM: 9 });
 }
 function cavVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),

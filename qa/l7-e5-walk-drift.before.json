@@ -1,0 +1,202 @@
+{
+ "biome": "drift",
+ "samples": [
+  {
+   "t": 13,
+   "biome": "drift",
+   "x": 2,
+   "y": 30.3,
+   "z": 42,
+   "paper": "the big one hereTHE LANTERNCarry six lampflies up and light the lanternthe plinth at the top · 230 mpart 1 of 2NO GROUNDAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat whit",
+   "err": null
+  },
+  {
+   "t": 37.6,
+   "biome": "drift",
+   "x": -10.1,
+   "y": 0.3,
+   "z": 5.4,
+   "paper": "0 of 12 · Wake up somewhere impossiblethe plinth at the top · 220 mthe big one hereTHE LANTERNCarry six lampflies up and light the lanternthe plinth at the top · 200 mpart 1 of 2NO GROUNDAnnounce your",
+   "err": null
+  },
+  {
+   "t": 61.9,
+   "biome": "drift",
+   "x": -31.9,
+   "y": 35.1,
+   "z": -15.8,
+   "paper": "3 of 12 · Wake up somewhere impossiblethe plinth at the top · 190 mthe big one hereTHE LANTERNCarry six lampflies up and light the lanternthe plinth at the top · 190 mpart 1 of 2NO GROUNDAnnounce your",
+   "err": null
+  },
+  {
+   "t": 80.1,
+   "biome": "drift",
+   "x": -34,
+   "y": 11.8,
+   "z": -16.9,
+   "paper": "3 of 12 · Wake up somewhere impossiblethe plinth at the top · 190 mthe big one hereTHE LANTERNCarry six lampflies up and light the lanternthe plinth at the top · 190 mpart 1 of 2NO GROUNDAnnounce your",
+   "err": null
+  },
+  {
+   "t": 109.7,
+   "biome": "drift",
+   "x": -51.8,
+   "y": 86.1,
+   "z": -52,
+   "paper": "3 of 12 · Wake up somewhere impossiblethe plinth at the top · 160 mthe big one hereTHE LANTERNCarry six lampflies up and light the lanternthe plinth at the top · 160 mpart 1 of 2NO GROUNDAnnounce your",
+   "err": null
+  },
+  {
+   "t": 134.9,
+   "biome": "drift",
+   "x": -70.2,
+   "y": 53,
+   "z": -67,
+   "paper": "4 of 12 · Wake up somewhere impossiblethe plinth at the top · 160 mthe big one hereTHE LANTERNCarry six lampflies up and light the lanternthe plinth at the top · 160 mpart 1 of 2NO GROUNDAnnounce your",
+   "err": null
+  },
+  {
+   "t": 153.4,
+   "biome": "drift",
+   "x": -96.4,
+   "y": 6.6,
+   "z": -104.6,
+   "paper": "4 of 12 · Wake up somewhere impossiblethe plinth at the top · 160 mthe big one hereTHE LANTERNCarry six lampflies up and light the lanternthe plinth at the top · 160 mpart 1 of 2NO GROUNDAnnounce your",
+   "err": null
+  }
+ ],
+ "ticks": [
+  [
+   27,
+   "puff-up"
+  ],
+  [
+   36.3,
+   "cloud-dive"
+  ],
+  [
+   42.8,
+   "handed-back"
+  ],
+  [
+   122.9,
+   "updraft"
+  ]
+ ],
+ "imp": [
+  {
+   "cause": "something back there",
+   "t": 14.239800000019432,
+   "v": 7.4
+  },
+  {
+   "cause": "something back there",
+   "t": 20.786500000037375,
+   "v": 7.4
+  }
+ ],
+ "arrivalTicks": [],
+ "events": [
+  [
+   1.3,
+   "toast",
+   "be a menace."
+  ],
+  [
+   11.6,
+   "toast",
+   "saved — you can close this and come back"
+  ],
+  [
+   17.6,
+   "toast",
+   "that bar is your puff. a run spends it; stand still and it comes back."
+  ],
+  [
+   19.2,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   26.5,
+   "toast",
+   "that was something back there"
+  ],
+  [
+   35.2,
+   "toast",
+   "WHEEK on the way down. go on."
+  ],
+  [
+   41.3,
+   "toast",
+   "ticked  ·  Wheek in mid-air (trust me)"
+  ],
+  [
+   49.3,
+   "toast",
+   "drawing a little less to keep up"
+  ],
+  [
+   51.5,
+   "toast",
+   "ticked  ·  Step off the end of the jetty"
+  ],
+  [
+   56.6,
+   "toast",
+   "ticked  ·  Let the cloud hand you back"
+  ],
+  [
+   63.7,
+   "toast",
+   "see? nothing to it. the cloud has you."
+  ],
+  [
+   72.6,
+   "toast",
+   "nothing up here can hurt you. that is the whole arrangement."
+  ],
+  [
+   136,
+   "toast",
+   "ticked  ·  Let a column of air carry you up"
+  ],
+  [
+   141.3,
+   "toast",
+   "that is a good one  ·  carried up to 89 m"
+  ],
+  [
+   148.2,
+   "toast",
+   "the air up here goes somewhere."
+  ],
+  [
+   149.8,
+   "toast",
+   "personal best  ·  carried up to 95 m"
+  ]
+ ],
+ "done": [
+  "puff-up",
+  "cloud-dive",
+  "handed-back",
+  "updraft"
+ ],
+ "shove": [
+  [
+   19.2,
+   "that was something back there"
+  ],
+  [
+   26.5,
+   "that was something back there"
+  ]
+ ],
+ "shoveUnnamed": 2,
+ "impUnsrc": 2,
+ "voids": 0,
+ "tickN": 4,
+ "firstNonFree": 27
+}

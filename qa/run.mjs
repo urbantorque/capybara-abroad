@@ -55,6 +55,11 @@ const ASSERTS = [
   ['qa/l4-pal-static.cjs',  'the two regulars found by kind (Sydney, Pasto)'],
   // THE VOICE'S TICS (L6, E7): no author's phrase in more than three files.
   ['qa/l6-tics.mjs',        'dialogue literals: no phrase in more than three files'],
+  // ONE SENTENCE PER SURFACE (L7, E6): the place card's sub is said neither
+  // by the notebook's first line nor by the departure card; no "chapter" in
+  // the past tense; at most five `left` lines end on "You…"; no percentage
+  // on the paper; every chapter answers a returner.
+  ['qa/l7-echo.mjs',        'CHAPTERS: sub~nb[0] and sub~left share no trigram; no "chapter"; the again lines'],
   ['build.mjs',           'the one-file build: wraps, splices, no collisions, writes dist/'],
 ];
 const REPORTS = [

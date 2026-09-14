@@ -471,7 +471,9 @@ const venSHORE = { shore: 0.26, shoreBand: 0.24, shoreWet: 0.40, shoreDark: 0.72
                    shoreScale: 1.8, shoreColor: PALETTE.venFoam };
 function venVC() {
   if (!venWallMat) venWallMat = grainOwn(mat(0xffffff, { vertexColors: true }),
-    Object.assign({ scale: 0.45, amount: 0.09, warp: 0.55, near: 0.30, nearPale: 0.60, nearScale: 8, contact: 1 },
+    // `course` (L7, E4): a palazzo is built in courses, and the calle's
+    // walls measured as one value up their whole height. ±4 % at 0.55 m.
+    Object.assign({ scale: 0.45, amount: 0.09, warp: 0.55, near: 0.30, nearPale: 0.60, nearScale: 8, contact: 1, course: 0.04 },
                   venSHORE));
   return venWallMat;
 }

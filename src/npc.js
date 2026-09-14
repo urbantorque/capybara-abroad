@@ -1288,6 +1288,17 @@ export function createNPCs(game) {
       ? npcSpeak : null;
   }
 
+  // ---- HOW MANY ARE UP, for the paper's tutorial (L7, E5 / writing W4) ----
+  // systems.js holds its first line until the crowd pauses; a probe reads it.
+  let npcStartAt = -1;             // game time the file went live
+  const npcFIRST_T = 10;           // s of a fresh start the arrival chatter is capped
+  const npcFIRST_CAP = 2;          // bubbles up at once in that window
+  function npcBubblesLive() {
+    let n = 0;
+    for (let i = 0; i < BUB; i++) if (bubbles[i].owner && bubbles[i].t < bubbles[i].life) n++;
+    return n;
+  }
+  game.bubblesLive = npcBubblesLive;
   function sayBubble(npcRec, text) {
     // ---- NOBODY TALKS OVER THE TITLE CARD (T1) ---------------------------
     // The locals do not know the game has not started. Measured 5 Sep 2026 at
@@ -1303,6 +1314,13 @@ export function createNPCs(game) {
     // the capybara's gaze follows — is not pointed at a silent person. The
     // world goes on living; it just does not narrate itself to an empty room.
     if (!game.state.started) return;
+    // ---- ...AND NOT FOUR AT ONCE ON THE FIRST FRAME (L7, E5 / writing W4).
+    // MEASURED: four bubbles at t = 2 s of a fresh Sydney ("I was NEXT." /
+    // "Table with a view, you said." / ...) while the narrator explained the
+    // HUD. Two up at once for the first ten seconds; the rest is dropped, and
+    // a crowd that talks less on the first frame is still a crowd.
+    if (npcStartAt < 0) npcStartAt = game.state.time;
+    if (game.state.time - npcStartAt < npcFIRST_T && npcBubblesLive() >= npcFIRST_CAP) return;
     let slot = null;
     for (let i = 0; i < BUB; i++) {
       if (bubbles[i].owner === npcRec) { slot = bubbles[i]; break; }
@@ -1536,13 +1554,65 @@ export function createNPCs(game) {
     m.castShadow = true;
     return m;
   }
+  // ---- SIX STANCES (L7, E4 / art #4) ---------------------------------------
+  // MEASURED (qa/l7r-art-scene.json.png, every local in the live chapter):
+  // torso z sd 0.000, knee sd 0.000, shoulder x sd 0.04–0.06 rad, elbow
+  // −0.25 on everyone — the Quay's eleven people, ten of them standing to
+  // attention with their arms straight down and their feet together. The
+  // beats (work / reach / rock) are ACTIONS on a clock; between them the
+  // pose is one constant, and a crowd is read as people by the variety of
+  // its silhouettes, not its shirts.
+  //
+  // A stance is the pose a person RETURNS to. Resolved once per figure,
+  // here, and added per frame under the same rules everything else on the
+  // arm obeys: it gives way to a beat, a flinch, a guard, an umbrella, a
+  // photograph and a walk (`busy` below), it is scaled by the shoulder mask
+  // the elbow already uses so the poses that were MEASURED against a
+  // straight arm keep their geometry, and it is damped on its own field so
+  // a beat plays out of the stance and eases back into it.
+  //
+  // On this rig negative shoulder x is forward and up; positive z on the
+  // LEFT arm is toward the centre line, negative on the right. The elbow
+  // bends forward only, so "folded" is two forearms up across the chest
+  // rather than a true cross — which is what the huddle already draws and
+  // what reads at six metres. Everybody, plain included, carries a small
+  // random lean and a free knee, because nobody stands square.
+  //
+  //   aLx aLz aRx aRz  shoulders · eL eR  elbows · brow: the sun chapters
+  const npcSTANCE = [
+    { n: 'plain',   aLx: 0,     aLz: 0,     aRx: 0,     aRz: 0,     eL: -0.26, eR: -0.26, hip: 0.4 },
+    { n: 'hip',     aLx: 0.12,  aLz: 0.05,  aRx: -0.12, aRz: -0.03, eL: -0.40, eR: -0.18, hip: 1.0 },
+    { n: 'folded',  aLx: -0.60, aLz: 0.55,  aRx: -0.60, aRz: -0.55, eL: -1.75, eR: -1.75, hip: 0.7 },
+    { n: 'pockets', aLx: 0.45,  aLz: 0.05,  aRx: 0.45,  aRz: -0.05, eL: -0.95, eR: -0.95, hip: 0.7 },
+    { n: 'hips',    aLx: -0.30, aLz: -0.75, aRx: -0.30, aRz: 0.75,  eL: -1.60, eR: -1.60, hip: 0.7 },
+    { n: 'brow',    aLx: 0.10,  aLz: 0.02,  aRx: -2.10, aRz: -0.30, eL: -0.26, eR: -2.00, hip: 0.7 },
+  ];
+  // The chapters where a hand goes up to the brow: the ones with a sun in
+  // them. Kowloon at night and the cave shade nobody.
+  const npcSTANCE_SUN = { sydney: 1, quay: 1, manly: 1, cali: 1, pasto: 1, rio: 1, palawan: 1,
+                          sahara: 1, goreme: 1, pantanal: 1, monaco: 1, hanoi: 1, venice: 1 };
+  function npcStancePick(sun) {
+    let i = randInt(0, npcSTANCE.length - 1);
+    if (i === 5 && !sun) i = randInt(0, 4);
+    const s = npcSTANCE[i];
+    const side = randInt(0, 1) ? 1 : -1;
+    const h = s.hip;
+    // the free knee bends and the weighted one locks; the torso leans a
+    // little over the weighted hip and the pelvis shifts under it
+    return { n: s.n, aLx: s.aLx, aLz: s.aLz, aRx: s.aRx, aRz: s.aRz, eL: s.eL, eR: s.eR,
+             tz: side * rand(0.045, 0.085) * h,
+             px: -side * 0.05 * h,
+             kL: side > 0 ? rand(0.20, 0.28) * h + npcKNEE_REST * (1 - h) : rand(0.02, 0.04),
+             kR: side < 0 ? rand(0.20, 0.28) * h + npcKNEE_REST * (1 - h) : rand(0.02, 0.04) };
+  }
   /**
    * A standing person, 1.72 m, facing +z. Returns the group and the two nodes
    * worth animating. `o` may name any of the four colours; anything not named
    * is picked, so twelve stalls do not end up staffed by twelve identical
-   * people in the same shirt.
+   * people in the same shirt. `sun` (L7, E4) says the chapter has one, for
+   * the stance with a hand to the brow.
    */
-  function buildLocalFigure(o) {
+  function buildLocalFigure(o, sun) {
     const skin = o.skin || npcLOC_SKIN[randInt(0, npcLOC_SKIN.length - 1)];
     const hair = o.hair || npcLOC_HAIR[randInt(0, npcLOC_HAIR.length - 1)];
     const shirt = o.shirt || npcLOC_SHIRT[randInt(0, npcLOC_SHIRT.length - 1)];
@@ -1661,7 +1731,8 @@ export function createNPCs(game) {
              kneeL: kneeL, kneeR: kneeR, elbowL: elbowL, elbowR: elbowR,
              face: { eyeN: eyeN, browL: browL, browR: browR,
                      browY: 0.228, upK: 0.6, mouthN: mouthN, mouthY: 0.118 },
-             arch: arch };
+             arch: arch,
+             stance: npcStancePick(!!sun) };   // (L7, E4) the pose they return to
   }
 
   // =======================================================================
@@ -1997,6 +2068,26 @@ export function createNPCs(game) {
   // should, and it is the chapter that earned it. And Antarctica keeps the log,
   // which four chapters were running as the same gag with the same noun; it is
   // the best of the four and it is now the only one.
+  //
+  // ---- ...AND THE PEOPLE OF THIS SQUARE (L7, E6 / writing W8) ------------
+  // Two slots per chapter said the chapter's lines and everybody else said
+  // Sydney's: the L7 writing review counted a 90 s naive walk in Venice at
+  // 13 bubbles, 5 of them Venice's, and Marrakech at 0 of 4 — because the
+  // most-heard dialogue in the game, two locals calling across a square
+  // (localsChat, every 11 to 28 s), drew from npcLOC_CHAT's ten shared
+  // openers in all seventeen chapters. `passing` is the third slot: six
+  // lines of what THESE people say to each other when nothing has happened
+  // — a price, a timetable, the weather they actually have — read by
+  // localsChat for both halves of the exchange before the shared pool. The
+  // reply is a second observation rather than an answer, which is what two
+  // people who see each other every day actually trade. NOT about the
+  // animal, ever: the animal may not have arrived yet.
+  //
+  // ...and `startled` gets a chapter override of THREE in the six chapters
+  // with the most barging (Venice, Hanoi, Kowloon, the Sahara, Rio, Cali).
+  // Merged with the neutral nine rather than replacing them, on the same
+  // argument F2 made for wary and incident: a three-line pool on the most
+  // heard event in the game is a template wearing a hat.
   const npcPLACE_SAY = {
     quay: {
       wary:     ['You again, mate.', 'Yeah, I know you.', 'Not on this wharf.',
@@ -2007,6 +2098,11 @@ export function createNPCs(game) {
                  'The nine-forty is going to be late and I know why.',
                  'Forty crossings a day and this is new.',
                  'I am not paid enough to describe this.'],
+      passing:  ['Nine-forty is running eight late.', 'Southerly is due at four, they reckon.',
+                 'Wharf three is shut again. Nobody knows why.',
+                 'Two hundred on the Manly boat and one of them had a surfboard.',
+                 'Coffee cart has put the price up. Again.',
+                 'The old fella is checking the wheel. Third time this morning.'],
     },
     kyoto: {
       wary:     ['Ah. You.', 'The face is familiar.', 'Please. Not again.',
@@ -2018,6 +2114,11 @@ export function createNPCs(game) {
                  'Four hundred years, and then this afternoon.',
                  'Nobody is going to say anything. That is the problem.',
                  'Something is going to have to be rearranged.'],
+      passing:  ['The maples are a week early this year.', 'Forty coaches before nine. I counted.',
+                 'The mill has the new tea in. He will not say what he wants for it.',
+                 'Somebody has moved the third stone. Somebody always moves the third stone.',
+                 'The bridge is closed for the crossing on Sunday.',
+                 'Rain by four. The moss is pleased about it.'],
     },
     cali: {
       wary:     ['Otra vez vos.', 'It is the same one.', 'Ay, no. Not you.',
@@ -2029,6 +2130,12 @@ export function createNPCs(game) {
                  'It is on the beat. That is the worst part.',
                  'Nobody here is even surprised any more.',
                  'Put on something louder. Drown it out.'],
+      passing:  ['The chiva leaves at eight. It left at nine last night.', 'Lulada is two thousand now. Two.',
+                 'The whole block is going up the hill tonight, vos.',
+                 'My cousin is playing at the corner. Do not go and listen. He is terrible.',
+                 'They are closing the bridge for the parade. Nobody told the buses.',
+                 'Thirty-one degrees and it is not yet ten.'],
+      startled: ['Ay! On the beat, at least.', 'Vos. VOS.', 'That is my foot and I need it tonight.'],
     },
     rio: {
       wary:     ['Ah, e voce.', 'That face again.', 'Not on my stretch.',
@@ -2040,6 +2147,12 @@ export function createNPCs(game) {
                  'Somebody is filming. Somebody is always filming.',
                  'It is Saturday. Of course it is Saturday.',
                  'That is not a dog. I have said so twice.'],
+      passing:  ['Globo is five reais. Was four on Monday.', 'The sea is flat. Arpoador will be packed by noon.',
+                 'The bateria has been rehearsing since six. Six.',
+                 'Somebody has painted the bottom step again. Wrong blue.',
+                 'The cable car is running. The queue goes to the kiosk.',
+                 'Thirty-four degrees and the sand is worse.'],
+      startled: ['Ei! Calma, calma.', 'Not on the mosaic. Not on the MOSAIC.', 'My caipirinha. My whole caipirinha.'],
     },
     iceland: {
       wary:     ['Oh. The animal.', 'So that is what you are.',
@@ -2052,6 +2165,11 @@ export function createNPCs(game) {
                  'It has stopped being weather and started being you.',
                  'Nothing here has ever needed a rule before.',
                  'I am going to have to mention this to somebody.'],
+      passing:  ['It gets dark at eleven now. Properly dark.', 'The puffins go next week. Most of them have gone.',
+                 'Pylsa is nine hundred. He knows. He does not care.',
+                 'The pool was thirty-nine this morning. Somebody complained.',
+                 'Road east is open. Road north is a rumour.',
+                 'Forecast says clear. It said that yesterday.'],
     },
     sahara: {
       wary:     ['Ah. The rodent.', 'I have seen you before.', 'Not at this cart.',
@@ -2063,6 +2181,12 @@ export function createNPCs(game) {
                  'And it is not yet noon.',
                  'Somebody go and find whoever owns it.',
                  'It has learnt where everything is.'],
+      passing:  ['Oranges are four dirham. For you, four dirham.', 'The storytellers start at dusk. The good one is late.',
+                 'A bus came in from the desert. Nobody on it had slept.',
+                 'The snake man has a new snake. Same snake.',
+                 'Forty-one degrees in the shade, and there is no shade.',
+                 'The mint is from Meknes. Everything else is from here.'],
+      startled: ['Ya Allah! My oranges.', 'Balak! Balak!', 'The lamps. Mind the LAMPS.'],
     },
     drift: {
       wary:     ['Oh. It is you.', 'I remember you from lower down.', 'Careful. This time.',
@@ -2074,6 +2198,11 @@ export function createNPCs(game) {
                  'Whatever that was, it is still falling.',
                  'We are a very long way from a replacement.',
                  'It does not mind the drop at all.'],
+      passing:  ['Wind is from below today. It usually is.', 'The third island has drifted again. East, this time.',
+                 'Lantern has been out since before I came up.',
+                 'I dropped a spoon last week. It has not landed.',
+                 'The seed-heads are leaving. They always leave.',
+                 'Cold up top. Warmer under. Nobody knows why.'],
     },
     venice: {
       wary:     ['Ancora tu.', 'Ah. It is you, signore.', 'Not in my calle.',
@@ -2085,6 +2214,12 @@ export function createNPCs(game) {
                  'For once we cannot blame the tide.',
                  'It knows the bridges better than the tourists do.',
                  'This city has survived worse. Not much worse.'],
+      passing:  ['The tide table says one metre ten. The tide table is optimistic.', 'Fourteen euros for a coffee on the square. Standing.',
+                 'Siren at four, they say. It said four yesterday.',
+                 'The duckboards are out on the Molo. Somebody has already fallen off one.',
+                 'Cruise ship in. Four thousand of them, and one bridge.',
+                 'The pigeons have moved to the Procuratie. They know something.'],
+      startled: ['Attento! The water is RIGHT there.', 'Madonna. My gondola.', 'Not on the boards. Not on the BOARDS.'],
     },
     kowloon: {
       wary:     ['You again, ah.', 'I know your face.', 'Not on my street.',
@@ -2096,6 +2231,12 @@ export function createNPCs(game) {
                  'Business is bad enough without this.',
                  'Somebody has put it in the group chat already.',
                  'It is faster than the delivery boys.'],
+      passing:  ['Tray comes out at ten past. Be there at ten.', 'The scaffold on the corner goes up another floor tonight.',
+                 'Rent is up. Rent is always up.',
+                 'Typhoon signal three, they said. It is not raining.',
+                 'The Star Ferry is two-eighty now. Nobody has noticed.',
+                 'Eleventh floor has a new tenant. Nobody has seen them.'],
+      startled: ['Aiyah! The tray, the TRAY.', 'Wah — mind the bamboo.', 'Siu sam! That is a fresh batch.'],
     },
     palawan: {
       wary:     ['Ay, ikaw na naman.', 'This one, again.', 'Not the boat. Please.',
@@ -2107,6 +2248,11 @@ export function createNPCs(game) {
                  'Nothing on this island moves that fast.',
                  'The tide will take it. The tide takes everything.',
                  'It has been in the water again.'],
+      passing:  ['The bangka goes out at seven. If the engine goes.', 'The manta was at the drop-off again. Same one.',
+                 'Nets are in. Half a basket. Half a basket is fine.',
+                 'The clam has grown. Nobody measures it. It has grown.',
+                 'Rain at three, sun at four. Same as every day.',
+                 'A boat came in from Coron with eleven people and one chicken.'],
     },
     goreme: {
       wary:     ['Sen yine.', 'You were in the valley. I saw.', 'Not the ropes again.',
@@ -2118,6 +2264,11 @@ export function createNPCs(game) {
                  'It waits for the burner. It has worked that out.',
                  'Somebody is going to have to explain the invoice.',
                  'That is the valley for you. That is not the valley.'],
+      passing:  ['Wind is from the north up top. South below. Same as always.', 'Crew four is late. Crew four is always late.',
+                 'Eighty went up this morning. Seventy-nine came down where they meant to.',
+                 'The truck has a new tyre. The old one is in the valley somewhere.',
+                 'Tea is on. Tea is always on.',
+                 'Somebody has booked the sunrise flight three months out. From Australia.'],
     },
     manly: {
       wary:     ['Not you. Not on a Saturday.', 'Yeah, I remember you.', 'Not on my beach.',
@@ -2129,6 +2280,11 @@ export function createNPCs(game) {
                  'Somebody is going to put that on the internet.',
                  'It is not the wind doing that.',
                  'Well. That is a Saturday.'],
+      passing:  ['Four-foot sets, mate. Six by lunch.', 'Flags have moved. Rip has moved. Nobody told the tourists.',
+                 'Corso is chockers. Ferry just came in.',
+                 'The pool has got something in it. A big something.',
+                 'Nor-easter at two, then it will go flat.',
+                 'Gulls have got the chips off some poor bloke already.'],
     },
     // The Pantanal is the one place that does not mind you, and its whole
     // premise is that nobody looks up. So its wariness is not wariness and
@@ -2145,6 +2301,11 @@ export function createNPCs(game) {
                  'The river will have it by morning.',
                  'Nothing out here belongs to anybody.',
                  'That is not a problem. That is a Tuesday.'],
+      passing:  ['River is up a hand since morning.', 'Eleven in the water by the bridge. Twelve, now.',
+                 'The jabiru is back on the nest. Same nest.',
+                 'Truck went through at dawn. First one since Thursday.',
+                 'The caiman by the third bridge has not moved in two days. It is fine.',
+                 'Hot. Wet. Both, by four.'],
     },
     cave: {
       wary:     ['I could hear you coming. Again.', 'I heard you coming this time.',
@@ -2157,6 +2318,11 @@ export function createNPCs(game) {
                  'Everything in this cave is older than everybody in it.',
                  'We carried all of that in on our backs.',
                  'I am going to stop saying be careful.'],
+      passing:  ['Water is up in the second chamber. Ankle. Maybe knee.', 'The light comes down the hole at about eleven. Then it is gone.',
+                 'Rope count. Forty. Forty this morning, forty now.',
+                 'Somebody left a lamp on at the far camp. It will be out by now.',
+                 'The river inside is louder today. Rain outside, then.',
+                 'Nine kilometres and I have been to three of them.'],
     },
     antarctic: {
       wary:     ['Oh good. It is the animal.', 'I know that shape now.',
@@ -2169,6 +2335,11 @@ export function createNPCs(game) {
                  'We are eight hundred miles from another one of anything.',
                  'That is the most that has happened since March.',
                  'The log is getting very strange this season.'],
+      passing:  ['Minus eleven. Warm one.', 'The ship is due Thursday. The ship was due Thursday last week too.',
+                 'Four blows in the channel this morning. Same four.',
+                 'The bar opens at six. Somebody has written five on the sign.',
+                 'The gentoos are back on the point. Loud about it.',
+                 'Mug count is eight. It was nine.'],
     },
     monaco: {
       wary:     ['Ah. Sir.', 'I have your face now.', 'Not in here.',
@@ -2180,6 +2351,11 @@ export function createNPCs(game) {
                  'The management is aware.',
                  'I am to describe you, and I am struggling.',
                  'There is a form for this. There is a form for everything.'],
+      passing:  ['The Hungarian has taken the corner table. Again, sir.', 'Forty-metre yacht in berth nine. Nobody aboard. Nobody ever aboard.',
+                 'The grid is being swept. It was swept an hour ago.',
+                 'Twenty past eight and the rooms are full. They are always full.',
+                 'The Prince is not in residence. The flag says otherwise.',
+                 'A car went round in one minute twelve. Nobody was timing it.'],
     },
     hanoi: {
       wary:     ['Lai la ban.', 'Yes. You.', 'Not my stool. Not again.',
@@ -2191,6 +2367,12 @@ export function createNPCs(game) {
                  'The road does not stop. Neither does that.',
                  'My mother has had this corner for thirty years.',
                  'Somebody is going to hit something.'],
+      passing:  ['Pho is forty thousand now. Forty-five with the egg.', 'The train comes through at half past. Get the stools in.',
+                 'They are digging up Hang Bac. They dug it up last month.',
+                 'A tourist tried to cross at the lights. They are still there.',
+                 'The bridge is open to mopeds. It is always open to mopeds.',
+                 'Rain at four. Everybody will be under the same awning.'],
+      startled: ['Oi! Not the stools.', 'Troi oi. My BROTH.', 'Sit down or go round. Pick one.'],
     },
   };
   /**
@@ -2223,7 +2405,9 @@ export function createNPCs(game) {
     const row = live && npcPLACE_SAY[live];
     const here = row && row[kind];
     if (!here || !here.length) return npcLOC_SAY[kind];
-    if (kind !== 'wary' && kind !== 'incident') return here;
+    // ...and `startled` (L7, E6): the six chapter overrides are three lines
+    // each on the most-heard event in the game, and they lead the nine.
+    if (kind !== 'wary' && kind !== 'incident' && kind !== 'startled') return here;
     const neutral = npcLOC_SAY[kind];
     if (!neutral || !neutral.length) return here;
     const key = live + '|' + kind;
@@ -2724,6 +2908,10 @@ export function createNPCs(game) {
   // is not on the save file, so it says what happened on this journey rather
   // than what has ever happened, which is what the last scene is about.
   const npcTravMet = Object.create(null);
+  // ...and whether they rode in the basket (L7, E6 / writing A). Session-
+  // scoped on the same terms as the set above: the finale says what happened
+  // on this journey. The notebook's page keeps its own copy on the file.
+  let npcTravUp = false;
   // "Stood in front of" is a distance, and it is not the greeting's eight
   // metres (L6, F4): counted at `near` the Quay's spawn met them in 0.8 s
   // from 8.8 m and Marrakech's met them before a key was pressed. Three
@@ -2777,7 +2965,7 @@ export function createNPCs(game) {
     let g = o.group || null;
     let fig = null;
     if (!g && o.figure) {
-      fig = buildLocalFigure(o.figure === true ? {} : o.figure);
+      fig = buildLocalFigure(o.figure === true ? {} : o.figure, !!npcSTANCE_SUN[o.biome]);
       g = fig.group;
       g.position.set(o.x || 0, o.y || 0, o.z || 0);
       g.rotation.y = o.face || 0;
@@ -2951,6 +3139,7 @@ export function createNPCs(game) {
       wel: 0, welX: 0, welZ: 0, welSaid: false,   // the welcome party (N1)
       // ---- what the weather has done to them (see ...AND THEY NOTICE) ----
       umb: 0, umbG: null, umbUp: false,   // the umbrella: level, mesh, latch
+      stW: 0,                             // how much of their stance is live (L7, E4)
       hud: 0,                             // the huddle, 0..1
       look: 0, lookT: rand(4, npcLOC_LOOK_GAP),   // the glance up
       wetWas: false,                      // rising edge of "it has started"
@@ -4397,8 +4586,12 @@ export function createNPCs(game) {
     { t: 'That is the map used up.', when: npcTravKnown },
     { t: 'I take photographs now. They are all blurry. I have made my peace with it.',
       when: npcTravKnown },
+    // ...and THE ASK's one exception (L7, E6 / writing A): the traveller can
+    // account for exactly one of the nineteen, because they were in it.
     { t: 'Six months, and I still could not tell you how you got to half of them.',
-      when: npcTravKnown },
+      when: function () { return npcTravKnown() && !npcTravUp; } },
+    { t: 'Six months, and I still could not tell you how you got to half of them. Cappadocia I can. I was in the basket.',
+      when: function () { return npcTravKnown() && npcTravUp; } },
     { t: 'You are back where you started. So am I. Only one of us meant to be.',
       when: npcTravKnown },
     // ---- THE ONE SENTENCE THIS GAME HAS NEVER SAID OUT LOUD --------------
@@ -6423,6 +6616,13 @@ export function createNPCs(game) {
       // ceiling on the second visit rather than the twentieth.
       if (r.talkCd > 0) r.talkCd -= dt;
       r.t += dt;
+      // ---- THE ASK (L7, E6 / writing A): a person the chapter is carrying.
+      // `carried()` answers where (the traveller in the basket, goreme.js);
+      // anchor, target and ground all follow, so the shuffle and the pose
+      // stack below see somebody standing still on a floor that moves. The
+      // collider stays where they stood: a solid box in the basket would
+      // push the animal out of it. `npcTravUp` is the finale's one exception.
+      if (r.carried) { const c = r.carried(); if (c) { r.x = r.ax = r.tx = c.x; r.z = r.az = r.tz = c.z; r.y = r.baseY = c.y; r.group.position.x = c.x; r.group.position.z = c.z; r.anchor.group.position.set(c.x, c.y + 1.35, c.z); if (r.trav) npcTravUp = true; } }
       const dx = cx - r.x, dz = cz - r.z;
       const d2 = dx * dx + dz * dz;
       // ---- WARINESS: what they remember, rather than what they just felt ---
@@ -7057,8 +7257,19 @@ export function createNPCs(game) {
           const cw = Math.cos(th);
           const swL = cw < 0 ? -cw : 0, swR = cw > 0 ? cw : 0;
           const kk = gw * npcLOC_KNEE;
-          r.fig.kneeL.rotation.x = npcKNEE_REST + swL * swL * kk;
-          r.fig.kneeR.rotation.x = npcKNEE_REST + swR * swR * kk;
+          // ---- THE STANCE, BELOW THE WAIST (L7, E4) ----------------------
+          // The weighted leg locks and the free one bends; the torso leans
+          // over the weighted hip and the pelvis shifts under it. Only when
+          // standing — a walk and a sit return the rig to what they were
+          // measured against — and damped, so the return is a settle.
+          const st = r.fig.stance;
+          const sB = st ? (1 - r.mv) * (1 - satK) : 0;
+          r.fig.kneeL.rotation.x = (st ? npcKNEE_REST + (st.kL - npcKNEE_REST) * sB : npcKNEE_REST) + swL * swL * kk;
+          r.fig.kneeR.rotation.x = (st ? npcKNEE_REST + (st.kR - npcKNEE_REST) * sB : npcKNEE_REST) + swR * swR * kk;
+          if (st) {
+            r.fig.torso.rotation.z = damp(r.fig.torso.rotation.z, st.tz * sB, 5, dt);
+            r.fig.torso.position.x = damp(r.fig.torso.position.x, st.px * sB, 5, dt);
+          }
           // Shoulders one way, hips the other. The torso node carries the
           // shirt, the head and both arms; the legs are on the group, so they
           // take the pelvis half directly.
@@ -7176,18 +7387,35 @@ export function createNPCs(game) {
             ? Math.min(1, Math.min(npcPAT_HOLD - r.patT, r.patT) / (npcPAT_HOLD * 0.35))
             : 0;
           const pat = patK * npcPAT_ARM;
+          // ---- THE STANCE, ON THE ARMS (L7, E4). See npcSTANCE. ----------
+          // The pose stack's own targets first; the stance is added UNDER
+          // the shoulder mask of that stack (|shoulder| ≥ 1.25 → nothing),
+          // so the umbrella, the guard and the photograph keep the geometry
+          // they were measured with — and it gives way to everything that
+          // is an action: a walk, a sit, a beat on its clock, the talk
+          // gesture, the flinch, the huddle. `stW` is damped on its own
+          // field so the elbow and the shoulder leave and return together.
+          const tLx = sway - guard - fold * 0.42 + beatL - snap + pat;
+          const tRx = -sway - talk * (1 - hold) - guard - hold * npcLOC_UMB_ARM - fold * 0.42 + beat - snapR + pat;
+          const st = r.fig.stance;
+          let sAL = 0, sAR = 0;
+          if (st) {
+            const busy = clamp(f * 3 + guard * 2 + hold * 2 + fold * 2 + talk * 1.5 + snapK + giftK + patK
+                               + (r.beatP >= 0 ? 1 : 0) + r.mv + satK, 0, 1);
+            r.stW = damp(r.stW, 1 - busy, 6, dt);
+            sAL = r.stW * clamp(1 - Math.abs(tLx) * 0.8, 0, 1);
+            sAR = r.stW * clamp(1 - Math.abs(tRx) * 0.8, 0, 1);
+          }
           r.fig.armL.rotation.x = damp(r.fig.armL.rotation.x,
-                                       sway - guard - fold * 0.42 + beatL - snap + pat,
+                                       tLx + (st ? st.aLx * sAL : 0),
                                        r.beatP >= 0 ? npcBEAT_LAM : armL, dt);
           r.fig.armR.rotation.x = damp(r.fig.armR.rotation.x,
-                                       -sway - talk * (1 - hold) - guard
-                                       - hold * npcLOC_UMB_ARM - fold * 0.42
-                                       + beat - snapR + pat, r.beatP >= 0 ? npcBEAT_LAM : armR, dt);
+                                       tRx + (st ? st.aRx * sAR : 0), r.beatP >= 0 ? npcBEAT_LAM : armR, dt);
           r.fig.armR.rotation.z = damp(r.fig.armR.rotation.z,
                                        -talk * 0.7 * (1 - hold) - f * 0.4
-                                       - hold * 0.20 - fold * 0.34, armR, dt);
+                                       - hold * 0.20 - fold * 0.34 + (st ? st.aRz * sAR : 0), armR, dt);
           r.fig.armL.rotation.z = damp(r.fig.armL.rotation.z,
-                                       f * 0.4 + fold * 0.34, armL, dt);
+                                       f * 0.4 + fold * 0.34 + (st ? st.aLz * sAL : 0), armL, dt);
           // ---- THE ELBOW (v56) -------------------------------------------
           // Read off the shoulder angle that was just written rather than from
           // the pose stack, because that stack is fourteen additive terms
@@ -7206,8 +7434,11 @@ export function createNPCs(game) {
           // talking, or shuffling — gets the bend.
           const mkL = clamp(1 - Math.abs(r.fig.armL.rotation.x) * 0.8, 0, 1);
           const mkR = clamp(1 - Math.abs(r.fig.armR.rotation.x) * 0.8, 0, 1);
-          r.fig.elbowL.rotation.x = -npcELBOW_REST * mkL;
-          r.fig.elbowR.rotation.x = -npcELBOW_REST * mkR;
+          // ...and the stance's own elbow, by the same damped weight the
+          // shoulder took it at (L7, E4): folded arms are the elbow, not
+          // the shoulder, and a rest bend under a folded forearm is a kink.
+          r.fig.elbowL.rotation.x = st ? -npcELBOW_REST * mkL * (1 - sAL) + st.eL * sAL : -npcELBOW_REST * mkL;
+          r.fig.elbowR.rotation.x = st ? -npcELBOW_REST * mkR * (1 - sAR) + st.eR * sAR : -npcELBOW_REST * mkR;
           // ---- THE FACE (v54) ---------------------------------------------
           // Every input here already existed and none of it was drawn above
           // the neck: the flinch spring, the guard that goes up when the
@@ -7282,7 +7513,10 @@ export function createNPCs(game) {
         // the same rule chatStep landed on for the same reason.
         if (b.biome === (game.biome && game.biome.current) && b.fl > -0.02) {
           b.cd = b.cool * rand(0.7, 1.2);
-          localLine(b, npcSay(b, 'chatBack') || npcLOC_CHAT.back);
+          // The chapter's `passing` for the reply too (L7, E6): a second
+          // observation, not an answer. The echo ring keeps it from being
+          // the opener said back.
+          localLine(b, npcSay(b, 'chatBack') || npcSayFor(b.biome, 'passing') || npcLOC_CHAT.back);
         }
       }
       return;
@@ -7317,7 +7551,12 @@ export function createNPCs(game) {
         // kind no layer declares, so the shared pool is still the fallback and
         // no line changes until a chapter or a person is given one — see the
         // `chatOpen`/`chatBack` keys in addLocal.
-        localLine(a, npcSay(a, 'chatOpen') || npcLOC_CHAT.open);
+        // ---- THE PEOPLE OF THIS SQUARE (L7, E6 / writing W8) ------------
+        // A person's own opener, then the chapter's `passing` — what these
+        // people say to each other when nothing has happened — and only
+        // then the ten shared lines. Measured before this: Venice 5 of 13
+        // bubbles in 90 s were Venice's, Marrakech 0 of 4.
+        localLine(a, npcSay(a, 'chatOpen') || npcSayFor(live, 'passing') || npcLOC_CHAT.open);
         locChatRec = b;
         locChatWhen = rand(1.4, 2.3);
         locChatT = rand(11, 28);     // ...and now the long one, so it is not a chorus
@@ -8852,6 +9091,8 @@ export function createNPCs(game) {
   // ================================================================= capy ref
   let capyX = 0, capyZ = 0, capySpd = 0, capyOk = false;
   let capyVX = 0, capyVZ = 0, capySpdH = 0;
+  let npcCapyOdo = 0;              // m walked this session (L7, E5)
+  const npcPHOTO_WALK = 2;         // m the animal must have moved before the first photo
   // ---- TWO OF THE NINE SKILLS ARE READ HERE (see capySkill in capybara.js) --
   // `quiet` (ch4 Kyoto) is how much of an impression the animal makes; `flow`
   // (ch19 Hanoi) is whether it is holding a line worth getting out of the way
@@ -8863,6 +9104,13 @@ export function createNPCs(game) {
   function refreshCapy() {
     const c = game.capy;
     if (!c || !c.position) { capyOk = false; npcCapyOk = false; return; }
+    // ...and how far the animal has WALKED, for the free tick (L7, E5 / play
+    // 8): a step per frame, never a teleport (a cross moves it 300 m in one).
+    if (capyOk) {
+      const sx = c.position.x - capyX, sz = c.position.z - capyZ;
+      const st = Math.sqrt(sx * sx + sz * sz);
+      if (st < 1) npcCapyOdo += st;
+    }
     capyX = c.position.x; capyZ = c.position.z;
     npcCapyX = capyX; npcCapyZ = capyZ; npcCapyOk = true;
     capySpd = c.velocity ? c.velocity.length() : 0;
@@ -9080,6 +9328,7 @@ export function createNPCs(game) {
       // that it cannot be the first thing, short enough that a player who sits
       // down to watch the harbour still gets it.
       if (rec.hasCamera && rec.photoCd <= 0 && game.state.time > npcPHOTO_WAIT &&
+          npcCapyOdo >= npcPHOTO_WALK &&    // the player did something first (L7, E5)
           d > 3.0 && d < 11 && vis > 0.42 && capySpd < 0.35) {
         const cg = game.capy && game.capy.group;
         let capyFacing = 1;
@@ -13209,6 +13458,21 @@ export function createNPCs(game) {
   const npcQG_LOOK = 0.4;
   let qgLookT = 0;
   let qgBestMob = 0;              // most gulls on the chips at once, this session
+  // ---- THE RECORD IS FILED WHEN THE MOB LEAVES (L7, E5 / design 2.7) -------
+  // MEASURED: "personal best · put up 5 / 6 / 7 / 8 gulls at once" — four
+  // record pills in seven seconds from one bag of chips, because the count
+  // was posted every frame it grew. The live number stays on the paper
+  // (recordLive); the high-water mark of THIS mob is filed once, at its end.
+  let qgMobPeak = 0;
+  function qgMobDone() {
+    if (qgMobPeak > qgBestMob) {
+      qgBestMob = qgMobPeak;
+      if (typeof game.record === "function") {
+        try { game.record("seagull-chips", qgMobPeak); } catch (e) {}
+      }
+    }
+    qgMobPeak = 0;
+  }
 
   function qgStep(dt) {
     qgCryCd -= dt;
@@ -13217,7 +13481,7 @@ export function createNPCs(game) {
     // reason to keep it. The rest still stand: a cone that is removed, owned,
     // hidden or bodiless is not a thing eight gulls can be over.
     if (qgTarget && (qgTarget.removed || qgTarget.owner ||
-                     qgTarget.hidden || !qgTarget.body)) { qgTarget = null; qgMobT = 0; }
+                     qgTarget.hidden || !qgTarget.body)) { qgTarget = null; qgMobT = 0; qgMobDone(); }
     // Without the cooldown the flock re-acquires the same cone on the very frame
     // it gives up on it — `disturbed` never clears — and mobs it forever.
     qgLookT -= dt;
@@ -13308,12 +13572,7 @@ export function createNPCs(game) {
         // nothing to come back for. The count is the gulls actually ON the
         // chips at once, which rewards dragging the food somewhere open rather
         // than eating it against a wall — and that is the funnier picture.
-        if (arrived > qgBestMob) {
-          qgBestMob = arrived;
-          if (typeof game.record === "function") {
-            try { game.record("seagull-chips", arrived); } catch (e) {}
-          }
-        }
+        if (arrived > qgMobPeak) qgMobPeak = arrived;   // filed by qgMobDone (L7, E5)
         // ...AND THE COUNT IS ON THE PAPER WHILE THEY ARE ON IT (v36).
         // `arrived`, not `qgBestMob`: the interesting number is how many are on
         // the chips RIGHT NOW, which is what changes when the player drags the
@@ -13340,6 +13599,7 @@ export function createNPCs(game) {
       // they do not stay for ever
       if (qgMobT > 9) {
         qgTarget = null; qgMobT = 0; qgCool = 22;
+        qgMobDone();
         for (let i = 0; i < qgFlock.length; i++) qgFlock[i].state = QG_HOME;
       }
     }

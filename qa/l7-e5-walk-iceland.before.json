@@ -1,0 +1,352 @@
+{
+ "biome": "iceland",
+ "samples": [
+  {
+   "t": 13.9,
+   "biome": "iceland",
+   "x": 0,
+   "y": 0.3,
+   "z": 99,
+   "paper": "the big one hereTHE AURORAWait in the hot spring for the lights, then callthe hot pool · 120 mpart 1 of 3REYKJAVÍKAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat whiteSteal",
+   "err": null
+  },
+  {
+   "t": 39.9,
+   "biome": "iceland",
+   "x": -2.6,
+   "y": 1.1,
+   "z": 95,
+   "paper": "the big one hereTHE AURORAWait in the hot spring for the lights, then callthe hot pool · 110 mpart 1 of 3REYKJAVÍKAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat whiteSteal",
+   "err": null
+  },
+  {
+   "t": 64.6,
+   "biome": "iceland",
+   "x": -9.7,
+   "y": 0.4,
+   "z": 91.1,
+   "paper": "the big one hereTHE AURORAWait in the hot spring for the lights, then callthe hot pool · 110 mpart 1 of 3REYKJAVÍKAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat whiteSteal",
+   "err": null
+  },
+  {
+   "t": 84,
+   "biome": "iceland",
+   "x": 4.4,
+   "y": 0.3,
+   "z": 93,
+   "paper": "the big one hereTHE AURORAWait in the hot spring for the lights, then callthe hot pool · 110 mpart 1 of 3REYKJAVÍKAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat whiteSteal",
+   "err": null
+  },
+  {
+   "t": 113.4,
+   "biome": "iceland",
+   "x": 17.1,
+   "y": 1.8,
+   "z": 115.4,
+   "paper": "the big one hereTHE AURORAWait in the hot spring for the lights, then callthe hot pool · 140 mpart 1 of 3REYKJAVÍKAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat whiteSteal",
+   "err": null
+  },
+  {
+   "t": 139.6,
+   "biome": "iceland",
+   "x": 17.3,
+   "y": 0.6,
+   "z": 122.8,
+   "paper": "the big one hereTHE AURORAWait in the hot spring for the lights, then callthe hot pool · 140 mpart 1 of 3REYKJAVÍKAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat whiteSteal",
+   "err": null
+  },
+  {
+   "t": 152.9,
+   "biome": "iceland",
+   "x": 27.7,
+   "y": 1.7,
+   "z": 132.8,
+   "paper": "the big one hereTHE AURORAWait in the hot spring for the lights, then callthe hot pool · 160 mpart 1 of 3REYKJAVÍKAnnounce yourself (wheek)Steal a tourist’s hatMake someone spill their flat whiteSteal",
+   "err": null
+  }
+ ],
+ "ticks": [
+  [
+   13.1,
+   "pylsa"
+  ],
+  [
+   129.2,
+   "the-whale"
+  ]
+ ],
+ "imp": [
+  {
+   "cause": "the geyser",
+   "t": 15.359500000007495,
+   "v": 7.4
+  },
+  {
+   "cause": "the geyser",
+   "t": 20.611600000016484,
+   "v": 7.8
+  },
+  {
+   "cause": "the geyser",
+   "t": 27.36650000002995,
+   "v": 7.4
+  },
+  {
+   "cause": "the geyser",
+   "t": 42.62060000006838,
+   "v": 5.4
+  },
+  {
+   "cause": "the geyser",
+   "t": 54.965510000083114,
+   "v": 8
+  },
+  {
+   "cause": "the geyser",
+   "t": 70.50701000007537,
+   "v": 7.4
+  },
+  {
+   "cause": "the geyser",
+   "t": 76.86711000007672,
+   "v": 7.1
+  },
+  {
+   "cause": "the geyser",
+   "t": 89.90671000008528,
+   "v": 6.8
+  },
+  {
+   "cause": "the geyser",
+   "t": 102.70101000009693,
+   "v": 7.3
+  },
+  {
+   "cause": "the geyser",
+   "t": 106.89051000008936,
+   "v": 7
+  },
+  {
+   "cause": "the geyser",
+   "t": 122.86680000008137,
+   "v": 7.4
+  },
+  {
+   "cause": "the geyser",
+   "t": 128.15440000007533,
+   "v": 7.3
+  }
+ ],
+ "arrivalTicks": [],
+ "events": [
+  [
+   1.8,
+   "toast",
+   "be a menace."
+  ],
+  [
+   10.7,
+   "toast",
+   "saved — you can close this and come back"
+  ],
+  [
+   17.3,
+   "toast",
+   "that bar is your puff. a run spends it; stand still and it comes back."
+  ],
+  [
+   18.9,
+   "toast",
+   "that was the geyser"
+  ],
+  [
+   26.5,
+   "toast",
+   "ticked  ·  Rob the hot dog stand"
+  ],
+  [
+   28.5,
+   "toast",
+   "“ Something is happening. ” — somebody at the pool"
+  ],
+  [
+   30.1,
+   "toast",
+   "that was the geyser"
+  ],
+  [
+   38.8,
+   "toast",
+   "eina með öllu — one with everything, and no krona changed hands"
+  ],
+  [
+   40.5,
+   "toast",
+   "that was the geyser"
+  ],
+  [
+   49.2,
+   "toast",
+   "somebody saw that. three things in front of people is AN INCIDENT, five is A SCENE — unles"
+  ],
+  [
+   52,
+   "toast",
+   "drawing a little less to keep up"
+  ],
+  [
+   53.8,
+   "toast",
+   "“ Everybody all right? ” — somebody at the pool"
+  ],
+  [
+   60.2,
+   "toast",
+   "that was the geyser"
+  ],
+  [
+   67.6,
+   "toast",
+   "“ Cold one. ” — somebody at the pool"
+  ],
+  [
+   75.8,
+   "toast",
+   "that was the geyser"
+  ],
+  [
+   84.8,
+   "toast",
+   "“ It has stopped. ” — somebody at the pool"
+  ],
+  [
+   93.7,
+   "toast",
+   "that was the geyser"
+  ],
+  [
+   100.3,
+   "toast",
+   "“ Bit sharp. ” — somebody at the pool"
+  ],
+  [
+   102,
+   "toast",
+   "that was the geyser"
+  ],
+  [
+   116.4,
+   "toast",
+   "that was the geyser"
+  ],
+  [
+   129.5,
+   "toast",
+   "“ Still open? ” — somebody at the pool"
+  ],
+  [
+   132.2,
+   "toast",
+   "that was the geyser"
+  ],
+  [
+   137.1,
+   "toast",
+   "that was the geyser"
+  ],
+  [
+   143.9,
+   "toast",
+   "“ Not for you. ” — somebody at the pool"
+  ],
+  [
+   156.6,
+   "toast",
+   "that was the geyser"
+  ],
+  [
+   158.3,
+   "toast",
+   "“ Brr. ” — somebody at the pool"
+  ],
+  [
+   163.2,
+   "toast",
+   "that was the geyser"
+  ],
+  [
+   177,
+   "toast",
+   "“ Bit sharp. ” — somebody at the pool"
+  ],
+  [
+   189.1,
+   "toast",
+   "the boats out of here go a very long way south."
+  ],
+  [
+   192.5,
+   "toast",
+   "“ That went right through me. ” — somebody at the pool"
+  ]
+ ],
+ "done": [
+  "pylsa",
+  "the-whale"
+ ],
+ "shove": [
+  [
+   18.9,
+   "that was the geyser"
+  ],
+  [
+   30.1,
+   "that was the geyser"
+  ],
+  [
+   40.5,
+   "that was the geyser"
+  ],
+  [
+   60.2,
+   "that was the geyser"
+  ],
+  [
+   75.8,
+   "that was the geyser"
+  ],
+  [
+   93.7,
+   "that was the geyser"
+  ],
+  [
+   102,
+   "that was the geyser"
+  ],
+  [
+   116.4,
+   "that was the geyser"
+  ],
+  [
+   132.2,
+   "that was the geyser"
+  ],
+  [
+   137.1,
+   "that was the geyser"
+  ],
+  [
+   156.6,
+   "that was the geyser"
+  ],
+  [
+   163.2,
+   "that was the geyser"
+  ]
+ ],
+ "shoveUnnamed": 0,
+ "impUnsrc": 12,
+ "voids": 0,
+ "tickN": 2,
+ "firstNonFree": 13.1
+}
