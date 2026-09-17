@@ -16702,7 +16702,13 @@ export function createSystems(game) {
         m.hi = { n: n, f: lp, g: g };
       },
       throttle: function (m, k, now) {
-        sysAudioSet(m.hi.f.frequency, 8000 + 4000 * k, now, 1.5);
+        // THE AIR BREATHES WITH THE FRONT (L7, F4): the wind ahead of a
+        // crossing is audible before anything else about it is — one term,
+        // same shape as the pad's skyRain a few thousand lines down.
+        const wf = game.weather && game.weather.front ? game.weather.front() : -1;
+        const ahead = wf > -1 ? clamp(-wf * 4, 0, 1) : 0;   // 0 far out, 1 at the line
+        sysAudioSet(m.hi.f.frequency, 8000 + 4000 * k + 2000 * ahead, now, 1.5);
+        sysAudioSet(m.hi.g.gain, 1.0 + 0.6 * ahead, now, 1.5);
       } },
   };
   // Which chapters get which bed at the animal, and how open each one's air
@@ -41146,6 +41152,11 @@ export function createSystems(game) {
 
   game.hud = {
     mapMarkAudit: mapMarkAudit,
+    /** THE WEATHER FRONT's own forcing hook (L7, F4), same shape as
+     *  game.cloudForce: a number pins wxFront there every frame, anything
+     *  else (including no argument) releases it back to the weather's own
+     *  6-9 minute roll. */
+    front: function (k) { if (game.weather && game.weather.frontForce) game.weather.frontForce(k); },
     /**
      * What the mix would do with a sound at this point: its gain multiplier and
      * its pan, -1..1. For the same reason mapMarkAudit exists — a law applied
@@ -45416,6 +45427,17 @@ export function createSystems(game) {
       amb.intensity = lerp(amb.intensity, 0.72, k);
     }
     // ---- THE DOME, THE FILL AND THE GRADE ---------------------------------
+    // ---- THE FRONT'S TWO PILLS (L7, F4) ------------------------------------
+    // One at the first commitment to cross, one once it has cleared — read-
+    // once flags weather.js sets on the frame each edge happens (its update()
+    // already ran this frame, ahead of systems.js in main.js's module order),
+    // so an event that moves the cloud, the gust, the rain and the score
+    // together also gets a beginning and an end the player can read, and not
+    // only numbers the other systems happen to move.
+    if (game.weather) {
+      if (game.weather.frontNear && game.weather.frontNear()) toastNow('here it comes.', 'note');
+      if (game.weather.frontPast && game.weather.frontPast()) toastNow('that was the whole of it.', 'note');
+    }
     // Last in the atmosphere section on purpose. Everything above has finished
     // moving the fog, the background and the three lights for this frame; these
     // three all READ that result rather than duplicating any of it, which is

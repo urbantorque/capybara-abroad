@@ -455,6 +455,8 @@ const wxRAIN_BG    = 0.24;   // ...and the sky, which must move LESS than the fo
 const wxCLOUD_SUN  = 0.22;   // a passing shadow at full depth
 const wxCLOUD_AMB  = 0.055;  // ...and the fill that keeps it from being a hole
 const wxPULSE_HEMI = 1.0;    // the row's pulseK IS the fraction. See the table.
+const wxFRONT_CLOUD = 0.55;  // (L7, F4) coverage the front alone adds at the line
+const wxFRONT_GUST  = 2.0;   // ...and the gust's own speed multiplier, ahead of it
 // The grade. A wet street is not a darker street, it is a HIGHER CONTRAST one
 // with more saturated lights in it, and the threshold has to come down or the
 // reflections never clear the bright pass at all.
@@ -558,11 +560,29 @@ export function createWeather(game) {
   let rainT = 0;                  // 0..1 the shower's own envelope, damped
   let rainWant = 0;
   let rainAt = 0;                 // s left of the current shower
-  let rainNext = rand(8, 26);     // s until the next roll of the dice
   let cloudV = 0, pulseV = 0;
   let wet = row.wet;
   let thunderAt = 0;              // s until this shower is allowed a rumble
   let live = true;                // false while the title card is up
+
+  // ---- THE FRONT (L7, F4) --------------------------------------------------
+  // A single scalar, -1..1, the front's position along the chapter's wind:
+  // negative is still approaching, 0 is the line itself, positive is past.
+  // Every chapter whose mood row allows rain at all gets one, crossing once
+  // every wxFrontPeriod (6-9 minutes, re-rolled each cycle so nineteen
+  // chapters do not march in lockstep); a chapter with `rain.odds === 0`
+  // never gets one; `wxFrontForce` pins it for the harness (`hud.front(k)`).
+  // It is the shower's CAUSE now, not a bystander: crossing the line starts
+  // exactly the shower row.rain already describes (same hold, same peak),
+  // which is what turns four independent dice rolls (cloud, gust, rain, the
+  // ground) into one event with a beginning the player can watch arrive.
+  let wxFront = -1;
+  let wxFrontT = rand(0, 1) * 60;          // desynchronised start
+  let wxFrontPeriod = rand(360, 540);
+  let wxFrontForce = -2;                   // -2: the weather's own roll
+  let wxFrontFired = false;                // this cycle's shower already started
+  let wxFrontSaid = false, wxFrontSaidAfter = false;   // the two pills, once per cycle
+  let wxFrontNearFlag = false, wxFrontPastFlag = false; // read-once edges for systems.js's two pills
 
   // ---- the two emitters ---------------------------------------------------
   // Built with mat(), flat Lambert, exactly as the aesthetic law requires. No
@@ -723,10 +743,14 @@ export function createWeather(game) {
     name = to || 'sydney';
     row = wxMOOD[name] || wxBASE;
     rainT = 0; rainWant = 0; rainAt = 0;
-    rainNext = rand(6, row.rain.gap * 0.5 + 6);
     cloudV = 0; pulseV = 0;
     wet = row.wet;
     thunderAt = 0;
+    // THE FRONT IS PER-CHAPTER TOO (L7, F4): a front three minutes from
+    // crossing in Kyoto is not a front anybody arriving in Marrakech should
+    // inherit — same reasoning as every other reset on this line.
+    wxFront = -1; wxFrontT = rand(0, 1) * 60; wxFrontPeriod = rand(360, 540);
+    wxFrontFired = false; wxFrontSaid = false; wxFrontSaidAfter = false;
     rainMesh.count = 0;
     // ...and the rings, for the reason the shower itself is reset: a ring
     // expanding on a canal in Venice must not finish its life over a dune.
@@ -805,6 +829,20 @@ export function createWeather(game) {
     return row.label;
   }
   function lock() { return row.lock; }
+  /** -1..1, the front's position along the chapter's wind; -1 in a chapter
+   *  with no rain at all. See THE FRONT, above `update`. */
+  function front() { return wxFront; }
+  /** The harness's forcing hook (`hud.front(k)` in systems.js): a number
+   *  pins the front there every frame; anything else releases it back to
+   *  the weather's own roll. */
+  function frontForce(k) { wxFrontForce = (typeof k === 'number') ? k : -2; }
+  /** Read-once: true on the one frame the front first commits to crossing
+   *  ("here it comes") or first clears past it ("that was the whole of
+   *  it") — systems.js polls these once a frame and the read consumes it,
+   *  so a caller that never asks never sees the pill fire and dialogue and
+   *  toast do not have to agree on whose job it was to reset a shared flag. */
+  function frontNear() { const f = wxFrontNearFlag; wxFrontNearFlag = false; return f; }
+  function frontPast() { const f = wxFrontPastFlag; wxFrontPastFlag = false; return f; }
 
   /** The deltas systems.js lays over the atmosphere it has already computed.
    *  Returns a SHARED scratch object — read it, do not keep it. */
@@ -859,12 +897,14 @@ export function createWeather(game) {
     if (n === name) {
       row = next;
       wxFieldTo(row);
-      // A CONFIG CHANGE HAS TO TAKE EFFECT PROMPTLY. `rainNext` was seeded from
-      // the OLD row on arrival, so a caller that shortens the gap from ninety
-      // seconds to one still waits out the old ninety — which looks exactly
-      // like `set` not working, and is how the first audio soak measured a
-      // rain bed of zero after twenty seconds of a forced downpour.
-      rainNext = Math.min(rainNext, next.rain.gap);
+      // A CONFIG CHANGE HAS TO TAKE EFFECT PROMPTLY. `wxFrontT` was seeded
+      // against the OLD row's odds on arrival, so a caller that turns rain on
+      // for a chapter that had none still waits out a period nothing set —
+      // which looks exactly like `set` not working, and is how the first
+      // audio soak measured a rain bed of zero after twenty seconds of a
+      // forced downpour (L7, F4: the front replaced the old rainNext dice
+      // timer this same comment used to describe).
+      if (next.rain.odds > 0 && wxFrontT > wxFrontPeriod * 0.5) wxFrontT = wxFrontPeriod * 0.5;
       // ...AND A SHOWER ALREADY IN FLIGHT HAS TO BE RE-FITTED TO THE NEW HOLD.
       // `rainAt` counts down and the envelope reads `1 - rainAt / hold`, so
       // changing the hold under a running shower moves it to a completely
@@ -881,45 +921,73 @@ export function createWeather(game) {
     live = !!(game.state && game.state.started) && !(game.state && game.state.paused);
     wxT += dt;
 
-    // ---- 1. the shower ---------------------------------------------------
-    // A dice roll on a timer rather than a probability per frame: at 60 Hz a
-    // per-frame probability is a rate, and a rate that reads correctly at
-    // 60 fps is four times too fast at 240.
+    // ---- 0. THE FRONT (L7, F4) --------------------------------------------
+    // Advances only where a shower is possible at all, and only while the
+    // game is actually running — a title card is not weather.
+    if (row.rain.odds > 0) {
+      if (live) wxFrontT += dt;
+      if (wxFrontT > wxFrontPeriod) {
+        wxFrontT -= wxFrontPeriod; wxFrontPeriod = rand(360, 540);
+        wxFrontFired = false; wxFrontSaid = false; wxFrontSaidAfter = false;
+      }
+      const auto = clamp(wxFrontT / wxFrontPeriod * 2 - 1, -1, 1);
+      wxFront = wxFrontForce > -1.5 ? wxFrontForce : auto;
+      if (wxFront >= -0.06 && !wxFrontSaid) { wxFrontSaid = true; wxFrontNearFlag = true; }
+      if (wxFront >= 0.94 && !wxFrontSaidAfter) { wxFrontSaidAfter = true; wxFrontPastFlag = true; }
+    } else {
+      wxFront = -1;
+    }
+
+    // ---- 1. the shower, CAUSED BY THE FRONT'S CROSSING --------------------
+    // This used to be its own dice roll on a timer, independent of the
+    // cloud and the gust — four separate rolls for one grey afternoon. The
+    // front crossing zero is now the one trigger; row.rain's hold and peak
+    // are unchanged, so a chapter that used to see a shower of a given shape
+    // still does, just on a schedule the player can watch approach instead
+    // of a coin flip nothing announced.
     if (rainAt > 0) {
       rainAt -= dt;
       const u = 1 - rainAt / Math.max(0.001, row.rain.hold);
       rainWant = wxEnvelope(u) * row.rain.peak;
-      if (rainAt <= 0) { rainWant = 0; rainNext = row.rain.gap * rand(0.7, 1.4); }
-    } else if (row.rain.odds > 0) {
-      rainNext -= dt;
-      if (rainNext <= 0) {
-        if (Math.random() < row.rain.odds) { rainAt = row.rain.hold; thunderAt = rand(4, 12); }
-        else rainNext = row.rain.gap * rand(0.5, 1.0);
-      }
+      if (rainAt <= 0) { rainWant = 0; wxFrontFired = false; }
+    } else if (row.rain.odds > 0 && wxFront >= 0 && !wxFrontFired) {
+      rainAt = row.rain.hold; thunderAt = rand(4, 12); wxFrontFired = true;
     }
     // Damped rather than assigned, so the envelope's own corners are rounded
     // off and a biome change cannot step the rain from 0.7 to 0 in one frame.
     rainT = damp(rainT, rainWant, 0.9, dt);
     if (rainT < 0.0015) rainT = 0;
 
+    // ---- THE FRONT, AHEAD OF ITSELF (L7, F4) ------------------------------
+    // Coverage builds as the line approaches and clears once it has passed
+    // (frontCloud, a triangle centred on the crossing); the gust's own
+    // strength ramps specifically AHEAD of it (frontGust — the wind picking
+    // up before the rain it is bringing, 0 at half an excursion out, 1 at
+    // the line). shared.js's swayTick turns wxGust's bigger magnitude into
+    // the roadmap's swayK 0.4 -> 1.2 on its own; nothing here computes sway.
+    const frontOn = row.rain.odds > 0;
+    const frontCloud = frontOn ? clamp(1 - Math.abs(wxFront) * 2, 0, 1) : 0;
+    const frontGust = frontOn ? clamp(-wxFront * 4, 0, 1) : 0;
+
     // ---- 2. cloud, pulse, gust -------------------------------------------
     // Under prefers-reduced-motion every oscillator holds at its centre. The
     // shower still happens — it is weather, not motion — but nothing wobbles.
     if (wxCalm()) {
-      cloudV = damp(cloudV, 0, 2, dt); pulseV = damp(pulseV, 0, 2, dt);
-      wxGust.x = damp(wxGust.x, Math.sin(row.dir) * row.gust.base, 2, dt);
-      wxGust.z = damp(wxGust.z, Math.cos(row.dir) * row.gust.base, 2, dt);
+      cloudV = damp(cloudV, frontCloud * wxFRONT_CLOUD, 2, dt); pulseV = damp(pulseV, 0, 2, dt);
+      const gm = 1 + frontGust * (wxFRONT_GUST - 1);
+      wxGust.x = damp(wxGust.x, Math.sin(row.dir) * row.gust.base * gm, 2, dt);
+      wxGust.z = damp(wxGust.z, Math.cos(row.dir) * row.gust.base * gm, 2, dt);
     } else {
       // Half-wave rectified: a cloud either is in front of the sun or is not,
       // and there is no such thing as negative shadow.
-      const cw = Math.max(0, wxOsc(wxT, 0.021, 0.0)) * row.cloudK;
+      const cw = Math.min(1, Math.max(0, wxOsc(wxT, 0.021, 0.0)) * row.cloudK + frontCloud * wxFRONT_CLOUD);
       cloudV = damp(cloudV, cw, 1.6, dt);
       pulseV = damp(pulseV, wxOsc(wxT, 0.037, 1.7) * row.pulseK * wxPULSE_HEMI, 1.1, dt);
       // The gust swings the HEADING as well as the speed, or a "wind shift" is
       // just a volume knob on a fan.
       const sw = wxOsc(wxT, row.gust.hz, 3.1);
       const th = row.dir + sw * 0.55;
-      const sp = row.gust.base + wxOsc(wxT, row.gust.hz * 1.63, 5.5) * row.gust.swing;
+      const sp = (row.gust.base + wxOsc(wxT, row.gust.hz * 1.63, 5.5) * row.gust.swing) * (1 + frontGust * (wxFRONT_GUST - 1));
       wxGust.x = damp(wxGust.x, Math.sin(th) * sp, 1.4, dt);
       wxGust.z = damp(wxGust.z, Math.cos(th) * sp, 1.4, dt);
     }
@@ -1137,6 +1205,7 @@ export function createWeather(game) {
     mood: mood, label: label, lock: lock,
     drizzle: drizzle, cloud: cloud, pulse: pulse,
     gust: gust, wetness: wetness, slip: slip, splash: splash, shine: shine,
+    front: front, frontForce: frontForce, frontNear: frontNear, frontPast: frontPast,
     light: light, bed: bed, set: set,
     /** For the QA harness and for nothing else: what the table says about a
      *  place without having to be standing in it. */

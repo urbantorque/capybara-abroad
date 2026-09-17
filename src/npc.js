@@ -2924,11 +2924,12 @@ export function createNPCs(game) {
   // update() rather than inside localsStep, because localsStep returns early
   // when a chapter has no locals and the Sydney cast below still needs them.
   let npcWxRain = 0, npcWxGustS = 0, npcWxGustX = 0, npcWxGustZ = 0;
-  let npcWxMotes = 0, npcWxCold = 0;
+  let npcWxMotes = 0, npcWxCold = 0, npcWxFront = -1;
   function npcWxRead() {
     const WX = game.weather;
     if (!WX) { npcWxRain = 0; npcWxGustS = 0; npcWxGustX = 0; npcWxGustZ = 0;
-               npcWxMotes = 0; npcWxCold = 0; return; }
+               npcWxMotes = 0; npcWxCold = 0; npcWxFront = -1; return; }
+    npcWxFront = WX.front ? WX.front() : -1;
     npcWxRain = WX.drizzle();
     const gu = WX.gust();
     npcWxGustX = gu.x; npcWxGustZ = gu.z;
@@ -6602,6 +6603,10 @@ export function createNPCs(game) {
     if (locPhotoLive > 0) locPhotoLive -= dt;
     const wxRain = npcWxRain, wxGustS = npcWxGustS, wxGustX = npcWxGustX;
     const wxGustZ = npcWxGustZ, wxMotes = npcWxMotes, wxCold = npcWxCold;
+    // How close the front is to crossing, 0 far out .. 1 at the line — the
+    // umbrella's own anticipation (L7, F4): a local who waits for the first
+    // drop is one photograph too late for a scene about a front arriving.
+    const wxFrontNear = npcWxFront > -1 ? clamp(-npcWxFront * 3, 0, 1) : 0;
     // Read ONCE for the whole population, for the same reason the weather is:
     // it is the same number for all of them and asking systems.js a hundred
     // and ten times a frame for one float is the cost that only shows up in
@@ -6960,8 +6965,11 @@ export function createNPCs(game) {
         // THE UMBRELLA, ON A LATCH. Without hysteresis it opens and shuts
         // repeatedly all the way down the shower's long tail, which is the
         // single most irritating thing a background figure can do.
-        if (!r.umbUp && wxRain > npcLOC_UMB_ON) r.umbUp = true;
-        else if (r.umbUp && wxRain < npcLOC_UMB_OFF) r.umbUp = false;
+        // ...and AHEAD OF IT (L7, F4): the front within its last sixth of
+        // approach puts the umbrella up before the first drop, same as the
+        // roadmap's "locals put umbrellas up ahead of it."
+        if (!r.umbUp && (wxRain > npcLOC_UMB_ON || wxFrontNear > 0.85)) r.umbUp = true;
+        else if (r.umbUp && wxRain < npcLOC_UMB_OFF && wxFrontNear < 0.5) r.umbUp = false;
         r.umb = damp(r.umb, r.umbUp ? 1 : 0, npcLOC_UMB_LAM, dt);
         if (r.umb > 0.01) {
           const g2 = r.umbG || npcMakeUmbrella(r);
