@@ -2320,6 +2320,13 @@ function mainBoot() {
       pf.contacts = game.world ? game.world.contacts.length : 0;
       pf.substeps = mainSubsteps; mainSubsteps = 0;
       pf.ms = mainMs;
+      // THE GOVERNOR'S OWN CLOCK (L7, E7): the sum of every module's smoothed
+      // bill, i.e. the JS this frame actually cost — not the rAF period,
+      // which on a vsync-locked panel is the refresh rate no matter how
+      // cheap the frame was. A 30 Hz cap reads 33 ms of period and 12 ms of
+      // this; the governor's step-UP reads this number so that panel can
+      // still climb back a rung.
+      { let t = 0; for (const k in mainMs) t += mainMs[k]; game.state.tickMs = t; }
       ri.reset();
     }
     // The tab-switch guard, and from rung 2 the shed clamp — see MAIN_SHED_*.

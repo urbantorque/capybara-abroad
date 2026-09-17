@@ -110,6 +110,9 @@ function stage(src) {
   let code = readFileSync(join(ROOT, src), 'utf8');
   code = code.replace(/http:\/\/localhost:\d+/g, 'http://localhost:' + PORT);
   code = code.replace(/file:\/\/\/[^'"]*untitled-capybara-game\.html/g, distUrl);
+  // THE SOAK WANTS THE LONG FUZZ (L7, E7): the assert-suite's callers want
+  // fuzz.js fast (8 s/chapter); this run wants the roadmap's 45.
+  if (src === 'qa/fuzz.js') code = code.replace('const sysFUZZ_SEC = 8;', 'const sysFUZZ_SEC = 45;');
   const out = join(TMP, src.split('/').pop());
   writeFileSync(out, code);
   return out;

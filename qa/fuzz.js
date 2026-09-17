@@ -24,6 +24,20 @@ async page => {
   // own keepsake teleport (950, 12, 950 reaching 90 m/s) was the source of
   // every clamp it reported — so it is read as a DELTA over the eight
   // seconds of input, and the teleport's own clamps are a separate column.
+  // (L7, E7) the window of random keys per chapter. `npm run soak` wants 45 s
+  // (the roadmap's own number); the assert-suite's callers want this file
+  // fast, so the default stays 8 and qa/soak.mjs's stage() text-replaces this
+  // exact line for its own run — the same substitution trick it already uses
+  // for the port and the dist:// path.
+  const sysFUZZ_SEC = 8;
+  // A ceiling, not just the existing floor: `maxSpeed >= 1` below catches a
+  // harness that pressed nothing, this catches the animal being LAUNCHED —
+  // Monaco's pack car handed the solver 34-85 m/s before capy.velocity was
+  // clamped (see monaco.js, monUpdateRide). Drift's vertical fall between
+  // islands and Cappadocia's balloon are legitimately faster than a foot
+  // chase; both get headroom rather than the general ceiling.
+  const sysFUZZ_SPEED_MAX = 30;
+  const sysFUZZ_SPEED_BY = { drift: 34, goreme: 50 };
   await page.goto('http://localhost:5188/index.html');
   await page.waitForTimeout(6000);
   await page.keyboard.press('Enter');
@@ -34,7 +48,7 @@ async page => {
                  'manly', 'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi'];
   const res = {};
   for (const n of names) {
-    res[n] = await page.evaluate(async (name) => {
+    res[n] = await page.evaluate(async ([name, fuzzSec]) => {
       function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       const g = window.__capy;
       const errs = [];
@@ -56,7 +70,7 @@ async page => {
       const held = new Set();
       const saves0 = g.state.solverSaves || 0;     // cumulative; see the header
       const t0 = performance.now();
-      while (performance.now() - t0 < 8000) {
+      while (performance.now() - t0 < fuzzSec * 1000) {
         if (rnd() < 0.09) {
           const k = KEYS[(rnd() * KEYS.length) | 0];
           if (held.has(k)) { up(k); held.delete(k); } else { down(k); held.add(k); }
@@ -217,7 +231,7 @@ async page => {
         end: [+g.capy.position.x.toFixed(1), +g.capy.position.y.toFixed(1), +g.capy.position.z.toFixed(1)],
         errs: errs.slice(0, 6), lastError: g.state.lastError || null,
       };
-    }, n);
+    }, [n, sysFUZZ_SEC]);
   }
   // ---- THE GATE --------------------------------------------------------
   // Written into the file AND thrown, so a caller reading the JSON and a
@@ -231,6 +245,8 @@ async page => {
     if (r.started !== true) fail.push(n + ': started ' + r.started);
     if (r.biome !== n) fail.push(n + ': biome read ' + r.biome);
     if (!(r.maxSpeed >= 1)) fail.push(n + ': maxSpeed ' + r.maxSpeed + ' < 1 (no input reached the animal)');
+    const speedCap = sysFUZZ_SPEED_BY[n] || sysFUZZ_SPEED_MAX;
+    if (r.maxSpeed > speedCap) fail.push(n + ': maxSpeed ' + r.maxSpeed + ' > ' + speedCap + ' (something launched the animal)');
     if (r.nanFrames) fail.push(n + ': nanFrames ' + r.nanFrames);
     if (r.camNaN) fail.push(n + ': camNaN ' + r.camNaN);
     if (r.belowVoid) fail.push(n + ': belowVoid ' + r.belowVoid);

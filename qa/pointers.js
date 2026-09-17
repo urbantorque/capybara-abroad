@@ -3,12 +3,14 @@ async page => {
   // Cycle the pin through every open task in every chapter and record whether
   // the card can point at it at all. A task with no pointer and no beacon is a
   // task whose only guidance is one sentence of prose.
-  await page.mouse.click(400, 400);
+  // THE DOOR (L7, E7 / qa#9, see qa/_boot.js): raw pixel click replaced —
+  // see npchealth.js's header for why.
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(1500);
   const names = ['sydney', 'pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland',
                  'sahara', 'drift', 'venice', 'kowloon', 'palawan', 'goreme',
                  'manly', 'pantanal', 'cave', 'antarctic'];
-  const out = {};
+  const out = { started: await page.evaluate(() => !!(window.__capy && window.__capy.state.started)) };
   for (const b of names) {
     const n = await page.evaluate((name) => {
       const g = window.__capy;

@@ -3,11 +3,14 @@ async page => {
   // real-time soak per biome with the ambience and the score running.
   // Console errors are collected by playwright itself (`playwright-cli console`);
   // this script only drives the game and reports game.state.lastError.
-  await page.mouse.click(400, 400);          // trusted gesture -> audio unlock
+  // THE DOOR (L7, E7 / qa#9, see qa/_boot.js): Enter is a trusted gesture
+  // too, and it is the one that actually opens the title card instead of
+  // risking a raw pixel landing on it — see npchealth.js's header for why.
+  await page.keyboard.press('Enter');        // trusted gesture -> audio unlock, AND starts the game
   await page.waitForTimeout(1500);
   const names = ['sydney', 'quay', 'pasto', 'kyoto', 'cali', 'rio', 'iceland',
                  'sahara', 'drift', 'venice', 'kowloon', 'palawan', 'goreme'];
-  const res = { perBiome: {} };
+  const res = { started: await page.evaluate(() => !!(window.__capy && window.__capy.state.started)), perBiome: {} };
   for (const n of names) {
     await page.evaluate((name) => {
       const g = window.__capy;

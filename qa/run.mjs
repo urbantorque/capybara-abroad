@@ -68,6 +68,9 @@ const ASSERTS = [
 const REPORTS = [
   ['qa/p7-tokens.cjs',    'the HUD vocabulary: radii, type steps, shadows'],
   ['qa/p8-spawn.cjs',     'is there anything loose where the player lands'],
+  // THE PROBES ALIVE (L7, E7): which browser probes still open on a raw
+  // pixel click instead of qa/_boot.js's keyboard door.
+  ['qa/probes-alive.mjs', 'browser probes: raw pixel clicks, state.started reads'],
   // THE SOAK HAS A HISTORY (L6, E8 / qa F5). `npm run soak` boots the game
   // under playwright and appends one line to qa/soak-history.jsonl; this
   // reads it back and says which columns moved more than 30 % against the

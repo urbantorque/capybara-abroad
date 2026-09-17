@@ -78,6 +78,7 @@ const sysIMPULSE_BY = {
   venice: { wet: 'the tide' },
   palawan: { wet: 'the manta' },
   manly: { wet: 'the wave' }, antarctic: { wet: 'the swell' },
+  monaco: { dry: 'the pack', wet: 'the harbour' },   // (L7, E7) the fallback behind capy.shove's own naming
 };
 let sysImpPrev = 0, sysImpWin = 0, sysImpCool = 0, sysImpJumpT = 0;
 
@@ -26323,9 +26324,22 @@ export function createSystems(game) {
     return p1;
   }
 
+  // WRITE ON CHANGE (L7, E7). `recPaint` and the stamina bar already gate on
+  // a changed value; this — clearRect, drawImage, and every mark and path
+  // stroke on the chart — ran unconditionally at sysMAP_HZ whether or not
+  // the map would have looked any different. Rounded to millimetres and a
+  // hundredth of a radian: well under a pixel at this canvas's size, so a
+  // truly idle frame (interpolatedPosition still settling, or the game
+  // paused under a modal) is the only thing this skips.
+  let mapLastX = NaN, mapLastZ = NaN, mapLastYaw = NaN, mapLastCam = NaN, mapLastGoal = undefined, mapLastSpec = null;
   function mapDraw(p, yaw, camYawNow, goal) {
     const cssW = mapEl.clientWidth;
     if (!cssW) return;
+    const rx = Math.round(p.x * 1000), rz = Math.round(p.z * 1000);
+    const ry = Math.round(yaw * 100), rc = Math.round(camYawNow * 100);
+    if (rx === mapLastX && rz === mapLastZ && ry === mapLastYaw && rc === mapLastCam &&
+        goal === mapLastGoal && mapSpec === mapLastSpec) return;
+    mapLastX = rx; mapLastZ = rz; mapLastYaw = ry; mapLastCam = rc; mapLastGoal = goal; mapLastSpec = mapSpec;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = Math.round(cssW * dpr);
     if (w !== mapCssW) { mapCssW = w; mapCv.width = w; mapCv.height = w; }
@@ -34920,8 +34934,17 @@ export function createSystems(game) {
     if (restore && jrFile) {
       const t = jrFile.tasks || [];
       for (let i = 0; i < t.length; i++) completeTask(t[i], true);
-      const sn = jrFile.seen || [];
-      for (let i = 0; i < sn.length; i++) jrSeen[sn[i]] = 1;
+      // A `seen` entry is a chapter number, 1..chapterCount() — nothing else
+      // (L7, E7 / qa F6). Bad elements are dropped, not the file: the shape
+      // check above this function only looks at `seen` being an array; a
+      // huge, negative or non-integer value inside it was written straight
+      // into jrSeen as an object key, which the QA harness could plant and
+      // read back unbounded (`seenHuge`).
+      const sn = jrFile.seen || [], chN = chapterCount();
+      for (let i = 0; i < sn.length; i++) {
+        const v = sn[i];
+        if (Number.isInteger(v) && v >= 1 && v <= chN) jrSeen[v] = 1;
+      }
       const rc = jrFile.recs || {};
       // ---- ...UNLESS THE ROW CHANGED WHAT IT MEASURES (L5) ---------------
       // The manta's row was seconds held on; it is metres cleared now. The
@@ -36933,11 +36956,12 @@ export function createSystems(game) {
         const lens = photoLens > slowLens ? photoLens : slowLens;
         const dofRow = lens > 0.002 ? lerp(dr[0], Math.max(dr[0], sysDOF_LENS), lens) : dr[0];
         const dofKRow = lens > 0.002 ? lerp(dr[1], Math.min(dr[1], sysDOF_LENS_K), lens) : dr[1];
-        // ...and rung 3 of THE GOVERNOR (L4, qa #4) cuts it the way the switch
-        // does, along with the wide crease octave (pp.creaseWide, read by
-        // main.js beside uCreaseK).
-        pp.dof = (game.state.noDof || sysPerfRung >= 3) ? 0 : dofRow;
-        pp.creaseWide = sysPerfRung >= 3 ? 0 : 1;
+        // ...and rung 2 of THE GOVERNOR (L4, qa #4; re-ordered L7, E7) cuts it
+        // the way the switch does, along with the wide crease octave
+        // (pp.creaseWide, read by main.js beside uCreaseK) — ahead of the
+        // pixel scale now, since nobody can screenshot a focus plane.
+        pp.dof = (game.state.noDof || sysPerfRung >= 2) ? 0 : dofRow;
+        pp.creaseWide = sysPerfRung >= 2 ? 0 : 1;
         const f0 = sd * dofKRow;
         pp.dofFar0 = f0;
         pp.dofFar1 = f0 * sysDOF_SPAN;
@@ -38319,15 +38343,25 @@ export function createSystems(game) {
   // game had for a slow laptop let go within a minute.
   //
   // WHAT IS HERE. Four rungs, driven by ABSOLUTE frame time, with hysteresis
-  // in both the threshold and the clock:
+  // in both the threshold and the clock. RE-ORDERED (L7, E7): the two
+  // invisible costs go first, the one everybody can see goes last.
   //
   //   rung 0   everything
-  //   rung 1   pixels — dpr scale sysPF_DPR (0.6; the old floor was 0.7)
-  //   rung 2   ...and the shadow map 2048 → 1024, drawn every other frame,
-  //            and the world stepping at most twice a frame with dt clamped
-  //            to 1/20 (L6, E8 / qa F3 — the solver's bill used to GROW as
-  //            the frame slowed; see MAIN_SHED_RUNG in main.js)
-  //   rung 3   ...and the composite's DoF and wide crease off
+  //   rung 1   the far cascade off, and the shadow map 2048 → 1024, drawn
+  //            every other frame — nothing the eye can find in a screenshot
+  //   rung 2   ...and the composite's DoF and wide crease off, dpr scale to
+  //            sysPF_DPR2 (0.8), and the world stepping at most twice a
+  //            frame with dt clamped to 1/20 (L6, E8 / qa F3 — the solver's
+  //            bill used to GROW as the frame slowed; see MAIN_SHED_RUNG in
+  //            main.js)
+  //   rung 3   ...and dpr the rest of the way to sysPF_DPR (0.6) — today's
+  //            floor, unchanged, just the last thing shed instead of tied
+  //            to rung 1
+  //
+  // OWED: the roadmap also asks rung 2 for "2 blur taps" on the composite's
+  // bloom pass. That is a shader-level tap count with no existing lever —
+  // touching it without a rendered A/B is exactly the kind of change this
+  // pass measures everything else to avoid, so it stays unbuilt here.
   //
   // DOWN when the half-second mean frame is over sysPF_SLOW_MS for
   // sysPF_DOWN_S running; UP when it is under the fast line for sysPF_UP_S.
@@ -38369,8 +38403,10 @@ export function createSystems(game) {
   const sysPF_UP_S     = 4;      // s of fast before a step up
   const sysPF_UP_MAX   = 32;     // s — the patience cap after bounces
   const sysPF_BOUNCE_S = 20;     // s — a step down this soon after a step up is a bounce
-  const sysPF_DPR      = 0.6;    // dpr scale from rung 1 up
-  const sysPF_SHADOW   = 1024;   // shadow map from rung 2 up
+  const sysPF_DPR      = 0.6;    // dpr scale from rung 3 up (L7, E7: was rung 1)
+  const sysPF_DPR2     = 0.8;    // dpr scale at rung 2 only (L7, E7)
+  const sysPF_SHADOW   = 1024;   // shadow map from rung 1 up (L7, E7: was rung 2)
+  const sysPF_TICK_FAST_MS = 12; // ms — the JS-only frame bill a step-UP reads (L7, E7)
   // 8 -> 30 (L6, E4 / play 8): the apology shared the first ten seconds with
   // the first tick on the fresh player's run. Half a minute in, the player has
   // read the paper; and it never lands inside sysPF_TICK_GAP of a tick pill.
@@ -38383,12 +38419,13 @@ export function createSystems(game) {
     if (r === sysPerfRung) return;
     sysPerfRung = r;
     game.state.perfRung = r;
-    const scale = r >= 1 ? sysPF_DPR : 1;
+    const scale = r >= 3 ? sysPF_DPR : (r >= 2 ? sysPF_DPR2 : 1);
     if (scale !== dprScale) { dprScale = scale; applyDPR(); }
     // The far cascade is the first thing to go (THE FAR CASCADE): it is one
-    // whole extra shadow pass, and it is gone on the same step as the pixels.
+    // whole extra shadow pass, and it is gone on the same step as the shadow
+    // map halves — both invisible in a screenshot (L7, E7).
     if ((r === 0) !== sysFarOn) sysFarSet(r === 0);
-    const res = r >= 2 ? sysPF_SHADOW : sysSHADOW_RES;
+    const res = r >= 1 ? sysPF_SHADOW : sysSHADOW_RES;
     if (res !== sysShadowRes) {
       sysShadowRes = res;
       sun.shadow.mapSize.set(res, res);
@@ -47383,8 +47420,12 @@ export function createSystems(game) {
       pfFastMs = Math.max(sysPF_FAST_MS, sysPF_FAST_K * 1000 / Math.max(fpsCeil, sysPF_PEAK_MIN));
       const here = game.biome ? game.biome.current : '';
       if (here !== pfBiome) { pfBiome = here; pfUpNeed = sysPF_UP_S; pfSlowT = 0; pfFastT = 0; }
+      // The DOWN branch stays on pfMs (the rAF period): a chapter that is
+      // actually slow is slow, vsync or not. The UP branch reads tickMs
+      // instead (L7, E7) — see the note on game.state.tickMs in main.js.
+      const tickMs = game.state.tickMs || pfMs;
       if (pfMs > sysPF_SLOW_MS) { pfSlowT += win; pfFastT = 0; }
-      else if (pfMs < pfFastMs) { pfFastT += win; pfSlowT = 0; }
+      else if (tickMs < sysPF_TICK_FAST_MS) { pfFastT += win; pfSlowT = 0; }
       else { pfSlowT = 0; pfFastT = 0; }
       if (sysPerfMode === 1) sysPerfSet(0);
       else if (sysPerfMode === 2) sysPerfSet(3);

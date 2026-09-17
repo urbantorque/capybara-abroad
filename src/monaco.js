@@ -3277,6 +3277,34 @@ function monUpdateRide(game, dt) {
   const capy = game.capy;
   if (!capy || !capy.position || monRaceOn) { monRider = -1; return; }
   const p = capy.position;
+  // ---- THE PACK DOES NOT LAUNCH YOU (L7, E7) ---------------------------
+  // monCarBody is kinematic (see the array's own comment above): cannon-es
+  // resolves a contact against a kinematic box by the RELATIVE velocity at
+  // the manifold, which at 26 m/s and a shallow graze can hand the dynamic
+  // side many multiples of the car's own speed — measured 34-85 m/s, with
+  // "hold on." as the only pill, because nothing named a shove. Any car
+  // within 3 m that leaves the capybara faster than the car's own speed +
+  // 2 m/s gets the excess clamped to the car's speed + 4 m/s, and the
+  // clamp is what names it: shove(0, 0, …) adds no velocity of its own,
+  // it only sets capy.impulseSrc (see the src branch in capy.shove).
+  if (capy.velocity) {
+    let nearD2 = 9, cv = null;
+    for (let i = 0; i < monCarG.length; i++) {
+      const g = monCarG[i];
+      const dx = p.x - g.position.x, dz = p.z - g.position.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < nearD2) { nearD2 = d2; cv = monCarBody[i].velocity; }
+    }
+    if (cv) {
+      const carSpd = Math.hypot(cv.x, cv.z);
+      const mySpd = Math.hypot(capy.velocity.x, capy.velocity.z);
+      if (mySpd > carSpd + 2) {
+        const s = (carSpd + 4) / mySpd;
+        capy.velocity.x *= s; capy.velocity.z *= s;
+        if (typeof capy.shove === 'function') capy.shove(0, 0, capy.swimming ? 'the harbour' : 'the pack');
+      }
+    }
+  }
   let on = -1;
   for (let i = 0; i < monCarG.length; i++) {
     const g = monCarG[i];

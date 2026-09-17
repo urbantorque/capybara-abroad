@@ -1,8 +1,16 @@
 async page => {
+  // THE DOOR (L7, E7 / qa#9, see qa/_boot.js): this pressed nothing at all —
+  // no click, no key — and trusted a previous run-code call in the same
+  // session to have already started the game. A fresh session (or a session
+  // where a prior probe reloaded) leaves this reading a title card's
+  // kinematic bodies, which is a report of nothing. See npchealth.js's
+  // header for the click-anti-pattern half of this same fix.
   await page.reload(); await page.waitForTimeout(5000);
+  await page.keyboard.press('Enter'); await page.waitForTimeout(1500);
+  const started = await page.evaluate(() => !!(window.__capy && window.__capy.state.started));
   const names = ['sydney', 'pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland',
                  'sahara', 'drift', 'venice', 'kowloon', 'palawan', 'goreme', 'manly', 'pantanal', 'cave', 'antarctic'];
-  const res = { biomes: {} };
+  const res = { started, biomes: {} };
   for (const n of names) {
     const r = await page.evaluate(async (name) => {
       function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }

@@ -1,9 +1,11 @@
 async page => {
   // Are any props lost? Below the terrain, above it in mid-air, NaN, or asleep
   // somewhere the player can never reach them. A lost prop is a dead task.
-  await page.mouse.click(400, 400);
+  // THE DOOR (L7, E7 / qa#9, see qa/_boot.js): raw pixel click replaced —
+  // see npchealth.js's header for why.
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(1500);
-  const out = {};
+  const out = { started: await page.evaluate(() => !!(window.__capy && window.__capy.state.started)) };
   for (const b of ['sydney', 'pasto']) {
     await page.evaluate((name) => {
       const g = window.__capy;

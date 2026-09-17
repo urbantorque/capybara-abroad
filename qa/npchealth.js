@@ -1,7 +1,12 @@
 async page => {
-  await page.mouse.click(400, 400);
+  // THE DOOR (L7, E7 / qa#9, see qa/_boot.js): this was a raw pixel click on
+  // the title card, the same anti-pattern qa/fuzz.js regressed on once
+  // already — a resize puts (400, 400) on the card instead of its backdrop,
+  // and nothing here checked `started` before reading a title screen as
+  // three empty chapters.
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(1500);
-  const out = {};
+  const out = { started: await page.evaluate(() => !!(window.__capy && window.__capy.state.started)) };
   for (const b of ['sydney', 'quay', 'pasto']) {
     await page.evaluate((name) => {
       const g = window.__capy;
