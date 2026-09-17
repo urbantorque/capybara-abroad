@@ -158,6 +158,11 @@ let gorBuilt = false;
 let gorRoot = null;
 let gorTime = 0;
 let gorPhase = 0.06;
+// THE FIRST ARM (L7, F3): the dawn does not count down from the moment the
+// card lifts — held until the animal has actually boarded the balloon
+// (gorAboard, the same flag the sunrise hurry already reads) or 90 s have
+// passed. See gorUpdateClock; never touched again after that.
+let gorArmed = false, gorArmT = 0;
 let gorSun = 0;                      // 0..1 — how far the sun is over the ridge
 let gorDawnLit = 0;                  // 0..1 — the light, which leads the sun a bit
 let gorSeenSun = false;
@@ -4930,11 +4935,19 @@ function gorUpdateClock(game, dt) {
   // time-lapse of the light coming, nothing snaps — until the ramp begins.
   {
     let rate = 1;
+    // THE FIRST ARM (L7, F3): a one-time gate on dt, ahead of the hurry
+    // above, so that mechanic runs exactly as it always has once armed.
+    let dtEff = dt;
+    if (!gorArmed) {
+      gorArmT += dt;
+      if (gorAboard || gorArmT >= 90) gorArmed = true;
+      else dtEff = 0;
+    }
     if (!gorSunDone && gorAboard && gorPhase < gorSUN_P - 0.01 && gorPhase > 0.2) {
       const alt = gorBalY - gorTerrain(gorBalX, gorBalZ);
       if (alt > 40) rate = 4;
     }
-    gorPhase += dt * rate / gorCYCLE;
+    gorPhase += dtEff * rate / gorCYCLE;
   }
   if (gorPhase >= 1) { gorPhase -= 1; gorWarned = false; gorToldLayer = -1; gorSyncSaid = false; }
 
@@ -5532,6 +5545,7 @@ export function createGoreme(game) {
       // Put the morning back to a few minutes before the launch, so a chapter
       // you come back to opens the way it opened the first time.
       gorPhase = 0.06;
+      gorArmed = false; gorArmT = 0;   // (L7, F3) the first arm, fresh every visit
       gorSun = 0; gorDawnLit = 0; gorWarned = false; gorSyncSaid = false;
       // D4.3: a fresh dawn is a fresh burn, a fresh nag and a fresh flock.
       gorSunBurned = false; gorSunNagged = false; gorSunDoves = false;

@@ -131,6 +131,11 @@ let hkBuilt = false;
 let hkRoot = null;
 let hkTime = 0;
 let hkPhase = 0.06;
+// THE FIRST ARM (L7, F3): the evening does not count down from the moment
+// the card lifts — held until the animal has actually reached a roof
+// (hkSHOW_ROOF, the same height hkHURRY already reads) or 90 s have
+// passed. See hkUpdateShow; never touched again after that.
+let hkArmed = false, hkArmT = 0;
 let hkShow = 0;                      // 0..1 — how much of the show is running
 let hkShowT = -1;                    // s into the show, -1 when it is not on
 let hkLitCount = 0;                  // towers currently up
@@ -4179,13 +4184,22 @@ const hkHURRY = 6;
 function hkUpdateShow(game, dt) {
   const prev = hkPhase;
   let rate = 1;
+  // THE FIRST ARM (L7, F3): a one-time gate on dt, ahead of hkHURRY, so
+  // that mechanic runs exactly as it always has once armed.
+  let dtEff = dt;
+  if (!hkArmed) {
+    hkArmT += dt;
+    const cpA = game.capy && game.capy.position;
+    if ((cpA && cpA.y > hkSHOW_ROOF) || hkArmT >= 90) hkArmed = true;
+    else dtEff = 0;
+  }
   if (!hkShowDone) {
     const cp0 = game.capy && game.capy.position;
     const inWin = hkPhase >= hkSHOW_ON && hkPhase < hkSHOW_OFF;
     // ...and not from the helicopter (X2): its finale is the eighth ring
     if (cp0 && cp0.y > hkSHOW_ROOF && !inWin && !hkHeliOn) rate = hkHURRY;
   }
-  hkPhase += dt * rate / hkCYCLE;
+  hkPhase += dtEff * rate / hkCYCLE;
   while (hkPhase >= 1) hkPhase -= 1;
 
   const warnNow = hkPhase >= hkSHOW_WARN && hkPhase < hkSHOW_ON;
@@ -5466,6 +5480,7 @@ export function createKowloon(game) {
       // The evening is put back to a couple of minutes before eight, so a
       // chapter you come back to opens the way it opened the first time.
       hkPhase = 0.06;
+      hkArmed = false; hkArmT = 0;   // (L7, F3) the first arm, fresh every visit
       hkShow = 0; hkShowT = -1; hkLitCount = 0; hkWarned = false; hkSoonSaid = false;
       // X2: the helicopter is back on its H and the rings are unlit
       hkHeliX = hkHELI.x; hkHeliY = hkROOF_Y; hkHeliZ = hkHELI.z; hkHeliYaw = hkHELI.yaw;

@@ -209,6 +209,10 @@ let venRoot = null;
 let venTime = 0;
 let venPhase = venTIDE_START;
 let venWaterY = venTIDE_LOW;
+// THE FIRST ARM (L7, F3): the tide's clock is held at its entry value until
+// the animal is within 25 m of the flood point or 90 s have passed, once
+// per visit — see venUpdateTide. Never touches the tide again after that.
+let venArmed = false, venArmT = 0;
 let venLapMover = null;               // the lagoon's bed (L3-9)
 let venWaterMesh = null, venWaterMat = null;
 let venWaterAttr = null, venWaterBase = null, venRipT = 0;
@@ -5054,12 +5058,24 @@ const venHURRY = 5;
 function venUpdateTide(game, dt) {
   const prevPhase = venPhase;
   let rate = 1;
+  // THE FIRST ARM (L7, F3): held at the entry phase until the animal is
+  // within 25 m of the flood point (0, -34 — the same point nextIn() reads)
+  // or 90 s have passed. A one-time gate on dt itself, so venHURRY and
+  // everything below runs exactly as it always has once armed.
+  let dtEff = dt;
+  if (!venArmed) {
+    venArmT += dt;
+    const cpA = game.capy && game.capy.position;
+    const dxA = cpA ? cpA.x - 0 : 1e9, dzA = cpA ? cpA.z - (-34) : 1e9;
+    if ((cpA && dxA * dxA + dzA * dzA < 625) || venArmT >= 90) venArmed = true;
+    else dtEff = 0;
+  }
   if (!venFloodDone) {
     const cp0 = game.capy && game.capy.position;
     const low = venPhase < venTIDE_WARN - 0.02 || venPhase >= venTIDE_FALL1;
     if (low && cp0 && venInZone('square', cp0.x, cp0.z)) rate = venHURRY;
   }
-  venPhase += dt * rate / venTIDE_PERIOD;
+  venPhase += dtEff * rate / venTIDE_PERIOD;
   while (venPhase >= 1) venPhase -= 1;
 
   const target = venTideY(venPhase);
@@ -5613,6 +5629,7 @@ export function createVenice(game) {
       // low water, a minute to look round, and then the siren.
       venPhase = venTIDE_START;
       venWaterY = venTIDE_LOW;
+      venArmed = false; venArmT = 0;   // (L7, F3) the first arm, fresh every visit
       venSirenT = -1; venSirenStep = 0;
       venWasFlooded = false;
       venBoardRunT = -1; venBoardOff = 0;

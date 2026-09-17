@@ -123,6 +123,11 @@ let palBuilt = false;
 let palRoot = null;
 let palTime = 0;
 let palPhase = 0.10;
+// THE FIRST ARM (L7, F3): the bloom does not count down from the moment
+// the card lifts — held until the animal is within 25 m of the lagoon
+// (palLAG, the same point the crackle sfx already measures from) or 90 s
+// have passed. See palUpdateClock; never touched again after that.
+let palArmed = false, palArmT = 0;
 let palBloom = 0;                    // 0..1 — how much of the bloom is in the bay
 let palBloomT = -1;                  // s into it, -1 when it is not on
 let palSeenBloom = false;
@@ -4072,7 +4077,16 @@ function palUpdateReefSound(game, dt) {
 
 // ================================================================ THE CLOCK =
 function palUpdateClock(game, dt) {
-  palPhase += dt / palCYCLE;
+  // THE FIRST ARM (L7, F3): a one-time gate on dt.
+  let dtEff = dt;
+  if (!palArmed) {
+    palArmT += dt;
+    const cpA = game.capy && game.capy.position;
+    const dxA = cpA ? cpA.x - palLAG.x : 1e9, dzA = cpA ? cpA.z - palLAG.z : 1e9;
+    if ((cpA && dxA * dxA + dzA * dzA < 625) || palArmT >= 90) palArmed = true;
+    else dtEff = 0;
+  }
+  palPhase += dtEff / palCYCLE;
   if (palPhase >= 1) { palPhase -= 1; palWarned = false; }
 
   let want = 0;
@@ -4639,6 +4653,7 @@ export function createPalawan(game) {
       // The bay is put back to a couple of minutes before the bloom, so a
       // chapter you come back to opens the way it opened the first time.
       palPhase = 0.10;
+      palArmed = false; palArmT = 0;   // (L7, F3) the first arm, fresh every visit
       palBloom = 0; palBloomT = -1; palWarned = false;
       palTime = 0; palSub = 0;
       palTurtleWith = 0; palBreathIn = 0; palTurtleOff = 0; palTurtleTold = false;

@@ -214,6 +214,11 @@ let hanRideGrace = 0;
 let hanTrainG = null, hanTrainBody = null;
 let hanTrainS = -1;               // metres along the alley, or -1 when it is away
 let hanTrainT = hanTRAIN_GAP2 * 0.35;
+// THE FIRST ARM (L7, F3): the train's own countdown does not run down from
+// the moment the card lifts — held until the animal has actually reached
+// the alley (inAlley, the same flag the hurry above already reads) or 90 s
+// have passed. See hanUpdateTrain; never touched again after that.
+let hanArmed = false, hanArmT = 0;
 let hanFoldK = 0;                 // 0 open, 1 everything folded away
 let hanTrainNear = 99;            // closest the animal has been to it, this pass
 let hanTrainBest = 99;
@@ -2989,11 +2994,19 @@ function hanUpdateTrain(game, dt) {
   }
 
   if (hanTrainS < 0) {
+    // THE FIRST ARM (L7, F3): a one-time gate, ahead of the hurry below, so
+    // that mechanic runs exactly as it always has once armed.
+    let armK = 1;
+    if (!hanArmed) {
+      hanArmT += dt;
+      if (inAlley || hanArmT >= 90) hanArmed = true;
+      else armK = 0;
+    }
     // THE TRAIN HURRIES FOR YOU (W4). Ninety-six seconds between trains and
     // the task is to stand still: in the alley with the marquee open, the gap
     // runs at three times until the horn is due, and the horn's own eleven
     // seconds run at one, so the warning is still a warning.
-    hanTrainT -= dt * ((!hanTrainDone && inAlley && hanTrainT > hanTRAIN_WARN + 3) ? 3 : 1);
+    hanTrainT -= dt * armK * ((!hanTrainDone && inAlley && hanTrainT > hanTRAIN_WARN + 3) ? 3 : 1);
     // the horn, eleven seconds out, and the street starts folding on it
     if (hanTrainT <= hanTRAIN_WARN && !hanTrainWarned) {
       hanTrainWarned = true;
@@ -3142,7 +3155,11 @@ function hanUpdateTrain(game, dt) {
     if (hanTrainS > 60 + (hanTRAIN.x1 - hanTRAIN.x0) + 13.6 * hanTRAIN_LEN + 90) {
       // gone. Score whatever happened, and stand the street back up.
       hanTrainS = -1;
-      hanTrainT = hanTRAIN_GAP2;
+      // THE FIRST MISS RE-ARMS SHORT (L7, F3): once the task is done,
+      // hanTrainDone stays true for the rest of the visit and the full gap
+      // is the ambient rhythm ("traffic as a medium"); a pass that has NOT
+      // yet earned it gets a 20 s second chance instead of the full 96.
+      hanTrainT = hanTrainDone ? hanTRAIN_GAP2 : 20;
       hanTrainWarned = false;
       hanTrainG.visible = false;
       hanTrainBody.position.set(0, -900, 0);
@@ -4792,11 +4809,13 @@ export function createHanoi(game) {
         hanRideBody.velocity.setZero();
         hanSyncBody(hanRideBody);
       }
-      // THE TRAIN IS AWAY AGAIN, and its clock is reset to a third of the gap
-      // — near enough that a player who walks straight to the alley is not
-      // waiting ninety-six seconds, far enough that it is not there already.
+      // THE TRAIN IS AWAY AGAIN. Its clock used to be reset to a third of the
+      // gap here as a guess at walk-in time; THE FIRST ARM (L7, F3) replaced
+      // the guess with a real gate — the full gap, frozen until the animal
+      // actually reaches the alley or 90 s pass (hanArmed, hanUpdateTrain).
       hanTrainS = -1;
-      hanTrainT = hanTRAIN_GAP2 * 0.30;
+      hanTrainT = hanTRAIN_GAP2;
+      hanArmed = false; hanArmT = 0;
       hanTrainWarned = false; hanTrainNear = 99; hanTrainHave = false;
       hanFoldK = 0;
       if (hanTrainG) hanTrainG.visible = false;
