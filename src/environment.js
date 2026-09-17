@@ -696,9 +696,15 @@ const envBOUNDS = {
 // the zone is the carpet's own rectangle now rather than 2.5 m wider each
 // side, so "on the red" and "in the zone" are the same fact — and a metre
 // north of where the flat carpet lay, for the stair (see the block's note).
+// GREW BY 0.9 m2 (L7, F3): z0 0.0..z1 2.9 was 0.35 m short of the riser,
+// which runs to 3.5, and stopped 0.6 m short of its own front step — two
+// fresh playtesters in a row stood on the riser and the zone said no. This
+// is the same rectangle problem the L6 comment above solved once already
+// (a zone that disagreed with the geometry it names), fixed the same way:
+// measured against the riser, not guessed narrower to be safe.
 const envSTAGE_Y = 1.5;
 const envZONES = {
-  operaStage: { x0: -6.5, z0: 0.0, x1: 6.5, z1: 2.9 },
+  operaStage: { x0: -6.5, z0: -0.6, x1: 6.5, z1: 3.5 },
   gardens:    { x0: 14, z0: 4, x1: 62, z1: 58 },
   flowerbed:  { x0: 17, z0: 6, x1: 56, z1: 51 },
   promenade:  { x0: -62, z0: -9, x1: -14, z1: 12 },

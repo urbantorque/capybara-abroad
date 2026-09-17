@@ -9635,7 +9635,7 @@ function sysBuildCSS() {
    a SENTENCE is italic and set at reading size, a LABEL is tracked-out caps
    and quieter. Nothing here changes the pill's shape, its paper or its
    entrance — a toast is still one object, said three ways. */
-'.capyui-toast.say{font-style:italic;font-weight:700;letter-spacing:0;}',
+'.capyui-toast.say,.capyui-toast.why{font-style:italic;font-weight:700;letter-spacing:0;}',
 /* inkSoft -> 0.88 of the ink (L4, E3 / writing #5): at 0.70 over the paper
    the reward pills measured under 4.5:1 and read as a footnote to their own
    moment. Still a step quieter than a sentence; no longer grey. */
@@ -27391,7 +27391,7 @@ export function createSystems(game) {
   // of the way up the screen and the fifth was already pushing the first one
   // off; three is the most that can be read before the first one goes.
   const sysTOAST_MAX = 3;
-  const sysTOAST_HOLD = { say: 2600, note: 2200, last: 5200 };
+  const sysTOAST_HOLD = { say: 2600, note: 2200, last: 5200, why: 4200 };   // (L7, F3) >= 4 s
   // ---- THE FIRST MINUTE (L4, E3 / design #2, writing #4, player #2) --------
   // Measured on a fresh file with a naive three-minute drive (qa/l4-first-
   // minute.js): twenty to twenty-five pills in minute one — the arrival card
@@ -27582,7 +27582,7 @@ export function createSystems(game) {
     // whoever happens to fire last. A toast raised while it is up is DROPPED,
     // not queued: it is an autosave notice or a record, and the run is over.
     if (ledShown) return null;
-    const k = (kind === 'note' || kind === 'last') ? kind : 'say';
+    const k = (kind === 'note' || kind === 'last' || kind === 'why') ? kind : 'say';
     // A closing sentence arrives alone. Same exit every other pill gets — the
     // pills already up are pushed, not deleted, which is the lesson the
     // fifth-toast bug left behind two paragraphs down.
@@ -27638,6 +27638,15 @@ export function createSystems(game) {
   const sysWHY_GAP = 2.0;        // s between why-lines
   const sysWHY_SAME = 7;         // s the same why-line is not said twice
   const sysWHY_R = 10;           // m from the marquee point a press is "at" it
+  // THE WHY, FOR A MARQUEE WITH NO CLOCK (L7, F3). Keyed by biome, not by
+  // task id, because the point of this table is coverage without having to
+  // read each chapter's own marquee state machine — the roadmap's own three
+  // verbatim; nothing here claims to be all nineteen.
+  const sysMARQUEE_WHY = {
+    pasto: 'she is over the plaza — be under her when she comes down',
+    cali: 'the ladder is on the back; she goes when you are on the roof',
+    palawan: 'she laps the drop-off — under, and wait for her',
+  };
   let sysWhyAt = -1e9, sysWhyTxt = '', sysWhyEl = null;
   function marqueeWhy(text) {
     const t = String(text || '');
@@ -27648,7 +27657,7 @@ export function createSystems(game) {
     sysWhyAt = now; sysWhyTxt = t;
     if (wowLiveOn && sysPlaceLine(t)) return;
     sysToastOut(sysWhyEl);
-    sysWhyEl = toastNow(t, 'say');
+    sysWhyEl = toastNow(t, 'why');   // (L7, F3) >= 4 s, and a bubble cannot evict it
   }
   game.marqueeWhy = marqueeWhy;
   // ---- ...AND THE CONCERT SAYS IT (L6, E4 / play 3) -----------------------
@@ -27668,7 +27677,11 @@ export function createSystems(game) {
       const dx = p.x - (z.x0 + z.x1) * 0.5, dz = p.z - (z.z0 + z.z1) * 0.5;
       if (dx * dx + dz * dz > sysWHY_R * sysWHY_R) return;
       if (taskRec['opera-stage'] && taskRec['opera-stage'].done) return;
-      if (env.inZone('operaStage', p.x, p.z) && p.y > 0.9) return;     // a note; stageNote spoke
+      // A HALF-METRE MARGIN (L7, F3), on this check only — the why-hint's
+      // job is to not talk over somebody who is basically there, not to
+      // gate the task itself (43370 below stays exact for that).
+      const M = 0.5;
+      if (p.x >= z.x0 - M && p.x <= z.x1 + M && p.z >= z.z0 - M && p.z <= z.z1 + M && p.y > 0.9) return;     // a note; stageNote spoke
       const a = typeof env.concertAudit === 'function' ? env.concertAudit() : null;
       if (!a || !a.on) marqueeWhy(p.y > 0.9 ? 'closer to the middle — on the red, then Q' : 'up onto the red first, then Q');
       else if (a.notes < 3) marqueeWhy('that’s ' + (a.notes === 1 ? 'one' : 'two') + ' — back on the red, and again');
@@ -27683,6 +27696,18 @@ export function createSystems(game) {
     if (dx * dx + dz * dz > sysWHY_R * sysWHY_R) return;
     const nx = todoNextIn(marqId);
     if (nx > 1) marqueeWhy('not yet — ' + Math.ceil(nx) + ' s. be here when it comes');
+    // THE WHY, EVERYWHERE (L7, F3): `nx < 0` is not "no wait" — the seven
+    // chapters that publish `nextIn` already answered above, so a chapter
+    // reaching here has a marquee with NO countdown at all, and the old
+    // code said nothing about it, ever. A partial table, said honestly: the
+    // roadmap's own three (condor, cali, palawan) plus what could be
+    // authored in this pass without reading every chapter's marquee state
+    // by hand — a chapter with a marquee this table has not reached yet
+    // still says nothing, same as before, rather than something guessed.
+    else if (nx < 0) {
+      const w = sysMARQUEE_WHY[game.biome && game.biome.current];
+      if (w) marqueeWhy(w);
+    }
   });
   // ---- OVERHEARD, AND SAID BY SOMEBODY (L6, E4 / writing W4) --------------
   // npc.js reads a bubble whose speaker is off the frame out as a pill (F4),
@@ -27756,26 +27781,38 @@ export function createSystems(game) {
    * toasts at a time. `going` is the latch: a pill can be pushed out only
    * once, however many toasts land while it is leaving.
    */
+  function sysToastEvict(el2) {
+    el2.dataset.going = '1';
+    el2.classList.remove('in');
+    el2.classList.add('out');
+    // Out of the flow at once, so the ones below it slide up on the same
+    // frame instead of waiting out the fade. The wrapper is positioned, so
+    // this leaves the pill exactly where it already was.
+    el2.style.position = 'absolute';
+    el2.style.pointerEvents = 'none';
+    setTimeout(function () { if (el2.parentNode) el2.parentNode.removeChild(el2); }, 400);
+  }
   function sysToastPush(keep) {
     let live = 0;
     for (let i = 0; i < toastWrap.children.length; i++) {
       if (!toastWrap.children[i].dataset.going) live++;
     }
+    // A BUBBLE CANNOT PUSH THE WHY OUT (L7, F3). Oldest-first, same as
+    // always, but a live `why` pill is skipped on this first pass — the
+    // marquee's own answer to a press just made must survive whatever a
+    // passing local says next. It is not unkillable: a second pass below
+    // still takes it if nothing else is left to evict, so the stack cannot
+    // wedge on it forever (marqueeWhy replaces its own why-pill directly,
+    // via sysToastOut, before this function ever sees the new one).
+    for (let i = 0; live > keep && i < toastWrap.children.length; i++) {
+      const old = toastWrap.children[i];
+      if (old.dataset.going || old.classList.contains('why')) continue;
+      sysToastEvict(old); live--;
+    }
     for (let i = 0; live > keep && i < toastWrap.children.length; i++) {
       const old = toastWrap.children[i];
       if (old.dataset.going) continue;
-      old.dataset.going = '1';
-      live--;
-      old.classList.remove('in');
-      old.classList.add('out');
-      // Out of the flow at once, so the ones below it slide up on the same
-      // frame instead of waiting out the fade. The wrapper is positioned, so
-      // this leaves the pill exactly where it already was.
-      old.style.position = 'absolute';
-      old.style.pointerEvents = 'none';
-      (function (el2) {
-        setTimeout(function () { if (el2.parentNode) el2.parentNode.removeChild(el2); }, 400);
-      })(old);
+      sysToastEvict(old); live--;
     }
   }
 
