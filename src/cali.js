@@ -5119,6 +5119,18 @@ function caliBuild(game) {
       onTask: { 'chiva-ride': ['On the ROOF. Everybody on the roof.'],
                 'chiva-mirador': ['Four hundred and sixty-five metres. Nobody rides the whole way.',
                                   'You did not fall off. Most people fall off.'] } });
+    // ---- THE TRAVELLER, A CAMEO (L8, F2) -----------------------------------
+    // sysMAP_WORLDS.cali.way is the bridge at roughly x=-6, z=0 — this stands
+    // a few metres off it rather than on the deck, clear of whatever the
+    // bridge's own colliders claim. y is asked of caliTerrain, never assumed.
+    // Hidden until Cali's own first real tick (gateChap).
+    if (typeof game.addTraveller === 'function') {
+      game.addTraveller({ biome: 'cali', x: -3, y: caliTerrain(-3, 3), z: 3, face: 0.8,
+        gateChap: 5,
+        lines: ['Everybody in this city dances. I have seen it. It is not optional.',
+                'I am told there is a bridge with your name on it now. Figuratively.'],
+        wheek: ['Salsa. Even the river sounds like salsa here.'] });
+    }
     caliLocTeach = game.addLocal({ biome: 'cali', x: caliFLOOR.x + Math.cos(2.2) * 9.0,
       y: caliTerrain(caliFLOOR.x, caliFLOOR.z) + 0.20,
       z: caliFLOOR.z + Math.sin(2.2) * 9.0, near: 9, face: -0.94,

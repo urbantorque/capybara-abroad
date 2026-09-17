@@ -1132,6 +1132,22 @@ function panBuild(game) {
       onTask: { 'caiman-nap': ['Now THAT is the correct attitude to four o clock.'],
                 'the-crossing': ['Ah. It is that time. Listen — the frogs start in about ten minutes.'],
                 'tamandua': ['Slowest ride in South America. Very sensible.'] } });
+    // ---- THE TRAVELLER (L8, F2) --------------------------------------------
+    // Just off the last bridge (panBRIDGES' final crossing, the map's `way`
+    // mark at x:-3.3 z:-96) rather than on the deck itself, which is a narrow
+    // strip with its own collider. panNavBlocked is asked rather than assumed,
+    // because the ground either side of a bridge in this chapter is the flood.
+    // Hidden until Pantanal's own first real tick (gateChap).
+    if (typeof game.addTraveller === 'function') {
+      let travX = 0, travZ = -93;
+      if (panNavBlocked(travX, travZ, 0.6)) travZ = -90;
+      const travY = panTerrain(travX, travZ);
+      game.addTraveller({ biome: 'pantanal', x: travX, y: travY, z: travZ, face: 2.5,
+        gateChap: 15,
+        lines: ['The last bridge. I counted. There have been a great many bridges.',
+                'I have seen more wildlife in this one wetland than in four other countries combined.'],
+        wheek: ['Something in the water did that. Not me.'] });
+    }
   }
 
   // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ---------------

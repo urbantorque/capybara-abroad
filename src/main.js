@@ -2086,6 +2086,25 @@ function mainBoot() {
     game.addLocal = npcs.addLocal;
     // ...and the one person who is in four of them. See THE TRAVELLER.
     game.addTraveller = npcs.addTraveller;
+    // THE BAG (L8, F2): SYDNEY'S OWN CAMEO — the one chapter built before
+    // this line runs (`biome.capture('sydney', ...)` fires while npc.js's
+    // addTraveller was still undefined), so it cannot register itself from
+    // environment.js the way the other fourteen register from their own
+    // chapter file (a `typeof game.addTraveller === 'function'` guard there
+    // would just silently skip forever — measured, on the first pass of this
+    // feature). `game.env` is already built by here (createEnvironment ran
+    // at line ~2031, above), so its terrainHeight is safe to call now. The
+    // ferry wharf deck is the solid rectangle envIsOverWaterFast carves out
+    // of the harbour at x[-43.7,-36.3] z>=-24.4 (environment.js), so
+    // (-42,-19) is walked ground, not a guess.
+    if (typeof game.addTraveller === 'function') {
+      const travY = (game.env && typeof game.env.terrainHeight === 'function') ? game.env.terrainHeight(-42, -19) : 0.34;
+      game.addTraveller({ biome: 'sydney', x: -42, y: isFinite(travY) ? travY : 0.34, z: -19, face: 2.1,
+        gateChap: 1,
+        lines: ['Every trip starts somewhere. Mine started in this exact garden, six months ago, badly.',
+                'You have got the whole world still ahead of you. I checked. I have been to most of it.'],
+        wheek: ['Even here. Of course even here.'] });
+    }
     game.addExchange = npcs.addExchange;
     game.say = npcs.say;
     // ...and the version that puts the line over a PERSON rather than at a

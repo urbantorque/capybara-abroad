@@ -5318,6 +5318,24 @@ function palBuild(game) {
       onTask: { 'the-crack': ['Nine years. Nine years and a rodent does it on the first go.'],
                 'cathedral': ['The hole in the roof. So it IS real. I told them it was real.'] } });
 
+    // ---- THE TRAVELLER, A CAMEO (L8) --------------------------------------
+    // Off the beach end of the bamboo jetty. palJETTY.z1 = 28 is where the
+    // planking meets the sand; z0 = 14 is the boat end, out over the reef
+    // flat, where palTerrain reads well below palWATER — the suggested z = 15
+    // lands there, underwater, so this stands past z1 instead. Three metres
+    // off the deck in x, clear of palJETTY.w, and palTerrain is asked rather
+    // than assumed so the figure stands on dry sand and not on the reef.
+    // Hidden until this chapter's own first real tick (gateChap).
+    if (typeof game.addTraveller === 'function') {
+      let tvx = 9, tvz = 31;
+      if (palNavBlocked(tvx, tvz, 0.6)) { tvx += 2; tvz += 2; }
+      game.addTraveller({ biome: 'palawan', x: tvx, y: palTerrain(tvx, tvz), z: tvz, face: -2.0,
+        gateChap: 12,
+        lines: ['A jetty made of bamboo. It held. I want that on record.',
+                'The water here is a colour I did not think was real until I saw it.'],
+        wheek: ['That splash. That was definitely you.'] });
+    }
+
     // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) -------------
     // The boatman is the one who carries you out. Where you go so that he
     // cannot: under two of the houses on stilts (the `huts` table in the beach

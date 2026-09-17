@@ -3395,6 +3395,24 @@ function pastoBuild(game) {
     game.addHide({ biome: 'pasto', x: pastoCOF_X0 + 2.5 + 4 * 3.6, z: pastoCOF_Z0 + 1.6 + 1 * 2.4, r: 2.6, kind: 'the coffee bushes' });
   }
 
+  // ---- THE TRAVELLER, A SIXTEENTH CAMEO (L8, F2) ---------------------------
+  // Two metres past the rim (pastoCRATER_R = 11), on the near side, where the
+  // ground is climbing but has not yet crested — pastoMeshY is asked rather
+  // than assumed, the same rule every other cameo in this pass follows.
+  // sysMAP_WORLDS.pasto.way is the dynamic 'craterCentre' mark; this stands
+  // near it rather than in the vent itself. Hidden until Pasto's own first
+  // real tick (gateChap).
+  if (typeof game.addTraveller === 'function') {
+    const tx = pastoGAL_X + Math.cos(0.3) * (pastoCRATER_R + 2);
+    const tz = pastoGAL_Z + Math.sin(0.3) * (pastoCRATER_R + 2);
+    const ty = pastoMeshY(tx, tz);
+    game.addTraveller({ biome: 'pasto', x: tx, y: isFinite(ty) ? ty : 0, z: tz, face: -2.4,
+      gateChap: 2,
+      lines: ['A live volcano. You walked up to a live volcano.',
+              'I did not come all this way to stand at the edge of one and then not stand at the edge of one.'],
+      wheek: ['That is the crater talking. Probably.'] });
+  }
+
   // THE MUSICIAN (L7, F2): a quena player in the gap the north stalls
   // deliberately leave clear, between the fountain and the church steps —
   // the one chapter-local figure in a file whose people otherwise live in

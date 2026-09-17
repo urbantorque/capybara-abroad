@@ -5650,6 +5650,26 @@ function driBuild(game) {
         figure: t.figure, lines: t.lines, wheek: t.wheek, beat: t.beat });
     }
 
+    // ---- THE TRAVELLER, A CAMEO (L8, F2) -----------------------------------
+    // driLANTERN's own y:108 is an authored constant, not ground truth, and
+    // this is a floating-island chapter where most of the world is void — so
+    // driTerrain(38, -188) is asked rather than assumed. That point sits well
+    // inside the crown island's footprint (centre 36,-184, half-extents
+    // 16x14: driISLES[…] 'crown'), and it resolves to a sane 108, the same
+    // deck height driCROWN_KEEP and the lantern itself already stand on — no
+    // NaN, so the driLANTERN.y fallback documented in the roadmap was not
+    // needed. Two metres off the plinth, not on it. Hidden until Drift's own
+    // first real tick (gateChap).
+    if (typeof game.addTraveller === 'function') {
+      const trY = driTerrain(38, -188);
+      game.addTraveller({ biome: 'drift', x: 38, y: isFinite(trY) ? trY : driLANTERN.y, z: -188,
+        face: 1.2,
+        gateChap: 9,
+        lines: ['I do not entirely understand how this place stays up. Nobody here does either.',
+                'A lantern on a floating rock. Of course there is.'],
+        wheek: ['Careful. It is a long way down from up here.'] });
+    }
+
     // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) -------------
     // The lantern keeper is the one who carries you out. Where you go so that
     // she cannot: inside the roofless croft on the Shelf (its walls stand at

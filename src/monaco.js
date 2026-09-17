@@ -4841,6 +4841,23 @@ function monBuildLocals(game) {
     beat: { kind: 'work', every: 4.2, dur: 0.9, sfx: 'strum', volume: 0.10 },
   });
 
+  // ---- THE TRAVELLER (L8, F2) --------------------------------------------
+  // The steps of the Casino (monCASINO at x:118 z:119, monSTEPS at x:118
+  // z:97), a little off to the side rather than square on the steps
+  // themselves. monNavBlocked is asked rather than assumed, because the
+  // square this close to the harbour has water on more than one side.
+  // Hidden until Monaco's own first real tick (gateChap).
+  if (typeof game.addTraveller === 'function') {
+    let travX = 121, travZ = 93;
+    if (monNavBlocked(travX, travZ, 0.6)) { travX = 124; travZ = 93; }
+    const travY = monTerrain(travX, travZ);
+    game.addTraveller({ biome: 'monaco', x: travX, y: travY, z: travZ, face: -1.8,
+      gateChap: 18,
+      lines: ['The steps of the Casino. I am underdressed for this place in every possible way.',
+              'Somebody in a very expensive car nearly did not see me. I have decided that is a story now.'],
+      wheek: ['That is a very serious car park for a country this size.'] });
+  }
+
   // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ---------------
   // See THE HIDE in systems.js. Still inside one of these and the doorman
   // walks to where you were and gives up. Outside only — the room has its

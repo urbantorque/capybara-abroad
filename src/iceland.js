@@ -5831,6 +5831,20 @@ function iceBuild(game) {
                               'Every winter I have stood here. Twice, I have seen that. Twice.'],
                 'aurora': ['That is a good one. Nine, I would say. Out of ten.'] },
       praise: ['Mm. This harbour has seen worse.'] });
+    // ---- THE TRAVELLER, A CAMEO (L8, F2) -----------------------------------
+    // Near the BASE of the pier, not the head — icePIER runs from about
+    // z=128 to its head at z=140, and the far end sits over open water.
+    // iceTerrain(26, 125) hits the pier's own causeway branch (line ~694)
+    // and returns a flat 1.0, the same floor the deck itself agrees with —
+    // no NaN, no seabed, so no fallback to z=120 was needed. Hidden until
+    // Iceland's own first real tick (gateChap).
+    if (typeof game.addTraveller === 'function') {
+      game.addTraveller({ biome: 'iceland', x: 26, y: iceTerrain(26, 125), z: 125, face: 3.0,
+        gateChap: 7,
+        lines: ['The end of a pier is a strange place to keep running into somebody.',
+                'Six months and I have finally found somewhere colder than my hotel room.'],
+        wheek: ['That is the ice. It does that here.'] });
+    }
     // FOUR MORE. Two people in a chapter is not austerity, it is an oversight
     // dressed as one: the emptiness of Iceland is the LANDSCAPE, and the town
     // in the middle of it is supposed to be the warm bit. One in the street,

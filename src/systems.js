@@ -4119,6 +4119,11 @@ const sysSAVE_SHAPE = {
   owned: 'array',
   inv: 'object',   // {thermos:n, mango:n, feather:n}, each clamped 0-20
   item: 'string',  // the equipped consumable id, or absent/null
+  // THE BAG (L8, F2). A number that only rises — spendable yuzu (`yuzu`
+  // above) and the relationship are not the same ledger. The peel-pouch
+  // unlock it gates at 100 lifetime needs no save key of its own: `owned`
+  // already says whether it fired, unambiguously, on restore.
+  gifted: 'number',
 };
 const sysSAVE_DEBOUNCE = 700;      // ms — a streak of ticks writes once
 // ---- THE TWO WAYS STORAGE LETS A PLAYER DOWN, BOTH SILENT UNTIL R3 ---------
@@ -10217,6 +10222,43 @@ function sysBuildCSS() {
 '.capyui-ledhint{margin-top:8px;text-align:center;font-size:clamp(11px,2.1vw,12px);',
   'color:' + inkSoft + ';letter-spacing:.1em;text-transform:uppercase;',
   'animation:capyui-blink 2s ease-in-out infinite;}',
+/* THE BAG (L8, F2). The ledger's frame again — same veil, same title, same
+   hint — for the same reason the album borrowed it rather than inventing a
+   third one: a shop that reinvented pause/inert/focus/Escape would be a
+   second seam to learn. The body is its own: three shelves, not a column of
+   chapters. */
+'.capyui-bag{position:absolute;inset:0;z-index:66;overflow:auto;overscroll-behavior:contain;',
+  'background:' + veil2 + ';opacity:0;pointer-events:none;transition:opacity .7s ease;',
+  'display:flex;flex-direction:column;align-items:center;',
+  'padding-top:calc(clamp(16px,4vw,34px) + env(safe-area-inset-top,0px));',
+  'padding-bottom:calc(clamp(16px,4vw,34px) + env(safe-area-inset-bottom,0px));',
+  'padding-left:calc(14px + env(safe-area-inset-left,0px));',
+  'padding-right:calc(14px + env(safe-area-inset-right,0px));}',
+'.capyui-bag.show{opacity:1;pointer-events:auto;}',
+'.capyui-bag h2{font-size:clamp(20px,5.4vw,42px);color:' + ink + ';letter-spacing:.05em;',
+  'font-weight:700;transform:rotate(-1.2deg);text-align:center;text-wrap:balance;}',
+'.capyui-bagaway,.capyui-bagintro{width:100%;max-width:620px;margin-top:6px;text-align:center;',
+  'font-size:' + tMd + ';color:' + accentInk + ';font-style:italic;line-height:1.4;}',
+'.capyui-bagaway[hidden],.capyui-bagintro[hidden]{display:none;}',
+'.capyui-bagshelf{width:100%;max-width:620px;margin-top:4px;display:flex;',
+  'flex-direction:column;gap:6px;}',
+'.capyui-bagrow{display:flex;align-items:center;gap:10px;background:' + paper + ';',
+  'border:1px solid ' + paper2 + ';border-radius:' + rMd + ';padding:8px 11px;}',
+'.capyui-bagrow.locked{opacity:.55;}',
+'.capyui-bagmain{flex:1 1 auto;min-width:0;}',
+'.capyui-bagname{font-size:clamp(12px,2.4vw,14px);color:' + ink + ';font-weight:700;}',
+'.capyui-bagline{font-size:' + tMd + ';color:' + inkSoft + ';margin-top:2px;line-height:1.35;}',
+'.capyui-bagstate{flex:0 0 auto;font-size:' + tXs + ';color:' + inkSoft + ';font-weight:700;',
+  'text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;text-align:right;}',
+'.capyui-bagbuy{flex:0 0 auto;border:1px solid ' + accent + ';border-radius:999px;',
+  'background:' + paper + ';color:' + ink + ';font-weight:700;font-size:' + tXs + ';',
+  'padding:6px 13px;cursor:pointer;white-space:nowrap;touch-action:manipulation;',
+  '-webkit-tap-highlight-color:transparent;',
+  'transition:transform ' + dFast + ' ' + mSpring + ';}',
+'@media (hover:hover){.capyui-bagbuy:hover{transform:translateY(-2px);}}',
+'.capyui-bagbuy:disabled{opacity:.4;cursor:default;transform:none;}',
+'.capyui-bagempty{padding:12px;text-align:center;font-style:italic;color:' + inkSoft + ';',
+  'font-size:' + tMd + ';}',
 
 /* ---------- biome transition ---------- */
 /* One full-screen chalk-white div. 0.8 s out, a held beat while the world is
@@ -24354,6 +24396,14 @@ export function createSystems(game) {
     pauseSet.appendChild(sysEl('div', 'capyui-setsplit', 'and the journey itself'));
     pauseSet.appendChild(row);
   }
+  // THE BAG's LEDGER (L8, F2): a fourth split, read-only — what is owned,
+  // what is worn, what is banked, what has been given — so a player can see
+  // the shelf without walking back to the way out. Built in `bagLedgerBuild`
+  // (defined with `owned`/`inv`/`jrGifted`, much further down this closure —
+  // called from `pauseSetToggle` on open, the same moment `wardBuild` runs).
+  pauseSet.appendChild(sysEl('div', 'capyui-setsplit', 'and what it has bought'));
+  const bagLedgerBox = sysEl('div', 'capyui-setsave capyui-bagledger', '');
+  pauseSet.appendChild(bagLedgerBox);
   pauseCard.appendChild(pauseSet);
   const pauseFoot = sysEl('div', 'capyui-pausefoot',
     sysScheme('esc to resume', 'tap RESUME, or anywhere outside the card'));
@@ -24388,7 +24438,7 @@ export function createSystems(game) {
     // appeared, which reads as "this row is selected" on a card where nothing
     // is selectable — measured off the first screenshot of it. The panel opens
     // directly beneath this button, so Tab already walks straight into it.
-    if (pauseSetOpen) { pauseSync(); wardBuild(); }
+    if (pauseSetOpen) { pauseSync(); wardBuild(); bagLedgerBuild(); }
   }
   function pauseAskOpen() {
     pauseAsk.hidden = false;
@@ -24953,6 +25003,33 @@ export function createSystems(game) {
   itemEl.title = 'nothing pocketed · T';
   itemEl.classList.add('capyui-item-empty');
   hudRoot.appendChild(itemEl);
+  // THE BAG (L8, F2): the wallet's SECOND door — a press from anywhere, any
+  // time the world is not already doing something else. `bagShow`/`bagHide`/
+  // `bagBusy` are declared later in this closure (with the ledger and the
+  // album, the two modals whose shape the bag copies) but hoisted the way
+  // every other function in this file is; this handler only ever RUNS once
+  // the whole closure has finished setting up.
+  walletEl.addEventListener('click', function (e) {
+    e.preventDefault();
+    if (bagShown) { bagHide(); return; }
+    if (pauseShown || jrShown || ledShown || albShown) return;
+    if (bagBusy()) return;
+    bagShow(true);
+  });
+  /**
+   * THE BAG (L8, F2): the same "don't open this on top of a chapter's own
+   * action" idiom used ad hoc elsewhere in this file (e.g. the finale's own
+   * busy check) — carried, at the helm, climbing, diving, swimming, or
+   * riding the condor. There is no single named guard to reuse (pauseShow
+   * itself has none — checked, see the wave-1 research), so this is that
+   * guard, written once for the wallet's own door.
+   */
+  function bagBusy() {
+    const capy = game.capy;
+    return !!(capy && (capy.carriedBy || capy.rideBody || capy.atHelm ||
+                        capy.climbing || capy.diving || capy.swimming)) ||
+           !!(game.condor && game.condor.mounted);
+  }
 
   // --- toasts ---
   const toastWrap = sysEl('div', 'capyui-toasts');
@@ -27129,6 +27206,249 @@ export function createSystems(game) {
     if (e.target === albEl) albHide();
   });
 
+  // --- THE BAG's card (L8, F2) ----------------------------------------------
+  // The ledger/album's shape again, for the third time in this file and the
+  // same reason the album gives for borrowing it from the ledger: pause,
+  // inert, focus-return, Escape and the keyboard swallow are already solved
+  // there, and a shop that solved them a third way would be a third seam.
+  // Two doors in (npc.js's hold-E, in person; walletEl's click, from
+  // anywhere not busy) both call `bagShow`; only the wallet's sets `away`.
+  const bagAWAY_LINES = [
+    'you found the bag on your own. fine by me.',
+    'ah — you already know it is there. saves us both the walk.',
+    'straight to the bag, then. no small talk necessary.',
+    'you did not even come and say hello. the bag does not mind.',
+  ];
+  const bagEl = sysEl('div', 'capyui-bag');
+  bagEl.setAttribute('role', 'dialog');
+  bagEl.setAttribute('aria-modal', 'true');
+  bagEl.setAttribute('aria-label', 'The bag');
+  bagEl.tabIndex = -1;
+  const bagTitle = sysEl('h2', null, 'THE BAG');
+  const bagAwayEl = sysEl('div', 'capyui-bagaway', '');
+  bagAwayEl.hidden = true;
+  // F3.3: "the bag says so on its first open" — once per session, not saved.
+  const bagIntroEl = sysEl('div', 'capyui-bagintro',
+    'the things a place teaches you, it teaches you. this is the rest.');
+  bagIntroEl.hidden = true;
+  const bagUpSplit = sysEl('div', 'capyui-setsplit', 'upgrades');
+  const bagUpList = sysEl('div', 'capyui-bagshelf');
+  const bagPockSplit = sysEl('div', 'capyui-setsplit', 'the pocketed kind');
+  const bagPockList = sysEl('div', 'capyui-bagshelf');
+  const bagWearSplit = sysEl('div', 'capyui-setsplit', 'wear');
+  const bagWearList = sysEl('div', 'capyui-bagshelf');
+  const bagHint = sysEl('div', 'capyui-ledhint',
+    sysScheme('ESC to close  ·  or press the wallet again', 'tap outside the card to close'));
+  bagEl.appendChild(bagTitle);
+  bagEl.appendChild(bagAwayEl);
+  bagEl.appendChild(bagIntroEl);
+  bagEl.appendChild(bagUpSplit);
+  bagEl.appendChild(bagUpList);
+  bagEl.appendChild(bagPockSplit);
+  bagEl.appendChild(bagPockList);
+  bagEl.appendChild(bagWearSplit);
+  bagEl.appendChild(bagWearList);
+  bagEl.appendChild(bagHint);
+  bagEl.inert = true;
+  hudRoot.appendChild(bagEl);
+  let bagShown = false, bagReturnFocus = null, bagIntroShown = false;
+
+  function bagUpgradeRow(def) {
+    const tier = upgradeTier(def.id);
+    const maxed = tier >= def.tiers.length;
+    const row = sysEl('div', 'capyui-bagrow');
+    const main = sysEl('div', 'capyui-bagmain');
+    main.appendChild(sysEl('div', 'capyui-bagname', def.name + (def.capstone ? '  ·  worth saving for' : '')));
+    main.appendChild(sysEl('div', 'capyui-bagline', def.line +
+      (tier > 0 && !maxed ? '  (tier ' + tier + ' of ' + def.tiers.length + ' owned)' : '')));
+    row.appendChild(main);
+    if (maxed) {
+      row.appendChild(sysEl('div', 'capyui-bagstate', 'OWNED'));
+    } else {
+      const nextTier = def.tiers[tier];
+      if (!upgradePrereqOk(def.id)) {
+        row.classList.add('locked');
+        row.appendChild(sysEl('div', 'capyui-bagstate', 'needs ' + (def.prereqLabel || 'a prerequisite') + ' first'));
+      } else if (jrYuzu < nextTier.price) {
+        row.classList.add('locked');
+        row.appendChild(sysEl('div', 'capyui-bagstate', (nextTier.price - jrYuzu) + ' more'));
+      } else {
+        const btn = sysEl('button', 'capyui-bagbuy', nextTier.price + ' yuzu');
+        btn.type = 'button';
+        btn.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+        btn.addEventListener('click', function (e) {
+          e.preventDefault(); e.stopPropagation();
+          if (buyUpgrade(def.id, tier)) { sfx('chime', { volume: 0.5, pitch: 1.15 }); toast('yours.', 'note'); bagBuild(); }
+        });
+        row.appendChild(btn);
+      }
+    }
+    return row;
+  }
+  function bagConsumRow(def) {
+    const bank = inv[def.id] || 0;
+    const cap = (game.capy && typeof game.capy.itemCap === 'function') ? game.capy.itemCap(def.id) : def.cap;
+    const row = sysEl('div', 'capyui-bagrow');
+    const main = sysEl('div', 'capyui-bagmain');
+    main.appendChild(sysEl('div', 'capyui-bagname', def.name + '  ·  ' + bank + ' / ' + cap));
+    main.appendChild(sysEl('div', 'capyui-bagline', def.line + '  (' + def.price + ' yuzu per unit)'));
+    row.appendChild(main);
+    if (bank >= cap) {
+      row.classList.add('locked');
+      const hasPouch = owned.indexOf('peel-pouch') >= 0;
+      row.appendChild(sysEl('div', 'capyui-bagstate',
+        hasPouch ? 'bank full' : 'bank full — the pouch would take three more'));
+    } else if (jrYuzu < def.price) {
+      row.classList.add('locked');
+      row.appendChild(sysEl('div', 'capyui-bagstate', (def.price - jrYuzu) + ' more'));
+    } else {
+      const btn = sysEl('button', 'capyui-bagbuy', '+1');
+      btn.type = 'button';
+      btn.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+      btn.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        if (buyConsumable(def.id, 1)) { sfx('chime', { volume: 0.5, pitch: 1.15 }); toast('yours.', 'note'); bagBuild(); }
+      });
+      row.appendChild(btn);
+    }
+    return row;
+  }
+  // THE FOR-SALE FIELD (F5, wave 2): a `sysWARDROBE` row becomes purchasable
+  // in this shelf the moment it carries a numeric `price` — nothing else
+  // about it changes, `wardBuild`'s own earned-by-task rendering is
+  // untouched. None of the current ten (or the gift-only peel pouch, not a
+  // real row yet — see the roadmap note) carry one, so this shelf is
+  // correctly empty until wave 2 adds its six. `bagBuyWear` is the shop
+  // half of that contract, written now so wave 2 only has to add rows.
+  function bagBuyWear(id, price) {
+    if (owned.indexOf(id) >= 0) return false;
+    if (jrYuzu < price) return false;
+    jrYuzu -= price;
+    if (walletEl) walletEl.textContent = jrYuzu + ' yuzu';
+    owned.push(id);
+    saveSoon();
+    return true;
+  }
+  function bagWearRow(w) {
+    const row = sysEl('div', 'capyui-bagrow');
+    const main = sysEl('div', 'capyui-bagmain');
+    main.appendChild(sysEl('div', 'capyui-bagname', sysWEAR_NAMES[w.wear] || w.wear));
+    main.appendChild(sysEl('div', 'capyui-bagline', w.shopLine || w.line || ''));
+    row.appendChild(main);
+    const has = owned.indexOf(w.wear) >= 0;
+    if (has) {
+      row.appendChild(sysEl('div', 'capyui-bagstate', 'OWNED'));
+    } else if (jrYuzu < w.price) {
+      row.classList.add('locked');
+      row.appendChild(sysEl('div', 'capyui-bagstate', (w.price - jrYuzu) + ' more'));
+    } else {
+      const btn = sysEl('button', 'capyui-bagbuy', w.price + ' yuzu');
+      btn.type = 'button';
+      btn.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+      btn.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        if (bagBuyWear(w.wear, w.price)) { sfx('chime', { volume: 0.5, pitch: 1.15 }); toast('yours.', 'note'); bagBuild(); }
+      });
+      row.appendChild(btn);
+    }
+    return row;
+  }
+  function bagBuild() {
+    while (bagUpList.firstChild) bagUpList.removeChild(bagUpList.firstChild);
+    while (bagPockList.firstChild) bagPockList.removeChild(bagPockList.firstChild);
+    while (bagWearList.firstChild) bagWearList.removeChild(bagWearList.firstChild);
+    for (let i = 0; i < sysUPGRADES.length; i++) {
+      const def = sysUPGRADES[i];
+      if (def.capstone) continue;
+      bagUpList.appendChild(bagUpgradeRow(def));
+    }
+    bagUpList.appendChild(sysEl('div', 'capyui-setsplit', 'worth saving for'));
+    for (let i = 0; i < sysUPGRADES.length; i++) {
+      const def = sysUPGRADES[i];
+      if (!def.capstone) continue;
+      bagUpList.appendChild(bagUpgradeRow(def));
+    }
+    for (let i = 0; i < sysCONSUM.length; i++) bagPockList.appendChild(bagConsumRow(sysCONSUM[i]));
+    const wearRows = sysWARDROBE.filter(function (w) { return typeof w.price === 'number'; });
+    if (!wearRows.length) {
+      bagWearList.appendChild(sysEl('div', 'capyui-bagempty', 'nothing here yet.'));
+    } else {
+      for (let i = 0; i < wearRows.length; i++) bagWearList.appendChild(bagWearRow(wearRows[i]));
+    }
+  }
+  /** THE BAG's LEDGER (L8, F2): the settings card's read-only fourth split. */
+  function bagLedgerBuild() {
+    if (!bagLedgerBox) return;
+    while (bagLedgerBox.firstChild) bagLedgerBox.removeChild(bagLedgerBox.firstChild);
+    const tierNames = [];
+    for (let i = 0; i < sysUPGRADES.length; i++) {
+      const def = sysUPGRADES[i];
+      const t = upgradeTier(def.id);
+      if (t > 0) tierNames.push(def.name + (def.tiers.length > 1 ? ' (' + t + '/' + def.tiers.length + ')' : ''));
+    }
+    const wearNames = [];
+    for (let i = 0; i < sysWARDROBE.length; i++) {
+      const w = sysWARDROBE[i];
+      if (typeof w.price === 'number' && owned.indexOf(w.wear) >= 0) wearNames.push(sysWEAR_NAMES[w.wear] || w.wear);
+    }
+    if (owned.indexOf('peel-pouch') >= 0) wearNames.push('the peel pouch');
+    const bankBits = [];
+    for (let i = 0; i < sysCONSUM.length; i++) {
+      const def = sysCONSUM[i];
+      bankBits.push(def.name.toLowerCase() + ' ×' + (inv[def.id] || 0));
+    }
+    const lines = [
+      tierNames.length ? 'owns: ' + tierNames.join(', ') : 'owns: nothing yet',
+      wearNames.length ? 'wears: ' + wearNames.join(', ') : 'wears: nothing bought yet',
+      'banked: ' + bankBits.join(', '),
+      'given: ' + jrGifted + ' yuzu, lifetime',
+    ];
+    for (let i = 0; i < lines.length; i++) bagLedgerBox.appendChild(sysEl('span', 'capyui-setnote', lines[i]));
+  }
+  function bagShow(away) {
+    if (bagShown) return;
+    bagShown = true;
+    bagAwayEl.hidden = !away;
+    if (away) bagAwayEl.textContent = bagAWAY_LINES[(Math.random() * bagAWAY_LINES.length) | 0];
+    if (!bagIntroShown) { bagIntroEl.hidden = false; bagIntroShown = true; } else bagIntroEl.hidden = true;
+    bagBuild();
+    bagEl.inert = false;
+    bagEl.classList.add('show');
+    uiSfx('open');
+    bagEl.scrollTop = 0;
+    game.state.paused = true;
+    bagReturnFocus = document.activeElement;
+    bagEl.focus();
+  }
+  function bagHide() {
+    if (!bagShown) return;
+    bagShown = false;
+    bagEl.classList.remove('show');
+    bagEl.inert = true;
+    if (bagReturnFocus && bagReturnFocus.focus) { try { bagReturnFocus.focus(); } catch (e) {} }
+    bagReturnFocus = null;
+    // ...and the pause card is a fifth thing that can be holding the world
+    // still. See the note in albHide/ledHide.
+    if (!document.hidden && !jrShown && !pauseShown && !ledShown && !albShown) game.state.paused = false;
+  }
+  bagEl.addEventListener('pointerdown', function (e) {
+    if (e.target === bagEl) bagHide();
+  });
+  // THE BAG's FIRST DOOR (L8, F2): npc.js's own hold-E tap calls this —
+  // opening the bag "in person", never the wallet's away-line. The wallet's
+  // click handler (above, by walletEl) calls `bagShow(true)` directly since
+  // it lives in this same closure; npc.js has no other way in.
+  game.bagOpen = function (away) { bagShow(!!away); };
+  game.state.qaOpenBag = function (away) { bagShow(!!away); };
+  game.state.qaCloseBag = function () { bagHide(); };
+  game.state.qaBagCounts = function () {
+    return {
+      up: bagUpList.querySelectorAll('.capyui-bagrow').length,
+      pock: bagPockList.querySelectorAll('.capyui-bagrow').length,
+      wear: bagWearList.querySelectorAll('.capyui-bagrow').length,
+    };
+  };
+
   // --- the souvenir card: the second beat of a chapter's ceremony ----------
   // Finishing a place used to pay out a tally and a time and nothing you could
   // carry. This is the one thing in the game that crosses a chapter boundary;
@@ -28602,6 +28922,22 @@ export function createSystems(game) {
     }
     return d;
   }
+  // THE BAG (L8, F2): "has this chapter's first REAL tick happened" — not
+  // the arrival tick alone (`nbDoneHere` already excludes ids prefixed
+  // 'to-'), and NOT `jrChapInc` (that counts incident-chain payouts, an
+  // unrelated notoriety register — its own doc comment says so). This is
+  // the exact compound the game already uses for its own "a return, not
+  // just an arrival" line (see sysAgainLine): `jrSeen[n] &&
+  // nbDoneHere(n) >= 1` — simplified to the second half alone, because a
+  // real completed task in chapter n cannot exist without having been
+  // there. Exposed on `game` because the fifteen new traveller cameos live
+  // in each chapter's OWN file, outside this closure, and have no other
+  // door to `nbDoneHere`.
+  const qaForceChapTick = Object.create(null);
+  game.chapDoneHere = function (n) {
+    return !!qaForceChapTick[n] || nbDoneHere(n) >= 1;
+  };
+  game.state.qaForceChapTick = function (n) { qaForceChapTick[n] = true; };
   /** Everything the page can be filled from, as numbers, at this moment. */
   function nbFacts(n) {
     const rec = chapRec[n], def = chapterDef(n);
@@ -28718,7 +29054,17 @@ export function createSystems(game) {
   // what to call the place is this table's, because a page for a chapter
   // that is not built has no figure to ask.
   const sysTRAV_PLACE = { quay: 'the ferry wharf', sahara: 'Jemaa el-Fnaa, by the snake basket',
-                          goreme: 'the square', hanoi: 'Hang Ngang, by the pho stall' };
+                          goreme: 'the square', hanoi: 'Hang Ngang, by the pho stall',
+                          // THE BAG (L8, F2): fifteen more, one per remaining chapter, each
+                          // near that chapter's own `way` mark (systems.js, sysMAP_WORLDS).
+                          sydney: 'the gardens, by the ferry wharf', pasto: 'the rim of the crater',
+                          kyoto: 'the bridge at Uji', cali: 'the bridge over the river',
+                          rio: 'the rock at Arpoador', iceland: 'the end of the pier',
+                          drift: 'the lantern plinth', venice: 'the two columns on the molo',
+                          kowloon: 'the Star Ferry pier', palawan: 'the bamboo jetty',
+                          manly: 'between the flags', pantanal: 'the last bridge',
+                          cave: 'daylight, at the far end', antarctic: 'the head of the jetty',
+                          monaco: 'the steps of the Casino' };
   let nbTravArm = '';
   function nbTravMet(n) {
     const def = chapterDef(n);
@@ -31663,6 +32009,10 @@ export function createSystems(game) {
   // full-plate bonus paying twice if a task is somehow re-ticked.
   let jrYuzu = 0;
   const jrPlatedAt = Object.create(null);
+  // THE BAG (L8, F2): THE GIFT. Holding E on the traveller never touches
+  // `jrYuzu` — it credits this instead, a number that only rises. See
+  // `game.bagGift` and the peel-pouch unlock near sysUPGRADES/owned below.
+  let jrGifted = 0;
   let yuzuRunN = 0, yuzuRunAt = -1e9;
   // THE ANIMAL GETS BETTER (L8, F3) + THE POCKETED KIND (L8, F6). `owned` is
   // a plain array of purchased ids — see `buyUpgrade`'s doc comment for the
@@ -31888,6 +32238,8 @@ export function createSystems(game) {
         // ...and THE ANIMAL GETS BETTER (L8, F3) / THE POCKETED KIND (L8,
         // F6): what has been bought, what is banked, what is equipped.
         owned: owned, inv: inv, item: jrItem || undefined,
+        // ...and THE BAG (L8, F2): the relationship ledger.
+        gifted: jrGifted,
       }));
       // ---- SAY IT ONCE ----------------------------------------------------
       // This game is three and a quarter hours long and it has kept a save file
@@ -32670,6 +33022,15 @@ export function createSystems(game) {
     snorkel: 'the snorkel', flycap: 'the flying cap', surfcap: 'the surf cap', cavehelm: 'the caving helmet',
     parka: 'the parka', 'black-tie': 'the dinner jacket',
   };
+  // THE BAG's WEAR SHELF (L8, F2/F5): a row becomes purchasable in the bag
+  // the moment it carries a numeric `price` field (yuzu) — `bagWearRow`/
+  // `bagBuyWear` in the bag's own code already read it, and a row with no
+  // `price` renders exactly as it does today, task-earned and free. An
+  // optional `shopLine` overrides the bag's row description (falls back to
+  // `line` — currently unused by any row, since none of these ten have
+  // one) for a costume whose shop pitch differs from its wardrobe caption.
+  // None of the current ten carry `price` — F5 (wave 2) is what adds six
+  // for-sale rows, so the bag's wear shelf is correctly empty until then.
   const sysWARDROBE = [
     { biome: 'sydney',    task: 'steal-hat',    wear: 'sunhat' },
     { biome: 'quay',      task: 'manly-voyage', wear: 'ferrycap' },
@@ -32834,6 +33195,10 @@ export function createSystems(game) {
     if (walletEl) walletEl.textContent = jrYuzu + ' yuzu';
     saveSoon();
   };
+  // THE BAG (L8, F2): a direct number, not the wallet's own textContent —
+  // reading DOM text as a proxy for the underlying value is exactly the
+  // kind of race a QA probe should not have to work around.
+  game.state.qaYuzu = function () { return jrYuzu; };
   game.state.qaOwned = owned;
   game.state.qaInv = inv;
   // Switching the equipped consumable is the bag's own job (F2, not built
@@ -32846,6 +33211,28 @@ export function createSystems(game) {
     itemSync();
     return true;
   };
+  /**
+   * THE BAG (L8, F2): THE GIFT. Called by npc.js's own hold-E timer (it owns
+   * proximity and the input; this owns the ledger) once a hold on the
+   * traveller reaches 1.2 s. `jrYuzu` is never touched — spendable yuzu and
+   * the relationship are not the same ledger. At 100 lifetime, ONCE ever,
+   * unlocks 'peel-pouch' into `owned` (checked via `owned.indexOf`, not a
+   * second save key — one fewer key to restore correctly) and shows the
+   * mini-tier payoff. A twenty-first gift past 100 just gifts, silently.
+   */
+  game.bagGift = function () {
+    jrGifted = Math.max(0, Math.min(99999, jrGifted + 5));
+    if (owned.indexOf('peel-pouch') < 0 && jrGifted >= 100) {
+      owned.push('peel-pouch');
+      showMoment('THE PEEL POUCH',
+        'a satchel at the hip — every one of the pocketed kind’s banks, wider from here.',
+        'a hundred gifts, given back');
+    }
+    saveSoon();
+    return jrGifted;
+  };
+  game.state.qaAddGifted = function (n) { jrGifted = Math.max(0, Math.min(99999, jrGifted + (n || 0))); saveSoon(); return jrGifted; };
+  game.state.qaGifted = function () { return jrGifted; };
   // A clean slate WITHOUT a page reload — `page.goto()` to the same origin
   // can hand a probe back the SAME live module state (bfcache, or the
   // dev server's own caching; see the headless-QA-harness notes on this
@@ -32858,6 +33245,7 @@ export function createSystems(game) {
     inv.thermos = 0; inv.mango = 0; inv.feather = 0;
     jrItem = null;
     jrYuzu = 0;
+    jrGifted = 0;
     if (game.capy) { game.capy.boon = null; game.capy.ward = 0; }
     itemSync();
     if (walletEl) walletEl.textContent = '0 yuzu';
@@ -35034,7 +35422,7 @@ export function createSystems(game) {
     // K is in the fold on the title card, so for many players this is the
     // first time they learn the camera exists at all.
     setTimeout(function () {
-      if (ledShown || albShown || jrShown || pauseShown) return;
+      if (ledShown || albShown || jrShown || pauseShown || bagShown) return;
       if (!game.biome || chapterOf(game.biome.current) !== n) return;
       if (albBest(def.biome)) return;
       // ---- ...AND ONLY WHERE THE CAMERA CAN BE REACHED (P2) --------------
@@ -35522,6 +35910,11 @@ export function createSystems(game) {
         for (const k of ['thermos', 'mango', 'feather']) { if (inv[k] > 0) { jrItem = k; break; } }
       }
       itemSync();
+      // THE BAG (L8, F2): `gifted` only ever rises, so a plain clamped
+      // int is the whole restore — no allowlist hazard, it is not a key.
+      if (typeof jrFile.gifted === 'number') {
+        jrGifted = Math.max(0, Math.min(99999, Math.round(jrFile.gifted)));
+      }
       // a chapter already finished on the file must not throw its party again
       for (let n = 1; n <= chapMax; n++) if (chapComplete(n)) jrChapDone[n] = true;
     } else if (!restore) {
@@ -35836,6 +36229,14 @@ export function createSystems(game) {
     if (albShown) {
       if (c === 'Escape') { e.preventDefault(); albHide(); return; }
       if (c === 'Tab') { sysFocusWrap(albEl, e); }
+      return;
+    }
+    // ...and so does the bag (L8, F2), by the same rules again — it has
+    // buttons in it (buy), so Tab is wrapped rather than swallowed, the
+    // pause card's own reason for the same choice.
+    if (bagShown) {
+      if (c === 'Escape') { e.preventDefault(); bagHide(); return; }
+      if (c === 'Tab') { sysFocusWrap(bagEl, e); return; }
       return;
     }
     // ---- AND SO DOES THE PAUSE CARD (R4), WITH ONE DIFFERENCE -------------
@@ -36528,6 +36929,7 @@ export function createSystems(game) {
   function sysPadTopCard() {
     if (albShown) return albEl;
     if (ledShown) return ledEl;
+    if (bagShown) return bagEl;
     // THE QUIT QUESTION IS A CARD INSIDE A CARD, and it has to be scoped like
     // one: while it is up, the four buttons behind it are still visible and
     // still focusable, so a list taken over the whole pause card walks out of
@@ -36543,6 +36945,7 @@ export function createSystems(game) {
   function sysPadBack() {
     if (albShown) { albHide(); return; }
     if (ledShown) { ledHide(); return; }
+    if (bagShown) { bagHide(); return; }
     if (pauseShown) { if (!pauseAskShut()) pauseHide(); return; }
     if (jrShown) { jrHide(); return; }
   }
@@ -38990,7 +39393,7 @@ export function createSystems(game) {
     // and a restore that only knew about jrShown ran the world — physics,
     // incidents, the sfx gate — behind an open ledger or album for as long as
     // it stayed open.
-    game.state.paused = document.hidden || jrShown || ledShown || albShown || pauseShown;
+    game.state.paused = document.hidden || jrShown || ledShown || albShown || pauseShown || bagShown;
     if (document.hidden) {
       // ---- THE SAVE, BEFORE THE FRAMES STOP (R3) --------------------------
       // FIRST, above everything else in this branch. The debounce is drained by

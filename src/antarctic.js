@@ -3632,6 +3632,22 @@ function antBuildLocals(game) {
             'I will put it under shrinkage. We have a column for shrinkage.'],
     rush: ANT_RUSH,
   });
+  // ---- THE TRAVELLER (L8, F2) --------------------------------------------
+  // A little inboard of the jetty's head end (antJETTY runs z:39 to z:18, and
+  // z1:18 is the tip, closer to open water) rather than out on the very end
+  // of it. antNavBlocked is asked rather than assumed, because the water
+  // either side of the jetty is exactly what a landmark constant would miss.
+  // Hidden until Antarctica's own first real tick (gateChap).
+  if (typeof game.addTraveller === 'function') {
+    let travX = 2, travZ = 22;
+    if (antNavBlocked(travX, travZ)) { travX = 2; travZ = 27; }
+    const travY = antTerrain(travX, travZ);
+    game.addTraveller({ biome: 'antarctic', x: travX, y: travY, z: travZ, face: -0.3,
+      gateChap: 17,
+      lines: ['The head of the jetty, and it is colder than anywhere else I have stood on this trip.',
+              'I did not pack for this continent. Nobody packs for this continent.'],
+      wheek: ['That is the ice again. Cracking, probably.'] });
+  }
 
   // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ---------------
   // See THE HIDE in systems.js. Still inside one of these and the station

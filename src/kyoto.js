@@ -5193,6 +5193,19 @@ function kyoBuild(game) {
                 when: function () { return !!(kyoGame && kyoGame.capy && (kyoGame.capy.wet || 0) > 0.4); } }],
       wheek: ['…the cormorants heard that. They are not impressed.'],
       onTask: { 'uji-run': ['From this bridge to that mill. I have never seen it done.'] } });
+    // ---- THE TRAVELLER, A SEVENTEENTH CAMEO (L8, F2) -----------------------
+    // Same bridge, same proven deck height (y=3.16) as the tea local three
+    // lines up — this IS `sysMAP_WORLDS.kyoto.way` (x:4, z:128, 'the bridge
+    // at Uji'). The opposite rail, facing back across it. Hidden until
+    // Kyoto's own first real tick (gateChap).
+    if (typeof game.addTraveller === 'function') {
+      game.addTraveller({ biome: 'kyoto', x: kyoBRIDGE_X + 3.0, y: 3.16,
+        z: kyoRIVER_Z + 2.5, face: -1.6,
+        gateChap: 4,
+        lines: ['The bridge at Uji. I have crossed a lot of bridges. This might be the one.',
+                'Somebody told me the river used to flood this whole valley. I believe them.'],
+        wheek: ['That splash was you. It is always you.'] });
+    }
     game.addLocal({ biome: 'kyoto', x: kyoBAMBOO.x + kyoBAMBOO.hx + 3.4,
       y: kyoTerrain(kyoBAMBOO.x + kyoBAMBOO.hx + 3.4, kyoBAMBOO.z + 8),
       z: kyoBAMBOO.z + 8, near: 6, face: -1.5,

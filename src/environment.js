@@ -3074,6 +3074,14 @@ export function createEnvironment(game) {
     game.addHide({ biome: 'sydney', x: envQUAY_TABLES[2], z: envQUAY_TABLES[3], r: 1.6, kind: 'under the table' });
     game.addHide({ biome: 'sydney', x: envKIOSK_X - 1.1 - 1.2, z: envKIOSK_Z, r: 1.6, kind: 'behind the kiosk' });
   }
+  // ---- THE TRAVELLER'S SYDNEY CAMEO IS IN main.js, NOT HERE (L8, F2) ------
+  // This build runs at `biome.capture('sydney', ...)`, BEFORE npc.js has
+  // wired up `game.addTraveller` (main.js assigns it a couple hundred lines
+  // later) — sydney is the one chapter built before that line, every other
+  // one being lazy-built well after. A `typeof game.addTraveller ===
+  // 'function'` guard here would just silently skip forever (measured: it
+  // did, on the first pass). See main.js, right after
+  // `game.addTraveller = npcs.addTraveller;`.
 
   // lily pads
   const lilies = [];

@@ -3019,6 +3019,31 @@ export function createNPCs(game) {
   // metres is the regulars' sitting distance — close enough that you meant
   // it, far enough that you do not have to stand on their feet.
   const npcTRAV_MET_R = 3.2;
+  // A QA-only peephole into the gift's own hold timer (L8, F2) — see the
+  // -1/0../-2 state machine in localsStep. Undefined if the traveller for
+  // that biome has never been built or is not the live cameo.
+  if (game.state) {
+    game.state.qaGiftT = function (biome) {
+      for (let i = 0; i < locals.length; i++) {
+        if (locals[i].trav && locals[i].biome === biome) return locals[i].eGiftT;
+      }
+      return undefined;
+    };
+  }
+  // THE BAG (L8, F2): a tap on E in reach opens the bag in person; held for
+  // this long instead, it gives. The roadmap's own citation for a
+  // ready-made "hold to release" gesture (npc.js's `stow`) does not exist
+  // under that name anywhere in this file — `stow` is systems.js's
+  // companion-save shape, unrelated to input — so this is built fresh, on
+  // the shape capybara.js's own hold-timer already uses (`capyPutT`: -1
+  // idle, armed to 0 on the down edge, accumulated while held).
+  const npcTRAV_GIFT_HOLD = 1.2;
+  const npcTRAV_GIFT_LINES = [
+    'he nods. that’s kind of you.',
+    'he weighs it in his hand for a second before it disappears into the bag.',
+    'well. that is a first, actually.',
+    'he doesn’t say anything. he just looks pleased about it.',
+  ];
   // With a biome it is that one chapter's flag (0/1), for the notebook's
   // page and the pointer that hides once they have been stood in front of
   // (L6, F4); with none it is the count the closing lines have always read.
@@ -3056,9 +3081,26 @@ export function createNPCs(game) {
     o.trav = true;
     if (o.near === undefined) o.near = 8;
     // The lawn's figure is the finale's, not a cameo: the notebook points
-    // at the four places they keep turning up, never at the last one.
-    if (o.biome && o.biome !== 'sydney') o.wheres = npcTravAt[o.biome] = { x: o.x || 0, y: o.y || 0, z: o.z || 0 };
-    return addLocal(o);
+    // at the four places they keep turning up, never at the last one. A
+    // Sydney CAMEO (L8, F2 — `gateChap` is only ever set on a real cameo,
+    // never on the finale's own call) is not that figure, so it is let
+    // through the same door the other eighteen already use.
+    if (o.biome && (o.biome !== 'sydney' || o.gateChap)) {
+      o.wheres = npcTravAt[o.biome] = { x: o.x || 0, y: o.y || 0, z: o.z || 0 };
+    }
+    const rec = addLocal(o);
+    // THE BAG (L8, F2): fifteen new cameos show only after their chapter's
+    // first REAL tick — `game.chapDoneHere(n)`, systems.js (not this
+    // pass's own closure, and not `jrChapInc`: see that function's own
+    // doc comment for why). Hidden here so there is no one-frame pop-in
+    // before localsStep's own live check (below) runs; the four
+    // pre-existing cameos and the finale never pass `gateChap`, so they
+    // are exactly as before.
+    if (rec && rec.group && o.gateChap) {
+      rec.gateChap = o.gateChap;
+      rec.group.visible = false;
+    }
+    return rec;
   }
 
   function addLocal(o) {
@@ -7590,6 +7632,70 @@ export function createNPCs(game) {
         localLine(r, r.lines);
       }
       r.was = near;
+      // ---- THE BAG (L8, F2): the fifteen new cameos stay hidden until
+      // their chapter's first REAL tick. `gateChap` is only set by the
+      // fifteen new calls (see addTraveller); the four pre-existing
+      // cameos and the finale carry none, so they are unaffected. Checked
+      // every frame the chapter is live, which is cheap and self-heals if
+      // a QA force-door flips mid-visit.
+      if (r.gateChap && r.group) {
+        const gateOk = typeof game.chapDoneHere === 'function' ? game.chapDoneHere(r.gateChap) : true;
+        if (r.group.visible !== gateOk) r.group.visible = gateOk;
+      }
+      // ---- ...AND THE GIFT, the same person's other door (L8, F2) --------
+      // Only a traveller ever reads `input.action` here — no other local in
+      // the game has this branch — so it cannot fire near anybody else's
+      // cast. Paused is a hard stop: the bag itself pauses the world, and a
+      // hold that kept accumulating behind an open card would fire the
+      // instant it closed.
+      //
+      // NAMED `eGiftT`, NOT `giftT` — MEASURED, the obvious name collided
+      // with the field EVERY local already carries for the pre-existing
+      // auto-gift-a-snack mechanic (record init, "giftT: 0, gifted: false,
+      // giftCd: 0" a few hundred lines up; the countdown that reads/writes
+      // it a few hundred lines below that). A traveller is a local like any
+      // other and is eligible for that mechanic too, so the two systems
+      // fought over one field on the same record — the snack timer's own
+      // `r.giftT = npcGIFT_HOLD` stomped this hold mid-count, and its
+      // `r.giftT -= dt` ate the accumulation back down, which looked
+      // exactly like a flaky headless keyboard until logged frame by frame.
+      if (r.trav) {
+        if (game.state && game.state.paused) {
+          r.eGiftT = -1;
+        } else {
+          const inReach = d2 < npcTRAV_MET_R * npcTRAV_MET_R;
+          const input = game.input;
+          const held = inReach && !!(input && input.action);
+          if (r.eGiftT === undefined) r.eGiftT = -1;
+          if (held) {
+            // -1 arms; -2 ("already fired this hold") deliberately does
+            // NOT re-arm while still held — a continuous 3 s press gifts
+            // once, not twice, and has to be released and pressed again.
+            if (r.eGiftT === -1) r.eGiftT = 0;
+            else if (r.eGiftT >= 0) {
+              r.eGiftT += dt;
+              if (r.eGiftT >= npcTRAV_GIFT_HOLD) {
+                r.eGiftT = -2; // fired; wait for release before it can arm again
+                if (typeof game.bagGift === 'function') game.bagGift(r.biome);
+                localLine(r, npcTRAV_GIFT_LINES);
+              }
+            }
+          } else {
+            // A quick tap — the key came up (or the animal stepped out of
+            // reach) before the hold fired — opens the bag in person, no
+            // "found it on your own" line. This only matches the ONE frame
+            // the hold ends: `r.eGiftT` drops back to -1 right after, so a
+            // player standing there afterward with the key up re-triggers
+            // nothing. A completed gift already set `eGiftT` to -2, which
+            // this range excludes.
+            if (inReach && r.eGiftT >= 0 && r.eGiftT < npcTRAV_GIFT_HOLD &&
+                typeof game.bagOpen === 'function') {
+              game.bagOpen(false);
+            }
+            r.eGiftT = -1;
+          }
+        }
+      }
     }
   }
 

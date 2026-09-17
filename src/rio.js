@@ -4996,6 +4996,20 @@ function rioBuild(game) {
       onTask: { 'arpoador': ['LISTEN to them. All of that is for you.',
                              'Two hundred people. Clapping. At a rodent.'],
                 'take-a-wave': ['From up here that looked deliberate.'] } });
+    // ---- THE TRAVELLER, A CAMEO (L8, F2) -----------------------------------
+    // rioARPOADOR is a rock outcrop, r=13 — this stands just outside that
+    // radius (15 m out, at bearing 2.6) rather than embedded in the rock.
+    // y is asked of rioTerrain, never assumed. Hidden until Rio's own first
+    // real tick (gateChap).
+    if (typeof game.addTraveller === 'function') {
+      const trX = rioARPOADOR.x + Math.cos(2.6) * 15;
+      const trZ = rioARPOADOR.z + Math.sin(2.6) * 15;
+      game.addTraveller({ biome: 'rio', x: trX, y: rioTerrain(trX, trZ), z: trZ, face: -1.0,
+        gateChap: 6,
+        lines: ['That rock has a view of the whole bay. I have been staring at it for twenty minutes.',
+                'Somebody told me a capybara got up there. I did not believe them until now.'],
+        wheek: ['The waves do that. Every time.'] });
+    }
     rioLocBonde = game.addLocal({ biome: 'rio', x: 34, y: rioTerrain(34, rioBONDE_Z + 2.4), z: rioBONDE_Z + 2.4,
       near: 8,
       figure: { shirt: PALETTE.cloth3, legs: PALETTE.khaki },

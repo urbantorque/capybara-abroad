@@ -3697,6 +3697,21 @@ function cavBuildCamp(game, root) {
              'Do that outside. It is better outside.'],
     startled: CAVE_STARTLED, splash: CAVE_SPLASH, thief: CAVE_THIEF, rush: CAVE_RUSH,
   }, true);
+  // ---- THE TRAVELLER (L8, F2) --------------------------------------------
+  // Just inside the exit (cavEXIT_Z = -168, daylight visible past it), facing
+  // back up the passage rather than out through it. cavNavBlocked is asked
+  // rather than assumed, because the passage floor here shares ground with
+  // the river. Hidden until the cave's own first real tick (gateChap).
+  if (typeof game.addTraveller === 'function') {
+    let travX = 3, travZ = -163;
+    if (cavNavBlocked(travX, travZ, 0.6)) { travX = 3; travZ = -159; }
+    const travY = cavTerrain(travX, travZ);
+    game.addTraveller({ biome: 'cave', x: travX, y: travY, z: travZ, face: 0.5,
+      gateChap: 16,
+      lines: ['Daylight, at the far end of a very long dark. I have never been so glad to see weather.',
+              'I went in. I do not know what happened in there. I am choosing not to ask.'],
+      wheek: ['That echo. This whole place does that.'] });
+  }
 
   // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ---------------
   // See THE HIDE in systems.js. Still inside one of these and the leader

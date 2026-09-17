@@ -6205,6 +6205,22 @@ function venBuild(game) {
       onTask: { 'rialto': ['Over the Rialto at a RUN. In front of the tour boats as well.'],
                 'traghetto': ['Standing up the whole way. He is showing off and it is working.'] } });
 
+    // ---- THE TRAVELLER, A CAMEO (L8) --------------------------------------
+    // Between the two molo columns, on the paving rather than out past the
+    // quay edge — venTerrain is asked rather than assumed, the same rule
+    // every cameo in this pass follows, and venNavBlocked keeps the point
+    // off the column bases if it ever lands on one. Hidden until this
+    // chapter's own first real tick (gateChap).
+    if (typeof game.addTraveller === 'function') {
+      let tvx = -1, tvz = 10;
+      if (venNavBlocked(tvx, tvz, 0.6)) { tvx += 2; tvz += 2; }
+      game.addTraveller({ biome: 'venice', x: tvx, y: venTerrain(tvx, tvz), z: tvz, face: 2.0,
+        gateChap: 10,
+        lines: ['Two columns and a whole city behind them. I have been photographing the wrong things all trip.',
+                'Somebody rowed me here. I did not ask how much it cost. I am still finding out.'],
+        wheek: ['The water does that. Rises, I mean. Constantly.'] });
+    }
+
     // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) -------------
     // The waiter is the one who carries you out. Where you go so that he
     // cannot: under the far table of his own row (the tables run along Z from

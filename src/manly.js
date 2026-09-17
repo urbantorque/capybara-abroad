@@ -1190,6 +1190,25 @@ function manBuild(game) {
     z: manPINE_Z + 2.6, near: 8, face: 1.2,
     beat: { kind: 'work', every: 4.2, dur: 0.9, sfx: 'chime', volume: 0.10 } });
 
+  // ---- THE TRAVELLER, A CAMEO (L8) ---------------------------------------
+  // Past the flags rather than between them — manFLAG_HOME, not the live
+  // manFlagX/manFlagZ, because the flags move (move-flags) and the point
+  // that matters here is the beach itself, not wherever the poles have
+  // ended up. Ten metres out from manFLAG_HOME.x, which clears the poles
+  // (they stand 5.5 m either side of centre) by about four and a half
+  // metres, so this never overlaps move-flags' own hit-test. manTerrain is
+  // asked rather than assumed. Hidden until this chapter's own first real
+  // tick (gateChap).
+  if (typeof game.addTraveller === 'function') {
+    let tvx = manFLAG_HOME.x + 10, tvz = manFLAG_HOME.z;
+    if (manNavBlocked(tvx, tvz, 0.6)) { tvx += 2; tvz += 2; }
+    game.addTraveller({ biome: 'manly', x: tvx, y: manTerrain(tvx, tvz), z: tvz, face: 1.5,
+      gateChap: 14,
+      lines: ['Between the flags is apparently where you are supposed to swim. Nobody told me that in Sydney.',
+              'I have been on more beaches this trip than in the rest of my life put together.'],
+      wheek: ['That is the surf. It never really stops.'] });
+  }
+
   // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ---------------
   // See THE HIDE in systems.js. Still inside one of these and the lifeguard
   // walks to where you were and gives up. Every spot is beside a thing the

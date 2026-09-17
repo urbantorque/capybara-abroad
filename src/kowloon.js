@@ -6003,6 +6003,21 @@ function hkBuild(game) {
       praise: ['I saw that from here. I see everything from here.',
                'Forty years at this table and that is new.'] });
 
+    // ---- THE TRAVELLER, A CAMEO (L8) --------------------------------------
+    // Near the base of the Star Ferry pier rather than out on the pontoon —
+    // hkTerrain is asked rather than assumed, and hkNavBlocked keeps the
+    // point off the street kerb line if it ever lands there. Hidden until
+    // this chapter's own first real tick (gateChap).
+    if (typeof game.addTraveller === 'function') {
+      let tvx = 3, tvz = -64;
+      if (hkNavBlocked(tvx, tvz, 0.6)) { tvx += 2; tvz += 2; }
+      game.addTraveller({ biome: 'kowloon', x: tvx, y: hkTerrain(tvx, tvz), z: tvz, face: -0.4,
+        gateChap: 11,
+        lines: ['The Star Ferry. Cheapest good view in the world, they told me. They were right.',
+                'I have crossed this harbour four times today for no reason at all.'],
+        wheek: ['That horn. Every crossing.'] });
+    }
+
     // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) -------------
     // The fishmonger is the one who carries you out. Where you go so that he
     // cannot: in front of the roast meat window at the end of his own lane
