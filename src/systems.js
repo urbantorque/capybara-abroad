@@ -9,7 +9,8 @@ import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo, keyDomeTick, keyDomeInfo, skyDomeLit,
          exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt, lensFadeUniform, lensCapTick } from './shared.js';
-import { capyKeyTick } from './capybara.js';   // THE CHARACTER KEY (L7, E4)
+// THE CHARACTER KEY (L7, E4)
+import { capyKeyTick } from './capybara.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -6315,6 +6316,15 @@ const sysMUS_LIFT   = [79, 84, 88];      // G5, C6, E6 — above everything else
 const sysMUS_LIFT_L = [0.036, 0.029, 0.020];
 const sysMUS_LIFT_UP  = 1.4;             // s to bloom      (default; see `lift`)
 const sysMUS_LIFT_DN  = 9.0;             // s to be gone again
+// ---- ...AND A BORDER RUNS THE TAIL OUT (L7, E1 / audio #9) -----------------
+// A marquee finished on the way to a border belongs to the place you left:
+// its nine-second release was still at 0.78 when the next chapter's arrival
+// asked to play, and the arrival (which never plays over a lift) waited on it
+// for the length of the tail. After a palette change the RELEASE runs this
+// many times faster — the same t² shape, no step, the room you left going
+// quiet as the new one comes up under the 6.5 s crossfade. A hold is not
+// hurried, and a swell fired in the new chapter is that chapter's own.
+const sysMUS_LIFT_XRUN = 3;
 const sysMUS_LIFT_ARP = 9;               // notes in the rising figure
 const sysMUS_LIFT_GAP = 0.115;           // s between them
 // The register the flourish is allowed to live in — C4 to C7, which brackets
@@ -16701,8 +16711,16 @@ export function createSystems(game) {
   // 7/19) added the Quay (−13 dB), Pasto (−23), the Drift (−20), Manly (−11)
   // and the cave (−25) — a chapter with no bed, or one with a bed the
   // make-up could not carry alone.
+  // `level` overrides the recipe's 0.10 for one chapter (sfxMover's opts.level):
+  // Rio's samba is the loudest rest of the six bands (−24.6 dBFS) and the
+  // beach a street away measured −33 under it at amp 1 — the row's own knob
+  // is capped at 1, so the sea's level is the one that moves.
+  // Sydney (L7, E1, resumed): chapter one IS Circular Quay — the same water
+  // and the same city as chapter three's row — and it had only the air:
+  // −8.7 dB at rest, and the walking windows 4/8 against the drive's 6/8.
   const sysBEDS_AT = {
-    rio:       [{ kind: 'sea', amp: 1.0, h: null }, { kind: 'city', amp: 0.7, h: null }],
+    sydney:    [{ kind: 'sea', amp: 0.85, h: null }, { kind: 'city', amp: 0.7, h: null }],
+    rio:       [{ kind: 'sea', amp: 1.0, h: null, level: 0.15 }, { kind: 'city', amp: 0.9, h: null }],
     quay:      [{ kind: 'sea', amp: 1.0, h: null }, { kind: 'city', amp: 0.8, h: null }],
     iceland:   [{ kind: 'wind', amp: 1.0, h: null }],
     antarctic: [{ kind: 'wind', amp: 1.0, h: null }],
@@ -17144,6 +17162,11 @@ export function createSystems(game) {
   // Rio measured +1.0 dB with the velocity term alone — so what the states
   // probe reads is density: this over the window's bars, chase against walk.
   let musBandHits = 0;
+  // ...and the bars they were scheduled in, never reset. musBarIndex re-anchors
+  // to 0 whenever the scheduler falls behind `now` (a stalled tab, a window
+  // boundary in the states probe), which made hits-per-bar read 27 in one
+  // window and 67 in the next of the same idle band; this only goes up.
+  let musBandBars = 0;
   // THE SLEEP (L6, E3): 0 awake, 1 gone. Integrated per frame from sysNapNow
   // with the two time constants above, read by the one writer, the pluck
   // scheduler and the beds. `musSleepOn` is the latch the wake fires from.
@@ -17199,6 +17222,7 @@ export function createSystems(game) {
   // The lift. One gain, one envelope value and one clock — everything else
   // about it is the pad's own chord, read live.
   let musLiftGain = null, musLift = 0, musLiftT = 0;
+  let musLiftRun = 1;    // the release's rate: sysMUS_LIFT_XRUN after a border (L7, E1)
   // Audio-clock time before which musSwell() will not schedule another figure.
   // See the note in musSwell: the held swells call it sixty times a second.
   let musLiftArpAt = 0;
@@ -17629,6 +17653,10 @@ export function createSystems(game) {
     musPal = pal;
     musPalN = sysMUS_PAL.indexOf(pal);
     musPadSpectrum(pal.pad || (sysMUS_PAD_OF[musPalN] || null));
+    // A lift still sounding belongs to the chapter being left: its release
+    // runs out at sysMUS_LIFT_XRUN from here (L7, E1 / audio #9). The rate is
+    // read by the lift's clock in the frame writer, and only in the release.
+    if (musLiftT > 0) musLiftRun = sysMUS_LIFT_XRUN;
     // The index must move with the pointer even when the context is suspended:
     // the band palettes' next-tables are shorter than the pad palettes', so a
     // stale musIdx indexes past the end and musTick throws on every interval.
@@ -18093,6 +18121,7 @@ export function createSystems(game) {
     }
     musLiftT = Math.max(musLiftT, musLiftUp + musLiftDn);
     musLift = Math.max(musLift, s);
+    musLiftRun = 1;   // a swell asked for HERE is this chapter's own (L7, E1)
     if (!ac || !musVol || ac.state !== 'running' || musMuted) return;
     const chord = musCurChord;
     if (!chord || !chord.length) return;
@@ -19831,7 +19860,7 @@ export function createSystems(game) {
     // on every eighth instead of the quarters, and the brass on every bar.
     // The clave, the congas and the tumbao are what they were — the section
     // changes over them, which is what makes it a section and not a fill.
-    const chase = musChaseT > 0;
+    const chase = musChaseT > 0; musBandBars++;
 
     // --- clave. Absolute eighths over the two-bar cycle, so this bar takes the
     //     strokes that fall inside its own eight.
@@ -19937,7 +19966,7 @@ export function createSystems(game) {
     // `musChaseHit` is set to 1 only when a chase BEGINS (npc:chase, latched)
     // and decays at 1.6/s, so `early` is the first six tenths of a second of
     // a chase and not of every re-latch — one bar's paradinha, once.
-    const chase = musChaseT > 0;
+    const chase = musChaseT > 0; musBandBars++;
     const early = chase && musChaseHit > 0;
     const out = brk || early;
 
@@ -20505,7 +20534,7 @@ export function createSystems(game) {
     // going from a line every eight bars to a STAB on two and four of every
     // bar — the whole chord, short — over the riff, and the ride doubled.
     // It is the section the idiom keeps for exactly this.
-    const chase = musChaseT > 0;
+    const chase = musChaseT > 0; musBandBars++;
 
     // --- the riff, once a bar, on the guitar.
     // IT USED TO SAY `half < 2` AND IT PLAYED THE SAME BAR TWICE. The offset
@@ -20748,7 +20777,7 @@ export function createSystems(game) {
     // the cello going from crotchets to quavers — the same line, with a
     // passing note between every pair, which is what a continuo does when
     // the movement gets faster and the one change a baroque bass can make.
-    const chase = musChaseT > 0;
+    const chase = musChaseT > 0; musBandBars++;
 
     for (let i = 0; i < sysMUS_CONTINUO.length; i++) {
       const c = sysMUS_CONTINUO[i];
@@ -20802,7 +20831,7 @@ export function createSystems(game) {
     // palette is the drummer moving off the closed hat onto the ride — every
     // eighth, and the hats filled in on every sixteenth under it — and the
     // kick on all four. The same track with the drummer standing up.
-    const chase = musChaseT > 0;
+    const chase = musChaseT > 0; musBandBars++;
 
     for (let i = 0; i < sysMUS_HK_KICK.length; i++) {
       const k = sysMUS_HK_KICK[i];
@@ -20883,7 +20912,7 @@ export function createSystems(game) {
     // on every half-pulse — and the tbel's pick-up on every cell. The
     // guembri does not change: in gnawa the bass is the thing that never
     // hurries, and the trance is the iron getting faster over it.
-    const chase = musChaseT > 0;
+    const chase = musChaseT > 0; musBandBars++;
     const dbl = chase ? 1 : build;
 
     // --- the iron. Never stops, and in the storm it is all there is.
@@ -38763,6 +38792,7 @@ export function createSystems(game) {
       // bands' stroke count, which is the density instrument for a band's
       // change of material.
       chaseInst: (musPal.chase || sysMUS_CHASE_DEF).inst, bandHits: musBandHits, barN: musBarIndex,
+      bandBars: musBandBars,
       // THE CUES (L7, E2): what each has fired this session
       cueTick: musCueTickN, cueOpen: musCueOpenN, cueArmed: musCueArmedN,
       cueDenied: musCueDeniedN, cueExit: musCueExitN,
@@ -47279,9 +47309,12 @@ export function createSystems(game) {
     // running while the context is suspended, or an alt-tab in the middle of the
     // aurora comes back to a swell that is permanently up.
     if (musLiftT > 0) {
-      musLiftT -= dt;
+      // ...at sysMUS_LIFT_XRUN in the release after a border (L7, E1): the
+      // bloom and a hold keep their own time, the tail of the last place
+      // does not get the new one's first nine seconds.
+      musLiftT -= dt * (musLiftT <= musLiftDn ? musLiftRun : 1);
       musLiftAtk += dt;      // ...and the attack's own clock, which a hold cannot pin (L6, E3)
-      if (musLiftT <= 0) { musLiftT = 0; musLift = 0; musLiftAtk = 0; }
+      if (musLiftT <= 0) { musLiftT = 0; musLift = 0; musLiftAtk = 0; musLiftRun = 1; }
     }
     // ---- the gnawa's two live inputs -----------------------------------
     // Read every frame rather than in the 0.3 s music block, because the storm

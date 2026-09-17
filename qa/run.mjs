@@ -60,6 +60,9 @@ const ASSERTS = [
   // the past tense; at most five `left` lines end on "You…"; no percentage
   // on the paper; every chapter answers a returner.
   ['qa/l7-echo.mjs',        'CHAPTERS: sub~nb[0] and sub~left share no trigram; no "chapter"; the again lines'],
+  // THE VOCABULARY OF A PLACE (L7, E2): generic voices played half an octave
+  // off their recipe, counted; a ratchet, so the number cannot go back up.
+  ['qa/l7-voices.mjs',      'generic sfx voices transposed half an octave: the count does not rise'],
   ['build.mjs',           'the one-file build: wraps, splices, no collisions, writes dist/'],
 ];
 const REPORTS = [

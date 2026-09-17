@@ -2149,7 +2149,8 @@ function hanUpdateBikes(game, dt) {
     const d = Math.hypot(dx, dz) || 1;
     if (typeof capy.shove === 'function') capy.shove(dx / d * 3.4, dz / d * 3.4, 'the traffic');   // named for the pill (L6, E1)
     if (typeof game.punch === 'function') game.punch(0.20);
-    hanCue('bark', hanV3b.x, hanV3b.y, hanV3b.z, 0.5, 2.6);
+    // the rider leans on the horn, and it is a horn (L7, E2): was `bark` at 2.6
+    hanCue('moped', hanV3b.x, hanV3b.y, hanV3b.z, 0.5, rand(0.95, 1.15));
     hanSwerved = 0;
     hanCrossLane = -1;
     if (!hanToldFlow) {
@@ -2171,8 +2172,10 @@ function hanUpdateBikes(game, dt) {
     }
     if (bi >= 0 && bd < 60) {
       hanBikeAt(bi, hanV3b);
-      hanCue('bark', hanV3b.x, hanV3b.y, hanV3b.z, clamp(0.26 - bd * 0.003, 0.05, 0.26),
-             rand(2.1, 3.2), 90);
+      // ...in the moped's own voice (L7, E2): this was `bark` at 2.1–3.2 every
+      // 0.5–2.1 s, which the drive counted as 75 of the chapter's calls
+      hanCue('moped', hanV3b.x, hanV3b.y, hanV3b.z, clamp(0.26 - bd * 0.003, 0.05, 0.26),
+             rand(0.85, 1.25), 90);
     }
   }
 }
@@ -3721,8 +3724,11 @@ function hanUpdateCau(game, dt) {
     f.m.rotation.y = f.a + Math.PI + Math.sin(hanTime * 1.4 + f.ph) * 0.18 - kick * 0.4;
   }
   if (k < dt * 2 && hanGame) {
-    hanCue('tick', hanShuttle.position.x, hanShuttle.position.y, hanShuttle.position.z,
-           0.16, rand(2.6, 3.4), 60);
+    // a foot on a feathered shuttle is a thock, not a click (L7, E2): this was
+    // `tick` at 2.6–3.4 and the drive counted it 194 times in 2.5 minutes —
+    // the single biggest borrowed word in the chapter. The pop's sine, low.
+    hanCue('pop', hanShuttle.position.x, hanShuttle.position.y, hanShuttle.position.z,
+           0.14, rand(0.72, 0.9), 60);
   }
   const capy = game.capy;
   if (!hanCauDone && capy && capy.position) {
@@ -4178,8 +4184,9 @@ function hanWheek(game) {
       const d = Math.hypot(hanV3b.x - p.x, hanV3b.z - p.z);
       if (d < 34) {
         n++;
-        hanCue('bark', hanV3b.x, hanV3b.y, hanV3b.z, clamp(0.28 - d * 0.006, 0.05, 0.28),
-               rand(1.9, 3.3), 80);
+        // every answer is a moped's horn (L7, E2): was `bark` at 1.9–3.3
+        hanCue('moped', hanV3b.x, hanV3b.y, hanV3b.z, clamp(0.28 - d * 0.006, 0.05, 0.28),
+               rand(0.8, 1.3), 80);
       }
       if (n > 9) break;
     }

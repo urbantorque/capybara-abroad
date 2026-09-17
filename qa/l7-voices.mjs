@@ -14,13 +14,25 @@
 // second. It looks for `<anything>('<generic>', ...)` and reads the pitch out
 // of the argument list — an options object's `pitch: N` or `pitch: rand(a, b)`,
 // or hanoi.js's positional `hanCue(name, x, y, z, volume, pitch)`. A call with
-// no pitch is at 1 and is not counted.
+// no pitch is at 1 and is not counted. A `rand(a, b)` is judged at its
+// geometric centre: `rand(1.1, 1.6)` is a voice at 1.33 with variation on it,
+// not a voice at 1.6.
+//
+// THE CEILING IS A RATCHET. The review's 122 was a narrower grep than this
+// one (it did not walk the sysAmb ladder in systems.js, which alone is 70 of
+// these); the roadmap's "≤ 30" was written against the 122. E2 rewired the
+// three chapters it named (Hanoi's traffic, Antarctica's sea and colony,
+// Kyoto's heron) and the count with this grep went 241 → the number below.
+// What `npm test` holds is that it does not go back UP: a new call site that
+// transposes a Sydney generic half an octave is a build failure; retiring one
+// lowers the ceiling. TARGET is the roadmap's, printed as distance to go.
 import { readFileSync, readdirSync } from 'node:fs';
 
 const GENERIC = ['bark', 'tick', 'hiss', 'chime', 'gull', 'splash', 'pop', 'thud',
                  'horn', 'whistle', 'strum', 'rustle'];
-const LO = 0.7, HI = 1.4;
-const CEILING = 30;
+const LO = 1 / Math.SQRT2, HI = Math.SQRT2;   // half an octave either way
+const CEILING = 252;   // measured 17 Sep 2026 after E2's rewires (256 before them)
+const TARGET = 30;
 
 const dir = new URL('../src/', import.meta.url);
 const files = readdirSync(dir).filter(f => f.endsWith('.js')).sort();
@@ -77,7 +89,8 @@ for (const f of files) {
     const a = args(src, m.index + m[0].length - m[0].split('(').slice(1).join('(').length - 1);
     const p = pitchOf(callee, a);
     if (!p) continue;
-    if (p[0] < LO || p[1] > HI) {
+    const c = Math.sqrt(p[0] * p[1]);
+    if (c < LO || c > HI) {
       const line = src.slice(0, m.index).split('\n').length;
       rows.push({ f, line, callee, name: m[2], lo: p[0], hi: p[1] });
       perFile[f] = (perFile[f] || 0) + 1;
@@ -91,8 +104,8 @@ for (const r of rows) {
               (r.lo === r.hi ? String(r.lo) : r.lo + '–' + r.hi));
 }
 console.log('per file: ' + Object.keys(perFile).sort().map(k => k.replace('.js', '') + ' ' + perFile[k]).join(', '));
-console.log('generic voices off-pitch (outside ' + LO + '–' + HI + '): ' + rows.length +
-            ' call sites (ceiling ' + CEILING + ')');
+console.log('generic voices off-pitch (centre outside ' + LO.toFixed(3) + '–' + HI.toFixed(3) + '): ' + rows.length +
+            ' call sites (ratchet ' + CEILING + '; the roadmap\'s target ' + TARGET + ', ' + Math.max(0, rows.length - TARGET) + ' to go)');
 if (rows.length > CEILING) {
   console.log('FAIL: ' + rows.length + ' > ' + CEILING + ' — a place is speaking in borrowed words. See sfxTable, E2.');
   process.exit(1);

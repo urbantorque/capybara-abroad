@@ -23,10 +23,16 @@ async page => {
     const t0 = Date.now()
     const g0 = await page.evaluate(() => window.__capy.state.time)
     let gt = g0, s = 0
-    await page.keyboard.down('KeyW')
-    while (gt - g0 < secs && Date.now() - t0 < 400000) {
-      if (s % 10 === 0) { await page.keyboard.down('KeyA'); await page.waitForTimeout(600); await page.keyboard.up('KeyA') }
-      if (s % 14 === 7) { await page.keyboard.press('Space') }
+    // ...and the first twenty of the ninety are STANDING (L7, E6, the
+    // resume): a fresh player reads the place card at arrival before they
+    // move, and the people at the spawn (Palawan's jetty pair) talk then.
+    // The pure walk measured Palawan at 0 bubbles because it walked into
+    // the sea; the Drift stays at 0 because its nearest local is 150 m away.
+    let walking = false
+    while (gt - g0 < secs && Date.now() - t0 < 300000) {
+      if (!walking && gt - g0 >= 20) { walking = true; await page.keyboard.down('KeyW') }
+      if (walking && s % 10 === 0) { await page.keyboard.down('KeyA'); await page.waitForTimeout(600); await page.keyboard.up('KeyA') }
+      if (walking && s % 14 === 7) { await page.keyboard.press('Space') }
       await page.waitForTimeout(1400)
       const sn = await snap()
       gt = sn.gt

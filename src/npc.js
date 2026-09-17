@@ -2088,6 +2088,20 @@ export function createNPCs(game) {
   // Merged with the neutral nine rather than replacing them, on the same
   // argument F2 made for wary and incident: a three-line pool on the most
   // heard event in the game is a template wearing a hat.
+  //
+  // ...AND THE WEATHER THEY ACTUALLY HAVE (L7, E6, the resume). `passing`
+  // alone measured 12/19 on the 90 s walk: the rest of what a square said
+  // was the four chapter-neutral weather pools — the one local on the
+  // Antarctic jetty said "Cold one." and "Brr." and nothing of its own,
+  // the Quay's wharfies "Feel that?" five times in a southerly. weather.js
+  // says what each place has (Iceland cold 1.0, the Sahara's dust at 1.1,
+  // spray on three beaches, petals in Kyoto, fireflies in the Pantanal), so
+  // `drift` (the motes), `chill` (a gust in a cold chapter), `drizzle` and
+  // `clearing` are authored where that weather IS — not in seventeen
+  // chapters as a matter of form. The resolver replaces for these kinds
+  // (only wary/incident/startled merge), so a chapter that declares one
+  // says nothing neutral for it. Same rules as the pool above them: unique
+  // across the table, nothing about the animal.
   const npcPLACE_SAY = {
     quay: {
       wary:     ['You again, mate.', 'Yeah, I know you.', 'Not on this wharf.',
@@ -2103,6 +2117,10 @@ export function createNPCs(game) {
                  'Two hundred on the Manly boat and one of them had a surfboard.',
                  'Coffee cart has put the price up. Again.',
                  'The old fella is checking the wheel. Third time this morning.'],
+      drift:    ['Spray is over the apron. She is coming in hard.', 'Harbour is on my glasses again.',
+                 'The wash is up over wharf two. Mind the papers.'],
+      chill:    ['There it is. The southerly.', 'There goes the buster. Twenty degrees in a minute.',
+                 'Jumper. Should have brought the jumper.'],
     },
     kyoto: {
       wary:     ['Ah. You.', 'The face is familiar.', 'Please. Not again.',
@@ -2119,6 +2137,13 @@ export function createNPCs(game) {
                  'Somebody has moved the third stone. Somebody always moves the third stone.',
                  'The bridge is closed for the crossing on Sunday.',
                  'Rain by four. The moss is pleased about it.'],
+      drift:    ['Petals on the step. I have just done the step.', 'Every one of those has to be swept.',
+                 'The maple is early. It is always early now.', 'They land in the tea. He says it improves it.'],
+      chill:    ['The wind comes down off Hiei. It has been cold up there since October.',
+                 'Off the river, that one.', 'The moss will not mind. I mind.'],
+      drizzle:  ['Rain. The moss is delighted.', 'Rain on the stones. Now they are the right colour.',
+                 'The coaches will go to the shops. Good.'],
+      clearing: ['Stopped. The stones will be dry by four.', 'There. The gates are shining, look.'],
     },
     cali: {
       wary:     ['Otra vez vos.', 'It is the same one.', 'Ay, no. Not you.',
@@ -2136,6 +2161,11 @@ export function createNPCs(game) {
                  'They are closing the bridge for the parade. Nobody told the buses.',
                  'Thirty-one degrees and it is not yet ten.'],
       startled: ['Ay! On the beat, at least.', 'Vos. VOS.', 'That is my foot and I need it tonight.'],
+      drift:    ['Guayacán seed. It is all over the beat.', 'It is in the lulada. Do not tell him.',
+                 'The trees are throwing seed at the dancers again.', 'That is going to be a tree somewhere.'],
+      drizzle:  ['Aguacero. Under the awning, everybody. Keep dancing.', 'Rain on the beat. The beat does not care.',
+                 'Ten minutes. It rains ten minutes here and then the street steams.'],
+      clearing: ['Done. Now the steam.', 'Sun. Turn it back up.'],
     },
     rio: {
       wary:     ['Ah, e voce.', 'That face again.', 'Not on my stretch.',
@@ -2153,6 +2183,11 @@ export function createNPCs(game) {
                  'The cable car is running. The queue goes to the kiosk.',
                  'Thirty-four degrees and the sand is worse.'],
       startled: ['Ei! Calma, calma.', 'Not on the mosaic. Not on the MOSAIC.', 'My caipirinha. My whole caipirinha.'],
+      drift:    ['Pollen off the almond trees. The whole calçadão is yellow.', 'It is on the ball. It is on everything.',
+                 'The bateria will be sneezing through the whole parade.', 'That is off the trees on the Avenida.'],
+      drizzle:  ['Chuva. Every umbrella on the beach for sale in one second.', 'Rain on the mosaic. Now it is a mirror.',
+                 'It will do this for four minutes and then apologise.'],
+      clearing: ['Sun is back. So is everybody.', 'Four minutes. Told you.'],
     },
     iceland: {
       wary:     ['Oh. The animal.', 'So that is what you are.',
@@ -2170,6 +2205,13 @@ export function createNPCs(game) {
                  'The pool was thirty-nine this morning. Somebody complained.',
                  'Road east is open. Road north is a rumour.',
                  'Forecast says clear. It said that yesterday.'],
+      drift:    ['That is snow. In August. It happens.', 'Off the glacier, that. Do not lick it.',
+                 'It is coming sideways. It always comes sideways.'],
+      chill:    ['Nine degrees. Tropical.', 'That is the glacier breathing out.',
+                 'The wind is from Greenland today. You can tell.'],
+      drizzle:  ['Rain. Of course. It is Iceland.', 'Horizontal again. Put the hood up and turn round.',
+                 'The forecast said dry. The forecast is from Reykjavík.'],
+      clearing: ['There. Now you can see the mountain. Quick.', 'Dry. Give it a minute.'],
     },
     sahara: {
       wary:     ['Ah. The rodent.', 'I have seen you before.', 'Not at this cart.',
@@ -2187,6 +2229,8 @@ export function createNPCs(game) {
                  'Forty-one degrees in the shade, and there is no shade.',
                  'The mint is from Meknes. Everything else is from here.'],
       startled: ['Ya Allah! My oranges.', 'Balak! Balak!', 'The lamps. Mind the LAMPS.'],
+      drift:    ['That is the desert coming to the square. It does this at four.', 'Dust off the Atlas. Cover the mint.',
+                 'Sand in the tagine. That is the seasoning.', 'Chergui. Shut the shutters.'],
     },
     drift: {
       wary:     ['Oh. It is you.', 'I remember you from lower down.', 'Careful. This time.',
@@ -2203,6 +2247,10 @@ export function createNPCs(game) {
                  'I dropped a spoon last week. It has not landed.',
                  'The seed-heads are leaving. They always leave.',
                  'Cold up top. Warmer under. Nobody knows why.'],
+      drift:    ['Spores off the third island. It is flowering, then.', 'That is the orchard letting go.',
+                 'It goes up like everything else.'],
+      chill:    ['Cold coming up from underneath. That is the odd one.', 'The wind has turned. Hold the rail.',
+                 'Cloud is in. It gets through a coat.'],
     },
     venice: {
       wary:     ['Ancora tu.', 'Ah. It is you, signore.', 'Not in my calle.',
@@ -2220,6 +2268,13 @@ export function createNPCs(game) {
                  'Cruise ship in. Four thousand of them, and one bridge.',
                  'The pigeons have moved to the Procuratie. They know something.'],
       startled: ['Attento! The water is RIGHT there.', 'Madonna. My gondola.', 'Not on the boards. Not on the BOARDS.'],
+      drift:    ['Plaster off the Procuratie. It has been coming off since 1800.', 'That is Venice, on my jacket.',
+                 'Salt. Everything here comes with salt.'],
+      chill:    ['Bora. Off the Alps and straight down the canal.', 'The water is warm. The air is not. Explain that.',
+                 'That wind brings the tide in. Watch the boards.'],
+      drizzle:  ['Rain and the tide. Both. Naturally.', 'Everybody under the arcades. Fourteen euros for the coffee, wet or dry.',
+                 'It rains and the canal rises to meet it.'],
+      clearing: ['Stopped. The tide has not.', 'Sun on the wet paving. Take the photograph now.'],
     },
     kowloon: {
       wary:     ['You again, ah.', 'I know your face.', 'Not on my street.',
@@ -2237,6 +2292,13 @@ export function createNPCs(game) {
                  'The Star Ferry is two-eighty now. Nobody has noticed.',
                  'Eleventh floor has a new tenant. Nobody has seen them.'],
       startled: ['Aiyah! The tray, the TRAY.', 'Wah — mind the bamboo.', 'Siu sam! That is a fresh batch.'],
+      drift:    ['Concrete dust. They are cutting on the ninth floor.', 'That is off the scaffold. Bamboo does that.',
+                 'It is from the site on Nathan Road. It is always from the site.'],
+      chill:    ['The air-conditioning is off. That is the wind. Different thing.', 'Typhoon three. That is the edge of it.',
+                 'Cold in Mong Kok. Put it in the group chat.'],
+      drizzle:  ['Amber rain. Black rain. Whatever. Get the tray in.', 'Rain down the neon. Every colour on the pavement.',
+                 'Every umbrella on the street up at once. Nobody can see.'],
+      clearing: ['Stopped. Now the steam off the road.', 'Off. Tray back out.'],
     },
     palawan: {
       wary:     ['Ay, ikaw na naman.', 'This one, again.', 'Not the boat. Please.',
@@ -2253,6 +2315,11 @@ export function createNPCs(game) {
                  'The clam has grown. Nobody measures it. It has grown.',
                  'Rain at three, sun at four. Same as every day.',
                  'A boat came in from Coron with eleven people and one chicken.'],
+      drift:    ['Spray off the bangka. Engine is going, then.', 'Salt on the nets. Salt on everything.',
+                 'That is the tide turning. You can taste it.', 'Wind on the reef. Look at the white line.'],
+      drizzle:  ['Rain at three. It is three.', 'Under the nipa, everybody. Nobody is going anywhere.',
+                 'It will rain for an hour and the reef will be flat after.'],
+      clearing: ['Sun. Told you four.', 'There. The reef is back.'],
     },
     goreme: {
       wary:     ['Sen yine.', 'You were in the valley. I saw.', 'Not the ropes again.',
@@ -2269,6 +2336,10 @@ export function createNPCs(game) {
                  'The truck has a new tyre. The old one is in the valley somewhere.',
                  'Tea is on. Tea is always on.',
                  'Somebody has booked the sunrise flight three months out. From Australia.'],
+      drift:    ['Tuff. The whole valley is made of it and it is all coming off.', 'That is the cliff. It comes down a little every day.',
+                 'Dust off the launch field. Crew four has started the fans.'],
+      chill:    ['Minus two before the sun. Plus twenty after it. Dress for both.', 'That comes down off Erciyes. It is snow up there.',
+                 'Cold enough to fill an envelope. That is the point of the cold.'],
     },
     manly: {
       wary:     ['Not you. Not on a Saturday.', 'Yeah, I remember you.', 'Not on my beach.',
@@ -2285,6 +2356,13 @@ export function createNPCs(game) {
                  'The pool has got something in it. A big something.',
                  'Nor-easter at two, then it will go flat.',
                  'Gulls have got the chips off some poor bloke already.'],
+      drift:    ['Spray off the break. Six foot, then.', 'Salt on the windscreen. Salt on the chips.',
+                 'That is off the big one. Watch the flags.', 'Sea mist. The Corso will smell of it till lunch.'],
+      chill:    ['Southerly buster. Everybody out of the water.', 'Wind has gone round. That is the swell done.',
+                 'Nor-east to south in a minute. Jumpers on.'],
+      drizzle:  ['Rain on a Saturday. Half the beach gone in a minute.', 'Shower. The surfers do not care. They are already wet.',
+                 'Under the pines, everybody.'],
+      clearing: ['There. Back in.', 'Sun. Beach fills up again. Watch.'],
     },
     // The Pantanal is the one place that does not mind you, and its whole
     // premise is that nobody looks up. So its wariness is not wariness and
@@ -2306,6 +2384,11 @@ export function createNPCs(game) {
                  'Truck went through at dawn. First one since Thursday.',
                  'The caiman by the third bridge has not moved in two days. It is fine.',
                  'Hot. Wet. Both, by four.'],
+      drift:    ['Vagalumes. The whole bank is going.', 'Fireflies over the water. The caiman does not mind them either.',
+                 'That is a lot of them tonight. Rain coming, then.'],
+      drizzle:  ['Rain. The river will be up a hand by morning.', 'It rains here and the road becomes the river.',
+                 'Under the truck, everybody. Nobody is going anywhere anyway.'],
+      clearing: ['Stopped. The frogs will start now.', 'Steam off the campo. Look at it.'],
     },
     cave: {
       wary:     ['I could hear you coming. Again.', 'I heard you coming this time.',
@@ -2323,6 +2406,10 @@ export function createNPCs(game) {
                  'Somebody left a lamp on at the far camp. It will be out by now.',
                  'The river inside is louder today. Rain outside, then.',
                  'Nine kilometres and I have been to three of them.'],
+      drift:    ['That is calcite. Off the roof. It is very old.', 'Dust in the lamp beam. Something moved up there.',
+                 'Mist off the river inside. It does that when the rain is outside.'],
+      chill:    ['The cave breathes out at night. That was a breath.', 'Cold off the underground river. Move away from it.',
+                 'Seventeen degrees down here, always. Then a draught like that.'],
     },
     antarctic: {
       wary:     ['Oh good. It is the animal.', 'I know that shape now.',
@@ -2340,6 +2427,10 @@ export function createNPCs(game) {
                  'The bar opens at six. Somebody has written five on the sign.',
                  'The gentoos are back on the point. Loud about it.',
                  'Mug count is eight. It was nine.'],
+      drift:    ['Spindrift. Off the ridge.', 'Blowing off the glacier. Old snow.',
+                 'It goes sideways here. Everything goes sideways here.'],
+      chill:    ['Minus eleven with wind. Call it minus thirty.', 'Katabatic. That comes down the glacier at night.',
+                 'Face in. Do not look at it.'],
     },
     monaco: {
       wary:     ['Ah. Sir.', 'I have your face now.', 'Not in here.',
@@ -2356,6 +2447,10 @@ export function createNPCs(game) {
                  'Twenty past eight and the rooms are full. They are always full.',
                  'The Prince is not in residence. The flag says otherwise.',
                  'A car went round in one minute twelve. Nobody was timing it.'],
+      drift:    ['Spray off the harbour wall. On the cars, sir.', 'Sea mist over the port. The yachts will be polished again.',
+                 'That is the Mediterranean, sir. On the terrace.'],
+      chill:    ['The mistral, sir. It reaches even here.', 'A breeze off the sea. The ladies have gone inside.',
+                 'Cold on the terrace. The heaters are on. They are always on.'],
     },
     hanoi: {
       wary:     ['Lai la ban.', 'Yes. You.', 'Not my stool. Not again.',
@@ -2373,6 +2468,11 @@ export function createNPCs(game) {
                  'The bridge is open to mopeds. It is always open to mopeds.',
                  'Rain at four. Everybody will be under the same awning.'],
       startled: ['Oi! Not the stools.', 'Troi oi. My BROTH.', 'Sit down or go round. Pick one.'],
+      drift:    ['Dust off Hang Bac. They are digging it up again.', 'That is the road. The road is in the air.',
+                 'Grit in the broth. No charge.', 'Milk flower. In the pho, again.'],
+      drizzle:  ['Rain. Two hundred and forty ponchos, same second.', 'Rain on the stools. Stools in. Stools out. Stools in.',
+                 'It rains and the road does not slow down. It never slows down.'],
+      clearing: ['Stopped. Stools out.', 'Steam off Hang Ngang. Now it is hot and wet.'],
     },
   };
   /**

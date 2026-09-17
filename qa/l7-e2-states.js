@@ -45,7 +45,7 @@ async page => {
     const t0 = performance.now(), g = window.__capy
     let chaseMax = 0, intMax = 0
     const sfx0 = Object.assign({}, window.__sfxN)
-    const mA = g.musAudit(); const bh0 = mA.bandHits, bn0 = mA.barN, ch0 = mA.chaseHits
+    const mA = g.musAudit(); const bh0 = mA.bandHits, bn0 = mA.bandBars, ch0 = mA.chaseHits
     while (performance.now() - t0 < secs * 1000) {
       for (const k in ans) {
         const a = acc[k], an = ans[k]; if (!an) continue
@@ -78,7 +78,7 @@ async page => {
     }
     res.stems = {}; for (const k in stemRms) res.stems[k] = +(10 * Math.log10(Math.max(1e-12, stemRms[k].s2 / Math.max(1, stemRms[k].n)))).toFixed(1)
     const m = g.musAudit()
-    res.mus = { pal: m.pal, band: m.band, pad: m.pad, bass: m.bass, intensity: m.intensity, intMax: +intMax.toFixed(3), chaseT: m.chaseT, chaseMax, chaseHits: m.chaseHits, breath: m.breath, chapProg: m.chapProg, secondN: m.secondN, melCells: m.melCells, worldDuck: m.worldDuck, speak: m.speak, sleep: m.sleep, layers: m.layers, pulseN: m.pulseN, ostN: m.ostN, themeSaid: m.themeSaid, stingEnv: m.stingEnv, beatLen: m.beatLen, chaseInst: m.chaseInst, bandHits: m.bandHits, secs, bandPerBar: +((m.bandHits - bh0) / Math.max(1, m.barN - bn0)).toFixed(1), bars: m.barN - bn0, chaseHitsW: m.chaseHits - ch0 }
+    res.mus = { pal: m.pal, band: m.band, pad: m.pad, bass: m.bass, intensity: m.intensity, intMax: +intMax.toFixed(3), chaseT: m.chaseT, chaseMax, chaseHits: m.chaseHits, breath: m.breath, chapProg: m.chapProg, secondN: m.secondN, melCells: m.melCells, worldDuck: m.worldDuck, speak: m.speak, sleep: m.sleep, layers: m.layers, pulseN: m.pulseN, ostN: m.ostN, themeSaid: m.themeSaid, stingEnv: m.stingEnv, beatLen: m.beatLen, chaseInst: m.chaseInst, bandHits: m.bandHits, secs, bandPerBar: +((m.bandHits - bh0) / Math.max(1, m.bandBars - bn0)).toFixed(1), bars: m.bandBars - bn0, bandHitsW: m.bandHits - bh0, chaseHitsW: m.chaseHits - ch0 }
     res.red = red; res.calm = +g.calm().toFixed(2)
     const sf = {}; for (const k in window.__sfxN) { const d = window.__sfxN[k] - (sfx0[k] || 0); if (d > 0) sf[k] = d }
     res.sfx = sf

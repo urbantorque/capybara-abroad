@@ -41,10 +41,12 @@ async page => {
     const names = {}; for (const s of st) names[s.st] = (names[s.st] || 0) + 1
     return { live, localsN: L.length, spread, names, sample: st.slice(0, 12), err: g.state.lastError || null }
   })
-  const CH = ['cave', 'venice', 'quay', 'sahara', 'kowloon']
+  const CH = ['sydney', 'pasto', 'quay', 'cali', 'goreme', 'manly', 'pantanal', 'cave', 'antarctic', 'venice', 'sahara', 'kowloon']
   for (const c of CH) {
-    await page.evaluate((c) => window.__capy.hud.cross(c), c)
-    await page.waitForTimeout(9000)
+    if (c !== 'sydney') {
+      await page.evaluate((c) => window.__capy.hud.cross(c), c)
+      await page.waitForTimeout(9000)
+    } else await page.waitForTimeout(2500)
     await page.screenshot({ path: 'qa/l7-e4-' + c + '-arrive.png' })
     out.rows.push(await info('arrive'))
     await page.keyboard.down('KeyW')
