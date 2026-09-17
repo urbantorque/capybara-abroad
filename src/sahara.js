@@ -370,6 +370,7 @@ function sahNoShadowOnGhosts(root) {
  * north of it and the acrobats' mat is at z 20.
  */
 let sahSquareBed = null;   // M13: the square's own floor of sound
+let sahTuneMv = null;      // (L7, F2) the maalem's own tune, through the mover pipeline
 const sahCART_X = 30;         // the wrap, past both ends of the square
 const sahCART_V = 1.5;        // m/s — a man pushing a barrow
 let sahCart = null, sahCartMover = null;
@@ -6032,6 +6033,13 @@ export function createSahara(game) {
         sahSquareBed.at(clamp(sp.x, sahSQ_X0, sahSQ_X1), 1.4,
                         clamp(sp.z, sahSQ_Z0, sahSQ_Z1));
         sahSquareBed.set(0.68);
+      }
+      // THE MUSICIAN (L7, F2): the maalem, at the fire, on his own guembri.
+      if (!sahTuneMv && typeof game.sfxMover === 'function') {
+        sahTuneMv = game.sfxMover('tune', { key: 'sahara:musician', biome: 'sahara' });
+      }
+      if (sahTuneMv && sahLocMaalem) {
+        sahTuneMv.at(sahLocMaalem.x, sahLocMaalem.y + 1.0, sahLocMaalem.z);
       }
       sahTime += dt;
 

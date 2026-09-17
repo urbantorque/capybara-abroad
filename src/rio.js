@@ -3228,6 +3228,7 @@ let rioBondeNodes = null, rioBondeLen = null;
 const rioBonde = [null, null];
 const rioBondeMover = [null, null];   // steel on steel (A1)
 let rioCrowdMover = null;             // the column, as a place (A1)     // { group, body, u, dir, dwell, pu, pyaw }
+let rioTuneMv = null;                 // (L7, F2) the bateria's own tune, on the head of the column
 const rioCabinFrame = { x: 0, z: 0 };
 let rioBondeRideT = 0, rioBondeDone = false, rioBondePassed = false;
 let rioBondeTold = false, rioBondeBell = 0;
@@ -3878,6 +3879,14 @@ function rioUpdateParade(game, dt) {
   if (rioCrowdMover) {
     rioCrowdMover.at(rioBateriaX, rioTerrain(rioBateriaX, rioAVE_Z) + 1.4, rioAVE_Z);
     rioCrowdMover.set(clamp(0.6 + rioBateriaPulse * 0.4, 0, 1));
+  }
+  // THE MUSICIAN (L7, F2): the cavaquinho over the bateria, riding the same
+  // point on the column the crowd bed already tracks.
+  if (!rioTuneMv && typeof game.sfxMover === 'function') {
+    rioTuneMv = game.sfxMover('tune', { key: 'rio:musician', biome: 'rio' });
+  }
+  if (rioTuneMv) {
+    rioTuneMv.at(rioBateriaX, rioTerrain(rioBateriaX, rioAVE_Z) + 1.4, rioAVE_Z);
   }
 
   if (rioBateriaGroup) {
