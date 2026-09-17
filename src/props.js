@@ -1040,6 +1040,16 @@ function physBuildYuzuGold(g) {
   physAdd(g, physSphG(0.122), PALETTE.yuzuGoldDk, 0, 0.12, 0).scale.set(1, 0.94, 1);
   physAdd(g, physBoxG(0.02, 0.06, 0.02), PALETTE.yuzuLeaf, 0.035, 0.225, 0, 0, 0, 0.5);
 }
+// THE GENERIC FOOD ROLL (L8, F4): a chapter with no edible of its own in
+// `physBIOME_SCATTER` (iceland, sahara, drift, venice, palawan, goreme,
+// manly, cave, antarctic, monaco — measured, see sysDROP_FOOD in
+// systems.js) drops this instead of borrowing another chapter's dish. A
+// ball plus a leaf nub, the same shape family as the yuzu it sits beside in
+// the pool, in the one colour this pass adds.
+function physBuildOrange(g) {
+  physAdd(g, physSphG(0.085), PALETTE.orange, 0, 0.085, 0);
+  physAdd(g, physBoxG(0.016, 0.04, 0.016), PALETTE.orangeLeaf, 0, 0.155, 0);
+}
 // THE BATH (F4): a tub, mesh only this pass. `grabbable: false` below is the
 // real, final value — the bath is a proximity ride (hop in), never a grab —
 // and its carriedBy sequence, the spawner, and the map star are all wave 1's
@@ -1390,6 +1400,13 @@ const physTYPES = {
   yuzu:      { name: 'a yuzu',        mass: 0.10, hy: 0.10, shape: ['sph', 0.10],             hold: [0, 0.02, 0.08],  spin: 1.4, build: physBuildYuzu, worth: 1 },
   yuzugold:  { name: 'a golden yuzu', mass: 0.12, hy: 0.12, shape: ['sph', 0.12],             hold: [0, 0.02, 0.09],  spin: 1.4, build: physBuildYuzuGold, worth: 5 },
   yuzubath:  { name: 'the yuzu bath', mass: 40.0, hy: 0.42, shape: ['box', 1.2, 0.42, 1.2],   hold: [0, 0, 0],        spin: 0,   grabbable: false, receive: true, build: physBuildYuzuBath, worth: 25 },
+  // THE GENERIC FOOD ROLL (L8, F4) — see physBuildOrange. `edible: true`
+  // like the eleven chapter foods, on purpose: a sysDrops-spawned instance is
+  // removed on `capy:grab` before physGrazeStep's 0.9 s settle can ever fire
+  // a first bite (see the food listener, systems.js), and a chapter that DID
+  // hand-place one of these on a table — none do today — would still get the
+  // ordinary bite-by-bite verb, which is the right fallback either way.
+  orange:    { name: 'an orange',     mass: 0.16, hy: 0.085, shape: ['sph', 0.085],           hold: [0, 0.02, 0.08],  spin: 1.3, edible: true, grazeSfx: 'rustle', build: physBuildOrange },
 
   // ---- Circular Quay (chapter 1) ----
   // Buoyancy is not authored here. Each type's material density lives in
@@ -2105,6 +2122,11 @@ export function createProps(game) {
     shatter: physShatter,
     puff: physPuff3,
     scatterShards: physThrowShards,
+    // ---- THINGS THAT TURN UP (L8, F4) ----
+    // A validated random ground point, biome by biome — see the doc comment
+    // above physDropSpot. sysDrops (systems.js) is the only caller.
+    dropSpot: physDropSpot,
+    dropSpotNear: physDropSpotNear,
   };
 
   return { update: physUpdate };
@@ -3176,6 +3198,70 @@ function physScatterBiome(name) {
     p.body.sleep();
   }
   return placed;
+}
+
+// ===========================================================================
+// THINGS THAT TURN UP (L8, F4) — a random, VALIDATED ground point for a drop.
+// ===========================================================================
+//
+// The same machinery physScatterRing already trusts in all seventeen chapters
+// that carry a `physBIOME_SCATTER` row: an annulus (or one of a chapter's two,
+// picked at random so drops spread across both clusters the way the scatter
+// itself does), physSpotOk for water/nav-blocked, physCrowded for the nicety.
+// No new placement algorithm — the roadmap's own instruction, followed.
+//
+// SYDNEY (chapter 1) AND PASTO (chapter 2) HAVE NO ROW HERE. Sydney's own
+// arrival scatter is a fixed rect (physScatterQuay, chapter 3's `quay` is the
+// one with a `physBIOME_SCATTER` entry — see "Quay is two places"); Pasto's is
+// a stall menu (physScatterPasto), not a ring. Both already publish named
+// zones through `env.randomPointIn` — physFindSpot already knows how to use
+// one — so those two chapters route through a zone instead of an annulus this
+// feature would otherwise have to invent from nothing.
+const physDropZONE_FALLBACK = {
+  sydney: ['promenade', 'picnic', 'gardens', 'operaStage'],
+  pasto: ['plaza', 'market', 'street'],
+};
+function physDropSpot(biome, radius) {
+  const zones = physDropZONE_FALLBACK[biome];
+  if (zones) {
+    const zone = zones[randInt(0, zones.length - 1)];
+    const spot = physFindSpot(zone, radius);
+    return spot.ok ? { x: spot.x, z: spot.z } : null;
+  }
+  const def = physBIOME_SCATTER[biome];
+  if (!def) return null;
+  let ring = def;
+  if (def.also) {
+    const list = Array.isArray(def.also) ? def.also.concat([def]) : [def, def.also];
+    ring = list[randInt(0, list.length - 1)];
+  }
+  for (let a = 0; a < 40; a++) {
+    const ang = rand(0, Math.PI * 2);
+    const rad = Math.sqrt(rand(ring.r0 * ring.r0, ring.r1 * ring.r1));
+    const x = ring.x + Math.cos(ang) * rad, z = ring.z + Math.sin(ang) * rad;
+    if (!physSpotOk(x, z, radius, false)) continue;
+    if (a < 32 && physCrowded(x, z, radius + 0.8)) continue;
+    return { x: x, z: z };
+  }
+  return null;
+}
+
+/**
+ * A second point 4-8 m from (x0, z0), same validation — the twin's pair
+ * (F4.2). There is no ring to draw it from — the twin's second fruit is
+ * defined relative to the first, not to the chapter's own centre — so this
+ * is a small local search rather than a call back into physDropSpot.
+ */
+function physDropSpotNear(x0, z0, minD, maxD, radius) {
+  for (let a = 0; a < 40; a++) {
+    const ang = rand(0, Math.PI * 2);
+    const rad = rand(minD, maxD);
+    const x = x0 + Math.cos(ang) * rad, z = z0 + Math.sin(ang) * rad;
+    if (!physSpotOk(x, z, radius, false)) continue;
+    if (a < 32 && physCrowded(x, z, radius + 0.8)) continue;
+    return { x: x, z: z };
+  }
+  return null;
 }
 
 let physQuayScattered = false;

@@ -188,6 +188,12 @@ export const PALETTE = {
   yuzuLeaf:     0x6b8f4e,
   yuzuGold:     0xf3c94a,
   yuzuGoldDk:   0xd19b1e,
+  // THINGS THAT TURN UP (L8, F4). One genuinely new prop — the generic food
+  // roll for a chapter with no edible of its own — and the one deliberate
+  // exception to "no new colours": orange has to read as distinct from every
+  // yellow the yuzu family already owns, at the same 25-70 m the fruit does.
+  orange:       0xe8791e,
+  orangeLeaf:   0x4f7a3c,
 
   // ---- Cali, Valle del Cauca (chapter 5) ----
   // Cali is a thousand metres up and three degrees off the equator: the light

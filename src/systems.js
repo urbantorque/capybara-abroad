@@ -4124,6 +4124,15 @@ const sysSAVE_SHAPE = {
   // unlock it gates at 100 lifetime needs no save key of its own: `owned`
   // already says whether it fired, unambiguously, on restore.
   gifted: 'number',
+  // THINGS THAT TURN UP (L8, F4). Live drops themselves are NOT saved — the
+  // whole pool is ephemeral, rerolled fresh on every arrival, and a save
+  // full of stale prop positions would be its own class of bug. The one
+  // thing that DOES need to survive a reload is the bath's own cooldown:
+  // without it, quitting the instant a bath spawns and reloading would find
+  // `bathAt` empty and roll a brand new one, defeating the "one per chapter
+  // per ten minutes" rule the moment it mattered most. One wall-clock number
+  // per chapter, restored and clamped exactly like `platedAt`.
+  bathAt: 'object',
 };
 const sysSAVE_DEBOUNCE = 700;      // ms — a streak of ticks writes once
 // ---- THE TWO WAYS STORAGE LETS A PLAYER DOWN, BOTH SILENT UNTIL R3 ---------
@@ -7629,6 +7638,14 @@ const sysWAY_ID = '__way';
 // resolves it exactly as it resolves a task, and game.hintTarget('traveller')
 // answers from outside.
 const sysTRAV_ID = 'traveller';
+// ...and THINGS THAT TURN UP's (L8, F4.4), on the same terms: two
+// underscores again, so a live drop's own pseudo-row can never collide with
+// a task id either. Declared up here with its two siblings — not down by
+// `sysDrops` itself — because `sysHINTS[sysDROP_ID]` is assigned at
+// module-init time, alongside `sysHINTS[sysWAY_ID]` and `sysHINTS[sysTRAV_ID]`,
+// and a `const` declared inside sysDrops's own block (much further down)
+// would still be in its temporal dead zone when that assignment runs.
+const sysDROP_ID = '__drop';
 const sysMAP_WORLDS = {
   // Sydney publishes zones rather than landmarks, so these come from the world
   // layout table in the contract.
@@ -26598,14 +26615,23 @@ export function createSystems(game) {
   // truly idle frame (interpolatedPosition still settling, or the game
   // paused under a modal) is the only thing this skips.
   let mapLastX = NaN, mapLastZ = NaN, mapLastYaw = NaN, mapLastCam = NaN, mapLastGoal = undefined, mapLastSpec = null;
+  let mapLastDrops = -1;
   function mapDraw(p, yaw, camYawNow, goal) {
     const cssW = mapEl.clientWidth;
     if (!cssW) return;
     const rx = Math.round(p.x * 1000), rz = Math.round(p.z * 1000);
     const ry = Math.round(yaw * 100), rc = Math.round(camYawNow * 100);
+    // THINGS THAT TURN UP (L8, F4): the drops overlay can change with nothing
+    // else on the chart moving — a spawn, a despawn, or just the bath's own
+    // pulse — so a cheap signature (live count, plus a coarse 8 Hz time
+    // bucket while anything is live) joins the "did anything change" test.
+    const dropsArr = (game.drops && typeof game.drops.where === 'function') ? game.drops.where() : null;
+    const dropsN = dropsArr ? dropsArr.length : 0;
+    const dropsSig = dropsN ? (dropsN * 100000 + (Math.floor(game.state.time * 8) % 100000)) : 0;
     if (rx === mapLastX && rz === mapLastZ && ry === mapLastYaw && rc === mapLastCam &&
-        goal === mapLastGoal && mapSpec === mapLastSpec) return;
+        goal === mapLastGoal && mapSpec === mapLastSpec && dropsSig === mapLastDrops) return;
     mapLastX = rx; mapLastZ = rz; mapLastYaw = ry; mapLastCam = rc; mapLastGoal = goal; mapLastSpec = mapSpec;
+    mapLastDrops = dropsSig;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = Math.round(cssW * dpr);
     if (w !== mapCssW) { mapCssW = w; mapCv.width = w; mapCv.height = w; }
@@ -26746,6 +26772,28 @@ export function createSystems(game) {
         g2.lineTo(qx + r * 0.92, qz + r * 0.72);
         g2.lineTo(qx - r * 0.92, qz + r * 0.72);
         g2.closePath(); g2.fill();
+      }
+    }
+
+    // ---- ...AND THINGS THAT TURN UP (L8, F4.4), BESIDE THE RING -----------
+    // A second overlay, not a replacement: a dot for any live drop, a star
+    // (pulsing at the front's own 0.7 Hz, `mapPulse`) for a live bath. Drawn
+    // from `game.drops.where()` — plain {x, z, kind}, no static-table entry —
+    // computed once above for the redraw signature and reused here.
+    if (dropsArr) {
+      for (let i = 0; i < dropsArr.length; i++) {
+        const d = dropsArr[i];
+        const dxp = PX(d.x), dzp = PZ(d.z);
+        if (d.kind === 'bath') {
+          const rr = (2.6 + mapPulse(0.9)) * u;
+          g2.fillStyle = sysHex(PALETTE.yuzuGold);
+          g2.beginPath();
+          g2.moveTo(dxp, dzp - rr); g2.lineTo(dxp + rr * 0.92, dzp + rr * 0.72); g2.lineTo(dxp - rr * 0.92, dzp + rr * 0.72);
+          g2.closePath(); g2.fill();
+        } else {
+          g2.fillStyle = sysHex(PALETTE.yuzu);
+          g2.beginPath(); g2.arc(dxp, dzp, 1.7 * u, 0, 6.284); g2.fill();
+        }
       }
     }
 
@@ -30736,6 +30784,45 @@ export function createSystems(game) {
       return p ? hintAt(p.x, p.z, p.y) : null;
     },
   };
+  // ---- ...AND THINGS THAT TURN UP (L8, F4.4) ------------------------------
+  // The bath first, then a twin whose window is still open, then whatever is
+  // nearest — the roadmap's own priority order — so the arrow, if anything
+  // ever pins this row, points at the thing most worth going to. `hintProp`
+  // already finds the nearest live prop of a type; this just orders the
+  // three checks. NOT built this pass: a dedicated, always-on paper row —
+  // the map's own dot/star (mapDraw) and the bath's one-time pill are how a
+  // player actually finds a drop day to day, and a `sysHINTS` entry with
+  // nothing pinning it is inert by construction, so this is a real, callable
+  // definition rather than a hollow one, sized to what the instrument asks.
+  sysHINTS[sysDROP_ID] = {
+    clue: 'go and get it',
+    where: function () {
+      const bath = hintProp('yuzubath');
+      if (bath) return bath;
+      for (let i = 0; i < dropLive.length; i++) {
+        const d = dropLive[i];
+        if (d.kind === 'twin' && d.prop && d.prop.body && typeof d.prop.dropWindowEnd === 'number' &&
+            game.state.time <= d.prop.dropWindowEnd) {
+          return hintAt(d.prop.body.position.x, d.prop.body.position.z, d.prop.body.position.y);
+        }
+      }
+      // Whatever is nearest, of whichever kind — reads `dropLive` directly
+      // rather than `hintProp` per type name, so a food drop points true no
+      // matter which of the eleven edible rows (or the generic orange) this
+      // chapter happens to be rolling today.
+      const cp = game.capy && game.capy.position;
+      let best = null, bestD = Infinity;
+      for (let i = 0; i < dropLive.length; i++) {
+        const d = dropLive[i];
+        const b = d.prop && d.prop.body;
+        if (!b || d.prop.held || d.prop.removed) continue;
+        const dx = cp ? b.position.x - cp.x : 0, dz = cp ? b.position.z - cp.z : 0;
+        const dist = dx * dx + dz * dz;
+        if (dist < bestD) { bestD = dist; best = b; }
+      }
+      return best ? hintAt(best.position.x, best.position.z, best.position.y) : null;
+    },
+  };
 
   // ---- ...AND SOMETHING TO STAND AT (D6) ---------------------------------
   //
@@ -32009,6 +32096,11 @@ export function createSystems(game) {
   // full-plate bonus paying twice if a task is somehow re-ticked.
   let jrYuzu = 0;
   const jrPlatedAt = Object.create(null);
+  // THINGS THAT TURN UP (L8, F4): the bath's own cooldown — biome -> the real
+  // wall-clock ms (Date.now()) of its last spawn. See the save block's own
+  // doc comment on `bathAt` for why this is Date.now() and not
+  // `game.state.time`.
+  const jrBathAt = Object.create(null);
   // THE BAG (L8, F2): THE GIFT. Holding E on the traveller never touches
   // `jrYuzu` — it credits this instead, a number that only rises. See
   // `game.bagGift` and the peel-pouch unlock near sysUPGRADES/owned below.
@@ -32240,6 +32332,12 @@ export function createSystems(game) {
         owned: owned, inv: inv, item: jrItem || undefined,
         // ...and THE BAG (L8, F2): the relationship ledger.
         gifted: jrGifted,
+        // ...and THINGS THAT TURN UP (L8, F4): the bath's own cooldown, in
+        // real wall-clock ms (Date.now(), not game.state.time — the ONE
+        // clock in this file that keeps moving while the tab is closed,
+        // which is the whole point of a "no more than one every ten
+        // minutes" rule surviving a reload).
+        bathAt: jrBathAt,
       }));
       // ---- SAY IT ONCE ----------------------------------------------------
       // This game is three and a quarter hours long and it has kept a save file
@@ -33246,9 +33344,15 @@ export function createSystems(game) {
     jrItem = null;
     jrYuzu = 0;
     jrGifted = 0;
-    if (game.capy) { game.capy.boon = null; game.capy.ward = 0; }
+    if (game.capy) { game.capy.boon = null; game.capy.ward = 0; game.capy.gullProof = 0; }
     itemSync();
     if (walletEl) walletEl.textContent = '0 yuzu';
+    // THINGS THAT TURN UP (L8, F4): a probe that reset everything else and
+    // kept a live drop pool or a stale bath cooldown from the boot chapter
+    // would measure the next chapter's odds against a cap that never
+    // actually had room. `dropForget` is defined with the rest of sysDrops,
+    // below — a function declaration, so the hoist makes it callable here.
+    dropForget();
   };
 
   // =========================================================================
@@ -35915,6 +36019,11 @@ export function createSystems(game) {
       if (typeof jrFile.gifted === 'number') {
         jrGifted = Math.max(0, Math.min(99999, Math.round(jrFile.gifted)));
       }
+      // THINGS THAT TURN UP (L8, F4): the bath's cooldown, read back the same
+      // way `platedAt` is above — a per-key type check, no allowlist hazard
+      // (the keys are chapter biome names, not player-chosen ids).
+      const baAt = jrFile.bathAt || {};
+      for (const k in baAt) { const t = baAt[k]; if (typeof t === 'number' && t === t) jrBathAt[k] = t; }
       // a chapter already finished on the file must not throw its party again
       for (let n = 1; n <= chapMax; n++) if (chapComplete(n)) jrChapDone[n] = true;
     } else if (!restore) {
@@ -43102,6 +43211,16 @@ export function createSystems(game) {
     const def = game.physics && game.physics.typeOf ? game.physics.typeOf(gp.type) : null;
     if (!def || typeof def.worth !== 'number') return;
     const b = gp.body;
+    // THINGS THAT TURN UP (L8, F4): `sysDrops` tags every prop it spawns
+    // with `dropKind` and, for rolling/twin, its OWN `dropWorth` — the same
+    // `yuzu` mesh and body as a plain one, worth more, per the roadmap's own
+    // "no new prop kind" rule. THE KEEN EYE's bonus (capy.mods.yuzuBonus,
+    // F3) applies to every ground kind at pickup — the bath never reaches
+    // this listener at all (grabbable: false, its own ritual pays directly).
+    const dropTag = gp.dropKind;
+    let worth = (typeof gp.dropWorth === 'number') ? gp.dropWorth : def.worth;
+    const eyeBonus = (game.capy && game.capy.mods) ? (game.capy.mods.yuzuBonus || 0) : 0;
+    if (dropTag) worth += eyeBonus;
     sfx('pop', { volume: 0.5, pitch: yuzuLadderPitch() });
     if (b) {
       const golden = gp.type === 'yuzugold';
@@ -43109,13 +43228,427 @@ export function createSystems(game) {
         { spd: 2.2, up: 1.6, grav: 9, drag: 0.6, life: 0.6, size: 0.16,
           rgb: golden ? [1.6, 1.35, 0.4] : [1.3, 1.1, 0.35] });
     }
-    yuzuAdd(def.worth, null, b && b.position.x, b && b.position.y + 0.3, b && b.position.z);
+    // GULL-PROOF (F4.3): rides on a golden yuzu specifically, on top of its
+    // own worth. See capy.gullProof's own doc comment (capybara.js) for why
+    // it is its own timer rather than another `capy.boon`.
+    if (dropTag === 'golden' && game.capy) game.capy.gullProof = sysGULL_PROOF_T;
+    // THE TWIN (F4.2): the second fruit, taken inside its 20 s window, gets
+    // a second flying number half a second behind the first — the
+    // roadmap's own "rising two-note flourish" — never boosted by THE KEEN
+    // EYE, whose own doc comment names the +4 as unchanged.
+    if (dropTag === 'twin' && typeof gp.dropWindowEnd === 'number' && game.state.time <= gp.dropWindowEnd) {
+      (function (bx, by, bz) {
+        setTimeout(function () { yuzuAdd(sysDROP_TWIN_BONUS, 'the pair.', bx, by, bz); }, 500);
+      })(b && b.position.x, b && b.position.y + 0.5, b && b.position.z);
+    }
+    // Said once, ever, for whichever of the five kinds turns up first —
+    // never the bath, which has its own pill on spawn (F4.4/F4.5).
+    if (dropTag && dropTag !== 'bath' && !dropFirstPillSaid) {
+      dropFirstPillSaid = true;
+      toast('yuzu turn up. the map has them.', 'note');
+    }
+    if (dropTag) dropTake(gp);
+    yuzuAdd(worth, null, b && b.position.x, b && b.position.y + 0.3, b && b.position.z);
     setTimeout(function () {
       if (gp.removed) return;
       if (game.capy && game.capy.heldProp === gp) game.capy.heldProp = null;
       if (game.physics && typeof game.physics.removeProp === 'function') game.physics.removeProp(gp);
     }, 0);
   });
+  // THINGS THAT TURN UP (L8, F4): the food/boon half of the same pool. These
+  // props carry no `worth` — physGrazeStep's bite-by-bite mechanic is what a
+  // hand-placed sandwich or empanada normally uses — so the listener above
+  // ignores them, and this one exists solely for a `dropBoon`-tagged
+  // instance. A chapter's own hand-placed food never carries the tag and
+  // keeps grazing exactly as it always has; the removal below runs well
+  // inside physGrazeStep's own 0.9 s settle, so a tagged instance is gone
+  // before grazing could ever take its first bite.
+  game.events.on('capy:grab', function (p) {
+    const gp = p && p.prop;
+    if (!gp || !gp.dropBoon) return;
+    if (game.capy) game.capy.boon = { id: gp.dropBoon, t: 75, fresh: true };
+    dropTake(gp);
+    setTimeout(function () {
+      if (gp.removed) return;
+      if (game.capy && game.capy.heldProp === gp) game.capy.heldProp = null;
+      if (game.physics && typeof game.physics.removeProp === 'function') game.physics.removeProp(gp);
+    }, 0);
+  });
+
+  // ===========================================================================
+  // THINGS THAT TURN UP (L8, F4) — the spawner. `sysDrops` (published as
+  // `game.drops`) is the pool: at most `capy.dropCap` live drops per BIOME,
+  // rolled from F1's own odds table, spawned through `game.physics.dropSpot`
+  // (props.js — the biome's own scatter ring, or a named zone for Sydney and
+  // Pasto, which have neither). Nothing here is saved — the whole pool is
+  // ephemeral, rerolled fresh on every arrival, per the roadmap's own note —
+  // except the bath's cooldown (`jrBathAt`, declared with the other save
+  // state above). See ROADMAP-LIFT8.md, F4.
+  // ===========================================================================
+  const sysDROP_ODDS = [['yuzu', 36], ['rolling', 20], ['golden', 17], ['food', 10], ['twin', 13], ['bath', 4]];
+  const sysDROP_TWIN_BONUS = 4;
+  // "Never the spawn ring" (the roadmap's own rule, F4.1) names a point this
+  // codebase has no single canonical object for — grepped: no `spawnRing`,
+  // no per-biome SPAWN constant read from outside its own chapter file. This
+  // pass takes it to mean the point the animal actually arrived at, THIS
+  // visit — captured the first tick a chapter reads as live — with a radius
+  // in the same family as `sysWHY_R`'s marquee exclusion.
+  const sysDROP_ARRIVE_R = 12;
+  const sysDROP_BATH_R = 1.5;        // m — the hop-in range
+  const sysDROP_BATH_COOL = 600000;  // ms (Date.now()) — 10 min, same chapter
+  const sysDROP_BATH_QUIET = 120;    // s of this VISIT before a bath may roll
+  const sysGULL_PROOF_T = 75;        // s — see capy.gullProof, capybara.js
+  // The chapter's own food, read off what `physBIOME_SCATTER` actually
+  // scatters there (props.js) rather than authored blind — kyoto's dango,
+  // cali's arepa and pasto's empanada are the roadmap's own three; the rest
+  // is whichever of the eleven edible rows that chapter's own table already
+  // serves. A chapter with none (measured: iceland, sahara, drift, venice,
+  // palawan, goreme, manly, cave, antarctic, monaco) gets the generic orange.
+  const sysDROP_FOOD = {
+    sydney: 'chips', quay: 'chips', kowloon: 'chips',
+    pasto: 'empanada', kyoto: 'dango', cali: 'arepa',
+    rio: 'icecream', pantanal: 'maiz', hanoi: 'phobowl',
+  };
+  function dropFoodType(biome) { return sysDROP_FOOD[biome] || 'orange'; }
+
+  let dropBiome = null;        // which biome's pool this state belongs to
+  const dropLive = [];         // [{prop, kind, x, z, despawnT, pairId?, used?, tailT?}]
+  let dropT = 0;               // s until the next spawn attempt
+  let dropArriveT = -1;        // s since THIS visit's pool went live
+  let dropArriveX = 0, dropArriveZ = 0;
+  let dropFirstPillSaid = false;
+  let dropPairSeq = 0;
+
+  /** A fresh pool for a newly-(re)entered biome — everything about the OLD
+   *  one is simply dropped; nothing here is saved. */
+  function dropReset(biome) {
+    dropBiome = biome;
+    dropLive.length = 0;
+    dropArriveT = 0;
+    const cp = game.capy && game.capy.position;
+    dropArriveX = cp ? cp.x : 0;
+    dropArriveZ = cp ? cp.z : 0;
+    dropT = rand(20, 40);   // the first drop, 20-40 s after arrival (F4.1)
+  }
+  /** THE QA DOOR (`qaReset`, above) and a fresh boot both want the pool gone
+   *  without waiting for the next tick's biome-change check. */
+  function dropForget() {
+    dropBiome = null;
+    // Actually REMOVE the live props, not just this file's own tracking of
+    // them — `dropLive.length = 0` alone would leak every currently-live
+    // prop into the world as an untracked, still-grabbable orphan (caught
+    // live by qa/l8-drops.js's own odds loop, which calls this dozens of
+    // times a second and measured Sydney filling up with stray chips).
+    for (let i = 0; i < dropLive.length; i++) {
+      const p = dropLive[i].prop;
+      if (p && !p.removed && game.physics && typeof game.physics.removeProp === 'function') game.physics.removeProp(p);
+    }
+    dropLive.length = 0;
+    dropT = 0;
+    dropFirstPillSaid = false;
+    game.state.qaForceDropKind = null;
+    if (Array.isArray(game.state.qaDropLog)) game.state.qaDropLog.length = 0;
+    for (const k in jrBathAt) delete jrBathAt[k];
+  }
+
+  /** Never inside `sysWHY_R` of the marquee point, never inside the arrival
+   *  ring (see `sysDROP_ARRIVE_R`'s own doc comment) — the roadmap's rule,
+   *  checked here because `game.physics.dropSpot` (props.js) has no idea
+   *  what a marquee or an arrival point is. */
+  function dropSpotFar(x, z) {
+    const mq = sysMarqueePoint();
+    if (mq) { const dx = x - mq.x, dz = z - mq.z; if (dx * dx + dz * dz < sysWHY_R * sysWHY_R) return false; }
+    const adx = x - dropArriveX, adz = z - dropArriveZ;
+    if (adx * adx + adz * adz < sysDROP_ARRIVE_R * sysDROP_ARRIVE_R) return false;
+    return true;
+  }
+  function dropFindSpot(radius) {
+    if (!game.physics || typeof game.physics.dropSpot !== 'function') return null;
+    for (let i = 0; i < 6; i++) {
+      const s = game.physics.dropSpot(dropBiome, radius);
+      if (s && dropSpotFar(s.x, s.z)) return s;
+    }
+    return null;
+  }
+  function dropSpawnAt(type, x, z) {
+    if (!game.physics || typeof game.physics.spawnProp !== 'function') return null;
+    return game.physics.spawnProp(type, x, z, undefined, rand(0, Math.PI * 2));
+  }
+
+  /** One roll, honouring both refusal rules (F4.1) — a refused bath or twin
+   *  is re-rolled to a plain yuzu, never simply skipped.
+   *  `game.state.qaForceDropKind` (qa/l8-drops.js): forces the NEXT roll to a
+   *  named kind, consumed on the one attempt — the refusal rules still run
+   *  against it, so a probe can prove a forced bath/twin is correctly turned
+   *  back into a yuzu, not just that the ordinary odds are roughly right. */
+  function dropRollKind(freeSlots) {
+    let kind;
+    const forced = game.state.qaForceDropKind;
+    if (typeof forced === 'string') {
+      kind = forced;
+      game.state.qaForceDropKind = null;
+    } else {
+      const r = rand(0, 100);
+      let acc = 0; kind = 'yuzu';
+      for (let i = 0; i < sysDROP_ODDS.length; i++) {
+        acc += sysDROP_ODDS[i][1];
+        if (r < acc) { kind = sysDROP_ODDS[i][0]; break; }
+      }
+    }
+    if (kind === 'bath') {
+      let bathLive = false;
+      for (let i = 0; i < dropLive.length; i++) if (dropLive[i].kind === 'bath') bathLive = true;
+      const last = jrBathAt[dropBiome];
+      const since = (typeof last === 'number') ? Date.now() - last : Infinity;
+      if (bathLive || since < sysDROP_BATH_COOL || dropArriveT < sysDROP_BATH_QUIET) kind = 'yuzu';
+    }
+    if (kind === 'twin' && freeSlots < 2) kind = 'yuzu';
+    return kind;
+  }
+
+  function dropSpawnFood() {
+    const spot = dropFindSpot(0.22);
+    if (!spot) return;
+    const type = dropFoodType(dropBiome);
+    const prop = dropSpawnAt(type, spot.x, spot.z);
+    if (!prop) return;
+    prop.dropKind = 'food';
+    // "the chapter's own food -> SECOND WIND; the generic orange -> QUICK"
+    // (F4.3) — `sysDROP_FOOD`'s own fallback IS the orange, so the type
+    // decides the boon with no separate table to keep in sync.
+    prop.dropBoon = (type === 'orange') ? 'quick' : 'second-wind';
+    dropLive.push({ prop: prop, kind: 'food', x: spot.x, z: spot.z, despawnT: 150 });
+  }
+
+  function dropSpawnTwin() {
+    const spot1 = dropFindSpot(0.24);
+    if (!spot1 || !game.physics || typeof game.physics.dropSpotNear !== 'function') return;
+    let spot2 = null;
+    for (let i = 0; i < 6; i++) {
+      const s = game.physics.dropSpotNear(spot1.x, spot1.z, 4, 8, 0.24);
+      if (s && dropSpotFar(s.x, s.z)) { spot2 = s; break; }
+    }
+    if (!spot2) return;
+    const p1 = dropSpawnAt('yuzu', spot1.x, spot1.z);
+    const p2 = p1 && dropSpawnAt('yuzu', spot2.x, spot2.z);
+    if (!p1 || !p2) {
+      if (p1 && game.physics && typeof game.physics.removeProp === 'function') game.physics.removeProp(p1);
+      return;
+    }
+    const pairId = 'twin' + (dropPairSeq++);
+    p1.dropKind = 'twin'; p1.dropWorth = 2; p1.dropPairId = pairId; p1.dropPairFirst = true;
+    p2.dropKind = 'twin'; p2.dropWorth = 2; p2.dropPairId = pairId; p2.dropPairFirst = false;
+    dropLive.push({ prop: p1, kind: 'twin', x: spot1.x, z: spot1.z, despawnT: 150, pairId: pairId });
+    dropLive.push({ prop: p2, kind: 'twin', x: spot2.x, z: spot2.z, despawnT: 150, pairId: pairId });
+  }
+
+  function dropSpawnBath() {
+    const spot = dropFindSpot(0.85);
+    if (!spot) return;
+    const prop = dropSpawnAt('yuzubath', spot.x, spot.z);
+    if (!prop) return;
+    prop.dropKind = 'bath';
+    jrBathAt[dropBiome] = Date.now();
+    saveSoon();
+    dropLive.push({ prop: prop, kind: 'bath', x: spot.x, z: spot.z, despawnT: 240, used: false, tailT: 0 });
+    // THE BATH'S OWN PILL (F4.4) — the one drop worth interrupting the paper
+    // for, said from wherever the animal is, every time one spawns (unlike
+    // the ordinary kinds' pill, said once ever).
+    toast('the yuzu bath, somewhere near.', 'note');
+  }
+
+  function dropAttemptSpawn() {
+    const cap = (game.capy && game.capy.dropCap) || 2;
+    const freeSlots = cap - dropLive.length;
+    if (freeSlots <= 0) return;
+    const kind = dropRollKind(freeSlots);
+    // qa/l8-drops.js's own odds instrument: every kind THIS timer actually
+    // decided on, win or lose the ground-point search after — a cumulative
+    // log a probe can read without having to poll fast enough to catch a
+    // 150 s-lived prop before something else claims its slot.
+    if (Array.isArray(game.state.qaDropLog)) {
+      game.state.qaDropLog.push(kind);
+      if (game.state.qaDropLog.length > 4000) game.state.qaDropLog.shift();
+    }
+    if (kind === 'bath') return dropSpawnBath();
+    if (kind === 'twin') return dropSpawnTwin();
+    if (kind === 'food') return dropSpawnFood();
+    const golden = kind === 'golden';
+    const radius = golden ? 0.28 : 0.22;
+    const spot = dropFindSpot(radius);
+    if (!spot) return;
+    const prop = dropSpawnAt(golden ? 'yuzugold' : 'yuzu', spot.x, spot.z);
+    if (!prop) return;
+    prop.dropKind = kind;
+    prop.dropWorth = kind === 'rolling' ? 3 : golden ? 5 : 1;
+    if (kind === 'rolling') {
+      prop.dropSpawnX = spot.x; prop.dropSpawnZ = spot.z;
+      prop.dropNudgeT = rand(2.5, 4);
+    }
+    dropLive.push({ prop: prop, kind: kind, x: spot.x, z: spot.z, despawnT: 150 });
+  }
+
+  /** Called from the pickup listeners once a drop-tagged prop is grabbed —
+   *  frees its pool slot and, for a twin's first fruit, arms the partner's
+   *  20 s bonus window (F4.2/F1.5). The despawn is a separate 30 s, not the
+   *  same 20: the roadmap's own prose describes taking the second AFTER its
+   *  window as a real, unpenalised case ("just a yuzu, never a scolding"),
+   *  and a despawn tied to the identical instant the window closes leaves
+   *  that case a same-frame race no player could ever actually reach. Ten
+   *  seconds of grace makes it a real state without meaningfully changing
+   *  "does not squat on a slot forever." */
+  function dropTake(prop) {
+    for (let i = dropLive.length - 1; i >= 0; i--) {
+      if (dropLive[i].prop === prop) { dropLive.splice(i, 1); break; }
+    }
+    if (prop.dropKind === 'twin' && prop.dropPairFirst && prop.dropPairId) {
+      for (let i = 0; i < dropLive.length; i++) {
+        const d = dropLive[i];
+        if (d.kind === 'twin' && d.prop && d.prop.dropPairId === prop.dropPairId) {
+          d.prop.dropWindowEnd = game.state.time + 20;
+          d.despawnT = 30;
+        }
+      }
+    }
+  }
+  function dropRemove(rec) {
+    if (game.physics && typeof game.physics.removeProp === 'function') game.physics.removeProp(rec.prop);
+  }
+
+  /** Once a frame, from `update()`, only while the chapter is actually live
+   *  — the `wxFrontT` pattern (weather.js). */
+  function sysDropsTick(dt) {
+    const biome = (game.biome && game.biome.current) || 'sydney';
+    if (biome !== dropBiome) dropReset(biome);
+    dropArriveT += dt;
+    for (let i = dropLive.length - 1; i >= 0; i--) {
+      const d = dropLive[i];
+      const p = d.prop;
+      if (!p || p.removed) { dropLive.splice(i, 1); continue; }
+      if (p.held) continue;   // being carried — no timer runs while held
+      if (d.kind === 'bath') {
+        if (!d.used) {
+          const cp = game.capy && game.capy.position;
+          const b = p.body;
+          if (cp && b && game.capy.grounded !== false && !game.capy.diving &&
+              !game.capy.climbing && !game.capy.carriedBy) {
+            const dx = cp.x - b.position.x, dz = cp.z - b.position.z;
+            if (dx * dx + dz * dz < sysDROP_BATH_R * sysDROP_BATH_R) {
+              // THE BATH'S RITUAL (F4.5) — SIMPLIFIED, and said so: the
+              // roadmap's full picture is a camera ease, thickening steam
+              // and a 2.6 s hold on `capy.loafAsk`/`carriedBy`, the
+              // Iceland spring's soak in miniature. That is a camera-rig
+              // change this pass's budget does not reach; what ships is
+              // the honest smaller version it explicitly allows for — an
+              // instant refill, one steam burst, a half swell, the pill,
+              // then the +25 — same beats, no hold, no camera move.
+              d.used = true;
+              if (game.capy) game.capy.boon = { id: 'bath', t: 0.05, fresh: true };
+              game.sparks(b.position.x, b.position.y + 0.5, b.position.z, 20,
+                { spd: 0.6, up: 1.3, grav: -0.3, drag: 0.35, life: 1.4, size: 0.2, rgb: [1.7, 1.7, 1.7] });
+              if (typeof musSwell === 'function') musSwell(0.5);
+              toast('the yuzu bath.', 'note');
+              yuzuAdd(25, null, b.position.x, b.position.y + 0.6, b.position.z);
+            }
+          }
+        }
+        if (!d.used) {
+          d.despawnT -= dt;
+          if (d.despawnT <= 0) { dropRemove(d); dropLive.splice(i, 1); }
+        } else {
+          // The tub stays as scenery for 30 s once used, then goes (F1.5) —
+          // still showing its six floating fruit rather than an "empty"
+          // variant: a second mesh for a thirty-second tail is not worth
+          // this pass's budget, said plainly rather than built halfway.
+          d.tailT += dt;
+          if (d.tailT > 30) { dropRemove(d); dropLive.splice(i, 1); }
+        }
+        continue;
+      }
+      if (d.kind === 'rolling' && p.body) {
+        p.dropNudgeT -= dt;
+        const b = p.body;
+        const dx = b.position.x - p.dropSpawnX, dz = b.position.z - p.dropSpawnZ;
+        const far2 = dx * dx + dz * dz;
+        // A HARD SAFETY NET, NOT JUST THE TIMER (measured live: a run of
+        // nudges that all happened to head the same general way, plus
+        // whatever a collision added on top, put one 20 m from its spawn in
+        // 11 s — the roadmap's own "a small chase, never a flee" reads as
+        // exactly the opposite from that far out). Past 4.5 m the very next
+        // frame re-aims home early, on top of the ordinary timer, so the
+        // tether is soft in FEEL (it never yanks the fruit back, it just
+        // asks sooner) but hard in the one number that actually matters.
+        if (p.dropNudgeT <= 0 || far2 > 20.25) {
+          p.dropNudgeT = rand(2.5, 4);
+          let hx, hz;
+          if (far2 > 9) {
+            // past its 3 m tether — the nudge points home instead (F4.1)
+            hx = -dx; hz = -dz;
+            const m = Math.hypot(hx, hz) || 1; hx /= m; hz /= m;
+          } else {
+            const a = rand(0, Math.PI * 2);
+            hx = Math.cos(a); hz = Math.sin(a);
+          }
+          const spd = rand(0.6, 1.0);
+          if (b.wakeUp) b.wakeUp();
+          b.velocity.x = hx * spd; b.velocity.z = hz * spd;
+          sfx('pop', { volume: 0.06, pitch: 1.4 });
+        }
+      }
+      d.despawnT -= dt;
+      if (d.despawnT <= 0) { dropRemove(d); dropLive.splice(i, 1); }
+    }
+    const cap = (game.capy && game.capy.dropCap) || 2;
+    if (dropLive.length < cap) {
+      // qaForceDropT (l8-drops.js): forces the refill period short so a
+      // probe can watch hundreds of spawns inside a real test's budget,
+      // following qaForceOwned/qaAddYuzu's own naming (F3/F6).
+      const forced = game.state.qaForceDropT;
+      if (typeof forced === 'number') dropT = Math.min(dropT, forced);
+      dropT -= dt;
+      if (dropT <= 0) {
+        dropAttemptSpawn();
+        dropT = (typeof forced === 'number') ? forced : rand(60, 120);
+      }
+    }
+  }
+  game.state.qaForceDropT = null;
+  game.state.qaForceDropKind = null;
+  game.state.qaDropLog = null;   // set to [] by a probe that wants the odds log
+  // A synchronous odds-sampling loop (qa/l8-drops.js) runs no real frames
+  // between rolls, so `dropArriveT` never climbs past whatever it was at the
+  // last reset — which correctly refuses every bath roll for "the first two
+  // minutes of the chapter" and would read as the bath's odds being zero
+  // rather than as the quiet-period rule doing its job. One door to skip
+  // past it on purpose, for a test that wants the ODDS, not the quiet rule.
+  game.state.qaSetDropArriveT = function (t) { dropArriveT = t; };
+  game.state.qaDrops = function () { return dropLive; };
+  // A direct spawn-now door, for a probe that wants ONE specific kind without
+  // waiting on `dropT` at all — sets the force, ticks the timer to fire this
+  // frame, and returns whichever record actually landed (or null on a
+  // legitimate refusal, e.g. no valid ground point).
+  game.state.qaSpawnDrop = function (kind) {
+    const before = dropLive.length;
+    game.state.qaForceDropKind = kind || null;
+    dropAttemptSpawn();
+    dropT = rand(60, 120);   // else the next natural tick fires a second spawn
+    return dropLive.length > before ? dropLive[dropLive.length - 1] : null;
+  };
+  // THE MAP OVERLAY (F4.4) and THE HINT ROW's own `where()` both read this —
+  // an array of plain {x, z, kind}, no static-table entry, exactly the
+  // roadmap's own shape for `game.drops.where()`.
+  game.drops = {
+    where: function () {
+      const out = [];
+      for (let i = 0; i < dropLive.length; i++) {
+        const d = dropLive[i];
+        if (!d.prop || d.prop.removed || d.prop.held) continue;
+        const b = d.prop.body;
+        out.push({ x: b ? b.position.x : d.x, z: b ? b.position.z : d.z, kind: d.kind });
+      }
+      return out;
+    },
+  };
 
   game.events.on('npc:startled', function (p) {
     // A gasp from behind you is one of the funniest things this game does and
@@ -44410,8 +44943,8 @@ export function createSystems(game) {
       if (owned.indexOf('puff2') >= 0) m.puffRegenSprint = upgradeDef('puff2').tiers[0].k;
       if (owned.indexOf('eye') >= 0) m.yuzuBonus = 1;
       // THE SPARE SEAT: not a mod, a separate published field — see its own
-      // doc comment on `capy.dropCap` in capybara.js. `sysDrops` (F4, not
-      // built yet) is the only reader.
+      // doc comment on `capy.dropCap` in capybara.js. `sysDrops` (F4) is the
+      // only reader.
       game.capy.dropCap = owned.indexOf('seat') >= 0 ? 3 : 2;
       // ---- THE HUD'S ONE EXCEPTION (L8, F3) --------------------------------
       // BOTTOMLESS PUFF earns the single deliberate new HUD element this
@@ -44423,6 +44956,13 @@ export function createSystems(game) {
         stamEl.classList.add('capyui-goldrim');
       }
     }
+
+    // ---- THINGS THAT TURN UP (L8, F4) --------------------------------------
+    // After the mods writer above, which is where `capy.dropCap` and
+    // `capy.mods.yuzuBonus` are set for THIS frame — sysDropsTick reads both.
+    // Gated the `wxFrontT` way (weather.js): a title card or a paused menu is
+    // not a chapter, and nothing should turn up while either is showing.
+    if (started && !game.state.paused) sysDropsTick(dt);
 
     // ---- put me back --------------------------------------------------------
     // Sampled every frame, acted on after sysBACK_HOLD of held R. backBusy is a

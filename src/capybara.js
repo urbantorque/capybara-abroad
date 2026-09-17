@@ -4322,6 +4322,18 @@ export function createCapybara(game) {
     // charges banked against the next chaos roll (F6/wave-2 chaos); nothing
     // reads it yet.
     item: null, boon: null, ward: 0,
+    // GULL-PROOF (L8, F4.3): seconds remaining, 0 when off. Rides on a golden
+    // yuzu specifically, on top of its own worth (systems.js's pickup
+    // listener sets it) — its OWN timer, deliberately not routed through
+    // `capy.boon`'s single slot, so picking up a golden mid-thermos does not
+    // silently cancel the thermos the way starting a second `capy.boon`
+    // would. Ticked down alongside `boon` in the stamina block below.
+    // HONESTLY LEFT OPEN: nothing in this tree yet makes a thief or a gull
+    // take a held prop away from the animal at all (grepped thief/steal/
+    // snatch/heldProp across every chapter before writing this) — so this is
+    // the read point for whichever wave actually builds that reaction, not a
+    // guard on a mechanic that exists today.
+    gullProof: 0,
     /**
      * THE POCKETED KIND'S SOFT CAP. Base bank size per id (3/5/3) plus 2 if
      * the peel pouch has been earned (F2.6, gift-only, not buyable) — the
@@ -5324,6 +5336,12 @@ export function createCapybara(game) {
     // Decided here, one block, before anything reads either number — which is
     // the whole implementation: soften the grip the glacier already taught this
     // file to respect, and let the rest of the frame do the work.
+    // QUICK (L8, F4.3, a food boon): × 1.2 on both thresholds, same as THE
+    // LONG SLIDE above it. Computed inline rather than read off the stamina
+    // block's own `capyBoonSlideMul` — that block runs LATER in this same
+    // frame (it needs `capyStamBlown`, decided further down), so a variable
+    // it owns is not safely readable yet up here.
+    const capySlideQuickK = (capy.boon && capy.boon.id === 'quick') ? 1.2 : 1;
     {
       // World speed, not deck-relative: platVX is not solved until further down
       // the frame, and a deck fast enough to matter here is a deck you are
@@ -5342,13 +5360,13 @@ export function createCapybara(game) {
         // different game.
         if (!canSlide || !input.slide || capySlideAir > capySLIDE_AIR ||
             // THE LONG SLIDE (L8, F3, id `slide`) multiplies both thresholds.
-            (capySlideT > capySLIDE_MINT && gsp < capySLIDE_OUT * capy.mods.slideMul)) {
+            (capySlideT > capySLIDE_MINT && gsp < capySLIDE_OUT * capy.mods.slideMul * capySlideQuickK)) {
           capySliding = false;
           capySlideCool = capySLIDE_COOL;
           capySlideAir = 0;
         }
       } else if (input.slide && canSlide && grounded && capySlideCool <= 0 &&
-                 gsp >= capySLIDE_MIN * capy.mods.slideMul) {
+                 gsp >= capySLIDE_MIN * capy.mods.slideMul * capySlideQuickK) {
         capySliding = true;
         capySlideT = 0;
         capySlideAir = 0;
@@ -5680,13 +5698,23 @@ export function createCapybara(game) {
     // so it does not matter which one fires. A `fresh` boon (started this
     // frame, see systems.js's T-key handler) gets its one-off instant effect
     // — only the thermos has one — and then reads exactly like an old boon
-    // for the rest of its run. F4's chapter-food pickups (not built yet) drop
-    // boons into this same `capy.boon` field and inherit this same tick.
+    // for the rest of its run. F4's chapter-food pickups drop boons into this
+    // same `capy.boon` field and inherit this same tick — `second-wind` was
+    // already aliased alongside `mango` below for exactly that day.
     let capyBoonDrainMul = 1, capyBoonRegenMul = 1, capyBoonDrainZero = false;
+    // QUICK's slide half is handled inline where the slide gate is decided,
+    // above — this file's own slide block runs earlier in the frame than
+    // this one does. Only the run-speed half is read from here.
+    let capyBoonRunMul = 1;
     if (capy.boon) {
       if (capy.boon.fresh) {
         capy.boon.fresh = false;
-        if (capy.boon.id === 'thermos') capyStam = 1;   // THE THERMOS: instant full
+        // THE THERMOS, and THE YUZU BATH (L8, F4.5) riding the same one-way
+        // trick — `capy.stamina` is a publish-only mirror of `capyStam`
+        // (see its own doc comment below), so a ritual pickup that wants an
+        // instant full refill has to go through this field, exactly the way
+        // the thermos does, rather than writing the mirror directly.
+        if (capy.boon.id === 'thermos' || capy.boon.id === 'bath') capyStam = 1;
       }
       capy.boon.t -= dt;
       if (capy.boon.t <= 0) {
@@ -5695,8 +5723,14 @@ export function createCapybara(game) {
         capyBoonDrainZero = true;                        // drain reads exactly ×0
       } else if (capy.boon.id === 'mango' || capy.boon.id === 'second-wind') {
         capyBoonRegenMul = 2.0; capyBoonDrainMul = 0.5;   // SECOND WIND shape
+      } else if (capy.boon.id === 'quick') {
+        capyBoonRunMul = 1.12;                            // QUICK (F4.3)
       }
+      // 'bath' itself multiplies nothing — it is spent the instant it starts.
     }
+    // GULL-PROOF (L8, F4.3): its own timer, independent of `capy.boon` — see
+    // its doc comment above where it is declared.
+    if (capy.gullProof > 0) { capy.gullProof -= dt; if (capy.gullProof < 0) capy.gullProof = 0; }
 
     if (capyDiving) {
       capyStamHold = capySTAM_DELAY;
@@ -6272,8 +6306,10 @@ export function createCapybara(game) {
     // itself along the surface, and that is most of the drag.
     let topSpeed = capyDiving ? capyDIVE_SPEED
                  // LONG LEGS (L8, F3, id `legs`) multiplies the run constant only —
-                 // the walk speed and the swim/dive speeds are untouched.
-                 : capySwimming ? capySWIM_SPEED : (running ? capyRUN * capy.mods.runMul : capyWALK);
+                 // the walk speed and the swim/dive speeds are untouched. QUICK
+                 // (L8, F4.3) stacks on top of it the plain way, same as every
+                 // other boon-on-mod pairing in this file.
+                 : capySwimming ? capySWIM_SPEED : (running ? capyRUN * capy.mods.runMul * capyBoonRunMul : capyWALK);
     // Blown is not just "no sprint": the walk itself goes heavy for a beat, which
     // is what makes the recovery readable without a single word of UI.
     if (capyStamBlown && !capySwimming) topSpeed *= capySTAM_TIRED;
