@@ -27733,6 +27733,8 @@ export function createSystems(game) {
     pasto: 'she is over the plaza — be under her when she comes down',
     cali: 'the ladder is on the back; she goes when you are on the roof',
     palawan: 'she laps the drop-off — under, and wait for her',
+    hanoi: 'the cub is outside the stall with the bowls on — take it before they go cold',
+    iceland: 'the spring is right here — sit in it long enough and the sky comes up',
   };
   let sysWhyAt = -1e9, sysWhyTxt = '', sysWhyEl = null;
   function marqueeWhy(text) {
