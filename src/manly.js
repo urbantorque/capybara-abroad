@@ -1183,6 +1183,13 @@ function manBuild(game) {
                 'the-surfboat': ['In the boat. With the crew. Forty minutes from Wynyard.'] } });
   }
 
+  // THE MUSICIAN (L7, F2): between two Norfolk pines, off the trunk line so
+  // no collision box sits under him — a busker on the Corso is the most
+  // ordinary thing this beach has.
+  manLocals.musician = game.addLocal({ biome: 'manly', x: -33.6, y: manPROM_Y,
+    z: manPINE_Z + 2.6, near: 8, face: 1.2,
+    beat: { kind: 'work', every: 4.2, dur: 0.9, sfx: 'chime', volume: 0.10 } });
+
   // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ---------------
   // See THE HIDE in systems.js. Still inside one of these and the lifeguard
   // walks to where you were and gives up. Every spot is beside a thing the
@@ -4001,6 +4008,7 @@ function manTask(game, id) { game.completeTask(id); }
  * gets the groper — each of them the thing they were standing in front of.
  */
 const manLocals = {};
+let manTuneMv = null;
 // Additive, not destructive (M3). This was `r.lines = lines`, which deleted six
 // of this chapter's nine locals' authored pools — including every `{ after: }`
 // payoff — the first time a set piece fired, permanently. See the long note on
@@ -4890,6 +4898,13 @@ export function createManly(game) {
       manUpdateFlags(game, dt);
       manUpdateCone(game, dt);
       manUpdateSurfTasks(game, dt);
+      // THE MUSICIAN (L7, F2): the mallet, on the Corso.
+      if (!manTuneMv && typeof game.sfxMover === 'function') {
+        manTuneMv = game.sfxMover('tune', { key: 'manly:musician', biome: 'manly' });
+      }
+      if (manTuneMv && manLocals.musician) {
+        manTuneMv.at(manLocals.musician.x, manLocals.musician.y + 1.0, manLocals.musician.z);
+      }
     },
   };
   game.manly = api;

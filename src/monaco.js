@@ -476,6 +476,7 @@ let monWatchPh = null;
 // people
 let monLocDoor = null, monLocQuay = null;
 let monLocDeck = null, monLocCroup = null, monLocMarshal = null, monLocBar = null;
+let monLocMusician = null, monTuneMv = null;
 
 // the chapter's own bookkeeping
 let monArrived = false;
@@ -4832,6 +4833,14 @@ function monBuildLocals(game) {
     onTask: { 'the-wheel': ['That is not what it is for.'] },
   }, monFLOOR_Y);
 
+  // THE MUSICIAN (L7, F2): a lounge guitarist on the Cafe de Paris terrace,
+  // past the last row of tables — staff, like the doorman and the croupier,
+  // not a busker somebody would move on in this square.
+  monLocMusician = put(132, 43, {
+    figure: { shirt: PALETTE.monShirt, legs: PALETTE.monTux }, face: Math.PI, near: 8,
+    beat: { kind: 'work', every: 4.2, dur: 0.9, sfx: 'strum', volume: 0.10 },
+  });
+
   // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ---------------
   // See THE HIDE in systems.js. Still inside one of these and the doorman
   // walks to where you were and gives up. Outside only — the room has its
@@ -5519,6 +5528,13 @@ export function createMonaco(game) {
       monUpdateWatchers(dt);
       monUpdateTasks(game, dt);
       monUpdateAmbience(game, dt);
+      // THE MUSICIAN (L7, F2): the twang, on the terrace.
+      if (!monTuneMv && typeof game.sfxMover === 'function') {
+        monTuneMv = game.sfxMover('tune', { key: 'monaco:musician', biome: 'monaco' });
+      }
+      if (monTuneMv && monLocMusician) {
+        monTuneMv.at(monLocMusician.x, monLocMusician.y + 1.0, monLocMusician.z);
+      }
     },
   };
   game.monaco = api;

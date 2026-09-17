@@ -205,6 +205,7 @@ const quayCol = new THREE.Color();
 
 // ---------------------------------------------------------------- module ----
 let quayGame = null;
+let quayLocBusker = null, quayTuneMv = null;
 let quayBuilt = false;
 let quayRoot = null;
 let quayTime = 0;
@@ -5986,7 +5987,7 @@ function quayBuild(game) {
     // whole lesson of the Kyoto miller (see THE LOCALS in npc.js).
 
     // the busker under the arcade, who is the reason the concourse has a sound
-    game.addLocal({ biome: 'quay', x: 34, y: 0.20, z: quayAPRON_Z1 - 3.4, near: 7, face: -0.4,
+    quayLocBusker = game.addLocal({ biome: 'quay', x: 34, y: 0.20, z: quayAPRON_Z1 - 3.4, near: 7, face: -0.4,
       figure: { shirt: PALETTE.cloth7, hat: PALETTE.hair1 },
       // the busker, and he never stops
       beat: { kind: 'work', every: 4.2, dur: 0.9, sfx: 'strum', volume: 0.13 },
@@ -6464,6 +6465,14 @@ export function createQuay(game) {
       quayHelmWorld(api.boat.helm);
       // the sun path follows the camera so it always lies between eye and sun
       quayUpdateGlitter(game);
+      // THE MUSICIAN (L7, F2): the arcade busker already stood there — just
+      // the tune, on his own mallet voice.
+      if (!quayTuneMv && typeof game.sfxMover === 'function') {
+        quayTuneMv = game.sfxMover('tune', { key: 'quay:musician', biome: 'quay' });
+      }
+      if (quayTuneMv && quayLocBusker) {
+        quayTuneMv.at(quayLocBusker.x, quayLocBusker.y + 1.0, quayLocBusker.z);
+      }
     },
   };
   // MERGE, DO NOT REPLACE. npc.js runs before this module and publishes its own

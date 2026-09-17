@@ -20,6 +20,7 @@ import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, swayMesh } from 
 
 let pastoBuilt = false;
 let pastoRoot = null;
+let pastoLocMusician = null, pastoTuneMv = null;
 let pastoApi = null;
 let pastoGame = null;
 
@@ -3337,6 +3338,13 @@ export function createPasto(game) {
       pastoUpdateTalc(game, dt);
       pastoUpdateSwifts(game, dt);
       pastoUpdateVoices(game, dt);
+      // THE MUSICIAN (L7, F2): the quena, in the plaza.
+      if (!pastoTuneMv && typeof game.sfxMover === 'function') {
+        pastoTuneMv = game.sfxMover('tune', { key: 'pasto:musician', biome: 'pasto' });
+      }
+      if (pastoTuneMv && pastoLocMusician) {
+        pastoTuneMv.at(pastoLocMusician.x, pastoLocMusician.y + 1.0, pastoLocMusician.z);
+      }
     },
   };
   game.pasto = api;
@@ -3385,6 +3393,17 @@ function pastoBuild(game) {
     game.addHide({ biome: 'pasto', x: pastoSTALL_SPEC[8].x, z: pastoSTALL_SPEC[8].z + 0.8 + 1.2, r: 1.8, kind: 'behind the stall' });
     game.addHide({ biome: 'pasto', x: pastoSTR_X0 + pastoHOUSE_W[0] * 0.5, z: pastoSTR_NF - 1.0, r: 1.6, kind: 'the doorway' });
     game.addHide({ biome: 'pasto', x: pastoCOF_X0 + 2.5 + 4 * 3.6, z: pastoCOF_Z0 + 1.6 + 1 * 2.4, r: 2.6, kind: 'the coffee bushes' });
+  }
+
+  // THE MUSICIAN (L7, F2): a quena player in the gap the north stalls
+  // deliberately leave clear, between the fountain and the church steps —
+  // the one chapter-local figure in a file whose people otherwise live in
+  // npc.js's own roster (see the comment above), because addLocal is the
+  // shared mechanism every other chapter with a musician already used.
+  if (typeof game.addLocal === 'function') {
+    pastoLocMusician = game.addLocal({ biome: 'pasto', x: 4, y: pastoHeight(4, 33), z: 33,
+      near: 8, face: -2.4,
+      beat: { kind: 'reach', every: 5.0, dur: 1.3, sfx: 'whistle', volume: 0.09, pitch: 0.75 } });
   }
 
   pastoApi = {
