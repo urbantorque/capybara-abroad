@@ -63,6 +63,10 @@ const ASSERTS = [
   // THE VOCABULARY OF A PLACE (L7, E2): generic voices played half an octave
   // off their recipe, counted; a ratchet, so the number cannot go back up.
   ['qa/l7-voices.mjs',      'generic sfx voices transposed half an octave: the count does not rise'],
+  // THE ANIMAL GETS BETTER (L8, F3): every sysUPGRADES id read somewhere, the
+  // everyday six sum to 730, the three capstones add 1020, the hop apex's own
+  // two constants never multiplied by a mod.
+  ['qa/l8-catalogue.mjs',   'sysUPGRADES: ids read, the everyday/capstone sums, the apex untouched'],
   ['build.mjs',           'the one-file build: wraps, splices, no collisions, writes dist/'],
 ];
 const REPORTS = [

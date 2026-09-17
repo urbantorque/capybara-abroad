@@ -1982,6 +1982,22 @@ const capySTAM_TIRED   = 0.90;      // walk speed multiplier while blown
 let capyStam = 1;                   // 0..1
 let capyStamBlown = false;          // out of puff: walk only, no hops
 let capyStamHold = 0;               // s left of the regen delay
+// ---- THE ANIMAL GETS BETTER / THE POCKETED KIND (L8, F3 + F6) -------------
+// A bought thing multiplies one of the constants above; a pocketed one
+// starts a `capy.boon` that ALSO multiplies them, layered underneath. Both
+// paths land here so a stacked stamina frame is one small block, not three.
+// The two caps below are the roadmap's own rule ("capped at the F3 tier
+// caps ×1.5") applied only while a BOON is actively stacking on top of a
+// bought multiplier — the bought multipliers alone are never touched by
+// these (puff2+lungs' own 0.50 floor and wind2+lungs' own 1.9 ceiling are
+// already exactly what their own numbers produce with no boon running).
+const capyDRAIN_MOD_FLOOR = 0.75;   // 0.50 (puff III + lungs) * 1.5
+const capyREGEN_MOD_CAP   = 2.85;   // 1.9  (wind II + lungs)  * 1.5
+// Base per-id banks for the three consumables (F6) — the bag's own prices
+// and names live in systems.js's `sysCONSUM`; these are the hard numbers
+// `capy.itemCap` answers from, read by the shop as a soft purchase ceiling.
+// THE PEEL POUCH (F2.6, not built yet) raises each by 2 — see `itemCap`.
+const capyITEM_CAP_BASE = { thermos: 3, mango: 5, feather: 3 };
 
 // ===========================================================================
 // WHAT THE PLACES TAUGHT YOU — nine skills, and they TRAVEL.
@@ -2593,7 +2609,11 @@ function capyAirCtl(game) {
   if (api && typeof api.airControl === 'number' && api.airControl === api.airControl) {
     return clamp(api.airControl, 0, 1);
   }
-  return capyAIR_CONTROL;
+  // SURE FEET (L8, F3, id `feet`) widens the DEFAULT envelope only — a
+  // chapter that has already asked for more (above) knows exactly what it
+  // wants and this does not second-guess it.
+  const m = game && game.capy && game.capy.mods ? game.capy.mods.airMul : 1;
+  return capyAIR_CONTROL * m;
 }
 
 /**
@@ -4267,6 +4287,52 @@ export function createCapybara(game) {
                                      // for the loaf where the rest test cannot
                                      // reach — a hot spring. Cleared every frame.
 
+    // =========================================================================
+    // THE ANIMAL GETS BETTER (L8, F3) — bought multipliers, WRITTEN EVERY FRAME
+    // by systems.js from `owned` + tier, the exact way capySkill is written
+    // from taskRec (see systems.js's per-frame writer, next to the skills
+    // block). Read at the same lines the skills are: stamina above, run speed,
+    // the slide and the hop's grace/coyote below. Every key defaults to the
+    // neutral value (1 for a multiplier, 0 for an additive bonus) so nothing
+    // here ever needs to null-check it, restore or no restore.
+    mods: {
+      drainMul: 1, regenMul: 1, runMul: 1, slideMul: 1, breathMul: 1,
+      coyoteMul: 1, graceMul: 1, airMul: 1,
+      puffRegenSprint: 0,  // BOTTOMLESS PUFF (capstone `puff2`): 0 normally,
+                           // 0.15 when owned — see the stamina block's use.
+      yuzuBonus: 0,        // THE KEEN EYE (capstone `eye`): 0 normally, +1
+                           // when owned. Nothing in this file reads it — F4's
+                           // ground drops (not built yet) will, at pickup.
+      pouch: false,        // the peel pouch owned (F2.6, not built yet) —
+                           // read by `itemCap` below, nowhere else.
+    },
+    // THE SPARE SEAT (capstone `seat`): 2 normally, 3 when owned. Nothing in
+    // this file reads it — F4's `sysDrops` (not built yet) is the reader.
+    // Written every frame by the same systems.js writer as `mods`.
+    dropCap: 2,
+    // THE POCKETED KIND (L8, F6). `item` is `{id, n}` or null — the equipped
+    // consumable, n mirrors `inv[id]`; systems.js owns switching it (the
+    // bag's shop UI) and equips/dims the HUD slot off it. `boon` is a single
+    // RUNNING TIMED EFFECT, `{id, t, fresh}` or null — `fresh` is a one-frame
+    // flag the starter sets so this file can apply an instant one-off (the
+    // thermos's full refill) exactly once, in the stamina block above.
+    // STARTING A NEW BOON ALWAYS REPLACES THE OLD ONE, NEVER STACKS — F4's
+    // chapter-food pickups (not built yet) write this SAME field and must
+    // cooperate with that rule too. `ward` counts un-spent LUCKY FEATHER
+    // charges banked against the next chaos roll (F6/wave-2 chaos); nothing
+    // reads it yet.
+    item: null, boon: null, ward: 0,
+    /**
+     * THE POCKETED KIND'S SOFT CAP. Base bank size per id (3/5/3) plus 2 if
+     * the peel pouch has been earned (F2.6, gift-only, not buyable) — the
+     * bag (F2, not built yet) refuses a purchase past this. An unknown id
+     * returns 0 rather than throwing, so a stray id never reads as "no cap".
+     */
+    itemCap(id) {
+      const base = capyITEM_CAP_BASE[id];
+      return base === undefined ? 0 : base + (this.mods.pouch ? 2 : 0);
+    },
+
     // The velocity of the FRAME the animal is currently solving in — a deck, the
     // air, a river. Published because "is the world moving under me, and how
     // fast" is the single most useful thing to be able to read back when a
@@ -5275,13 +5341,14 @@ export function createCapybara(game) {
         // could be held at a standstill is a crouch, and a crouch is a
         // different game.
         if (!canSlide || !input.slide || capySlideAir > capySLIDE_AIR ||
-            (capySlideT > capySLIDE_MINT && gsp < capySLIDE_OUT)) {
+            // THE LONG SLIDE (L8, F3, id `slide`) multiplies both thresholds.
+            (capySlideT > capySLIDE_MINT && gsp < capySLIDE_OUT * capy.mods.slideMul)) {
           capySliding = false;
           capySlideCool = capySLIDE_COOL;
           capySlideAir = 0;
         }
       } else if (input.slide && canSlide && grounded && capySlideCool <= 0 &&
-                 gsp >= capySLIDE_MIN) {
+                 gsp >= capySLIDE_MIN * capy.mods.slideMul) {
         capySliding = true;
         capySlideT = 0;
         capySlideAir = 0;
@@ -5607,13 +5674,40 @@ export function createCapybara(game) {
     // right thing, and a second one would be a second thing to learn.
     const stamFree = (capySwimming && !capyDiving) || !!capy.carriedBy || !!capy.atHelm;
     const stamWantRun = !!input.run && stamMag2 > 0.01 && !stamFree;
+
+    // ---- THE POCKETED KIND (L8, F6): one running timed effect --------------
+    // Ticked here, once per frame, before any of the branches below read it,
+    // so it does not matter which one fires. A `fresh` boon (started this
+    // frame, see systems.js's T-key handler) gets its one-off instant effect
+    // — only the thermos has one — and then reads exactly like an old boon
+    // for the rest of its run. F4's chapter-food pickups (not built yet) drop
+    // boons into this same `capy.boon` field and inherit this same tick.
+    let capyBoonDrainMul = 1, capyBoonRegenMul = 1, capyBoonDrainZero = false;
+    if (capy.boon) {
+      if (capy.boon.fresh) {
+        capy.boon.fresh = false;
+        if (capy.boon.id === 'thermos') capyStam = 1;   // THE THERMOS: instant full
+      }
+      capy.boon.t -= dt;
+      if (capy.boon.t <= 0) {
+        capy.boon = null;
+      } else if (capy.boon.id === 'thermos') {
+        capyBoonDrainZero = true;                        // drain reads exactly ×0
+      } else if (capy.boon.id === 'mango' || capy.boon.id === 'second-wind') {
+        capyBoonRegenMul = 2.0; capyBoonDrainMul = 0.5;   // SECOND WIND shape
+      }
+    }
+
     if (capyDiving) {
       capyStamHold = capySTAM_DELAY;
-      // ...and the snorkel is a longer breath (L3-7): a third more, worn
-      capyStam -= capySTAM_BREATH * (capyWorn === 'snorkel' ? 0.75 : 1) * dt;
+      // ...and the snorkel is a longer breath (L3-7): a third more, worn —
+      // and DEEP BREATH (L8, F3, id `breath`) multiplies the same constant.
+      capyStam -= capySTAM_BREATH * (capyWorn === 'snorkel' ? 0.75 : 1) * capy.mods.breathMul * dt;
     } else if (stamFree) {
       capyStamHold = 0;
-      capyStam += capySTAM_REGEN * dt;
+      let regenK = capy.mods.regenMul;
+      if (capyBoonRegenMul !== 1) regenK = Math.min(regenK * capyBoonRegenMul, capyREGEN_MOD_CAP);
+      capyStam += capySTAM_REGEN * regenK * dt;
       if (capyStam > 1) capyStam = 1;
     } else if (stamWantRun && !capyStamBlown) {
       capyStamHold = capySTAM_DELAY;
@@ -5625,12 +5719,32 @@ export function createCapybara(game) {
       // half the wait before any of it comes back. It changes no distance, no
       // speed and no reach — only how long you may keep going, which is the
       // one thing a mountain can actually teach a body.
-      capyStam -= capySTAM_DRAIN * (capySkill.lungs ? 0.71 : 1) * dt;
+      // ...and MORE PUFF (L8, F3, id `puff`) multiplies the same drain, three
+      // tiers deep, stacking with lungs the plain way (0.70 * 0.71 = 0.497,
+      // the roadmap's own stated "floor is 0.50"). THE THERMOS overrides this
+      // to nothing at all while it runs, ahead of any of these multipliers.
+      if (!capyBoonDrainZero) {
+        let drainK = capy.mods.drainMul * (capySkill.lungs ? 0.71 : 1);
+        if (capyBoonDrainMul !== 1) drainK = Math.max(drainK * capyBoonDrainMul, capyDRAIN_MOD_FLOOR);
+        capyStam -= capySTAM_DRAIN * drainK * dt;
+      }
+      // BOTTOMLESS PUFF (L8, F3 capstone `puff2`): the one everyday-drain
+      // branch that also gains a trickle of regen instead of none at all —
+      // see capy.mods.puffRegenSprint's own doc comment where it is declared.
+      if (capy.mods.puffRegenSprint > 0) {
+        capyStam += capySTAM_REGEN * capy.mods.regenMul * (capySkill.lungs ? 1.45 : 1) *
+                    capy.mods.puffRegenSprint * dt;
+      }
     } else if (capyStamHold > 0) {
       capyStamHold -= dt * (capySkill.lungs ? 2.0 : 1);
     } else if (capyStam < 1) {
-      capyStam += capySTAM_REGEN * (capySkill.lungs ? 1.45 : 1) *
-                  (stamMag2 > 0.01 ? capySTAM_REGEN_M : 1) * dt;
+      // ...and SECOND WIND (L8, F3, id `wind`) multiplies the same regen,
+      // stacking with lungs the plain way (1.30 * 1.45 = 1.885, the
+      // roadmap's own stated "ceiling 1.9").
+      let regenK = capy.mods.regenMul * (capySkill.lungs ? 1.45 : 1) *
+                   (stamMag2 > 0.01 ? capySTAM_REGEN_M : 1);
+      if (capyBoonRegenMul !== 1) regenK = Math.min(regenK * capyBoonRegenMul, capyREGEN_MOD_CAP);
+      capyStam += capySTAM_REGEN * regenK * dt;
       if (capyStam > 1) capyStam = 1;
     }
     if (capyStam <= 0) {
@@ -5691,16 +5805,18 @@ export function createCapybara(game) {
       capyClingCool = capyCLIMB_COOL;
       capyStam -= capySTAM_HOP; if (capyStam < 0) capyStam = 0;
       capyStamHold = capySTAM_DELAY;
-      capyJumpT = capyJUMP_GRACE;
+      // SURE FEET (L8, F3, id `feet`) multiplies both — see the doc comment
+      // at capySkill's block for why this never touches the hop apex itself.
+      capyJumpT = capyJUMP_GRACE * capy.mods.graceMul;
       capyJumpCool = capyJUMP_COOL;
-      capyAirTime = capyCOYOTE;
+      capyAirTime = capyCOYOTE * capy.mods.coyoteMul;
       capyPop = capyPop < 0.34 ? 0.34 : capyPop;
       capyPopVel = 5;
       capySfxOpts.volume = 0.75; capySfxOpts.pitch = 1.2;
       game.sfx('pop', capySfxOpts);
     }
     const canHop = !capy.carriedBy && !capyClinging && capyJumpCool <= 0 && stamCanHop &&
-                   (capySwimming || grounded || capyAirTime < capyCOYOTE);
+                   (capySwimming || grounded || capyAirTime < capyCOYOTE * capy.mods.coyoteMul);
     // THE PRESS IS NEVER LOST (see capyBUF_WINDOW). The edge is one frame long;
     // the buffer keeps it alive for as long as the coyote window keeps the
     // ledge alive, so a hop asked for just before the feet arrive is a hop.
@@ -5842,7 +5958,10 @@ export function createCapybara(game) {
         if (capyStam < 0) capyStam = 0;
         capyStamHold = capySTAM_DELAY;
       }
-      capyJumpT = capyJUMP_GRACE;
+      // SURE FEET (L8, F3, id `feet`): capyJUMP_GRACE and capyCOYOTE below
+      // are the two it multiplies; capyJUMP_HOLD (the actual apex sustain,
+      // just below) is untouched — see the hop-apex note above capySkill.
+      capyJumpT = capyJUMP_GRACE * capy.mods.graceMul;
       // The sustain window runs from the IMPULSE, exactly as it always did, so
       // a held key gives the 1.37 m apex to the centimetre. A key let go
       // during the arm is remembered as a CREDIT — the frames it was held —
@@ -5859,7 +5978,7 @@ export function createCapybara(game) {
       // chapters and it is not about to start meaning something else.
       if (capyDiving) { capyDiving = false; capyDiveGrace = 0; capy.diving = false; }
       capyJumpArm = !capySwimming;
-      capyAirTime = capyCOYOTE;          // the coyote window is spent, not doubled
+      capyAirTime = capyCOYOTE * capy.mods.coyoteMul; // the coyote window is spent, not doubled
       grounded = false;
       // ...AND NOW THERE IS A CROUCH TO STRETCH OUT OF (D2). The comment on
       // this line said "stretch out of the crouch" for eighteen chapters and
@@ -6152,7 +6271,9 @@ export function createCapybara(game) {
     // design decision — a body entirely in the water stops dragging half of
     // itself along the surface, and that is most of the drag.
     let topSpeed = capyDiving ? capyDIVE_SPEED
-                 : capySwimming ? capySWIM_SPEED : (running ? capyRUN : capyWALK);
+                 // LONG LEGS (L8, F3, id `legs`) multiplies the run constant only —
+                 // the walk speed and the swim/dive speeds are untouched.
+                 : capySwimming ? capySWIM_SPEED : (running ? capyRUN * capy.mods.runMul : capyWALK);
     // Blown is not just "no sprint": the walk itself goes heavy for a beat, which
     // is what makes the recovery readable without a single word of UI.
     if (capyStamBlown && !capySwimming) topSpeed *= capySTAM_TIRED;

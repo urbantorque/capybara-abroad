@@ -4110,6 +4110,15 @@ const sysSAVE_SHAPE = {
   stow: 'object', // the companion, { kind, from } (L6, F1); null when alone
   ms: 'number', biome: 'string',
   yuzu: 'number', platedAt: 'object', // THE YUZU (L8, F1)
+  // THE ANIMAL GETS BETTER (L8, F3) + THE POCKETED KIND (L8, F6). `owned` is
+  // shared with the bag (F2, wave 1) and wear (F5, wave 2) — it will hold
+  // upgrade ids, wear ids and 'peel-pouch' before this pass is over; the
+  // restore below allowlists it against `sysUPGRADES` only, which is fine —
+  // an id neither this pass nor a later one recognises is simply ignored,
+  // never written into a keyed table (the `seen`-validation rule).
+  owned: 'array',
+  inv: 'object',   // {thermos:n, mango:n, feather:n}, each clamped 0-20
+  item: 'string',  // the equipped consumable id, or absent/null
 };
 const sysSAVE_DEBOUNCE = 700;      // ms — a streak of ticks writes once
 // ---- THE TWO WAYS STORAGE LETS A PLAYER DOWN, BOTH SILENT UNTIL R3 ---------
@@ -9215,7 +9224,7 @@ function sysBuildCSS() {
    off the window and a row of counters is paper. */
 '#hud.bare .capyui-pips,#hud.bare .capyui-stamlbl,',
 '#hud.bare .capyui-fly,#hud.bare .capyui-perf,#hud.bare .capyui-home,',
-'#hud.bare .capyui-wallet{',
+'#hud.bare .capyui-wallet,#hud.bare .capyui-item{',
   'opacity:0 !important;pointer-events:none !important;}',
 /* the on-screen stick is display-driven and its children opt back into the
    pointer themselves, so it goes out of the layout rather than to zero alpha */
@@ -9312,7 +9321,7 @@ function sysBuildCSS() {
    The pool is where it belongs — a bubble is the world talking and the paper
    is the game talking, and the game is on top of the glass. */
 '.capyui-todo,.capyui-map,.capyui-toasts,.capyui-stam,.capyui-stamlbl,.capyui-pips,.capyui-fly,',
-  '.capyui-home,.capyui-moment,.capyui-touch,.capyui-wallet{z-index:40;}',
+  '.capyui-home,.capyui-moment,.capyui-touch,.capyui-wallet,.capyui-item{z-index:40;}',
 /* ---------- THE YUZU (L8, F1): the wallet ----------
    A sibling of the paper, not a child (see the DOM comment) — positioned
    under the card's own top edge so it reads as "one instrument, two rows"
@@ -9331,6 +9340,28 @@ function sysBuildCSS() {
 '.capyui-wallet.bump{animation:capyui-walletbump 260ms ' + mSpring + ';}',
 '@keyframes capyui-walletbump{0%{transform:rotate(-1deg) scale(1);}',
   '40%{transform:rotate(-1deg) scale(1.22);}100%{transform:rotate(-1deg) scale(1);}}',
+/* ---------- THE POCKETED KIND (L8, F6): the equipped-item slot ----------
+   Same row as the wallet, same pill — `left`/`top` are both set live by
+   yuzuWalletReposition() right after it places the wallet, reading the
+   wallet's own rendered width so the two never overlap regardless of how
+   many digits "47 yuzu" is this session (measured collision class, see
+   wave 0's own note on the wallet vs. the paper). +1deg rather than the
+   wallet's -1deg: two pills leaning the same way read as one stretched one. */
+'.capyui-item{position:absolute;left:120px;top:46px;display:flex;align-items:center;gap:6px;',
+  'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:999px;',
+  'padding:5px 12px 5px 8px;font-size:' + tXs + ';font-weight:700;color:' + ink + ';',
+  'box-shadow:' + shMd + ';transform:rotate(1deg);cursor:pointer;opacity:1;',
+  'transition:transform ' + dFast + ' ' + mSpring + ',opacity ' + dMed + ' ease;}',
+'.capyui-item:hover{transform:rotate(1deg) scale(1.04);}',
+'.capyui-item-dot{width:9px;height:9px;border-radius:50%;flex:none;',
+  'background:' + sysRgba(PALETTE.yuzuGold, 0.9) + ';}',
+/* dim = nothing equipped, OR equipped but the bank reads zero — the roadmap's
+   own rule is that the dimmed icon is the only feedback a spent-out press gets */
+'.capyui-item-empty,.capyui-item-dim{opacity:0.42;}',
+'.capyui-item-empty .capyui-item-dot{background:' + sysRgba(PALETTE.ibisHead, 0.35) + ';}',
+'.capyui-item.flash{animation:capyui-itemflash 260ms ' + mSpring + ';}',
+'@keyframes capyui-itemflash{0%{transform:rotate(1deg) scale(1);}',
+  '40%{transform:rotate(1deg) scale(1.22);}100%{transform:rotate(1deg) scale(1);}}',
 /* ---------- and the pickup's own flight to it ---------- */
 '.capyui-yzfly{position:fixed;left:0;top:0;z-index:55;pointer-events:none;',
   'font-size:clamp(12px,2vw,15px);font-weight:700;color:#caa428;',
@@ -10373,6 +10404,14 @@ function sysBuildCSS() {
 '.capyui-stam.blown{background:transparent;',
   'box-shadow:inset 0 0 0 1.5px ' + accent + ',' + shMd + ';animation:none;}',
 '.capyui-stam.blown i{background:transparent;}',
+/* ---- BOTTOMLESS PUFF (L8, F3 capstone `puff2`): the one deliberate new
+   HUD element this pass allows — see sysUpgradeTick's own doc comment on
+   why. A thin permanent gold rim, the same hue as the currency it cost
+   (PALETTE.yuzuGold): bought once, worn forever, and never removed. Sits
+   UNDER `.blown`'s own ring (that one still needs to read "empty" first). */
+'.capyui-stam.capyui-goldrim{box-shadow:inset 0 0 0 1.5px ' + sysRgba(PALETTE.yuzuGold, 0.85) + ',' + shMd + ';}',
+'.capyui-stam.capyui-goldrim.blown{box-shadow:inset 0 0 0 1.5px ' + accent +
+  ',inset 0 0 0 3px ' + sysRgba(PALETTE.yuzuGold, 0.85) + ',' + shMd + ';}',
 /* the word beside the bar (V2): to its right, on the same baseline, in the
    label size and the paper's ink on a soft paper pill so it reads over any
    ground. Fades with the bar. */
@@ -24900,6 +24939,20 @@ export function createSystems(game) {
   walletEl.type = 'button';
   walletEl.title = 'the bag';
   hudRoot.appendChild(walletEl);
+  // THE POCKETED KIND (L8, F6): the equipped-item slot, immediately right of
+  // the wallet, same row, same pill shape (the roadmap's own instruction —
+  // "what you have, what you can spend right now" as one instrument). A dot
+  // (colour-coded per id) plus a name-and-count text, the wallet's own idiom
+  // rather than a new icon asset this codebase has no pipeline for.
+  const itemEl = sysEl('button', 'capyui-item');
+  itemEl.type = 'button';
+  const itemDotEl = sysEl('i', 'capyui-item-dot');
+  const itemTxtEl = sysEl('span', 'capyui-item-txt', 'the pocketed kind');
+  itemEl.appendChild(itemDotEl);
+  itemEl.appendChild(itemTxtEl);
+  itemEl.title = 'nothing pocketed · T';
+  itemEl.classList.add('capyui-item-empty');
+  hudRoot.appendChild(itemEl);
 
   // --- toasts ---
   const toastWrap = sysEl('div', 'capyui-toasts');
@@ -31611,6 +31664,16 @@ export function createSystems(game) {
   let jrYuzu = 0;
   const jrPlatedAt = Object.create(null);
   let yuzuRunN = 0, yuzuRunAt = -1e9;
+  // THE ANIMAL GETS BETTER (L8, F3) + THE POCKETED KIND (L8, F6). `owned` is
+  // a plain array of purchased ids — see `buyUpgrade`'s doc comment for the
+  // tiered-id shape (`'puff:2'` etc) and the ownership note near sysUPGRADES
+  // for why the bag (F2) and wear (F5) will push OTHER kinds of string into
+  // this SAME array later. `inv` is the three-id consumable bank. `jrItem`
+  // is the equipped consumable id, or null. All three are read by the
+  // every-frame writer below (see sysUpgradeTick) and by capy.itemCap.
+  const owned = [];
+  const inv = { thermos: 0, mango: 0, feather: 0 };
+  let jrItem = null;
   /** The generation of every row that has one, for the save (L5). */
   function jrRecGen() {
     const g = {};
@@ -31822,6 +31885,9 @@ export function createSystems(game) {
         // ...and THE YUZU (L8, F1): the wallet, and which chapters have
         // already paid their full plate. Additive, no version bump.
         yuzu: jrYuzu, platedAt: jrPlatedAt,
+        // ...and THE ANIMAL GETS BETTER (L8, F3) / THE POCKETED KIND (L8,
+        // F6): what has been bought, what is banked, what is equipped.
+        owned: owned, inv: inv, item: jrItem || undefined,
       }));
       // ---- SAY IT ONCE ----------------------------------------------------
       // This game is three and a quarter hours long and it has kept a save file
@@ -32616,6 +32682,186 @@ export function createSystems(game) {
     { biome: 'antarctic', task: 'orca-ride',    wear: 'parka' },
     { biome: 'monaco',    task: 'black-tie',    wear: 'black-tie' },
   ];
+
+  // =========================================================================
+  // THE ANIMAL GETS BETTER (L8, F3) — nine multipliers on constants that
+  // already exist, never a branch on a chapter's state machine. Six everyday
+  // rows (each a ladder of tiers, bought in order, one price per rung) and
+  // three CAPSTONES (one rung each, no chapter-progress gate ever — see the
+  // roadmap's own rule). `capy.mods` is written every frame from `owned` by
+  // `sysUpgradeTick`, below the nine skills' own writer, the exact way
+  // `capySkill` is written from `taskRec`.
+  //
+  // A multi-tier id is stored in `owned` as `'id:n'` (n = 1-based tier
+  // reached, e.g. `'puff:2'`); a single-tier id (breath, feet, and every
+  // capstone) is stored bare. See `buyUpgrade` and `upgradeTier`.
+  // =========================================================================
+  const sysUPGRADES = [
+    { id: 'puff', name: 'MORE PUFF', line: 'ten seconds of sprint stretches to twelve, then fourteen.',
+      tiers: [ { price: 25, k: 0.88 }, { price: 70, k: 0.78 }, { price: 130, k: 0.70 } ] },
+    { id: 'wind', name: 'SECOND WIND', line: 'the bar comes back faster once you stop moving.',
+      tiers: [ { price: 30, k: 1.15 }, { price: 95, k: 1.30 } ] },
+    { id: 'legs', name: 'LONG LEGS', line: 'a flat run, a little quicker — 7.4 m/s toward 8.0.',
+      tiers: [ { price: 35, k: 7.7 / 7.4 }, { price: 115, k: 8.0 / 7.4 } ] },
+    { id: 'slide', name: 'THE LONG SLIDE', line: 'easier down, slower to spend.',
+      tiers: [ { price: 25, k: 1.12 }, { price: 80, k: 1.25 } ] },
+    { id: 'breath', name: 'DEEP BREATH', line: 'a longer held breath, under water.',
+      tiers: [ { price: 55, k: 0.85 } ] },
+    { id: 'feet', name: 'SURE FEET', line: 'a little more grace after the ledge, a little more say in the air.',
+      tiers: [ { price: 70, k: { coyote: 0.18 / 0.12, grace: 0.20 / 0.14, air: 0.45 / 0.35 } } ] },
+    // ---- THE THREE CAPSTONES — yuzu, and at most one owned purchase. Never
+    // a task id, a chapter-completion count, or jrChapInc. See the roadmap's
+    // own rule, restated so nobody "fixes" a slow capstone by adding one.
+    { id: 'puff2', name: 'BOTTOMLESS PUFF', capstone: true,
+      line: 'sprinting barely has to stop to catch its breath, ever again.',
+      tiers: [ { price: 340, k: 0.15 } ],
+      prereq: () => upgradeTier('puff') >= 3 && upgradeTier('wind') >= 2,
+      prereqLabel: 'puff III and wind II' },
+    { id: 'eye', name: 'THE KEEN EYE', capstone: true,
+      line: 'every ground yuzu is worth one more, for the rest of the journey.',
+      tiers: [ { price: 380, k: 1 } ] },
+    { id: 'seat', name: 'THE SPARE SEAT', capstone: true,
+      line: 'one more thing may turn up on the ground at once.',
+      tiers: [ { price: 300, k: 1 } ] },
+  ];
+  function upgradeDef(id) {
+    for (let i = 0; i < sysUPGRADES.length; i++) if (sysUPGRADES[i].id === id) return sysUPGRADES[i];
+    return null;
+  }
+  /** Highest tier reached for `id`, 1-based; 0 if not owned at all. */
+  function upgradeTier(id) {
+    const def = upgradeDef(id);
+    if (!def) return 0;
+    if (def.tiers.length <= 1) return owned.indexOf(id) >= 0 ? 1 : 0;
+    let best = 0;
+    const pfx = id + ':';
+    for (let i = 0; i < owned.length; i++) {
+      if (typeof owned[i] === 'string' && owned[i].indexOf(pfx) === 0) {
+        const n = parseInt(owned[i].slice(pfx.length), 10);
+        if (n > best) best = n;
+      }
+    }
+    return best;
+  }
+  function upgradePrereqOk(id) {
+    const def = upgradeDef(id);
+    return !def || !def.prereq || !!def.prereq();
+  }
+  /**
+   * BUY UPGRADE — called by the bag's shop UI (F2, not built yet) and by
+   * this pass's own QA hooks (`game.state.qaForceOwned`, see below, is the
+   * force-path for a probe that cannot walk the tiers one at a time).
+   * `tierIndex` is 0-based into `id`'s `tiers`; a multi-tier id must be
+   * bought in order (tierIndex must equal the tier count already owned), a
+   * capstone or single-tier row only ever accepts 0. Returns true on a
+   * successful purchase (yuzu deducted, `owned` updated, `saveSoon()`
+   * called), false on any refusal — insufficient yuzu, wrong order, an
+   * unmet prereq, or an unknown id — and never throws.
+   */
+  function buyUpgrade(id, tierIndex) {
+    const def = upgradeDef(id);
+    if (!def) return false;
+    const ti = tierIndex || 0;
+    const tier = def.tiers[ti];
+    if (!tier) return false;
+    if (upgradeTier(id) !== ti) return false;
+    if (!upgradePrereqOk(id)) return false;
+    if (jrYuzu < tier.price) return false;
+    jrYuzu -= tier.price;
+    if (walletEl) walletEl.textContent = jrYuzu + ' yuzu';
+    const entry = def.tiers.length <= 1 ? id : (id + ':' + (ti + 1));
+    if (owned.indexOf(entry) < 0) owned.push(entry);
+    saveSoon();
+    return true;
+  }
+  /**
+   * THE POCKETED KIND (L8, F6) — three restocked consumables, never owned,
+   * their bank in `inv`. Base cap is this table's own `cap`; the live cap
+   * (`capy.itemCap`, capybara.js) adds 2 per id once the peel pouch (F2.6,
+   * not built yet) is in `owned`.
+   */
+  const sysCONSUM = [
+    { id: 'thermos', name: 'THE THERMOS', price: 30, cap: 3,
+      line: 'instant full stamina, then no drain at all for 45 seconds.' },
+    { id: 'mango', name: 'A WRAPPED MANGO', price: 15, cap: 5,
+      line: 'an instant second wind, on demand, for 75 seconds.' },
+    { id: 'feather', name: 'A LUCKY FEATHER', price: 25, cap: 3,
+      line: 'cancels the next chaos roll in this chapter, silently.' },
+  ];
+  function consumDef(id) {
+    for (let i = 0; i < sysCONSUM.length; i++) if (sysCONSUM[i].id === id) return sysCONSUM[i];
+    return null;
+  }
+  /**
+   * BUY CONSUMABLE — called by the bag's shop UI (F2, not built yet) and by
+   * this pass's own QA hooks. Adds `n` units of `id` to `inv`, refusing past
+   * `capy.itemCap(id)` (the soft cap: base + 2 with the peel pouch) or past
+   * the yuzu on hand. If nothing is currently equipped, the purchase also
+   * equips it — a temporary convenience until the bag owns switching (F2).
+   * Returns true/false, never throws.
+   */
+  function buyConsumable(id, n) {
+    const def = consumDef(id);
+    if (!def || !inv.hasOwnProperty(id)) return false;
+    const qty = Math.max(1, Math.floor(n || 1));
+    const cap = (game.capy && typeof game.capy.itemCap === 'function') ? game.capy.itemCap(id) : def.cap;
+    if (inv[id] + qty > cap) return false;
+    const cost = def.price * qty;
+    if (jrYuzu < cost) return false;
+    jrYuzu -= cost;
+    if (walletEl) walletEl.textContent = jrYuzu + ' yuzu';
+    inv[id] += qty;
+    if (!jrItem) jrItem = id;
+    itemSync();
+    saveSoon();
+    return true;
+  }
+  // ---- QA HOOKS (L8, F3 + F6) ----------------------------------------------
+  // `owned`/`inv`/`jrYuzu` are closures with no other door in from outside —
+  // real play only ever reaches them through the bag (F2, not built yet) and
+  // the T key. `qa/l8-upgrades.js` and `qa/l8-item.js` need to actually CALL
+  // `buyUpgrade`/`buyConsumable` (to prove the prereq gate and the cap
+  // refusal, not just force the result) and need yuzu to spend — so both
+  // functions and a yuzu-setter are published here, read-only-in-spirit
+  // (nothing in src ever calls them; grep confirms). `qaForceOwned` (see
+  // sysUpgradeTick, a few hundred lines up) is the lighter-weight door for
+  // tests that only need a RESULT (a tier, a capstone) and do not care to
+  // prove the gate that produced it.
+  game.state.qaBuyUpgrade = buyUpgrade;
+  game.state.qaBuyConsumable = buyConsumable;
+  game.state.qaAddYuzu = function (n) {
+    jrYuzu = Math.max(0, Math.min(99999, jrYuzu + (n || 0)));
+    if (walletEl) walletEl.textContent = jrYuzu + ' yuzu';
+    saveSoon();
+  };
+  game.state.qaOwned = owned;
+  game.state.qaInv = inv;
+  // Switching the equipped consumable is the bag's own job (F2, not built
+  // yet) — nothing else in this pass ever changes `jrItem` once it is first
+  // auto-equipped, so `qa/l8-item.js` needs a door to test mango and feather
+  // without waiting for that shop to exist.
+  game.state.qaSetItem = function (id) {
+    if (id !== 'thermos' && id !== 'mango' && id !== 'feather') return false;
+    jrItem = id;
+    itemSync();
+    return true;
+  };
+  // A clean slate WITHOUT a page reload — `page.goto()` to the same origin
+  // can hand a probe back the SAME live module state (bfcache, or the
+  // dev server's own caching; see the headless-QA-harness notes on this
+  // exact family of trap), so a probe that wants tier 0 again after forcing
+  // tier 3 cannot trust a reload to give it one. This resets everything
+  // THIS pass owns, in place.
+  game.state.qaReset = function () {
+    owned.length = 0;
+    game.state.qaForceOwned = []; // else next frame's writer re-merges the old array right back in
+    inv.thermos = 0; inv.mango = 0; inv.feather = 0;
+    jrItem = null;
+    jrYuzu = 0;
+    if (game.capy) { game.capy.boon = null; game.capy.ward = 0; }
+    itemSync();
+    if (walletEl) walletEl.textContent = '0 yuzu';
+  };
 
   // =========================================================================
   // FIVE HELPERS FOR THE PLACE FINDS, AND NONE OF THEM ALLOCATES
@@ -35247,6 +35493,35 @@ export function createSystems(game) {
       if (walletEl) walletEl.textContent = jrYuzu + ' yuzu';
       const plAt = jrFile.platedAt || {};
       for (const k in plAt) if (plAt[k]) jrPlatedAt[k] = true;
+      // ...and THE ANIMAL GETS BETTER (L8, F3) / THE POCKETED KIND (L8, F6).
+      // `owned` is a loose allowlist ON PURPOSE: the bag (F2) and wear (F5)
+      // push wear ids and 'peel-pouch' into this SAME array in later waves,
+      // and this build cannot know their names yet — so anything that is
+      // actually a STRING is kept (an array has no keyed-lookup hazard the
+      // way an object does), and only the type is checked. `inv` DOES have
+      // that hazard (a keyed object), so it is the strict allowlist: exactly
+      // the three known ids, each clamped 0-20 — a made-up id is dropped.
+      const ownedIn = jrFile.owned || [];
+      for (let i = 0; i < ownedIn.length; i++) {
+        const oid = ownedIn[i];
+        if (typeof oid === 'string' && owned.indexOf(oid) < 0) owned.push(oid);
+      }
+      const invIn = jrFile.inv || {};
+      for (const k of ['thermos', 'mango', 'feather']) {
+        if (typeof invIn[k] === 'number') inv[k] = Math.max(0, Math.min(20, Math.round(invIn[k])));
+      }
+      // `item`, restored only if it names one of the three ids AND that
+      // bank actually has a charge — an empty equipped slot is just null.
+      if (typeof jrFile.item === 'string' && inv[jrFile.item] > 0) jrItem = jrFile.item;
+      // A TEMPORARY CONVENIENCE (the bag, F2, properly owns switching): if
+      // nothing ended up equipped but a bank has a charge in it — an older
+      // save with no `item` key, or one whose equipped id got dropped above
+      // — equip the first one found rather than stranding a paid-for bank
+      // behind a slot with nothing in it.
+      if (!jrItem) {
+        for (const k of ['thermos', 'mango', 'feather']) { if (inv[k] > 0) { jrItem = k; break; } }
+      }
+      itemSync();
       // a chapter already finished on the file must not throw its party again
       for (let n = 1; n <= chapMax; n++) if (chapComplete(n)) jrChapDone[n] = true;
     } else if (!restore) {
@@ -35711,6 +35986,40 @@ export function createSystems(game) {
       // ...and with one row open, F is the arrow itself (L3-14)
       if (!riddleShown) { riddleShown = true; sfx('pop', { volume: 0.22, pitch: 1.5 }); }
       todoStep(e.shiftKey ? -1 : 1);
+    }
+    // ---- T: THE POCKETED KIND (L8, F6) --------------------------------------
+    // One press, and it is spent. F and R were both already bound (the paper's
+    // own step key and the back-hold rescue) when this pass checked the live
+    // map, so T — verified free game-wide — is the one key for the one
+    // equipped consumable: no hotbar, no cycling, switching is a bag (F2)
+    // decision. At `inv[id] === 0` this does nothing at all and says nothing —
+    // the roadmap's own rule: the dimmed HUD slot already says so, so a press
+    // that does nothing gets no toast either.
+    if (c === 'KeyT' && started && jrItem && inv[jrItem] > 0 && game.capy) {
+      const id = jrItem;
+      inv[id]--;
+      const gp = game.capy.position;
+      if (id === 'thermos') {
+        // `fresh` is spent by capybara.js's own stamina block, once, for the
+        // instant full refill — see capy.boon's doc comment.
+        game.capy.boon = { id: 'thermos', t: 45, fresh: true };
+        sfx('chime', { volume: 0.55, pitch: 1.3 });
+      } else if (id === 'mango') {
+        game.capy.boon = { id: 'mango', t: 75, fresh: true };
+        sfx('chime', { volume: 0.55, pitch: 1.05 });
+      } else if (id === 'feather') {
+        // Nothing reads this yet — the chaos roll (wave 2) will. See its own
+        // doc comment on `capy.ward` in capybara.js.
+        game.capy.ward = (game.capy.ward || 0) + 1;
+        sfx('pop', { volume: 0.4, pitch: 1.4 });
+      }
+      if (gp && typeof game.sparks === 'function') {
+        game.sparks(gp.x, gp.y + 0.5, gp.z, 6,
+          { spd: 1.6, up: 1.4, grav: 8, drag: 0.6, life: 0.5, size: 0.12, rgb: [1.3, 1.1, 0.5] });
+      }
+      itemSync();
+      itemFlash();
+      saveSoon();
     }
     if (c === 'ShiftLeft' || c === 'ShiftRight') input.run = true;
     // The four audio keys, kept exactly as they were — they are muscle memory
@@ -42275,6 +42584,16 @@ export function createSystems(game) {
     if (!walletEl || !todoEl) return;
     const r = todoEl.getBoundingClientRect();
     walletEl.style.top = (r.bottom + 8) + 'px';
+    // THE POCKETED KIND (L8, F6): the item slot rides the wallet's own top
+    // and sits immediately right of it — read AFTER the top is set, because
+    // the wallet's rendered width (hence its right edge) is what the slot
+    // must clear, and wave 0's own wallet-vs-paper bug was exactly this kind
+    // of stale-rect collision.
+    if (itemEl) {
+      const wr = walletEl.getBoundingClientRect();
+      itemEl.style.top = wr.top + 'px';
+      itemEl.style.left = (wr.right + 8) + 'px';
+    }
   }
   window.addEventListener('resize', yuzuWalletReposition);
   // A CHASE, NOT A CHASE DOWN. The marquee's own text/'on' class is written
@@ -42287,6 +42606,40 @@ export function createSystems(game) {
   // panels() doc comment asks for — cheap, and it self-corrects regardless of
   // which of the card's many resize causes fired.
   setInterval(yuzuWalletReposition, 350);
+  /**
+   * THE POCKETED KIND (L8, F6). Keeps `capy.item` (the mirror capybara.js
+   * and a future drops agent read) and the HUD slot's text in agreement with
+   * `jrItem`/`inv` — called at every point either one changes: a purchase
+   * (`buyConsumable`), the T-key press, and once after a restore.
+   */
+  function itemSync() {
+    if (game.capy) game.capy.item = jrItem ? { id: jrItem, n: inv[jrItem] || 0 } : null;
+    itemPaint();
+  }
+  function itemPaint() {
+    if (!itemEl || !itemTxtEl) return;
+    if (!jrItem) {
+      itemEl.classList.add('capyui-item-empty');
+      itemEl.classList.remove('capyui-item-dim');
+      itemTxtEl.textContent = 'the pocketed kind';
+      itemEl.title = 'nothing pocketed · T';
+      return;
+    }
+    itemEl.classList.remove('capyui-item-empty');
+    const def = consumDef(jrItem);
+    const n = inv[jrItem] || 0;
+    itemTxtEl.textContent = (def ? def.name.toLowerCase() : jrItem) + '  ·  ' + n;
+    itemEl.classList.toggle('capyui-item-dim', n <= 0);
+    itemEl.title = (def ? def.name : jrItem) + ' · T';
+  }
+  /** The press's own feedback — see the roadmap's rule that a consumable
+   *  firing is a HUD change, not a pill. */
+  function itemFlash() {
+    if (!itemEl) return;
+    itemEl.classList.remove('flash');
+    void itemEl.offsetWidth;
+    itemEl.classList.add('flash');
+  }
   /** THE LADDER: a quick run of pickups climbs in pitch, then resets. A
    *  stepped chime rather than the music engine's own note dispatch — see
    *  ROADMAP-LIFT8.md's note on this being a deliberate simplification. */
@@ -43609,6 +43962,62 @@ export function createSystems(game) {
           sysSkillT = 4.6;
           showMoment(s.name, s.line);
         }
+      }
+    }
+
+    // ---- ...AND THE ANIMAL GETS BETTER (L8, F3) -----------------------------
+    // Same reason as the skills and the wardrobe just above: `capy.mods` is
+    // written FROM `owned` every frame rather than on a purchase event, so a
+    // restore, a chapter change or a picker jump all need nothing extra. No
+    // announcement here — a purchase already gets its own "yours." in the
+    // bag (F2, not built yet); this is silent bookkeeping, every frame.
+    //
+    // `game.state.qaForceOwned` (an array of ids) is this pass's own QA
+    // hook — merged in here, idempotently, so a probe can force a capstone
+    // or a not-yet-buyable id (`'peel-pouch'`, before F2.6 exists) without
+    // walking the tiers one purchase at a time. Harmless in a real session:
+    // nothing ever sets it outside qa/.
+    if (game.state && Array.isArray(game.state.qaForceOwned)) {
+      for (let i = 0; i < game.state.qaForceOwned.length; i++) {
+        const fid = game.state.qaForceOwned[i];
+        if (typeof fid === 'string' && owned.indexOf(fid) < 0) owned.push(fid);
+      }
+    }
+    if (game.capy && game.capy.mods) {
+      const m = game.capy.mods;
+      m.drainMul = 1; m.regenMul = 1; m.runMul = 1; m.slideMul = 1; m.breathMul = 1;
+      m.coyoteMul = 1; m.graceMul = 1; m.airMul = 1;
+      m.puffRegenSprint = 0; m.yuzuBonus = 0;
+      m.pouch = owned.indexOf('peel-pouch') >= 0;
+      const pt = upgradeTier('puff');
+      if (pt > 0) m.drainMul = upgradeDef('puff').tiers[pt - 1].k;
+      const wt = upgradeTier('wind');
+      if (wt > 0) m.regenMul = upgradeDef('wind').tiers[wt - 1].k;
+      const lt = upgradeTier('legs');
+      if (lt > 0) m.runMul = upgradeDef('legs').tiers[lt - 1].k;
+      const st = upgradeTier('slide');
+      if (st > 0) m.slideMul = upgradeDef('slide').tiers[st - 1].k;
+      if (owned.indexOf('breath') >= 0) m.breathMul = upgradeDef('breath').tiers[0].k;
+      if (owned.indexOf('feet') >= 0) {
+        const k = upgradeDef('feet').tiers[0].k;
+        m.coyoteMul = k.coyote; m.graceMul = k.grace; m.airMul = k.air;
+      }
+      // BOTTOMLESS PUFF and THE KEEN EYE do not multiply an existing field —
+      // they are the two additive exceptions the roadmap names explicitly.
+      if (owned.indexOf('puff2') >= 0) m.puffRegenSprint = upgradeDef('puff2').tiers[0].k;
+      if (owned.indexOf('eye') >= 0) m.yuzuBonus = 1;
+      // THE SPARE SEAT: not a mod, a separate published field — see its own
+      // doc comment on `capy.dropCap` in capybara.js. `sysDrops` (F4, not
+      // built yet) is the only reader.
+      game.capy.dropCap = owned.indexOf('seat') >= 0 ? 3 : 2;
+      // ---- THE HUD'S ONE EXCEPTION (L8, F3) --------------------------------
+      // BOTTOMLESS PUFF earns the single deliberate new HUD element this
+      // pass allows — see the roadmap's own "never a new number... except"
+      // rule. `stamBar` (built with the rest of the HUD, below) gets a
+      // permanent gold-rim class the moment the capstone is owned; nothing
+      // ever removes it once bought, which is correct — bought is forever.
+      if (stamEl && owned.indexOf('puff2') >= 0 && !stamEl.classList.contains('capyui-goldrim')) {
+        stamEl.classList.add('capyui-goldrim');
       }
     }
 
