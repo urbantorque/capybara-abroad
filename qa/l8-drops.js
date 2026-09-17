@@ -199,12 +199,13 @@ async page => {
   // THIS PASS actually built — the event payload's worth, THE KEEN EYE's
   // bonus, GULL-PROOF, the boon, the twin bookkeeping — without also
   // re-proving (unreliably) a pickup mechanic that was never in scope.
-  function grabRec(rec) {
-    return page.evaluate((rec) => {
+  function grabRec(rec, kindFilter) {
+    return page.evaluate(([rec, kindFilter]) => {
       const g = window.__capy;
       const live = g.state.qaDrops();
       let best = null, bestD = Infinity;
       for (const d of live) {
+        if (kindFilter && d.kind !== kindFilter) continue;
         if (!d.prop || !d.prop.body || d.prop.removed || d.prop.held) continue;
         const b = d.prop.body;
         const dist = (b.position.x - rec.x) * (b.position.x - rec.x) + (b.position.z - rec.z) * (b.position.z - rec.z);
@@ -212,7 +213,7 @@ async page => {
       }
       if (!best) return false;
       return !!g.physics.grab(best);
-    }, rec);
+    }, [rec, kindFilter || null]);
   }
 
   await page.evaluate(() => { window.__capy.state.qaReset(); });
@@ -275,7 +276,7 @@ async page => {
     if (pair.length !== 2) return null;
     const first = pair.find(p => p.first), second = pair.find(p => !p.first);
     const y0 = await page.evaluate(() => window.__capy.state.qaYuzu());
-    const g1 = await grabRec(first);
+    const g1 = await grabRec(first, 'twin');
     await page.waitForTimeout(100);
     const y1 = await page.evaluate(() => window.__capy.state.qaYuzu());
     if (waitBeforeSecond) await page.waitForTimeout(waitBeforeSecond);
@@ -283,7 +284,7 @@ async page => {
       yuzuBonus: window.__capy.capy.mods.yuzuBonus,
       live: window.__capy.state.qaDrops().map(d => ({ kind: d.kind, despawnT: d.despawnT, held: d.prop && d.prop.held, removed: d.prop && d.prop.removed })),
     }));
-    const g2 = await grabRec(second);
+    const g2 = await grabRec(second, 'twin');
     await page.waitForTimeout(700);   // the bonus flies 500 ms behind the base
     const y2 = await page.evaluate(() => window.__capy.state.qaYuzu());
     return { firstPay: y1 - y0, secondPay: y2 - y1, g1, g2, debug2 };

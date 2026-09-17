@@ -43317,12 +43317,27 @@ export function createSystems(game) {
   let dropArriveT = -1;        // s since THIS visit's pool went live
   let dropArriveX = 0, dropArriveZ = 0;
   let dropFirstPillSaid = false;
+  let sysDropsErrAt = 0;        // rate-limits the tick's own catch, below
   let dropPairSeq = 0;
 
   /** A fresh pool for a newly-(re)entered biome — everything about the OLD
    *  one is simply dropped; nothing here is saved. */
   function dropReset(biome) {
     dropBiome = biome;
+    // REMOVE THE PROPS, NOT JUST THE BOOKKEEPING. This is the SAME leak
+    // `dropForget` was fixed for (its own doc comment above), missed here
+    // because every QA path goes through `dropForget`/`qaReset` and never
+    // exercised the natural "the player just walked through a door" path.
+    // Biomes share one coordinate space (physCrowded's own doc comment) —
+    // a live drop abandoned here keeps a solid, grabbable body sitting
+    // exactly where it was, in every chapter entered afterwards, for as
+    // long as the session runs. A rare, real drop is small; the bath is a
+    // 1.2 m box that does not move — the one member of this pool worth
+    // never leaving behind by accident.
+    for (let i = 0; i < dropLive.length; i++) {
+      const p = dropLive[i].prop;
+      if (p && !p.removed && game.physics && typeof game.physics.removeProp === 'function') game.physics.removeProp(p);
+    }
     dropLive.length = 0;
     dropArriveT = 0;
     const cp = game.capy && game.capy.position;
@@ -44957,12 +44972,57 @@ export function createSystems(game) {
       }
     }
 
+    // ---- A PAUSE THE TAB NEVER ASKED TO KEEP (found chasing an unrelated
+    // fuzz.js regression report, L8 wave-1 verification) --------------------
+    // `document.addEventListener('visibilitychange', ...)` (below, pre-dating
+    // this pass) is the ONLY writer of `game.state.paused = document.hidden ||
+    // jrShown || ledShown || albShown || pauseShown || bagShown` — a real,
+    // necessary rule (coming back to the tab must not unpause the world
+    // behind an open card) but a ONE-SHOT one: it recomputes the flag only on
+    // the EVENT, never again afterwards. Measured live, under an automated
+    // multi-session harness: a tab that loses and regains OS focus (another
+    // driven browser window stealing it, not a real player alt-tabbing) does
+    // not reliably re-fire `visibilitychange` on the way back in headless
+    // Chrome, so `paused` is left stuck true with every modal already closed
+    // — capybara.js and every other module stop running (main.js's own
+    // per-frame loop skips everything but 'systems' while paused), which
+    // reads exactly like "no input reaches the animal, from here on, across
+    // every later chapter switch". It reproduced in this session ONLY when
+    // several playwright-cli browser sessions were open at once and never
+    // once in an isolated single session — an environment artifact, not a
+    // consequence of anything F4 spawns (traced with `game.state.paused`,
+    // `document.hidden` and the five modal flags read live mid-freeze).
+    // The self-heal: if the document is genuinely visible and every modal
+    // this file knows about reads closed, `paused` has no reason left to be
+    // true, however it got stuck — clearing it here costs five booleans a
+    // frame and never fires while a card is legitimately open.
+    if (game.state.paused && !document.hidden && !jrShown && !ledShown && !albShown && !pauseShown && !bagShown) {
+      game.state.paused = false;
+    }
+
     // ---- THINGS THAT TURN UP (L8, F4) --------------------------------------
     // After the mods writer above, which is where `capy.dropCap` and
     // `capy.mods.yuzuBonus` are set for THIS frame — sysDropsTick reads both.
     // Gated the `wxFrontT` way (weather.js): a title card or a paused menu is
     // not a chapter, and nothing should turn up while either is showing.
-    if (started && !game.state.paused) sysDropsTick(dt);
+    // OWN try/catch, NOT main.js's per-module net: 'systems' is on
+    // MAIN_NEVER_DROP, so a throw here would not lose the module — but it
+    // WOULD abort this call to update() at the point of the throw, and
+    // everything below this line in this one giant function (the back-crumb
+    // rescue, the framing envelope, the input-buffer clear at the very
+    // bottom) would silently stop running every single frame from then on,
+    // for the rest of the session — a much better fit for "stuck from here
+    // on, across every later chapter" than a boolean flag ever was. A local
+    // catch means the worst this feature can ever do is skip its OWN turn.
+    if (started && !game.state.paused) {
+      try { sysDropsTick(dt); } catch (e) {
+        const nowS = sysWall();
+        if (!sysDropsErrAt || nowS - sysDropsErrAt > 4) {
+          sysDropsErrAt = nowS;
+          console.error('[sysDropsTick] threw — skipped this frame', e);
+        }
+      }
+    }
 
     // ---- put me back --------------------------------------------------------
     // Sampled every frame, acted on after sysBACK_HOLD of held R. backBusy is a
