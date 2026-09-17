@@ -10651,6 +10651,14 @@ export function createNPCs(game) {
         break;
       }
       case 'busk': {      // guitar up, one lazy strum every couple of bars
+        // THE MUSICIAN (L7, F2): the tune, from here, through the mover
+        // pipeline. Built once, lazily — a busker who never sat down to
+        // play never needs a mover at all. Position only, no velocity: he
+        // does not move while busking, and Doppler is skipped for beds anyway.
+        if (!rec.tuneMv && typeof game.sfxMover === 'function') {
+          rec.tuneMv = game.sfxMover('tune', { key: 'sydney:busker', biome: 'sydney' });
+        }
+        if (rec.tuneMv) rec.tuneMv.at(rec.group.position.x, rec.group.position.y + 1.0, rec.group.position.z);
         rec.tgtArmL = -1.15;
         rec.tgtArmR = -1.30 + Math.sin(rec.stateT * 6.2) * 0.16;
         rec.tgtLean = 0.05;

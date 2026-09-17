@@ -4681,6 +4681,13 @@ const sysMUS_LAYER_OSTINATO = 1.0;
 // written: 21/21 at six or more (Sydney 7, Kyoto 6, Sơn Đoòng 6).
 const sysMUS_THEME     = [0, 4, 7, 4, 3, 2, 1, 0];
 const sysMUS_THEME_DUR = [2, 1, 1, 3, 2, 1, 1, 3];   // × the phrase gap; the arrival's own rhythm
+// THE MUSICIAN (L7, F2): the tune, played from a POSITION by a bed-class
+// mover instead of on the non-diegetic pad. One beat here is 0.6 s (the
+// theme's own eight notes, weighted by sysMUS_THEME_DUR, run about 8.4 s —
+// long enough to be worth walking toward, short enough that "once a
+// minute" (sysMUS_TUNE_GAP) reads as a phrase and not a loop playing at you).
+const sysMUS_TUNE_BEAT = 0.6;
+const sysMUS_TUNE_GAP  = 60;
 // The three shapes. `pent` is the minor pentatonic with every diatonic degree
 // snapped to its nearest tone — the second and the third both land on the
 // flat third, the sixth and seventh on the flat seventh — and it is what the
@@ -16710,6 +16717,70 @@ export function createSystems(game) {
         const ahead = wf > -1 ? clamp(-wf * 4, 0, 1) : 0;   // 0 far out, 1 at the line
         sysAudioSet(m.hi.f.frequency, 8000 + 4000 * k + 2000 * ahead, now, 1.5);
         sysAudioSet(m.hi.g.gain, 1.0 + 0.6 * ahead, now, 1.5);
+      } },
+    // ---- THE MUSICIAN (L7, F2) ----------------------------------------------
+    // The tune, from a person in the square, through the mover pipeline
+    // rather than the non-diegetic pad: a bed (a stationary source has no
+    // Doppler to speak of, and the budget guarantee matters more than the
+    // occlusion ray here), so distance and the biome gate are the pipeline
+    // terms this actually uses.
+    //
+    // THE VOICE IS A STAND-IN. musLiftNote already turns a scale degree into
+    // the palette's own authored instrument (koto, cavaquinho's cousin
+    // caipira, the ney...) but every one of those functions writes straight
+    // to the shared non-positional music bus — reusing them here would mean
+    // teaching eleven instrument functions to accept an output node, which is
+    // a bigger and riskier change than this pass makes to a system tuned over
+    // several lifts. What IS reused, exactly, is the melody: musThemeOff and
+    // musThemeBase compute the same semitones-from-tonic this palette's pad
+    // ostinato plays, so the tune a musician plays is never out of key even
+    // though the timbre synthesised below is a placeholder — two triangles,
+    // a fifth apart, into a short decay.
+    tune: { level: 0.11, near: 8, far: 40, bed: true,
+      build: function (m, out) {
+        const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3200; lp.Q.value = 0.4;
+        lp.connect(out);
+        const vg = ac.createGain(); vg.gain.value = 0.0001;
+        vg.connect(lp);
+        const o1 = ac.createOscillator(); o1.type = 'triangle'; o1.frequency.value = 220;
+        const o2 = ac.createOscillator(); o2.type = 'triangle'; o2.frequency.value = 330;
+        o1.connect(vg); o2.connect(vg); o1.start(); o2.start();
+        m.src.push(o1); m.src.push(o2);
+        m.tuneVG = vg; m.tuneO1 = o1; m.tuneO2 = o2;
+        // Staggered by key so nineteen musicians beginning in the same
+        // second do not all land on their downbeat together.
+        m.tuneAt = ac.currentTime + rand(2, sysMUS_TUNE_GAP);
+        m.tuneIdx = -1;
+      },
+      throttle: function (m, k, now) {
+        if (now < m.tuneAt) return;
+        m.tuneIdx++;
+        if (m.tuneIdx >= sysMUS_THEME.length) {
+          // THE J-CUT'S OTHER HALF: THE SECOND VOICE ANSWERS (L7, F2). Cell 0
+          // — the tonic the tune opened on — quoted on the score's own A6
+          // voice, four beats after the statement finishes. Silent if this
+          // palette carries no second row (sysMUS_2ND[musPalN] is null for
+          // most of them still) or nothing is sounding to answer against.
+          const sec = sysMUS_2ND[musPalN];
+          if (sec && musCurChord && musCurChord.length) {
+            const midi2 = musFold(musThemeBase(sec.oct === undefined ? 12 : sec.oct) + musThemeOff(0),
+                                   sysMUS_LIFT_LO, sysMUS_LIFT_HI);
+            musLiftNote(sec.inst || 'pluck', now + sysMUS_TUNE_BEAT * 4, midi2, 0,
+                        musVel(0.16 * (sec.vel === undefined ? 1 : sec.vel)), sysMUS_TUNE_BEAT * 4);
+            musSecondN++;
+          }
+          m.tuneIdx = -1;
+          m.tuneAt = now + sysMUS_TUNE_GAP;
+          return;
+        }
+        const midi = musFold(musThemeBase(0) + musThemeOff(m.tuneIdx), sysMUS_LIFT_LO, sysMUS_LIFT_HI);
+        const hz = 440 * Math.pow(2, (midi - 69) / 12);
+        const dur = sysMUS_TUNE_BEAT * sysMUS_THEME_DUR[m.tuneIdx];
+        sysAudioSet(m.tuneO1.frequency, hz, now, 0.015);
+        sysAudioSet(m.tuneO2.frequency, hz * 1.5, now, 0.015);   // a fifth above, not a unison
+        sysAudioSet(m.tuneVG.gain, 0.9, now, 0.02);
+        sysAudioSet(m.tuneVG.gain, 0.0001, now + dur * 0.75, dur * 0.35);
+        m.tuneAt = now + dur;
       } },
   };
   // Which chapters get which bed at the animal, and how open each one's air
@@ -41362,6 +41433,8 @@ export function createSystems(game) {
           back: +m.wantBack.toFixed(3), up: +m.wantUp.toFixed(3),
           rate: +m.rateNow.toFixed(4), d: +m.d.toFixed(2),
           k: +m.k.toFixed(3), amp: +m.amp.toFixed(3), parkedT: +m.parkedT.toFixed(1),
+          hz: m.tuneO1 ? +m.tuneO1.frequency.value.toFixed(1) : null,   // (L7, F2) the musician's own pitch
+          tuneIdx: m.tuneO1 ? m.tuneIdx : null, tuneIn: m.tuneO1 ? +(m.tuneAt - ac.currentTime).toFixed(2) : null,
           // L4, audio #6: the mover's own room send, as a share of the row's wet
           send: m.send ? +(acSendNear + (1 - acSendNear) * (m.live ? sysSendK(m.d, m.near) : 0)).toFixed(3) : 0,
         });
