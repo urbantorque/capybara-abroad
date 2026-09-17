@@ -5385,8 +5385,6 @@ const sysMUS_CHORDS_T = [
 ];
 const sysMUS_ROOTS_T = [38, 33, 31, 35];
 const sysMUS_NEXT_T  = [[1, 2, 3], [2, 3, 0], [3, 0], [0, 1]];
-/** Index of the title row in sysMUS_PAL — appended, so no chapter's `pal` moves. */
-const sysMUS_PAL_TITLE = 18;
 
 // ---- WHAT ANSWERS THE PLUCK, PER PALETTE (A6) ------------------------------
 // null is not an oversight: the five band palettes already HAVE a second voice
@@ -5753,8 +5751,9 @@ const sysMUS_PAL = [
     lift: { inst: 'glass', shape: 'soar', n: 9, gap: 0.22, oct: 0, vel: 1.00,
             up: 2.6, dn: 12.0 } },
   // 18 - THE TITLE CARD. Not a place. See sysMUS_CHORDS_T above for why it
-  // sounds like chapter one heard from the next room, and sysMUS_PAL_TITLE for
-  // the index — appended, so not one chapter's `pal` moved.
+  // sounds like chapter one heard from the next room. Appended, so not one
+  // chapter's `pal` moved; since the front draws its palette at random
+  // (titlePal) this row is one of the draws rather than the menu's own key.
   { chords: sysMUS_CHORDS_T, roots: sysMUS_ROOTS_T, next: sysMUS_NEXT_T,
     dwellA: 13.0, dwellB: 21.0, pluckA: 3.0, pluckB: 7.5, cut: 540, bus: 0.135, bass: 0.20,
     lead: 'mallet', xfade: 5.5, rhythm: null, scale: 'major',
@@ -12804,13 +12803,26 @@ export function createSystems(game) {
     try { c.addEventListener('statechange', go); } catch (e) {}
     setTimeout(go, 250);
   }
+  // ---- ONE SCORE FOR THE WHOLE FRONT, DRAWN ONCE ---------------------------
+  // The menu used to open in its own row (sysMUS_PAL[18]) and then change
+  // key under the pointer: every tile hovered for 420 ms called the same
+  // musSetPalette a real arrival does, so a mouse crossing the shelf stacked
+  // one palette's tail on the next one's band, and the player heard several
+  // scores at once. Now one palette is drawn at random per load, set once,
+  // and nothing on the card — hover, focus, page turn, back — writes it
+  // again; only startGame's own arrival does.
+  let titlePalN = -1;
+  function titlePal() {
+    if (titlePalN < 0) titlePalN = Math.floor(Math.random() * sysMUS_PAL.length);
+    return titlePalN;
+  }
   function titleAudio() {
     audioUnlock();
     if (started || !ac || musVol) return;
     // The palette FIRST: musicStart voices its opening chord out of musPal, so
-    // setting it afterwards would open the card in the gardens and drift out of
-    // them over five seconds for no reason.
-    musSetPalette(sysMUS_PAL_TITLE);
+    // setting it afterwards would open the card in the wrong key and drift out
+    // of it over five seconds for no reason.
+    musSetPalette(titlePal());
     musicStart();
   }
   // ---- THE NOISE FLOOR, AND IT WAS 1.2 SECONDS OF MONO (v41) ---------------
@@ -23203,10 +23215,12 @@ export function createSystems(game) {
   });
 
   // ---- LEANING TOWARDS A PLACE -------------------------------------------
-  // The colour behind the card and the key the score is in, both following
-  // whichever tile is under the pointer or holding focus. `wait` is the dwell:
-  // 420 ms for a hover, so crossing the shelf costs nothing, and 0 for focus,
-  // which is already a deliberate act. See the note on the tile's listeners.
+  // The colour behind the card follows whichever tile is under the pointer or
+  // holding focus. `wait` is the dwell: 420 ms for a hover, so crossing the
+  // shelf costs nothing, and 0 for focus, which is already a deliberate act.
+  // The KEY does not follow any more — see titleAudio: the score is one
+  // palette for the whole front, and a hover changing it was several scores
+  // at once to anybody moving a mouse.
   let titleLeanT = 0, titleLeanAt = '';
   function titleLeanCancel() { if (titleLeanT) { clearTimeout(titleLeanT); titleLeanT = 0; } }
   function titleLean(d, wait) {
@@ -23217,16 +23231,14 @@ export function createSystems(game) {
       if (started) return;
       titleLeanAt = d.biome;
       glowEl.style.color = sysMarkTint(d.biome, 0.62);
-      musSetPalette(d.pal);
     }, wait);
   }
-  /** Back to nowhere in particular: the front of the card, and the title key. */
+  /** Back to nowhere in particular: the front of the card. */
   function titleLeanHome() {
     titleLeanCancel();
     if (started || titleLeanAt === '') return;
     titleLeanAt = '';
     glowEl.style.color = '';
-    musSetPalette(sysMUS_PAL_TITLE);
   }
   function buildPick(d, i, hero) {
     const ids = tasksInChapter(d.n);
@@ -23394,17 +23406,12 @@ export function createSystems(game) {
       startGame(d.biome, jrFileCount > 0);
     });
     // ---- THE CARD LEANS TOWARDS WHATEVER YOU ARE LOOKING AT ---------------
-    // Resting on a tile warms the whole screen in that chapter's own colour
-    // and drifts the score into that chapter's own key. Both are free: the
-    // colour is the tint the tile's picture is already drawn in, and the key
-    // change is the same musSetPalette() a real arrival uses, so hovering
-    // Kyoto is literally a preview of what Kyoto sounds like.
-    //
-    // Nothing is REVERTED when the pointer leaves, only cancelled if it leaves
-    // before the dwell is up. The score in this game never snaps back to
-    // anything and it must not learn to here — a mouse crossing the shelf to
-    // reach the far side would otherwise fire seventeen key changes and a
-    // seventeenth back again.
+    // Resting on a tile warms the whole screen in that chapter's own colour —
+    // the tint the tile's picture is already drawn in. It used to drift the
+    // score into that chapter's key as well, and the player heard the shelf
+    // as several scores at once; the key is one palette for the whole front
+    // now (titleAudio). Nothing is REVERTED when the pointer leaves, only
+    // cancelled if it leaves before the dwell is up.
     el.addEventListener('pointerenter', function () { titleLean(d, 420); });
     el.addEventListener('pointerleave', titleLeanCancel);
     // Focus is a deliberate arrival, so it does not wait out a dwell.
