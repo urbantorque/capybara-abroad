@@ -16251,6 +16251,7 @@ export function createSystems(game) {
   // (+3.5 dB at a full calm), because it IS the world and the still state is
   // where it should be loudest. The ladder and the ring follow the same rule.
   const sysMOVER_CALM   = 0.5;      // how far a BED comes up when the world settles (was −0.35)
+  const sysMOVER_JCUT_GAIN = 0.25;  // (L7, F2) the J-cut's flat level, ~-12 dB — see biomePre
   const sysMovers = [];
   let sysMoverBuilds = 0;           // graphs built this session, for the harness
 
@@ -16914,22 +16915,37 @@ export function createSystems(game) {
     // ---- 1. what each one WOULD deliver, before any graph work ------------
     for (let i = 0; i < sysMovers.length; i++) {
       const m = sysMovers[i];
-      if (!playing || m.dead || (m.biome && m.biome !== live)) {
+      // THE J-CUT (L7, F2): a mover whose OWN biome is the destination the
+      // white card is fading to (not the live one yet) is heard at a forced
+      // 0.25 rather than silenced outright — the one exception to "another
+      // chapter's mover is silent," and only for the length of the hold.
+      const jcut = !!(m.biome && m.biome === biomePre && m.biome !== live);
+      if (!playing || m.dead || (m.biome && m.biome !== live && !jcut)) {
         // Clear the bearing with the gain. It changes no sound — the gain is
         // zero — but a mover parked in another chapter that goes on reporting
         // the pan it had when you left is a number a probe will one day believe.
         m.want = 0; m.d = 9999; m.wantPan = 0; m.wantBack = 0; m.wantUp = 0;
         continue;
       }
-      m.want = audioPlace(m.x, m.y, m.z, m.near, m.far) * m.level * m.amp;
+      // A J-CUT MOVER SKIPS THE DISTANCE TERM. audioPlace measures from the
+      // listener's CURRENT position, which during the hold is still standing
+      // in the chapter being LEFT — every biome shares one coordinate space
+      // (CONTRACT.md), so a distance computed against it is a number from
+      // nowhere, not "how far into the next chapter you'd have to walk." A
+      // flat 0.25 (roughly -12 dB) is the roadmap's own number for the crossing.
+      m.want = jcut ? sysMOVER_JCUT_GAIN * m.level * m.amp
+                    : audioPlace(m.x, m.y, m.z, m.near, m.far) * m.level * m.amp;
       // A bed comes up as the world settles, because it IS the world; a vehicle
       // going past does not, because a scooter does not get louder when you
       // sit down. (G6, and the two halves are genuinely different questions;
       // L6 flipped the sign — see sysMOVER_CALM.) Asleep, the beds are the
       // only thing left and they come up 3 dB more (THE SLEEP, E3).
       if (m.bed) m.want *= (1 + sysMOVER_CALM * sysCalmNow) * (1 + sysMUS_SLEEP_BEDS * musSleep);
-      m.wantPan = sysSfxPan; m.wantBack = sysSfxBack; m.wantUp = sysSfxUp;
-      m.d = sysEarTo.length();
+      // A J-cut mover is nowhere near the ear in any sense the pan, the top
+      // or the room send could honestly compute — dead centre, full
+      // brightness, no room, same reasoning as the flat gain above.
+      m.wantPan = jcut ? 0 : sysSfxPan; m.wantBack = jcut ? 0 : sysSfxBack; m.wantUp = jcut ? 0 : sysSfxUp;
+      m.d = jcut ? sysMOVER_FLAT : sysEarTo.length();
     }
     // ---- 2. the four loudest get a graph ---------------------------------
     sysMovers.sort(sysMoverCmp);
@@ -37148,6 +37164,12 @@ export function createSystems(game) {
   let skyT = 0;                   // 0..1, how far the rig has craned up
   let dayT = 0;                   // 0..1 completion, heavily damped
   let transBusy = false;
+  // THE J-CUT (L7, F2): the destination's biome name for the length of the
+  // white hold, before biomeGo actually switches `game.biome.current` to
+  // it. sysMoverTick treats a mover whose own `biome` equals this as live
+  // at a forced 0.25 — the departing chapter's picture with the arriving
+  // chapter's one signature rung already starting to be heard under it.
+  let biomePre = '';
   // THE PLACE ANSWERS BACK (L7, E6): the chapter's `again` for the crossing in
   // flight, or ''. Written at the top of biomeFadeTo, read by the card.
   let sysAgainLine = '';
@@ -37747,6 +37769,7 @@ export function createSystems(game) {
     const bio = game.biome;
     if (!bio || bio.isActive(name)) return false;
     transBusy = true;
+    biomePre = name;   // (L7, F2) the J-cut: cleared once biomeGo actually lands, below
     // ---- THE PLACE ANSWERS BACK (L7, E6 / writing B) --------------------
     // Measured HERE, before the crossing: biome:enter marks the chapter seen
     // and by the time the card rises every arrival looks like a return. A
@@ -37781,6 +37804,7 @@ export function createSystems(game) {
     musCross(-1);
     setTimeout(function () {
       biomeGo(name);
+      biomePre = '';   // (L7, F2) `name` is the live biome now; no more forcing needed
       // ---- THE WHITE COMES OFF A DRAWN FRAME, NOT A TIMER (L6, E8) --------
       // The 460 ms hold used to be armed here and fire whenever it could —
       // which, with the first draw stalling the thread for seconds, was the
