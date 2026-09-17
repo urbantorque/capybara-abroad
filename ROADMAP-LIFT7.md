@@ -439,6 +439,22 @@ boom first); planar reflections; a sliced generator build (E7's crossing
 number with company is the machine's); the 160 dead probes rewritten
 wholesale (E7 retires and counts them).
 
+Added at the close (17 Sep 2026): the musician on the palette's real lead
+voice (F2); SHOW ME on Tab and the sightline-yaw tuning (F3); the dome's
+front lobe and the bird flushes (F4); the composite's blur-tap reduction
+(E7); the band palettes' walking sidechain (E1 — `musSideG` ducks the pad
+alone; every band voice bypasses it); the full E3 occlusion suite run to
+completion.
+
+## Closed (17 Sep 2026)
+Three features and seven areas built and measured across three sessions;
+the closeout with the numbers is the L7 section at the top of CONTRACT.md.
+F2 stands in 13 of 19 chapters, the other six assessed and left without
+one on purpose. F3's why-line reaches all five clockless marquees and the
+first-clock gate all five clocked ones that could take it. F4 is one cause
+for cloud, gust, rain, wet, the air bed and the umbrellas. E7's governor,
+fuzz ceiling, soak diff and boot door are in `npm test`.
+
 ## Order and ownership
 Wave one (six agents, disjoint regions): E1 audio-mix, E2 audio-vocabulary,
 E3 lens, E4 surface, E5 paper, E6 words. Wave two (four agents):

@@ -1,3 +1,197 @@
+## THE SEVENTH LIFT — THE MUSICIAN, THE FIRST ONE ON THE HOUSE, THE WEATHER FRONT AND THE MACHINE (L7 — 14–17 Sep 2026)
+
+Asked for, a seventh time: functional and enjoyable → memorable, beautiful,
+engaging, in line with the top of the field; five to seven areas in detail
+and three to four features that change what the game is; nothing broken.
+Six reviewers read the tree and PLAYED it under playwright with real keys;
+ROADMAP-LIFT7.md is the synthesis. F1 (the parcel) was withdrawn on the
+roadmap's second day, leaving three features. Built in three sessions: the
+first put feature code and the `qa/l7-*` harness in flight across every
+world module and had wave one (E1–E6) partly measured when its limit
+fell; the second committed that tree as found, finished E1, E2, E3 and E6
+bullet by bullet, then built wave two — E7, F4, F3, F2 — serially where
+the roadmap had planned four agents; the third (this one) took the
+no-regret remainder and closed the pass. Every batch under playwright with
+its own instrument, `npm test` (19 checks now: `qa/probes-alive.mjs` joined
+it) green at every commit. The public build is `master`, fast-forwarded
+to `lift-pass` and redeployed by Pages on each push.
+
+### The three features
+
+**F2. THE MUSICIAN.** A `tune` mover in `sysMOVERS` (bed-class: guaranteed
+a slot, no Doppler, no occlusion) plays the L6 melody — `sysMUS_THEME`
+through the existing `musThemeOff`/`musThemeBase` so the degrees land in
+the chapter's own key — one statement every 60 s at 0.6 s a beat, from a
+positioned person, on a placeholder two-triangle voice; on the statement's
+last note the score's own A6 second voice (`sysMUS_2ND`, where the palette
+has a row) answers with the tonic four beats later. THE J-CUT: `biomePre`
+is set the moment `biomeFadeTo` starts, and a mover whose biome is the
+one being crossed INTO is heard flat at 0.25 through the white card, so
+the next chapter's musician arrives before the next chapter does.
+Thirteen of nineteen chapters carry one, each chosen against `sysMUS_PAL`
+rather than guessed: Sydney's busker (npc.js's roster), the Sahara's
+maalem, Rio's bateria, and ten placed by hand — Kyoto's koto on the pond
+bank, Hanoi's xẩm singer off the barber corner, Venice's violin in the
+campo, Cappadocia's ney at the field's edge, Cali's soloist on the
+salsoteca floor, the Pantanal's viola caipira on the porch, Quay's arcade
+busker (already standing there; only the tune added), Manly's busker
+between two Norfolk pines, Monaco's lounge guitarist on the Café de Paris
+terrace in the tux (staff, not a busker the square would move on), and
+Pasto's quena player in the gap the north stalls leave clear — the one
+chapter-local figure in a file whose people otherwise live in npc.js, and
+named as such in the file. Iceland, Kowloon, Drift, the cave, Antarctica
+and Palawan have no plausible performer and were left without one, on
+purpose. Measured: every mover live and built inside its `near` radius on
+a cold switch, 0 console errors across all thirteen; `secondN` 0 → 2 over
+95 s in Sydney, so statements complete and the answer fires; a pitch that
+read "frozen" at 293.7 Hz across five samples was the 60 s gap between
+statements (`tuneIdx` −1, `tuneIn` counting down), not a fault — the two
+debug fields were added to `moverAudit()` so the next reader does not
+make the same mistake. Not built: the palette's REAL lead voice on the
+mover (every `mus*` synth writes to the non-positional score bus; giving
+them an output node is a wider refactor than this pass would risk blind),
+and a "listen to the whole thing" row.
+
+**F3. THE FIRST ONE IS ON THE HOUSE.** THE ZONE: `envZONES.operaStage`
+grew from z 0–2.9 to −0.6–3.5, the riser's own extent, which is why two
+fresh playtesters in a row stood on it and got nothing; the why-hint's own
+check has a further half-metre margin, the task's completion stays exact.
+THE WHY SURVIVES: `marqueeWhy` is a new toast kind (`why`, 4.2 s, was
+`say` at 2.6) and `sysToastPush` evicts oldest-first EXCLUDING a live why
+pill on its first pass — a bubble no longer pushes it off. THE WHY,
+EVERYWHERE THERE IS NO CLOCK: `sysMARQUEE_WHY`, keyed by biome, answers a
+wrong press at a marquee that has no countdown to quote — Pasto, Cali and
+Palawan from the roadmap's own lines, then Hanoi and Iceland this session.
+That is all five of the chapters whose marquee is player-triggered rather
+than clocked; the seven with a `nextIn` already answered with the clock.
+THE FIRST CLOCK: Venice, Kowloon, Cappadocia, Hanoi and Palawan hold their
+countdown at its entry value until the animal is where the chapter already
+calls "there" (25 m of the flood point; a roof; aboard; the alley; the
+lagoon) or 90 s pass — a gate on the start, never on the rhythm once
+running. Hanoi's train re-arms in 20 s after a miss until `the-train` is
+earned, then the ambient 96 s returns. Measured: Venice's `nextIn` is
+bit-identical across 2 s standing 500 m off (78.92 == 78.92) and drops
+once teleported to the point; Kowloon and Cappadocia equally frozen at
+ground / not aboard; the widened zone's why-pill survives four toasts
+fired straight after it; Hanoi's and Iceland's new lines render as `why`
+pills at `game.marqueePoint()`. Not built: SHOW ME on Tab (Tab is the
+journal's key; how the two coexist is a UX decision, not a patch) and the
+sightline-yaw hit-rate (the mechanism is L4's `sysGlimpseShot`; moving
+9/19 → 15/19 is a tuning of `sysGL_KEEP`/`sysGL_SEE_MIN`/`sysGL_BOOM_MIN`
+that needs a per-chapter live measurement the E3 instrument would not
+complete).
+
+**F4. THE WEATHER FRONT.** `wxFront`, −1..1, a position along the
+chapter's wind, crossing once every 6–9 minutes wherever the mood row
+allows rain at all; it REPLACES the old independent dice-roll — crossing
+the line now starts the shower the row already describes, so the cloud
+field, the gust, the rain and the wet layer move from one event instead of
+four rolls. Ahead of the line: cloud builds as a triangle round the
+crossing, the gust's own speed multiplies on approach (shared.js's
+existing `swayTick` turns that into the roadmap's swayK 0.4 → 1.2 for
+free), the AIR bed brightens, and npc.js's umbrellas go up in the last
+sixth of approach. Two pills poll read-once flags: "here it comes." and
+"that was the whole of it." `hud.front(k)` forces it the way `cloudForce`
+does. Measured: `hud.front(−0.2)` moves cloud and gust visibly inside
+3 s, 0 console errors; the crossing and the after-threshold each fire
+their pill's path clean. Not built: the dome's azimuth-weighted dark lobe
+(a new shader term — the dark half of "one cause" is delivered through
+`light()`'s existing rainT/cloudV terms, which the front now drives) and
+the two bird flushes at the line; "that was the whole of it" is a pill,
+not the local's own line.
+
+### The seven areas
+
+**E1. THE MIX, INVERTED.** Sydney gets a sea+city bed (was air only,
+−8.7 dB at rest): the still-window world-vs-score is ≥ −4.7 dB across 11
+sampled chapters (target ≥ −8; was 1/5). Rio's bed gets its own `level`.
+A palette change runs the outgoing lift's release 3× faster
+(`sysMUS_LIFT_XRUN`) so a border does not wait out the last chapter's
+tail. `bandBars` replaces `barN` for the six bands (the pad scheduler's
+counter was resetting under them: 27 then 67 hits-per-bar on one idle
+band). The walking sidechain target (world ≥ score −4 dB) holds 9/11 and
+is short on Rio and Cali — see Held for why that is not a table entry.
+
+**E2. THE VOCABULARY OF A PLACE.** Hanoi's moped horn stops being `bark`
+(the traffic's voice had been borrowed from every dog and rooster in the
+game, 194–722 calls); the shuttlecock's foot is `pop`. `l7-voices.mjs` is
+a ratchet, not a one-shot ceiling: it walks the full call graph (`sysAmb`
+included, which the review's grep missed) and fails only if the count
+goes back up — 256 → 252. The Begin sting says the theme in 11/11 sampled
+chapters.
+
+**E3. THE LENS.** The occlusion capsule's far end scales with distance
+(0.85 floor, was a flat 0.85 that clipped close-up); a floor hit no
+longer counts as an occluder (the first run counted 2.3 % of "occluded"
+as the ground under the animal). `l7-e3-pxtest.js` is a same-frame
+visible/invisible render diff inside the animal's own screen box,
+independent of the raycast entirely — Sydney clean on four poses. The
+full 19-chapter suite (`l7-e3-occl.js`) would not complete: twice past
+15 minutes with no output, against sessions that stayed responsive.
+Reported, not guessed.
+
+**E4. THE SURFACE.** The six-stance table: knee-sd target holds 10/10
+chapters sampled (was ~0). Shoulder-x and torso-z are noisier — ten
+locals per chapter drawn from six stances swings on whether `brow` was
+drawn, which the shot instrument cannot resolve on its own.
+
+**E5. THE PAPER'S HONESTY** and **E6. THE WORDS.** A weather vocabulary
+per chapter (`drift`, `chill`, `drizzle`, `clearing`) keyed to what each
+place's weather.js actually has, so a square's chatter stops reaching for
+four neutral pools. The three walk harnesses stand 20 game-seconds before
+moving — a pure walk had Palawan's jetty pair measuring 0 bubbles because
+the naive path walked into the sea first.
+
+**E7. THE MACHINE.** Rungs re-ordered so the invisible costs go first
+(rung 1 the far cascade and half the shadow map; rung 2 DoF/wide-crease
+off and a new dpr 0.8; rung 3 alone drops to 0.6). Step-UP reads a new
+`game.state.tickMs` — the frame's own per-module bill — instead of the rAF
+period, so a vsync-locked 30 Hz panel can recover a rung. A kinematic
+pack car in Monaco brushing the animal handed cannon-es a response of
+34–85 m/s with "hold on." naming nothing: any car within 3 m that leaves
+the animal faster than its own speed + 2 is clamped to speed + 4 and
+named (`the pack` / `the harbour`). `qa/fuzz.js` gains a real ceiling
+(maxSpeed > 30 fails a chapter, Drift and the balloon given their own
+headroom); `qa/soak-diff.mjs` FAILS on < 2 rows or a stale commit instead
+of exiting 0 — L6-5's "green on one row for eight commits" was a report
+that could never say so. `qa/_boot.js` is the canonical keyboard door;
+the five named audits open with it and write `started`; `probes-alive.mjs`
+counts what still does not. `seen` on restore is bounded to
+1..chapterCount(). Not built: the composite's blur-tap reduction (no
+lever exists to turn).
+
+### What the instruments said that the roadmap did not expect
+
+- **The marqId mismatch was already handled, not a bug to fix.** Palawan,
+  Hanoi, Iceland and Pasto's `nextIn` gate on an id their `wow` task no
+  longer carries (the-bloom, the-train, the-whale, carroza — demoted to
+  minis when the manta, the pho run, the aurora and the condor took the
+  banner). Swapping the string would paint the OLD event's countdown onto
+  the NEW event's label. All four real marquees are player-triggered, so
+  the honest answer is no countdown — which is what `sysMARQUEE_WHY` now
+  says in words for every one of them.
+- **The Rio/Cali sidechain gap is architectural.** `musSideG` sits in
+  series after `musPad` alone; every band voice (clave, conga, surdo,
+  caixa, the bond horns…) writes to `musDrum`/`musPluckDry`, which never
+  pass through it. Not a table row: a new duck factor threaded through the
+  band-voice output path across all six band palettes, scoped so the
+  fifteen lead-instrument chapters do not change. Held.
+- **A pitch that does not move is a gap, not a fault.** See F2.
+- **The four unassessed chapters all fit.** Quay already had the busker.
+
+### Held (named, not built)
+
+From the roadmap: THE FAVOUR; THE VIEW THE PLACE COMPOSES; planar
+reflections; a sliced generator build; the 160 dead probes rewritten
+wholesale (E7 now counts them). Added by this pass: the musician on the
+palette's real lead voice; SHOW ME on Tab; the sightline-yaw tuning; the
+dome's front lobe and the bird flushes; the blur-tap reduction; the band
+palettes' sidechain; the full E3 occlusion suite run to completion.
+
+### THE LINK
+https://urbantorque.github.io/capybara-abroad/ — `master` fast-forwarded
+to `lift-pass` at the close.
+
 ## THE SIXTH LIFT — THE COMPANION, THE SECOND ASK, THE TUNE, THE NOTEBOOK AND THE LOCALS' VOICES (L6 — 13 Sep 2026)
 
 Asked for, a sixth time: functional and enjoyable → memorable, beautiful,
