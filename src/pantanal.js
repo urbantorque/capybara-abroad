@@ -65,6 +65,7 @@ const panLAST_BRIDGE = { z: -96 };
 const panBAIA = { x: -55, z: 6, r: 40 };
 const panRIVER = { z0: -80, z1: -56, bed: -4.2 };
 let panRiverBed = null;              // M13
+let panTuneMv = null;                 // (L7, F2) the viola caipira, on the porch
 let panMarshBed = null;              // ...and the wetland itself, at the animal (L6, E3)
 const panSANDBAR = { x: 34, z: -68, r: 13 };
 const panFAZENDA = { x: 36, z: 76, r: 24 };
@@ -993,6 +994,12 @@ function panBuild(game) {
                 'gather': ['They have gone with you. Just like that. Just like that!'],
                 'tamandua': ['On the tamandua. It has not noticed. It never notices.'],
                 'missing-plank': ['You went over the gap. The truck still cannot.'] } });
+    // THE MUSICIAN (L7, F2): the porch's other side from the boss, clear of
+    // the hammock too — a viola caipira, at dusk.
+    put('musician', panFAZENDA.x - 6, panFAZENDA.z + 14, {
+      face: 2.0,
+      beat: { kind: 'work', every: 4.0, dur: 1.0, sfx: 'strum', volume: 0.11, pitch: 0.75 },
+    });
     // ---- HE WAS NEVER THERE (R10) -----------------------------------------
     // Found by the shipping soak, which is the only pass that ever entered all
     // nineteen chapters and READ THE CONSOLE: `[pantanal] local at -33 -48 is
@@ -5922,6 +5929,13 @@ export function createPantanal(game) {
       panUpdateRipples(game, dt);
       panUpdateRafts(dt);
       panUpdateEcho(game, dt);
+      // THE MUSICIAN (L7, F2): the viola caipira, on the porch.
+      if (!panTuneMv && typeof game.sfxMover === 'function') {
+        panTuneMv = game.sfxMover('tune', { key: 'pantanal:musician', biome: 'pantanal' });
+      }
+      if (panTuneMv && panLocals.musician) {
+        panTuneMv.at(panLocals.musician.x, panLocals.musician.y + 1.0, panLocals.musician.z);
+      }
     },
   };
   game.pantanal = api;

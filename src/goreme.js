@@ -231,6 +231,8 @@ let gorTetherGone = false;
 // collider behind is an invisible wall on the launch field. See gorBuildTether.
 let gorTetherBody = null;
 
+let gorTuneMv = null;   // (L7, F2) the ney, at the field's west edge
+
 let gorSunMesh = null, gorSunGlow = null, gorSunMat = null, gorGlowMat2 = null;
 // the light along the crest of the east ridge — see the ridge block in gorBuild
 let gorRimMat = null;
@@ -5878,6 +5880,13 @@ export function createGoreme(game) {
       gorUpdateGroundSound(game, dt);
       gorUpdateTasks(game, dt);
       gorUpdateVoices(game, dt);
+      // THE MUSICIAN (L7, F2): the ney, at the field's west edge.
+      if (!gorTuneMv && typeof game.sfxMover === 'function') {
+        gorTuneMv = game.sfxMover('tune', { key: 'goreme:musician', biome: 'goreme' });
+      }
+      if (gorTuneMv && gorLocals.musician) {
+        gorTuneMv.at(gorLocals.musician.x, gorLocals.musician.y + 1.0, gorLocals.musician.z);
+      }
     },
   };
   game.goreme = api;
@@ -6336,6 +6345,12 @@ function gorBuild(game) {
       onTask: { 'the-envelope': ['End to end. Sixteen years I have done that walk. Every morning.'],
                 'the-mouth': ['Cold in there, isn’t it. Everybody goes quiet in there.'],
                 'aboard': ['Off you go then. Nobody is stopping you. Nobody ever does.'] } });
+
+    // THE MUSICIAN (L7, F2): the west edge of the field, clear of the crew's
+    // walk and the chief — a ney, waiting with everybody else for first light.
+    gorLocals.musician = game.addLocal({ biome: 'goreme', x: gorFIELD.x - 12,
+      y: gorTerrain(gorFIELD.x - 12, gorFIELD.z - 10), z: gorFIELD.z - 10, near: 8,
+      beat: { kind: 'reach', every: 5.0, dur: 1.3, sfx: 'whistle', volume: 0.09, pitch: 0.7 } });
 
     gorLocals.horse = game.addLocal({ biome: 'goreme', x: gorHERD_X - 5.5, y: gorTerrain(gorHERD_X - 5.5, -70),
       z: -70, near: 8,

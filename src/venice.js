@@ -3355,6 +3355,7 @@ let venCrewRec = null;
 // ...and the rest of the cast, for the exchanges and for anything that wants to
 // make one of them react. See THE PEOPLE WHO LIVE HERE at the bottom.
 let venWaiterRec = null, venWellRec = null, venGondRec = null, venFruitRec = null;
+let venLocMusician = null, venTuneMv = null;   // (L7, F2) the violin, in the campo
 let venCrewSaid = -1;              // which line he used last
 let venCrewCall = -1;              // s until he says it
 const venCREW_CALL = [
@@ -5885,6 +5886,13 @@ export function createVenice(game) {
       // swell on it, because a dead-flat sea reads as glass and it is never glass
       if (venFloatGroup) venFloatGroup.position.y = venWaterY + Math.sin(venTime * 0.7) * 0.025;
       if (venLagoonMesh) venLagoonMesh.position.y = venWaterY + Math.sin(venTime * 0.5) * 0.05;
+      // THE MUSICIAN (L7, F2): the violin, in the campo.
+      if (!venTuneMv && typeof game.sfxMover === 'function') {
+        venTuneMv = game.sfxMover('tune', { key: 'venice:musician', biome: 'venice' });
+      }
+      if (venTuneMv && venLocMusician) {
+        venTuneMv.at(venLocMusician.x, venLocMusician.y + 1.0, venLocMusician.z);
+      }
     },
   };
   game.venice = api;
@@ -6049,6 +6057,11 @@ function venBuild(game) {
       onTask: { 'the-well': ['Eleven hundred years and you are the first to put a nose in it.'],
                 'the-calli': ['You came through the calli? Which bridge? — no. Do not tell me.'],
                 'passerelle': ['End to end without going in. That is more than the mayor managed.'] } });
+    // THE MUSICIAN (L7, F2): the opposite arc of the campo from the well,
+    // clear of its stone box — a violin, busking.
+    venLocMusician = game.addLocal({ biome: 'venice', x: venCAMPO.x - 4,
+      y: venTerrain(venCAMPO.x - 4, venCAMPO.z + 3.5), z: venCAMPO.z + 3.5, near: 8, face: -0.6,
+      beat: { kind: 'work', every: 3.6, dur: 0.9, sfx: 'strum', volume: 0.10, pitch: 1.3 } });
     venGondRec = game.addLocal({ biome: 'venice', x: 4, y: venTerrain(4, 11), z: 11, near: 7,
       figure: { shirt: PALETTE.cloth6, hat: PALETTE.cloth3 },
       // waiting, in the way a man waits all day

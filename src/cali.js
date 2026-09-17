@@ -35,6 +35,7 @@ import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, 
 
 // ---------------------------------------------------------------- geography --
 let caliRiverBed = null;            // M13
+let caliTuneMv = null;               // (L7, F2) the soloist's own tune
 const caliRIVER_Z = 0;              // the Río Cali runs east-west
 const caliRIVER_HZ = 9;             // half-width of the channel
 const caliRIVER_Y = -1.5;           // water surface (the channel is cut below 0)
@@ -185,6 +186,7 @@ const caliM = new THREE.Matrix4();
 // The people this chapter needs a HANDLE on, because they talk to each other.
 // See the addExchange block at the foot of caliBuild.
 let caliLocTeach = null, caliLocBar = null, caliLocCart = null, caliLocLean = null;
+let caliLocMusician = null;   // (L7, F2) the soloist, on the salsoteca floor
 let caliGame = null;
 let caliBuilt = false;
 let caliRoot = null;
@@ -4875,6 +4877,13 @@ export function createCali(game) {
       caliUpdateKites(dt);
       caliUpdateLoros(game, dt);
       caliUpdateNight();
+      // THE MUSICIAN (L7, F2): the soloist, on the salsoteca floor.
+      if (!caliTuneMv && typeof game.sfxMover === 'function') {
+        caliTuneMv = game.sfxMover('tune', { key: 'cali:musician', biome: 'cali' });
+      }
+      if (caliTuneMv && caliLocMusician) {
+        caliTuneMv.at(caliLocMusician.x, caliLocMusician.y + 1.0, caliLocMusician.z);
+      }
     },
   };
   game.cali = api;
@@ -5125,6 +5134,12 @@ function caliBuild(game) {
       wheek: ['Eso! Now dance.'],
       onTask: { 'salsa-dance': ['Eso! ESO! Somebody get the trumpet.',
                                 'A capybara. On the clave. In Cali.'] } });
+    // THE MUSICIAN (L7, F2): a soloist on the opposite arc of the floor from
+    // the teacher, separate figure, same open-air salsoteca.
+    caliLocMusician = game.addLocal({ biome: 'cali', x: caliFLOOR.x + Math.cos(0.9) * 9.0,
+      y: caliTerrain(caliFLOOR.x, caliFLOOR.z) + 0.20,
+      z: caliFLOOR.z + Math.sin(0.9) * 9.0, near: 9, face: -2.8,
+      beat: { kind: 'reach', every: 3.6, dur: 0.9, sfx: 'strum', volume: 0.11, pitch: 1.1 } });
     // ---- and three more, because a city of two and a half million had three --
     // THE KITE HAD NOBODY ON THE END OF IT. caliBuildKites' own comment says
     // the cometas get "hauled back up by somebody the player cannot see", which

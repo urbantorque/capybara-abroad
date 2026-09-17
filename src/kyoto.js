@@ -124,6 +124,7 @@ const kyoM = new THREE.Matrix4();
 // See the addExchange block at the foot of kyoBuild.
 let kyoLocRake = null, kyoLocLate = null, kyoLocSweep = null;
 let kyoLocTea = null, kyoLocTea2 = null;
+let kyoLocMusician = null, kyoTuneMv = null;   // (L7, F2) the koto, at the pond
 let kyoGame = null;
 let kyoBuilt = false;
 let kyoRoot = null;
@@ -4895,6 +4896,13 @@ export function createKyoto(game) {
       kyoUpdateBirds(game, dt);
       kyoUpdateRun(game, dt);
       if (kyoTrackDirty) { kyoTrackDirty = false; kyoTrackMesh.instanceMatrix.needsUpdate = true; }
+      // THE MUSICIAN (L7, F2): the koto, at the pond.
+      if (!kyoTuneMv && typeof game.sfxMover === 'function') {
+        kyoTuneMv = game.sfxMover('tune', { key: 'kyoto:musician', biome: 'kyoto' });
+      }
+      if (kyoTuneMv && kyoLocMusician) {
+        kyoTuneMv.at(kyoLocMusician.x, kyoLocMusician.y + 1.0, kyoLocMusician.z);
+      }
     },
   };
   game.kyoto = api;
@@ -5082,6 +5090,13 @@ function kyoBuild(game) {
                                  'I watched the whole thing. So did the bird.'],
                 'lantern-topple': ['That was not the garden. That was eight hundred years.',
                                    'I heard it. The whole valley heard it.'] } });
+    // THE MUSICIAN (L7, F2): the west bank of the mirror pond, clear of the
+    // bridge and the rake monk both — floor-sitting, which is the only way
+    // a koto is played.
+    kyoLocMusician = game.addLocal({ biome: 'kyoto', x: kyoPOND.x - 18,
+      y: kyoTerrain(kyoPOND.x - 18, kyoPOND.z + kyoPOND.rz - 6),
+      z: kyoPOND.z + kyoPOND.rz - 6, near: 8, face: 2.2,
+      beat: { kind: 'work', every: 4.2, dur: 1.1, sfx: 'strum', volume: 0.11, pitch: 0.85 } });
     // OUTSIDE THE BOWL. kyoBOWL.x + 3 is three metres from the centre of a bowl
     // whose rim is at 5.4, so the tea master has been standing IN the tea, in
     // the middle of the only piece of ground the whisk task asks you to run

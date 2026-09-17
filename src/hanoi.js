@@ -250,6 +250,7 @@ const hanFlowerProps = [];
 let hanMirror = null, hanMirrorDone = false;
 let hanLocPho = null, hanLocBia = null, hanLocRail = null, hanLocFlower = null;
 let hanLocBarber = null, hanLocPuppet = null, hanLocMarket = null;
+let hanLocMusician = null, hanTuneMv = null;   // (L7, F2) the xẩm singer, off the barber corner
 
 // instanced fields
 let hanWinMesh = null;
@@ -4085,6 +4086,12 @@ function hanBuildLocals(game) {
             { t: 'You looked. Thirty-one years and that is the first time it has done THAT.', after: 'barber' }],
     wheek: ['You do not need a haircut. You need a WASH.'],
   });
+  // THE MUSICIAN (L7, F2): a xẩm singer's spot off the barber's corner —
+  // clear of the train alley (hanZ.alley), on a stool, on the đàn bầu.
+  hanLocMusician = put(hanBARBER.x - 4, hanBARBER.z + 5, {
+    face: 0.6, near: 8,
+    beat: { kind: 'work', every: 3.8, dur: 1.0, sfx: 'strum', volume: 0.10, pitch: 0.8 },
+  });
   hanLocPuppet = put(hanPUPPET.x - 7, hanPUPPET.z + 2.8, {
     figure: { shirt: PALETTE.hanWash1 }, face: -0.2, near: 9,
     // THE AUTHORITY (L3, F1): "you may not get in" is a job, and the person
@@ -4788,6 +4795,13 @@ export function createHanoi(game) {
       hanUpdateFolk(dt);
       hanUpdateTasks(game, dt);
       hanUpdateAmbience(game, dt);
+      // THE MUSICIAN (L7, F2): the xẩm singer, off the barber corner.
+      if (!hanTuneMv && typeof game.sfxMover === 'function') {
+        hanTuneMv = game.sfxMover('tune', { key: 'hanoi:musician', biome: 'hanoi' });
+      }
+      if (hanTuneMv && hanLocMusician) {
+        hanTuneMv.at(hanLocMusician.x, hanLocMusician.y + 1.0, hanLocMusician.z);
+      }
     },
   };
 
