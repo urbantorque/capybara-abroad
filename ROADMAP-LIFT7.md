@@ -52,44 +52,7 @@ What the six agreed on, said once:
   a Monaco pack car launches the animal at 34–85 m/s with "hold on." for a
   cause, and the soak diff has been green on one row for eight commits.
 
-## The four features
-
-### F1 · THE PARCEL — the border becomes a decision
-*Bring something from where you were.* (design F1 + 2.3 + 2.4; writing B)
-
-Nothing in 256 rows asks for a decision and nothing consumes the one thing
-that already crosses a border: props.js:4887 stamps `travelFrom` on the
-loose copy that follows a held thing through the white, and its only
-reader is the customs remark (npc.js:14240). THE PARCEL: one row per chapter
-from two onward (`needs: 'parcel'`, `anywhere: false`) — *bring something
-from where you were* — ticked when a prop whose `travelFrom` is the previous
-chapter's biome (`game.travelFromBiome`, or the `seen` order) is put down
-inside 3 m of the traveller's cameo where the traveller stands (Quay,
-Marrakech, Cappadocia, Hanoi) and the chapter's regular elsewhere; the
-cameo's line names the object (*"A traffic cone. From Kyoto. Of course."* —
-a line may be a function, npc.js already allows it); the notebook's entry
-gains a `{parcel}` fact; the row's clue is honest for the empty-handed
-(*there is always a bus back*). THE MANIFEST: the departure card
-(`jrTravel`, systems.js ~27612) says what is aboard — *you are taking · a
-tourist's hat · and an ibis · and a whisk* — and the price of leaving early
-is printed, not hidden (*the keepsake stays here · 4 more*; today the sub is
-'' by construction, 27612–27619). THE DOOR: the first time an animal is
-perched and the way-on is open, one line on the perch — *it will come with
-you, if you let it stay on* (`perchUpdate` ~38553 knows both facts); the
-picker tile shows the companion you would arrive with. THE OVERLAP (design
-2.4): in three chapters with two movers, schedule them to coincide once per
-cycle ≥ 60 m apart and put both on the live line — Venice the flood's peak
-and the traghetto's last crossing; Iceland Strokkur and the whale; Palawan
-the bloom and the manta — *the tide, 40 s · the traghetto, 45 s · not both.*
-Nothing fails; this cycle asks.
-
-**Instrument.** `qa/l7-parcel.js`: a Pasto empanada carried into the Quay
-ticks `parcel-quay` and the traveller names it; a Rio frisbee into Iceland
-ticks at the regular; 18/18 rows reachable under `qa/verbs.mjs` (a `parcel`
-consumer count ≥ 18, `travelFrom` readers ≥ 2); the departure card names the
-manifest and the price (today ''); the perch line fires on a fresh directed
-file before the whistle (today 0 lines); a stand at each overlap's midpoint
-sees both countdowns inside 45 s of each other in 3/3. Effort L / risk med.
+## The three features
 
 ### F2 · THE MUSICIAN — the place plays the tune, and the border is heard
 *A tune that comes from a person in the square.* (audio B + A)
@@ -478,7 +441,7 @@ wholesale (E7 retires and counts them).
 
 ## Order and ownership
 Wave one (six agents, disjoint regions): E1 audio-mix, E2 audio-vocabulary,
-E3 lens, E4 surface, E5 paper, E6 words. Wave two (five agents): F1 parcel,
+E3 lens, E4 surface, E5 paper, E6 words. Wave two (four agents):
 F2 musician, F3 on-the-house, F4 front, E7 machine. Every batch under
 playwright with its own instrument, `qa/fuzz.js` in the chapters it
 touched, `npm test` green; one commit per wave; the closeout in CONTRACT.md
