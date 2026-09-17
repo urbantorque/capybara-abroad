@@ -46,6 +46,7 @@ const sysLightOff  = new THREE.Vector3();
 const sysWorldUp   = new THREE.Vector3(0, 1, 0);
 const sysAimA      = new THREE.Vector3();   // hint arrow: capybara, in NDC
 const sysAimB      = new THREE.Vector3();   // hint arrow: target, in NDC
+const sysYzV       = new THREE.Vector3();   // THE YUZU (L8, F1): a pickup's screen point
 // ---- THE SHOVE, NAMED (L6, E1 / play #5) ----------------------------------
 // The fresh player was put 25 m into the harbour in 2.8 s and the only
 // feedback was a bystander's line. Every external impulse over sysIMP_V now
@@ -4108,6 +4109,7 @@ const sysSAVE_SHAPE = {
   nb: 'object',   // the traveller's notebook (L6, F4)
   stow: 'object', // the companion, { kind, from } (L6, F1); null when alone
   ms: 'number', biome: 'string',
+  yuzu: 'number', platedAt: 'object', // THE YUZU (L8, F1)
 };
 const sysSAVE_DEBOUNCE = 700;      // ms — a streak of ticks writes once
 // ---- THE TWO WAYS STORAGE LETS A PLAYER DOWN, BOTH SILENT UNTIL R3 ---------
@@ -9212,7 +9214,8 @@ function sysBuildCSS() {
 /* the pips go with the bar they sit over — the postcard key takes the paper
    off the window and a row of counters is paper. */
 '#hud.bare .capyui-pips,#hud.bare .capyui-stamlbl,',
-'#hud.bare .capyui-fly,#hud.bare .capyui-perf,#hud.bare .capyui-home{',
+'#hud.bare .capyui-fly,#hud.bare .capyui-perf,#hud.bare .capyui-home,',
+'#hud.bare .capyui-wallet{',
   'opacity:0 !important;pointer-events:none !important;}',
 /* the on-screen stick is display-driven and its children opt back into the
    pointer themselves, so it goes out of the layout rather than to zero alpha */
@@ -9309,7 +9312,32 @@ function sysBuildCSS() {
    The pool is where it belongs — a bubble is the world talking and the paper
    is the game talking, and the game is on top of the glass. */
 '.capyui-todo,.capyui-map,.capyui-toasts,.capyui-stam,.capyui-stamlbl,.capyui-pips,.capyui-fly,',
-  '.capyui-home,.capyui-moment,.capyui-touch{z-index:40;}',
+  '.capyui-home,.capyui-moment,.capyui-touch,.capyui-wallet{z-index:40;}',
+/* ---------- THE YUZU (L8, F1): the wallet ----------
+   A sibling of the paper, not a child (see the DOM comment) — positioned
+   under the card's own top edge so it reads as "one instrument, two rows"
+   without inheriting the card's fade/tuck. Same paper-and-ink idiom, no new
+   colour: the currency is part of the same ledger the paper already is. */
+/* `top` is set live by yuzuWalletReposition() — the paper's own height swings
+   from one tucked row to six rows of an active marquee, and a fixed offset
+   collided with it (measured live, see that function's comment). 46px here
+   is only the frame before the first layout pass reads a real number. */
+'.capyui-wallet{position:absolute;left:14px;top:46px;display:flex;align-items:center;gap:5px;',
+  'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:999px;',
+  'padding:5px 12px 5px 10px;font-size:' + tXs + ';font-weight:700;color:' + ink + ';',
+  'box-shadow:' + shMd + ';transform:rotate(-1deg);cursor:pointer;',
+  'transition:transform ' + dFast + ' ' + mSpring + ',opacity ' + dMed + ' ease;}',
+'.capyui-wallet:hover{transform:rotate(-1deg) scale(1.04);}',
+'.capyui-wallet.bump{animation:capyui-walletbump 260ms ' + mSpring + ';}',
+'@keyframes capyui-walletbump{0%{transform:rotate(-1deg) scale(1);}',
+  '40%{transform:rotate(-1deg) scale(1.22);}100%{transform:rotate(-1deg) scale(1);}}',
+/* ---------- and the pickup's own flight to it ---------- */
+'.capyui-yzfly{position:fixed;left:0;top:0;z-index:55;pointer-events:none;',
+  'font-size:clamp(12px,2vw,15px);font-weight:700;color:#caa428;',
+  'text-shadow:0 1px 2px rgba(0,0,0,.35);transform:translate(0,0) scale(1);opacity:1;',
+  'transition:transform 440ms cubic-bezier(.2,.7,.3,1),opacity 440ms ease 220ms;',
+  'will-change:transform,opacity;}',
+'.capyui-yzfly.go{opacity:0;}',
 /* ---------- to-do list ---------- */
 '.capyui-todo{position:absolute;left:14px;top:12px;width:clamp(172px,32vw,278px);',
   'background:' + paper + ';border-radius:' + rSm + ';padding:10px 12px 12px;transform:rotate(-1.7deg);',
@@ -24864,6 +24892,14 @@ export function createSystems(game) {
   recEl.appendChild(recBestEl);
   todoEl.appendChild(recEl);
   hudRoot.appendChild(todoEl);
+  // THE YUZU (L8, F1): THE WALLET, ALWAYS ON. A sibling of the paper, not a
+  // child of it — it stays up whether the card is out or tucked, which a
+  // node inside `todoEl` cannot do (the card's own fade/tuck classes would
+  // take it with them). Hidden only by `#hud.bare` (photo mode) below.
+  const walletEl = sysEl('button', 'capyui-wallet', '0 yuzu');
+  walletEl.type = 'button';
+  walletEl.title = 'the bag';
+  hudRoot.appendChild(walletEl);
 
   // --- toasts ---
   const toastWrap = sysEl('div', 'capyui-toasts');
@@ -31349,6 +31385,13 @@ export function createSystems(game) {
     // or a page number, and the one word says which (V2).
     countEl.textContent = chapLabel(n) + '  ·  ' + done + ' of ' + rec.ids.length + ' done';
     todoFindsLine(n);
+    // THE YUZU (L8, F1): the wallet sits just under the paper, and the paper's
+    // own height swings hard — a marquee in progress runs to six rows and a
+    // tucked card is one. A fixed offset collided with the marquee's own tag
+    // (measured live: the wallet drew over "OPERA HOUSE CONCERT"'s O). Read
+    // on the same "slow tick" `todoRefresh` already runs on, not per frame —
+    // see the panels() doc comment on why a rect read is not a per-frame cost.
+    yuzuWalletReposition();
 
     // ---- A FINISHED CHAPTER IS NOT AN EMPTY CARD ---------------------------
     // Tick the last thing in a place and the paper went blank: four hidden rows,
@@ -31562,6 +31605,12 @@ export function createSystems(game) {
   // =========================================================================
   const jrSeen = Object.create(null);          // chapters the player has stood in
   const jrRecs = Object.create(null);          // task id -> best value
+  // THE YUZU (L8, F1). One integer, one save key; see the block near the
+  // capy:grab listeners below for the award logic. `jrPlatedAt` stops the
+  // full-plate bonus paying twice if a task is somehow re-ticked.
+  let jrYuzu = 0;
+  const jrPlatedAt = Object.create(null);
+  let yuzuRunN = 0, yuzuRunAt = -1e9;
   /** The generation of every row that has one, for the save (L5). */
   function jrRecGen() {
     const g = {};
@@ -31770,6 +31819,9 @@ export function createSystems(game) {
         paper: paperEver ? 1 : 0,
         // ...and the puff bar's name (L6, E4).
         puff: puffEver ? 1 : 0,
+        // ...and THE YUZU (L8, F1): the wallet, and which chapters have
+        // already paid their full plate. Additive, no version bump.
+        yuzu: jrYuzu, platedAt: jrPlatedAt,
       }));
       // ---- SAY IT ONCE ----------------------------------------------------
       // This game is three and a quarter hours long and it has kept a save file
@@ -31893,6 +31945,11 @@ export function createSystems(game) {
       toast('that is a good one  ·  ' + def.label + ' ' + value.toFixed(def.dp) + def.unit, 'note');
       // P4: two notes up, on the chapter's own lead. See sysMUS_STING.
       if (!musSting('record', 1.15)) sfx('chime', { volume: 0.6, pitch: 1.62 });
+      // THE YUZU (L8, F1): the par crossing, not every personal best — RECORDS
+      // has no clean "wow record" flag to pay the roadmap's 10 against, so
+      // this is a flat 5. No extra pill: the toast above already says it.
+      const yp = game.capy && game.capy.position;
+      yuzuAdd(sysYUZU_RECORD, null, yp && yp.x, yp && yp.y + 1, yp && yp.z);
     } else if (prev !== undefined && !recQuiet) {
       sysRecSaidAt[id] = recWall;
       toast('personal best  ·  ' + def.label + ' ' + value.toFixed(def.dp) + def.unit, 'note');
@@ -33250,6 +33307,8 @@ export function createSystems(game) {
     sfx('chime', { volume: 0.42, pitch: 1.62 });
     const cp = game.capy && game.capy.position;
     if (cp) confettiBurst(cp.x, cp.y + 0.45, cp.z, 6);
+    // THE YUZU (L8, F1): no extra pill — 'noticed' above already says it.
+    yuzuAdd(sysYUZU_FIND, null, cp && cp.x, cp && cp.y + 1, cp && cp.z);
     findWhere[id] = chapterOf(game.biome && game.biome.current);
     saveSoon();
     return true;
@@ -35175,6 +35234,19 @@ export function createSystems(game) {
       slipEver = !!jrFile.slip;
       paperEver = !!jrFile.paper;
       puffEver = !!jrFile.puff;
+      // ...and THE YUZU (L8, F1): the `ms`-style number-or-zero guard, and
+      // the full-plate ledger read back the same way `pal`/`pho` are above.
+      jrYuzu = Math.max(0, typeof jrFile.yuzu === 'number' ? Math.round(jrFile.yuzu) : 0);
+      // PAINTED HERE, NOT JUST SET: yuzuAdd is the only other writer of the
+      // wallet's textContent, and a restore that doesn't fire a fresh award
+      // (jrSeen already has this chapter, so jrMarkSeen pays nothing) would
+      // otherwise leave the DOM on its literal '0 yuzu' initial string while
+      // jrYuzu itself was correctly restored — a real bug, caught live:
+      // `qa/_smoke-yuzu5.js` read the wallet as "0 yuzu" after a restore to
+      // 11.
+      if (walletEl) walletEl.textContent = jrYuzu + ' yuzu';
+      const plAt = jrFile.platedAt || {};
+      for (const k in plAt) if (plAt[k]) jrPlatedAt[k] = true;
       // a chapter already finished on the file must not throw its party again
       for (let n = 1; n <= chapMax; n++) if (chapComplete(n)) jrChapDone[n] = true;
     } else if (!restore) {
@@ -35215,7 +35287,7 @@ export function createSystems(game) {
     // all along: `if (!d && !jrSeen[n] && !anyFind) continue` means a player
     // who wandered around Sydney and left without ticking anything got no
     // Sydney leaf at all.
-    jrSeen[chapterOf(where)] = 1;
+    jrMarkSeen(chapterOf(where));
     const landed = cdef.biome !== 'sydney' ? biomeGo(cdef.biome) : false;
     // ---- ...AND SYDNEY'S REGULAR IS TOLD BY HAND (L4, E5) -------------------
     // The tier reaches npc.js on biome:enter and nowhere else, and Sydney is
@@ -42133,6 +42205,162 @@ export function createSystems(game) {
       incAdd(cp.x, cp.z, gp.id !== undefined ? gp.id : gp.type, 'theft', gp.type);
     }
   });
+
+  // ===========================================================================
+  // THE YUZU (L8, F1) — the currency. Earned at the choke points every reward
+  // already passes through (see the `yuzuAdd` calls near completeTask,
+  // foundFind and recordValue above, and jrMarkSeen for arrival), spent in
+  // the bag (F2, not yet built). See ROADMAP-LIFT8.md.
+  // ===========================================================================
+  const sysYUZU_ARRIVAL = 8;     // THE FIRST LOOK — first-ever entry to a chapter
+  const sysYUZU_TRAVMET = 5;     // meeting the traveller; npc.js gates once/biome
+  const sysYUZU_FIND = 2;
+  const sysYUZU_RECORD = 5;
+  const sysYUZU_KEEP = 15;       // the keepsake, paid alongside the full plate
+  const sysYUZU_TIER = { wow: 20, mini: 8, plain: 3 };
+  const sysYUZU_LADDER_GAP = 6;  // seconds a pickup streak survives
+
+  /**
+   * +n yuzu (n may be negative once the bag can spend it), the wallet's own
+   * juice, and an optional pill for awards with no announcement of their
+   * own — tasks, finds and records already have one (the tick, "noticed",
+   * "that is a good one"), so those pass `why: null` and let the wallet
+   * bump and the flying number carry it. The full plate and the first look
+   * have nothing else saying so, and get a real pill.
+   */
+  function yuzuAdd(n, why, x, y, z) {
+    if (!n) return;
+    jrYuzu = Math.max(0, Math.min(99999, jrYuzu + n));
+    if (walletEl) {
+      walletEl.textContent = jrYuzu + ' yuzu';
+      walletEl.classList.remove('bump');
+      void walletEl.offsetWidth;             // restart the animation, not queue it
+      walletEl.classList.add('bump');
+    }
+    if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number') {
+      const p0 = yuzuScreenPos(x, y, z);
+      if (p0) yuzuFly(p0.x, p0.y, n);
+    }
+    if (why) toast((n > 0 ? '+' + n : String(n)) + '  ·  ' + why, 'note');
+    saveSoon();
+  }
+  /** A world point in CSS pixels, the `boardScreen` pattern. Null behind the lens. */
+  function yuzuScreenPos(x, y, z) {
+    if (!camera || !canvas) return null;
+    sysYzV.set(x, y, z).project(camera);
+    if (sysYzV.z > 1) return null;
+    const r = canvas.getBoundingClientRect();
+    return { x: r.left + (sysYzV.x * 0.5 + 0.5) * r.width,
+             y: r.top + (0.5 - sysYzV.y * 0.5) * r.height };
+  }
+  /** The `+n` that leaves a pickup's screen point and lands on the wallet. */
+  function yuzuFly(x0, y0, n) {
+    if (!walletEl) return;
+    const w = walletEl.getBoundingClientRect();
+    const el = sysEl('div', 'capyui-yzfly', (n > 0 ? '+' : '') + n);
+    el.style.left = x0.toFixed(1) + 'px';
+    el.style.top = y0.toFixed(1) + 'px';
+    document.body.appendChild(el);
+    const dx = (w.left + w.width * 0.5) - x0, dy = (w.top + w.height * 0.5) - y0;
+    requestAnimationFrame(function () {
+      el.classList.add('go');
+      el.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + (dy - 30).toFixed(1) + 'px) scale(0.5)';
+    });
+    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 460);
+  }
+  /** Keeps the wallet clear of the paper regardless of the paper's own
+   *  height (idle, tucked, or six rows deep in a marquee) — see the comment
+   *  at its one call site in todoRefresh(). */
+  function yuzuWalletReposition() {
+    if (!walletEl || !todoEl) return;
+    const r = todoEl.getBoundingClientRect();
+    walletEl.style.top = (r.bottom + 8) + 'px';
+  }
+  window.addEventListener('resize', yuzuWalletReposition);
+  // A CHASE, NOT A CHASE DOWN. The marquee's own text/'on' class is written
+  // inside todoRefresh (a few lines above where this file's reposition call
+  // sits) but ALSO changes on frames todoRefresh is never called on — a
+  // marquee arming or a zone proximity check, neither of which ticks a task.
+  // Measured live: the todoRefresh-only hook left the wallet stranded mid-card
+  // ("...e someone spill their flat white", the M eaten) the moment a marquee
+  // came on between two refreshes. A 350 ms interval is the "slow tick" the
+  // panels() doc comment asks for — cheap, and it self-corrects regardless of
+  // which of the card's many resize causes fired.
+  setInterval(yuzuWalletReposition, 350);
+  /** THE LADDER: a quick run of pickups climbs in pitch, then resets. A
+   *  stepped chime rather than the music engine's own note dispatch — see
+   *  ROADMAP-LIFT8.md's note on this being a deliberate simplification. */
+  function yuzuLadderPitch() {
+    const now = game.state.time;
+    yuzuRunN = (now - yuzuRunAt < sysYUZU_LADDER_GAP) ? (yuzuRunN + 1) % 6 : 0;
+    yuzuRunAt = now;
+    return 1.0 + yuzuRunN * 0.09;
+  }
+  /** First-ever entry to chapter `n`. Called in place of a raw `jrSeen[n]=1`
+   *  at both of its call sites (startGame's landing, biome:enter) so the
+   *  bonus is exactly the transition from unseen to seen — a restored
+   *  `jrSeen` (read from the save before either site runs) already answers
+   *  "have I been here" correctly, so no separate save key is needed. */
+  function jrMarkSeen(n) {
+    if (n && !jrSeen[n]) yuzuAdd(sysYUZU_ARRIVAL, 'the first look');
+    jrSeen[n] = 1;
+  }
+
+  game.events.on('task:complete', function (p) {
+    const r = p && taskRec[p.id];
+    if (!r) return;
+    const tier = (r.def && r.def.wow) ? sysYUZU_TIER.wow
+               : (r.def && r.def.mini) ? sysYUZU_TIER.mini : sysYUZU_TIER.plain;
+    const cp = game.capy && game.capy.position;
+    yuzuAdd(tier, null, cp && cp.x, cp && cp.y + 1, cp && cp.z);
+  });
+  game.events.on('chapter:done', function (p) {
+    const n = p && p.chapter;
+    if (!n || jrPlatedAt[n]) return;
+    jrPlatedAt[n] = true;
+    const rec = chapRec[n];
+    const cnt = rec ? rec.ids.length : 12;
+    const cp = game.capy && game.capy.position;
+    yuzuAdd(Math.max(12, Math.floor(cnt * 1.2)) + sysYUZU_KEEP, 'the full plate',
+            cp && cp.x, cp && cp.y + 1, cp && cp.z);
+  });
+  game.events.on('npc:travMet', function () {
+    // npc.js only ever fires this once per biome (npcTravMet[r.biome] is set
+    // before the emit), so no separate guard is needed here.
+    const cp = game.capy && game.capy.position;
+    yuzuAdd(sysYUZU_TRAVMET, 'said hello', cp && cp.x, cp && cp.y + 1, cp && cp.z);
+  });
+  game.events.on('capy:grab', function (p) {
+    // THE PICKUP. A yuzu is not eaten (physGrazeStep's bite-by-bite mechanic
+    // is gated on `edible`, which these props deliberately do not carry) —
+    // it is collected on the grab itself. The prop is destroyed a tick later
+    // rather than inside this handler: physGrab (props.js) sets
+    // `capy.heldProp = prop`, emits this event, and THEN keeps running
+    // (physStampTouch, the getaway arming) against the same prop object —
+    // removing it synchronously here would pull the rug out from under that
+    // still-executing code. `setTimeout(fn, 0)` runs after physGrab's own
+    // continuation is done, by which point clearing `heldProp` and removing
+    // the prop is exactly as safe as a normal, player-initiated drop.
+    const gp = p && p.prop;
+    if (!gp) return;
+    const def = game.physics && game.physics.typeOf ? game.physics.typeOf(gp.type) : null;
+    if (!def || typeof def.worth !== 'number') return;
+    const b = gp.body;
+    sfx('pop', { volume: 0.5, pitch: yuzuLadderPitch() });
+    if (b) {
+      const golden = gp.type === 'yuzugold';
+      game.sparks(b.position.x, b.position.y + 0.1, b.position.z, golden ? 16 : 8,
+        { spd: 2.2, up: 1.6, grav: 9, drag: 0.6, life: 0.6, size: 0.16,
+          rgb: golden ? [1.6, 1.35, 0.4] : [1.3, 1.1, 0.35] });
+    }
+    yuzuAdd(def.worth, null, b && b.position.x, b && b.position.y + 0.3, b && b.position.z);
+    setTimeout(function () {
+      if (gp.removed) return;
+      if (game.capy && game.capy.heldProp === gp) game.capy.heldProp = null;
+      if (game.physics && typeof game.physics.removeProp === 'function') game.physics.removeProp(gp);
+    }, 0);
+  });
+
   game.events.on('npc:startled', function (p) {
     // A gasp from behind you is one of the funniest things this game does and
     // it has always come out of the middle of the mix.
@@ -43087,7 +43315,7 @@ export function createSystems(game) {
   // (see the atmosphere block in update); the frustum depth is a one-off swap.
   game.events.on('biome:enter', function (p) {
     const name = (p && p.name) || 'sydney';
-    jrSeen[chapterOf(name)] = 1;
+    jrMarkSeen(chapterOf(name));
     saveSoon();
     // The small-caster sweep on the new chapter's first rendered frame, not
     // three seconds in — one frame late, so the world matrices it reads have

@@ -182,6 +182,12 @@ export const PALETTE = {
   ibis:         0xf4f1e6,
   ibisHead:     0x3a332c,
   screenShadow: 0x000000,
+  // THE YUZU (L8, F1). Generic — the currency turns up in all nineteen
+  // chapters, so it gets its own colours rather than borrowing a chapter's.
+  yuzu:         0xe8c23a,
+  yuzuLeaf:     0x6b8f4e,
+  yuzuGold:     0xf3c94a,
+  yuzuGoldDk:   0xd19b1e,
 
   // ---- Cali, Valle del Cauca (chapter 5) ----
   // Cali is a thousand metres up and three degrees off the equator: the light

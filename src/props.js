@@ -1027,6 +1027,33 @@ function physBuildTowel(g) {
   physAdd(g, physBoxG(0.86, 0.06, 0.14), PALETTE.cloth1, 0, 0.2, -0.05);
 }
 
+// ---- THE YUZU (L8, F1) ----------------------------------------------------
+// Chapter-neutral like `poster` above: the currency and none of it scatters
+// from a chapter's own table. A ball plus a leaf nub, same low-poly budget
+// as `dango` — the fruit has to read from 25-70 m (F1's table), not up close.
+function physBuildYuzu(g) {
+  physAdd(g, physSphG(0.10), PALETTE.yuzu, 0, 0.10, 0);
+  physAdd(g, physBoxG(0.018, 0.05, 0.018), PALETTE.yuzuLeaf, 0.03, 0.19, 0, 0, 0, 0.5);
+}
+function physBuildYuzuGold(g) {
+  physAdd(g, physSphG(0.12), PALETTE.yuzuGold, 0, 0.12, 0);
+  physAdd(g, physSphG(0.122), PALETTE.yuzuGoldDk, 0, 0.12, 0).scale.set(1, 0.94, 1);
+  physAdd(g, physBoxG(0.02, 0.06, 0.02), PALETTE.yuzuLeaf, 0.035, 0.225, 0, 0, 0, 0.5);
+}
+// THE BATH (F4): a tub, mesh only this pass. `grabbable: false` below is the
+// real, final value — the bath is a proximity ride (hop in), never a grab —
+// and its carriedBy sequence, the spawner, and the map star are all wave 1's
+// job (see ROADMAP-LIFT8.md). Nothing spawns this type yet.
+function physBuildYuzuBath(g) {
+  physAdd(g, physCylG(0.62, 0.58, 0.42), PALETTE.woodDark, 0, 0.21, 0);
+  physAdd(g, physCylG(0.56, 0.56, 0.36), PALETTE.water, 0, 0.28, 0);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2, r = 0.32;
+    physAdd(g, physSphG(0.09), i % 2 ? PALETTE.yuzu : PALETTE.yuzuGold,
+      Math.cos(a) * r, 0.33, Math.sin(a) * r);
+  }
+}
+
 // ---- Circular Quay set (chapter 1) ---------------------------------------
 function physBuildChips(g) {
   // paper cone, apex down, stuffed with chips — readable from directly above
@@ -1352,6 +1379,17 @@ const physTYPES = {
   // B15. Chapter-neutral: systems.js puts one near the spawn from tier 3 and
   // nothing scatters it, so it appears in no chapter's own table.
   poster:    { name: 'wanted poster', mass: 2.2,  hy: 0.7,  shape: ['box', 0.32, 0.7, 0.09],  hold: [0, 0.16, 0.46],  spin: 0.5, receive: true, build: physBuildPoster },
+
+  // THE YUZU (L8, F1). Chapter-neutral, like poster above. `worth` is read
+  // only by the currency listener (systems.js) — nothing in props.js itself
+  // cares what a prop is worth. `rolling`/`pairId` are set at spawn time
+  // (F4, wave 1), not here; the mesh and the pickup are all this pass builds.
+  // deliberately NOT edible: that flag runs physGrazeStep (the bite-by-bite
+  // held-food mechanic) and the flock's food-seeking — a coin pickup is
+  // instant, on capy:grab, not nibbled over three seconds of standing still.
+  yuzu:      { name: 'a yuzu',        mass: 0.10, hy: 0.10, shape: ['sph', 0.10],             hold: [0, 0.02, 0.08],  spin: 1.4, build: physBuildYuzu, worth: 1 },
+  yuzugold:  { name: 'a golden yuzu', mass: 0.12, hy: 0.12, shape: ['sph', 0.12],             hold: [0, 0.02, 0.09],  spin: 1.4, build: physBuildYuzuGold, worth: 5 },
+  yuzubath:  { name: 'the yuzu bath', mass: 40.0, hy: 0.42, shape: ['box', 1.2, 0.42, 1.2],   hold: [0, 0, 0],        spin: 0,   grabbable: false, receive: true, build: physBuildYuzuBath, worth: 25 },
 
   // ---- Circular Quay (chapter 1) ----
   // Buoyancy is not authored here. Each type's material density lives in
