@@ -1,4 +1,4 @@
-# ROADMAP-WOW — the third beauty pass: reflections, the foreground, still pixels, and nineteen beats (19 Sep 2026)
+# ROADMAP-WOW — the third beauty pass: reflections, the foreground, grass, still pixels, and nineteen beats (19 Sep 2026)
 
 The brief: every chapter noticeably more beautiful — "like 40 % better,
 smoother-looking graphics and more wow factor." LIFT10's audit
@@ -213,6 +213,129 @@ Sydney keeps its own clouds. Cheap, and it is what those six frames'
 top fifth is made of.
 
 - **`game.state.noSky2`.**
+
+## Part A′ — what the reference asks for that the law allows (added 19 Sep 2026)
+
+Two reference frames were put beside the game (a smooth-shaded stylised
+survival game: a figure walking toward a farmhouse at golden hour, and
+the same scene in rain and fog). The game is not that — it is flat-shaded
+low-poly by law and stays so — but read closely, what makes those frames
+feel smooth and rich is mostly not the shading model. It is five things,
+and four of them cost almost nothing here. Ranked by look-per-millisecond;
+each is additive, each cuts on a `noX`, none moves a dial.
+
+### G1 — GRASS AS A VOLUME (the single biggest lift toward the reference)
+
+The reference's ground is a *volume* of blades the figure wades through.
+Ours is a plane with daisy specks and 14 cm squashed-cone tufts
+(`envTuftClump`, environment.js:3488). One instanced draw of flat-shaded
+blade fans — three or four triangles each, no quads-with-alpha, so it is
+inside the law — in a camera-following box like the mote field's
+(`wxBOX_R`, weather.js), ~4–6 k instances, colour taken from the ground's
+own vertex colour at the blade's foot (so it is the lawn's green, the
+Pantanal's, the Drift's violet-grey, never a new hex), height 0.25–0.6 m
+per chapter, a vertex-shader sway driven by the gust the chapter already
+publishes (`swayTick`'s wind, so grass and canopies move to the same
+breath), a distance fade at the far edge of the box, and a trample: blades
+inside 0.5 m of the animal's foot ring lie down along its velocity and
+stand back up over ~2 s. Chapters: Sydney, Pasto, the Pantanal, the
+Drift, Iceland (tussock), Manly (dune grass above the tide), Cali's
+riverbank, Goreme (sparse, dry, short). Not Palawan's sand, not the
+cave, not Antarctica.
+
+- **Cost:** +1 draw call, one instanced buffer updated only when the box
+  recentres (every ~3 m of travel), the sway entirely in the vertex
+  shader. Budget 0.3–0.6 ms. Rung 1 halves the count; rung 2 parks it.
+- **Instrument:** `qa/wow-grass.js` — instances in frustum at arrival,
+  the rAF A/B, and the still-diff (grass sway is INTENDED motion — mask
+  it in `wow-still` the way motes are).
+- **`game.state.noGrass`.**
+
+### G2 — DAPPLE UNDER THE CANOPIES
+
+The first reference frame's ground is mottled — light through leaves.
+The cloud-shadow term already subtracts direct light through a drifting
+noise (`uCloudP`/`uCloudS`, shared.js:2093; the rim-block cloud of the
+first beauty pass). A dapple is the same term with a finer noise, keyed
+to the ground inside each canopy's footprint rather than to the sky:
+`grain(ground, { dapple: { cells, k } })` reading the chapter's canopy
+list (the fig crowns, the Pantanal's gallery trees, Kyoto's, Manly's
+pines, Cali's cable-street trees) as a small uniform array of
+`(x, z, r)`. Moves with the gust like the crowns do. Zero geometry, zero
+draw calls, a few instructions per ground fragment.
+
+- **Instrument:** per-pixel diff inside the canopy footprints; the
+  cloud term's own A/B harness.
+- **`game.state.noDapple`.**
+
+### G3 — GROUND MIST
+
+The second reference frame is three layers of mist with trees dissolving
+through them. The cave already builds one (`cavMist`); nothing else
+does. Generalise it: two or three very large, very low, very soft quads
+per chapter — additive-ish, noise-alpha, drifting on the weather's
+`dir`, fading with height above the ground and to nothing at ~0.8 m —
+for the chapters whose weather row already describes it in words:
+Iceland ("Midnight Haar", a sea mist coming off the water), Goreme
+("the dust that hangs in it over the burners"), the Pantanal at dusk,
+the Drift ("in the mist", its own spawn comment), Monaco ("the faint
+salt haze a Mediterranean evening genuinely has"), Venice at tide. The
+rain rows raise it while a shower runs.
+
+- **Cost:** 2–3 transparent quads, sorted last; ~0.1 ms.
+- **Instrument:** the diff over the lower third of the frame; the
+  weather probe forced on (`odds: 1`, `hold: 14` — trap 35).
+- **`game.state.noMist`.**
+
+### G4 — THE ANIMAL'S RIM, WHEN BACKLIT
+
+The reference's figure has a bright edge against the sky. The game has a
+rim block already (the cloud lives in it; Mong Kok's had to back off its
+magenta hemisphere). It is a world-wide term. Give the animal its own
+rim gain — `capy.model`'s materials only — that rises with how backlit it
+is (`dot(view, sunDir)` at the animal, the same test `sysLEAF_K` is
+directional on), so the capybara separates from a dark background the
+way the figure does, and nothing else in the frame changes. Costs
+nothing; the term exists.
+
+- **Instrument:** `qa/leaf-orbit.js`'s eight azimuths, the animal's
+  silhouette diffed per pixel (hide-and-diff, not a raycast).
+- **`game.state.noCapyRim`.**
+
+### G5 — ROUND THINGS THAT ARE ROUND (the one item here that touches the law — flagged, not assumed)
+
+The reference's "curvature" is smooth normals on organic forms. The law
+says `flatShading: true` only, and the animal, the buildings, the props
+and the people are RIGHT flat-shaded — that is the look. But the canopy
+blobs and the boulders are the two families where a faceted sphere at
+8×6 reads as a gem rather than a crown, and smooth vertex normals on
+those alone — no extra triangles, the same silhouette, one flag per
+material — would read as the reference's soft round crowns while every
+edge in the frame stays hard. This is a taste call and it bends a
+written rule, so it ships behind `game.state.smoothCrowns` OFF by
+default with an A/B screenshot pair per chapter for a human to decide,
+the way `gorBuildSky`'s exemption was written down when it was made.
+Water already reads smooth and is unaffected.
+
+- **Instrument:** nineteen A/B pairs, read by eye. No number decides
+  this one.
+
+### What the reference has that this game should NOT chase
+
+Real-time volumetric fog (a raymarch; the airlight and G3 together are
+its whole visible effect at a hundredth of the cost); a smooth-shaded
+character (the flat capybara is the game's face); textures of any kind;
+motion blur; ambient occlusion beyond the crease (already measured to
+darken lawns — `capy3-the-depth-pass`). Held, with the rest.
+
+### Where G1–G5 sit in the waves
+
+G2 and G4 join **W1** (zero draw calls, pure shader terms — same safety
+class as A3). G1 is its own **W1b**, one agent, after `wow-still` has
+recorded the floors (grass sway must be masked as intended motion before
+it goes in, or the −40 % target reads as broken). G3 joins **W3** with
+the rays. G5 is **W4**, behind its switch, decided by eye at the
+closeout.
 
 ## Part B — nineteen beats, one per chapter, each in its own sentence
 
