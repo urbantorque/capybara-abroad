@@ -668,6 +668,83 @@ the first four reads to repeat).
 - **W0 — the sheet.** Before W1. `qa/wow-sheet.js`, ~160 raw frames,
   read by eye, findings table appended to this file under "The sheet
   said", one row per failing read. Two hours of looking; nothing built.
+
+### The sheet said (19 Sep 2026, first pass)
+
+`qa/wow-sheet.js` built and run: per chapter, the LIVE resting camera's
+own raw render for the hero (a raycast along the camera's forward axis
+finds the hero point with no per-chapter coordinate typed by hand — see
+the script's `heroPoint()`), an orbit side and close shot off that
+point, the marquee mover where this session found a live accessor for
+one, the nearest instanced roster figure, the first `g.locals` entry,
+and the animal in costume where a known task id unlocks one. 132 shots,
+zero console errors.
+
+**First trap, paid again:** the first run used a raw `Digit2..Digit9…`
+key press to move between chapters after chapter one, copying the title
+card's own picker keys. It produced eighteen chapters whose `heroPoint`
+camera position read within a metre of Sydney's — the picker's digit
+keys are wired to the title card alone (`biomeGo`, "a debug jump")
+and do nothing once the game has started; `biome.switchTo()` (trap 36)
+does not move the camera either. The fix, per `game.hud.cross(name)`'s
+own comment ("the only honest arrival"): call that for every chapter
+after the first. Re-run, all nineteen `camPos` values are distinct.
+
+**Second finding, about the instrument itself, not the game:** the
+raycast-based `heroPoint()` only works cleanly when nothing sits
+directly on the camera's forward axis. In twelve chapters (Venice,
+Kowloon, Palawan, Goreme, Manly, Pantanal, the cave, Antarctica, Monaco,
+Hanoi and others) it read a `dist` under 3 m — it found the nearest
+railing, sign or patch of ground, not the hero landmark the wide shot
+actually shows. The raw arrival-camera render (unaffected by this) is
+sound and is what the findings below are read from; the side/close
+orbit shots this instrument produced for those chapters orbit the wrong
+point and should not be trusted without a second look. Worth fixing
+before this instrument is reused for a full six-read pass — not fixed
+this round.
+
+**Read from the nineteen raw arrival frames (hero structures only —
+this is a first pass, not the full six-point rubric on all subjects;
+side/close/roster/local/costume shots were captured but not yet
+individually read):**
+
+- **Sydney — a real camera problem, the P1 kind.** The fig crowns
+  (`envCAM_FIG_R`) fill the frame edge to edge at the resting lens and
+  the Opera House shells are not visible in the arrival frame AT ALL —
+  fully occluded. This is the exact failure A2's own foreground rule
+  exists to avoid ("never crosses the animal's screen-line") on the
+  HERO rather than the animal; worth a look before Sydney's A2 fig
+  bough is added on top of it.
+- **Sahara/Marrakech — the ONE PERSON finding, seen, not just
+  measured.** The souk crowd reads as plain pale cylinders with small
+  cone heads at a glance, visibly lower detail than Sydney's roster in
+  the same session's own screenshots. Confirms the player's report and
+  this file's existing ONE PERSON section by eye, not just by the head-
+  ratio number already cited there.
+- **Antarctica already has a wow beat in its arrival frame.** The
+  resting camera caught what reads as an active ice-calving event — a
+  wall of ice mid-collapse, debris in the air. Whatever built this,
+  Antarctica may need less new work under Part B than its row assumes;
+  worth confirming this is a repeatable arrival state and not a one-off
+  before scoping its beat.
+- **Most chapters confirm A2's own premise** — the 0–4 m band in front
+  of the animal is empty in the raw frame in the great majority of the
+  nineteen. A few already read as having natural foreground by accident
+  (Monaco's quay lamp and palm frond, Kowloon's signpost, Palawan's
+  near-frame local) — worth checking those against A2's six-chapter W1
+  list before adding a second object on top.
+- **Goreme's arrival frame has a close red rail crossing the bottom of
+  frame** near the animal, and the balloon envelopes read as smooth
+  rounded blobs rather than the ribbed-panel silhouette the hero table
+  expects — flag for a closer look when Part C's per-chapter uplift
+  pass reaches it; not confirmed as a problem, just as a frame worth a
+  second look.
+- **Not yet done:** the six-point rubric (silhouette / secondary forms
+  / two colours / a moving part / one asymmetry / the face) on any
+  subject, the side/close hero orbits for the twelve chapters the
+  raycast mis-aimed on, and a read of the roster/local/costume shots
+  this run also captured. The next W0 session should start there rather
+  than re-shooting what already exists in `qa/`.
 - **W4 — the uplifts**, per chapter file, alongside Part B's beats and
   Part A′'s G5 — same files, same agent per chapter. The animal's own
   uplift is its own item in W4 (capybara.js, one agent, first).
