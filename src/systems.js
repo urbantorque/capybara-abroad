@@ -9418,6 +9418,12 @@ function sysBuildCSS() {
 '.capyui-wallet.bump{animation:capyui-walletbump 260ms ' + mSpring + ';}',
 '@keyframes capyui-walletbump{0%{transform:rotate(-1deg) scale(1);}',
   '40%{transform:rotate(-1deg) scale(1.22);}100%{transform:rotate(-1deg) scale(1);}}',
+// THE NINETY PASS, J3: a second, taller overshoot for a big credit — same
+// shape, same spring, more of it. `.big` alone (without `.bump`) does
+// nothing; the two classes are always toggled together at the call site.
+'.capyui-wallet.bump.big{animation:capyui-walletbumpbig 320ms ' + mSpring + ';}',
+'@keyframes capyui-walletbumpbig{0%{transform:rotate(-1deg) scale(1);}',
+  '45%{transform:rotate(-1deg) scale(1.42);}100%{transform:rotate(-1deg) scale(1);}}',
 /* ---------- THE POCKETED KIND (L8, F6): the equipped-item slot ----------
    Same row as the wallet, same pill — `left`/`top` are both set live by
    yuzuWalletReposition() right after it places the wallet, reading the
@@ -10580,6 +10586,11 @@ function sysBuildCSS() {
 '.capyui-mlswatch-leaf{width:10px;height:6px;border-radius:70% 0 70% 0;',
   'background:var(--mlc);transform:rotate(40deg);}',
 '.capyui-mlswatch-faint{width:8px;height:8px;border-radius:50%;border:1px solid var(--mlc);}',
+// THE NINETY PASS, Z1: the coin swatch — an ink disc with a gold ring inside
+// it, the CSS approximation of mapDraw's own shop glyph (a filled disc plus
+// an inner stroked circle in PALETTE.yuzuGold).
+'.capyui-mlswatch-coin{width:10px;height:10px;border-radius:50%;background:' + ink + ';',
+  'box-shadow:inset 0 0 0 2px var(--mlc);}',
 
 /* ---------- stamina ----------
    Bottom left, thin, and ABSENT while it is full: a bar that is always on screen
@@ -26633,6 +26644,11 @@ export function createSystems(game) {
     { shape: 'ring', color: sysHex(PALETTE.seaMid), label: 'water' },
     { shape: 'leaf', color: sysHex(PALETTE.leafB), label: 'leaf' },
     { shape: 'faint', color: sysRgba(PALETTE.ibisHead, 0.22), label: 'faint' },
+    // THE NINETY PASS, Z1: the shop's own coin-and-ring glyph (mapDraw, the
+    // "AND THE SHOP" block below) shipped in LIFT9 S3, after this legend was
+    // written, and was never added to it — the one surface built to teach a
+    // new player what a mark means stayed silent about the newest one.
+    { shape: 'coin', color: sysHex(PALETTE.yuzuGold), label: 'the shop' },
   ];
   for (let mi = 0; mi < mapLegendRows.length; mi++) {
     const row = mapLegendRows[mi];
@@ -26983,6 +26999,12 @@ export function createSystems(game) {
   // truly idle frame (interpolatedPosition still settling, or the game
   // paused under a modal) is the only thing this skips.
   let mapLastX = NaN, mapLastZ = NaN, mapLastYaw = NaN, mapLastCam = NaN, mapLastGoal = undefined, mapLastSpec = null;
+  // THE NINETY PASS, Z3: said once, ever, the first time the shop resolves
+  // to a real position — same one-shot shape as `dropFirstPillSaid`
+  // (systems.js's own THINGS THAT TURN UP pill). A new player is told once,
+  // in words, rather than left to infer a glyph from a legend they may
+  // never have hovered.
+  let mapShopIntroSaid = false;
   let mapLastDrops = -1;
   function mapDraw(p, yaw, camYawNow, goal) {
     const cssW = mapEl.clientWidth;
@@ -27344,6 +27366,7 @@ export function createSystems(game) {
     // about when there is something new to go and buy. Steady otherwise —
     // the stall is always a landmark, only sometimes an errand.
     const sm = mapMarkPos(sysSHOP_MARK);
+    if (sm && !mapShopIntroSaid) { mapShopIntroSaid = true; mapBadge('the shop, on the chart — the gold coin'); }
     if (sm) {
       const sxp = PX(sm.x), szp = PZ(sm.z);
       const sMargin = 5.0 * u;
@@ -27352,11 +27375,20 @@ export function createSystems(game) {
       const shopAfford = shopCu !== null && jrYuzu >= shopCu;
       const shopPr = shopAfford ? mapPulse(0.8) : 0;
       if (shopInside) {
-        const rr = 2.8 * u + shopPr * 0.4;
+        // THE NINETY PASS, Z2: 2.8*u sat between the leaf tick (2.1*u) and
+        // the peak triangle (3.1*u) — the same dark ink, a similar size, and
+        // `qa/l9-shop-map-poor-zoom.png` (this session) shows the result: the
+        // coin reads as just another landmark dot next to a triangle six
+        // pixels away. The pulse was never the fix for that — it is OFF
+        // whenever the wallet can't afford anything, which is exactly a new
+        // player's state. A standing size bigger than every other glyph but
+        // "you" and the goal (6.2*u / 4.6*u) makes it legible before a
+        // player has ever hovered the legend.
+        const rr = 3.6 * u + shopPr * 0.4;
         g2.fillStyle = mapC.ink;
         g2.beginPath(); g2.arc(sxp, szp, rr, 0, 6.284); g2.fill();
         g2.strokeStyle = sysHex(PALETTE.yuzuGold);
-        g2.lineWidth = 1.15 * u;
+        g2.lineWidth = 1.5 * u;
         g2.beginPath(); g2.arc(sxp, szp, rr * 0.55, 0, 6.284); g2.stroke();
       } else {
         // OFF THE DRAWN SQUARE — the hold-to-zoom crop (M7), or a fixture
@@ -43705,9 +43737,16 @@ export function createSystems(game) {
       // yuzu would read as a display that never settles.
       if (Math.abs(n) >= 3) yuzuCountTo(jrYuzu, 360);
       else { yuzuCountStop(); walletEl.textContent = jrYuzu + ' yuzu'; }
-      walletEl.classList.remove('bump');
+      walletEl.classList.remove('bump', 'big');
       void walletEl.offsetWidth;             // restart the animation, not queue it
       walletEl.classList.add('bump');
+      // THE NINETY PASS, J3: a credit worth noticing gets a taller overshoot,
+      // not just the same bump every time — `sysYUZU_BIG` is the golden
+      // yuzu's own worth (3), so this fires for exactly the credits large
+      // enough that a player looking at the corner, not the fruit, should
+      // still feel it happened. Cleared alongside `bump` above so it never
+      // sticks on a later small credit.
+      if (Math.abs(n) >= sysYUZU_BIG) walletEl.classList.add('big');
     }
     if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number') {
       const p0 = yuzuScreenPos(x, y, z);
@@ -43932,6 +43971,13 @@ export function createSystems(game) {
     const eyeBonus = (game.capy && game.capy.mods) ? (game.capy.mods.yuzuBonus || 0) : 0;
     if (dropTag) worth += eyeBonus;
     const twinIn = dropTag === 'twin' && typeof gp.dropWindowEnd === 'number' && game.state.time <= gp.dropWindowEnd;
+    // THE NINETY PASS, J1: every pickup before this scaled off the single
+    // `golden` boolean, so a rolling yuzu (worth 2) and a twin (worth 1) felt
+    // exactly like the plainest fruit in the game. `mag` is worth against the
+    // golden ceiling (dropWorth tops out at 3 pre-bonus; def.worth is the
+    // plain-yuzu fallback of 1) — 0..1, and it is additive to the existing
+    // golden branch below, never a replacement for it.
+    const mag = clamp(worth / sysDROP_MAG_REF, 0, 1);
     // 1. the plink, and the ladder
     const run = yuzuLadderStep();
     sfx('yuzu', { volume: golden ? 0.95 : 0.75, pitch: run.pitch });
@@ -43941,12 +43987,17 @@ export function createSystems(game) {
       setTimeout(function () { sfx('yuzu', { volume: 0.6, pitch: run.pitch * 2 }); }, 220);
       toast('six in a row.', 'note');
     }
-    // 2. the burst: a ring out, a shower up
+    // 2. the burst: a ring out, a shower up. J1: the golden-only counts
+    // become a `mag`-scaled range, `0.7 + 0.5*mag` — a plain yuzu (mag ~0.33)
+    // sits close to its old value, golden (mag 1) sits a little ABOVE its old
+    // one, and worth in between (rolling, twin) is no longer identical to
+    // the floor.
+    const burstK = 0.7 + 0.5 * mag;
     const rgb = golden ? [1.7, 1.4, 0.45] : [1.35, 1.15, 0.38];
-    game.sparks(fx, fy, fz, golden ? 26 : 14,
-      { spd: 3.4, up: 0.8, grav: 7, drag: 0.55, life: 0.55, size: golden ? 0.2 : 0.15, rgb: rgb });
-    game.sparks(fx, fy + 0.1, fz, golden ? 16 : 8,
-      { spd: 0.5, up: 2.4, grav: -1.4, drag: 0.85, life: 1.1, size: golden ? 0.11 : 0.085, rgb: rgb });
+    game.sparks(fx, fy, fz, Math.round((golden ? 26 : 14) * burstK),
+      { spd: 3.4, up: 0.8, grav: 7, drag: 0.55, life: 0.55, size: (golden ? 0.2 : 0.15) * burstK, rgb: rgb });
+    game.sparks(fx, fy + 0.1, fz, Math.round((golden ? 16 : 8) * burstK),
+      { spd: 0.5, up: 2.4, grav: -1.4, drag: 0.85, life: 1.1, size: (golden ? 0.11 : 0.085) * burstK, rgb: rgb });
     if (golden) {
       setTimeout(function () {
         game.sparks(fx, fy, fz, 22, { spd: 4.2, up: 0.5, grav: 5, drag: 0.5, life: 0.5, size: 0.16, rgb: [1.9, 1.8, 1.2] });
@@ -43954,6 +44005,15 @@ export function createSystems(game) {
       yuzuFlash();
       if (typeof musSwell === 'function') musSwell(0.25);
     }
+    // J2: a punch, gated on worth AND on the run streak — never on every
+    // single plain yuzu (mag ~0.33 alone stays under sysSHAKE_MIN and
+    // punch() no-ops), but a rolling/golden pickup, or a fast run of plain
+    // ones (`run.n`, the same streak the ladder already tracks), reads as an
+    // escalating series of small hits rather than a constant tax. `freeze:
+    // false` — a pickup must never hitstop; see punch()'s own doc comment on
+    // why that channel is reserved for named ceremonies only. Routes through
+    // shake()'s own sysCalmOn() guard, so a calm-mode player gets none of it.
+    punch(clamp((mag - 0.25) * 0.10 + run.n * 0.012, 0, sysDROP_PUNCH_MAX), false);
     // GULL-PROOF (F4.3): rides on a golden yuzu specifically, on top of its
     // own worth. See capy.gullProof's own doc comment (capybara.js).
     if (dropTag === 'golden' && game.capy) game.capy.gullProof = sysGULL_PROOF_T;
@@ -44089,6 +44149,15 @@ export function createSystems(game) {
   // is, so a much busier ground does not also mean a much richer one. Plain
   // yuzu (the baseline, and the floor of the whole table) is untouched.
   const sysDROP_TWIN_BONUS = 2;      // was 4 — see the per-fruit worth below
+  // THE NINETY PASS, J: dropCollect's worth-scaled juice (J1/J2). REF is the
+  // golden yuzu's ceiling (dropWorth 3, pre-bonus — see physTYPES) so a plain
+  // yuzu (worth 1, no dropTag) sits at mag ~0.33 and golden clamps to 1.
+  // PUNCH_MAX keeps the top of the range well under sysPUNCH_MIN (0.55 of
+  // sysSHAKE_MAX, ~0.187 in shake's own units) — a pickup must never cross
+  // into punch()'s freeze branch, which is reserved for named ceremonies.
+  const sysDROP_MAG_REF = 3;
+  const sysDROP_PUNCH_MAX = 0.09;
+  const sysYUZU_BIG = 3;             // wallet .big bump: golden's own worth
   // THE MAP SIZE FACTOR. A bigger place should have more to find in it —
   // Quay's harbour crossing is roughly fifteen times Sydney's lawn by area,
   // and a flat cap everywhere made it read exactly as empty as Sydney despite
