@@ -1,4 +1,4 @@
-# ROADMAP-WOW — the third beauty pass: reflections, the foreground, grass, still pixels, the model sheet, and nineteen beats (19 Sep 2026)
+# ROADMAP-WOW — the third beauty pass: reflections, the foreground, grass, still pixels, the model sheet, the living made round, and nineteen beats (19 Sep 2026)
 
 The brief: every chapter noticeably more beautiful — "like 40 % better,
 smoother-looking graphics and more wow factor." LIFT10's audit
@@ -302,29 +302,82 @@ nothing; the term exists.
   silhouette diffed per pixel (hide-and-diff, not a raycast).
 - **`game.state.noCapyRim`.**
 
-### G5 — ROUND THINGS THAT ARE ROUND (the one item here that touches the law — flagged, not assumed)
+### G5 — THE LIVING ARE ROUND (the one amendment to the law, decided)
 
-The reference's "curvature" is smooth normals on organic forms. The law
-says `flatShading: true` only, and the animal, the buildings, the props
-and the people are RIGHT flat-shaded — that is the look. But the canopy
-blobs and the boulders are the two families where a faceted sphere at
-8×6 reads as a gem rather than a crown, and smooth vertex normals on
-those alone — no extra triangles, the same silhouette, one flag per
-material — would read as the reference's soft round crowns while every
-edge in the frame stays hard. This is a taste call and it bends a
-written rule, so it ships behind `game.state.smoothCrowns` OFF by
-default with an A/B screenshot pair per chapter for a human to decide,
-the way `gorBuildSky`'s exemption was written down when it was made.
-Water already reads smooth and is unaffected.
+*Player: "apply more use of smoother curvature (rather than hard blocky
+edges) where appropriate — I think there's benefit applying it a bit to
+the capybara and live human-looking NPCs or animals."*
 
-- **Instrument:** nineteen A/B pairs, read by eye. No number decides
-  this one.
+The rule, and it is the split the reference frames make too (a blocky
+farmhouse, a soft figure): **the built world is hard-edged; anything
+that breathes is round.** Buildings, boats, vehicles, props, the ground,
+the trunks — `flatShading: true`, unchanged, the game's look. The
+capybara, every human, every animal — smooth.
+
+**Why it costs almost nothing.** Three's `SphereGeometry` carries smooth
+per-vertex normals and `BoxGeometry` carries face normals, by
+construction; `flatShading: true` throws both away and recomputes faces
+in the fragment shader. Turn it OFF on a living thing's material and the
+geometry decides: every sphere-built part goes round, every box-built
+part on the same figure stays hard. The capybara is `capyGeoBlob`
+(8×6 spheres, capybara.js:531) and `capyGeoBead` scaled into body,
+head, muzzle and limbs — it rounds in one flag. The ibis, the gull, the
+dog, the llama, the herd, the penguins are `npcMakeGeo` part lists with
+`k:'sph'` bodies and heads — same. The human roster figure's shirt,
+shoulders, hem and placket are boxes and stay crisp, which is right:
+**a body is alive, a garment is built.**
+
+1. **The materials.** `matSelf`/`mat` already take `opts` merged over
+   `{ flatShading: true }`, so `{ flatShading: false }` is the whole
+   change at each living call site — but `mat()` caches by colour, and
+   PALETTE.capy is not unique to the capybara (matSelf's own comment),
+   so the smooth variant needs its own cache key (`matRound(color,
+   opts)`, one wrapper, `_key + ':round'`), or the lawn's fig shares a
+   program with the animal.
+2. **Heads that are boxes become heads that are spheres.** The roster
+   figure's head is a 0.32 m box (npc.js:932); a sphere scaled to the
+   same 0.32×0.32×0.31 is a rounded head with the same silhouette
+   width, and the nose block and neck stay boxes on it. `npcMakeGeo`'s
+   `sph` part takes `r` only — add `sx/sy/sz`. This is the same edit
+   ONE PERSON already makes, so it lands with it. Hips and torso stay
+   boxes (a shirt has corners); hands and feet, where they exist as
+   parts, go `sph`.
+3. **A segment step for the two faces the camera lives on.** The
+   capybara's body and head blobs 8×6 → 12×8 (a few hundred
+   triangles, once; the law's "≤ 8×6" gets the same written exemption
+   row the sky dome and `gorBuildSky` have — this animal is the
+   subject of every frame in the game). Nothing else changes count.
+4. **The condor, the frigatebird, the orca, the manta, the whale, the
+   jacaré, the jabiru, the heron, the koi** — each is checked on the
+   sheet (W0) for which of its parts are spheres and which are boxes
+   that should be, and rounded on the same rule. Wings stay planar.
+5. **The law is amended in CONTRACT.md's "Aesthetic law" when this
+   lands**, in one line: *flat-shaded for the built world; smooth
+   normals for anything that breathes.* Written down, not inferred.
+
+- **Cost:** zero per frame; the program count rises by one per living
+  colour (the smooth variant); the capybara's own triangle count by
+  ~600.
+- **Instrument:** the animal's eight-azimuth contact sheet and each
+  chapter's three NPC kinds, flat vs round, side by side — read by eye
+  (no number decides curvature); `qa/rv-geom.js` re-baselined after.
+  `game.state.noRound` puts every living material back to flat for the
+  A/B.
+- **Wave:** W4, the animal first (with its belly band, eye fleck,
+  toenails and whisker nubs — one contact sheet covers all of it), then
+  the people with ONE PERSON, then the animals per chapter.
+
+Trees' crowns stay OUT of this item: a tree is alive but a crown is a
+mass, not a body, and rounding the fig blobs while the trunks stay
+faceted was the taste call the first draft of this item hedged on. It
+stays behind `game.state.smoothCrowns`, OFF, judged by eye at the
+closeout — the only thing in this pass that still is.
+
 
 ### What the reference has that this game should NOT chase
 
 Real-time volumetric fog (a raymarch; the airlight and G3 together are
-its whole visible effect at a hundredth of the cost); a smooth-shaded
-character (the flat capybara is the game's face); textures of any kind;
+its whole visible effect at a hundredth of the cost); a smooth-shaded BUILT world (G5 rounds what breathes and nothing else); textures of any kind;
 motion blur; ambient occlusion beyond the crease (already measured to
 darken lawns — `capy3-the-depth-pass`). Held, with the rest.
 
@@ -334,8 +387,7 @@ G2 and G4 join **W1** (zero draw calls, pure shader terms — same safety
 class as A3). G1 is its own **W1b**, one agent, after `wow-still` has
 recorded the floors (grass sway must be masked as intended motion before
 it goes in, or the −40 % target reads as broken). G3 joins **W3** with
-the rays. G5 is **W4**, behind its switch, decided by eye at the
-closeout.
+the rays. G5 is **W4**, with the animal and ONE PERSON; only the crowns stay behind a switch.
 
 ## Part B — nineteen beats, one per chapter, each in its own sentence
 
@@ -605,6 +657,6 @@ anti-aliasing (a history buffer fights the art style's hard edges and
 the fixed-camera interpolation contract); a second ambient-occlusion
 term beyond the crease; anything texture-shaped; a cloud layer for the
 thirteen chapters that show no sky; the composite's blur-tap reduction
-(still no lever); any change to Sơn Đoòng's darkness, Kyoto's lane
+(still no lever); smooth normals on anything built (G5 is for what breathes); any change to Sơn Đoòng's darkness, Kyoto's lane
 width, Monaco's still air or Goreme's still air — the audit's list of
 things that are the chapter, not a gap in it.
