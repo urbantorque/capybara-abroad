@@ -762,6 +762,20 @@ individually read):**
   raycast mis-aimed on, and a read of the roster/local/costume shots
   this run also captured. The next W0 session should start there rather
   than re-shooting what already exists in `qa/`.
+
+**A second look at the roster/local shots (same run), the ONE PERSON
+section confirmed by eye, not just by the head-ratio number:**
+`WOW-sahara-roster.png` is featureless cone-headed cylinder pillars —
+no face, no neck, no hair — starkly beside `WOW-sydney-roster.png`'s
+proper face and banded garment in the same sheet. Rio's roster
+(`WOW-rio-roster.png`) reads plainer too, though not as starkly as
+Sahara's. The HAND-BUILT locals, by contrast, are consistently good
+wherever this run sampled one — Venice's and Kyoto's
+(`WOW-venice-local.png`, `WOW-kyoto-local.png`) both carry a real face,
+a hat and a two-tone robe, no worse than the Sydney roster. The gap is
+exactly where ONE PERSON already said it is: the two chapters that roll
+their own crowd from nothing, not the hand-built locals and not the
+shared roster elsewhere.
 - **W4 — the uplifts**, per chapter file, alongside Part B's beats and
   Part A′'s G5 — same files, same agent per chapter. The animal's own
   uplift is its own item in W4 (capybara.js, one agent, first).
