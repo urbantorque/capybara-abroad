@@ -13,10 +13,14 @@
 //      on top of, so a later resize of one without the other cannot silently
 //      bury the leaf back inside the fruit.
 //   2. sysDROP_LIFT sits in the roadmap's own 0.85-1.0 range (V2).
-//   3. The pooled aura (V3) exists as an InstancedMesh, sized 0.9/1.3 m, in
-//      the roadmap's own over-1.0 colours, built the way sparkMesh already
-//      is (additive, toneMapped:false, fog:false, depthWrite:false), and its
-//      opacity is written every tick rather than fixed once.
+//   3. The pooled aura (V3) exists as an InstancedMesh, sized 1.6/2.0 m —
+//      raised from the wave's first pass (0.9/1.3), which a live playtest
+//      measured at 13-22px at the 52m range the roadmap set as its own
+//      target (qa/l9-aura-size.js, scratch); 1.6/2.0 clears 25px there under
+//      the same measured live camera fov — in the roadmap's own over-1.0
+//      colours, built the way sparkMesh already is (additive,
+//      toneMapped:false, fog:false, depthWrite:false), and its opacity is
+//      written every tick rather than fixed once.
 //   4. The vertical shaft (V4) reuses beaconShaft's own geometry numbers
 //      verbatim (0.10, 0.26, 3.0, 8) and is gated to monaco/kowloon/hanoi
 //      only.
@@ -78,10 +82,10 @@ else pass('dropAuraMesh is an InstancedMesh');
 if (!/toneMapped:\s*false,\s*blending:\s*THREEx\.AdditiveBlending/.test(sys.slice(sys.indexOf('dropAuraMesh = new THREEx.InstancedMesh'), sys.indexOf('dropAuraMesh = new THREEx.InstancedMesh') + 600)))
   fail('dropAuraMesh material is not additive/unlit the way sparkMesh is');
 else pass('dropAuraMesh material matches the sparkMesh pattern (additive, unlit)');
-if (!/sysDROP_AURA_D = 0\.9;/.test(sys)) fail('plain aura size is not 0.9 m');
-else pass('plain aura size is 0.9 m');
-if (!/sysDROP_AURA_GOLD_D = 1\.3;/.test(sys)) fail('golden aura size is not 1.3 m');
-else pass('golden aura size is 1.3 m');
+if (!/sysDROP_AURA_D = 1\.6;/.test(sys)) fail('plain aura size is not 1.6 m');
+else pass('plain aura size is 1.6 m');
+if (!/sysDROP_AURA_GOLD_D = 2\.0;/.test(sys)) fail('golden aura size is not 2.0 m');
+else pass('golden aura size is 2.0 m');
 if (!/sysDROP_AURA_RGB = \[1\.5, 1\.25, 0\.45\];/.test(sys)) fail('plain aura colour does not match the roadmap');
 else pass('plain aura colour matches the roadmap ([1.5, 1.25, 0.45])');
 if (!/sysDROP_AURA_GOLD_RGB = \[1\.9, 1\.6, 0\.5\];/.test(sys)) fail('golden aura colour does not match the roadmap');

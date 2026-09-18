@@ -43721,8 +43721,12 @@ export function createSystems(game) {
   // the two night chapters. One InstancedMesh each, fixed max, unused
   // instances parked off-screen rather than resized per chapter.
   const sysDROP_AURA_MAX = 16;            // dropCapFor tops out at 10
-  const sysDROP_AURA_D = 0.9;             // m across, plain yuzu
-  const sysDROP_AURA_GOLD_D = 1.3;        // m across, golden yuzu
+  const sysDROP_AURA_D = 1.6;              // m across, plain yuzu — measured against
+  const sysDROP_AURA_GOLD_D = 2.0;        // m across, golden yuzu   the roadmap's 25px-at-52m target
+  // (qa/l9-aura-size.js): 0.9/1.3 read 13-43px depending on live camera fov
+  // (48deg in play, not the review's rest-lens estimate), well under target
+  // at the far end for plain. 1.6/2.0 clear ~25-31px at 52m under the same
+  // measured fov and stay a soft additive glow, not a solid shape, up close.
   const sysDROP_AURA_RGB = [1.5, 1.25, 0.45];
   const sysDROP_AURA_GOLD_RGB = [1.9, 1.6, 0.5];
   const sysDROP_AURA_HZ = 1.1;            // pulse rate, ~beacon's own (:47344)
@@ -43740,6 +43744,7 @@ export function createSystems(game) {
   dropAuraMesh.renderOrder = 4;
   dropAuraMesh.instanceMatrix.setUsage(THREEx.DynamicDrawUsage);
   dropAuraMesh.count = sysDROP_AURA_MAX;
+  dropAuraMesh.name = 'l9DropAura';
   scene.add(dropAuraMesh);
   // reused so a stray zero-scale instance never rasterises as a lit pixel
   const dropAuraM4 = new THREEx.Matrix4(), dropAuraV = new THREEx.Vector3(), dropAuraS = new THREEx.Vector3();
@@ -43764,6 +43769,7 @@ export function createSystems(game) {
   dropShaftMesh.renderOrder = 4;
   dropShaftMesh.instanceMatrix.setUsage(THREEx.DynamicDrawUsage);
   dropShaftMesh.count = sysDROP_AURA_MAX;
+  dropShaftMesh.name = 'l9DropShaft';
   scene.add(dropShaftMesh);
   const dropShaftM4 = new THREEx.Matrix4(), dropShaftV = new THREEx.Vector3(), dropShaftQ = new THREEx.Quaternion();
   const dropShaftS = new THREEx.Vector3(1, 1, 1);
