@@ -43204,6 +43204,17 @@ export function createSystems(game) {
   function yuzuAdd(n, why, x, y, z) {
     if (!n) return;
     jrYuzu = Math.max(0, Math.min(99999, jrYuzu + n));
+    // THE BALANCE PASS's own ledger (L8, wave 3; qa/l8-balance.js): every
+    // credit, tagged rows-or-ground, so an earn rate can be split the way the
+    // roadmap asks for it. `ground` is whether the call came through
+    // `yuzuAddGround` (the pickup listener, the twin's pair bonus, the bath)
+    // rather than from a task, find, record, arrival, plate or the traveller.
+    // Null by default (qaForceDropT's own convention): one truthiness test
+    // per credit, nothing allocated, when no probe has asked for it.
+    if (Array.isArray(game.state.qaYuzuLog)) {
+      game.state.qaYuzuLog.push({ n: n, why: why || null, ground: yuzuGroundCtx, t: game.state.time });
+      if (game.state.qaYuzuLog.length > 20000) game.state.qaYuzuLog.shift();
+    }
     if (walletEl) {
       walletEl.textContent = jrYuzu + ' yuzu';
       walletEl.classList.remove('bump');
@@ -43217,6 +43228,15 @@ export function createSystems(game) {
     if (why) toast((n > 0 ? '+' + n : String(n)) + '  ·  ' + why, 'note');
     saveSoon();
   }
+  /** The ground's three credits (the pickup, the pair bonus, the bath) come
+   *  through here so the ledger above can tell them from the rows'. Same
+   *  call, one flag around it — nothing else about the credit changes. */
+  let yuzuGroundCtx = false;
+  function yuzuAddGround(n, why, x, y, z) {
+    yuzuGroundCtx = true;
+    try { yuzuAdd(n, why, x, y, z); } finally { yuzuGroundCtx = false; }
+  }
+  game.state.qaYuzuLog = null;   // set to [] by a probe that wants the ledger
   /** A world point in CSS pixels, the `boardScreen` pattern. Null behind the lens. */
   function yuzuScreenPos(x, y, z) {
     if (!camera || !canvas) return null;
@@ -43390,7 +43410,7 @@ export function createSystems(game) {
     // EYE, whose own doc comment names the +4 as unchanged.
     if (dropTag === 'twin' && typeof gp.dropWindowEnd === 'number' && game.state.time <= gp.dropWindowEnd) {
       (function (bx, by, bz) {
-        setTimeout(function () { yuzuAdd(sysDROP_TWIN_BONUS, 'the pair.', bx, by, bz); }, 500);
+        setTimeout(function () { yuzuAddGround(sysDROP_TWIN_BONUS, 'the pair.', bx, by, bz); }, 500);
       })(b && b.position.x, b && b.position.y + 0.5, b && b.position.z);
     }
     // Said once, ever, for whichever of the five kinds turns up first —
@@ -43400,7 +43420,7 @@ export function createSystems(game) {
       toast('yuzu turn up. the map has them.', 'note');
     }
     if (dropTag) dropTake(gp);
-    yuzuAdd(worth, null, b && b.position.x, b && b.position.y + 0.3, b && b.position.z);
+    yuzuAddGround(worth, null, b && b.position.x, b && b.position.y + 0.3, b && b.position.z);
     // THE POP (visibility bump): it doesn't just vanish — it grows then
     // shrinks to nothing over a short beat, bigger and slower the more it
     // was worth, so a golden reads as a bigger deal than a plain yuzu even
@@ -43839,7 +43859,7 @@ export function createSystems(game) {
                 { spd: 0.6, up: 1.3, grav: -0.3, drag: 0.35, life: 1.4, size: 0.2, rgb: [1.7, 1.7, 1.7] });
               if (typeof musSwell === 'function') musSwell(0.5);
               toast('the yuzu bath.', 'note');
-              yuzuAdd(10, null, b.position.x, b.position.y + 0.6, b.position.z);  // was 25
+              yuzuAddGround(10, null, b.position.x, b.position.y + 0.6, b.position.z);  // was 25
             }
           }
         }
