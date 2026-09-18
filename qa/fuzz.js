@@ -76,6 +76,15 @@ async page => {
           if (held.has(k)) { up(k); held.delete(k); } else { down(k); held.add(k); }
         }
         await sleep(16);
+        // THE BAG EATS THE KEYBOARD (L8, F2). A short E on the traveller — who
+        // stands at the way mark in all nineteen chapters now — opens a card
+        // that pauses the world and swallows every key but Escape, and this
+        // loop never pressed Escape: from the chapter it happened in, every
+        // later chapter read maxSpeed 0 ("no input reached the animal") with
+        // the animal parked at the previous chapter's end point. Measured
+        // three soaks running (18 Sep); the F4 fixup's stuck-`paused` story
+        // was this. A player closes the card; so does the fuzz.
+        if (g.state.paused && !document.hidden) { down('Escape'); up('Escape'); }
         const p = g.capy.position, v = g.capy.body.velocity, c = g.camera.position;
         if (!(p.x === p.x && p.y === p.y && p.z === p.z)) nanFrames++;
         if (!(v.x === v.x && v.y === v.y && v.z === v.z)) nanFrames++;

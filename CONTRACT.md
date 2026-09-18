@@ -1,3 +1,298 @@
+## THE EIGHTH LIFT — THE YUZU, THE BAG, THE ANIMAL THAT GETS BETTER, THE THINGS THAT TURN UP, THE WEAR AND THE INCIDENT (L8 — 17–18 Sep 2026)
+
+Asked for, an eighth time, and a different thing: not another lift of
+what is there but a REASON TO KEEP GOING — rewards for doing things, a
+place to spend them, upgrades that are felt, cosmetics that do something,
+and a chaotic element per biome. ROADMAP-LIFT8.md is the synthesis: six
+features and the incident, three waves, anchored to what the tree already
+had (a stamina bar, a wardrobe of ten, one tick event, the traveller who
+keeps turning up, thirty-eight prop kinds, Monaco's capped pool). Built in
+two sessions across seven agents: wave 0 (F1, one agent) at 28f0c11; wave
+1 as three agents in disjoint regions — F3+F6 at 0fd36d0, F2 at 0d5986b,
+F4 at 748c50e with its fixup at 8ea6d3e; a balance nudge after wave-1
+playtesting at 4891f65 and a title restraint pass at 75b0f43; wave 2 as
+two agents — the incident at 2c4a818, F5 at 833a9e1; then wave 3, the
+balance pass (this one), which was interrupted by a playtest that reworked
+the pickup itself (0cfefb7) and resumed against the new mechanic. `npm
+test` grew from 19 checks to 20 at wave 1 (`qa/l8-catalogue.mjs`) and was
+green at every commit. The public build is `master`, fast-forwarded to
+`lift-pass` and redeployed by Pages on each push.
+
+### The six features, and the incident
+
+**F1. THE YUZU.** One integer, `jrYuzu`, one save key, earned at the choke
+points every reward already passes through: a listener on `task:complete`
+pays by tier (plain 3, mini 8, wow 20, read off `taskRec[id].def`),
+`foundFind` 2, `recordValue` 5 on the par-crossing branch only, the full
+plate `max(12, floor(1.2·n)) + 15` on `chapter:done` guarded by
+`jrPlatedAt`, the traveller 5 (npc.js already gates it once per biome),
+and THE FIRST LOOK — 8 on the unseen→seen transition of `jrSeen`, no new
+key, because the restore already reads `jrSeen` before either call site
+runs. Two ground kinds shipped in wave 0 (a yuzu, a golden yuzu — new
+chapter-neutral prop types, deliberately NOT `edible` so the graze
+mechanic never runs on a coin), the bath's mesh registered but
+`grabbable:false`, the wallet as a sibling of the paper rather than a
+child so it survives the card's tuck. Measured: the arrival bonus fires
+once at boot and survives a reload; a forced `chapter:done` on a 20-task
+chapter pays 24+15 and not twice; three bugs found live and fixed in the
+same commit (a synchronous `removeProp` inside the grab listener pulled the
+prop out from under `physGrab`'s own continuation — deferred one tick; a
+restore left the wallet's DOM on its literal "0 yuzu" while the value was
+right — painted once in the restore branch; a fixed CSS top drew the
+wallet over the marquee's own text — a measured reposition on a 350 ms
+interval). Simplified and said so: the ladder was a stepped sfx pitch (the
+rework below made it a real scale), the `+n` flew on a straight transition
+not the roadmap's bezier.
+
+**F2. THE BAG.** Nineteen chapters have a traveller, not four: fifteen new
+cameos at each chapter's `way` mark, hidden until that chapter's first
+real tick (`game.chapDoneHere`, not `jrChapInc`, which the roadmap
+misnamed — it counts incidents). Sydney's lives in main.js because
+environment.js builds before npc.js wires `game.addTraveller`. The card is
+a fourth full-screen card in the ledger/album's own shape, opened by a
+short E on him or a click on the wallet from anywhere not busy, with three
+shelves (the everyday six then the capstones behind a "worth saving for"
+divider; the pocketed kind as a stepper against `capy.itemCap`; wear), and
+a fourth settings split listing what is owned, worn and banked. Holding E
+instead gifts 5 to `jrGifted` (never `jrYuzu`) and at 100, once, unlocks
+`peel-pouch` and raises every F6 cap by 2. Measured: `qa/l8-bag.js` and
+`qa/l8-trav.js` drive both doors and all nineteen `travWhere()` points
+(within 6 m of the way mark, on ground); the hold field started as `giftT`
+and collided with the locals' pre-existing auto-gift-a-snack field of the
+same name — caught frame by frame, renamed `eGiftT`.
+
+**F3 + F6. THE ANIMAL GETS BETTER, THE POCKETED KIND.** `sysUPGRADES`
+beside `sysWARDROBE`: six everyday rows (puff 25/70/130, wind 30/95, legs
+35/115, slide 25/80, breath 55, feet 70 — 730) and three capstones
+(BOTTOMLESS PUFF 340 behind puff III + wind II, THE KEEN EYE 380, THE SPARE
+SEAT 300 — 1 020), `capy.mods` written every frame from `owned` the way
+`capySkill` is written from `taskRec`, read at eight capybara.js sites
+(drain, regen, breath, run, the slide ×2, coyote/grace/air). `capyHOP_VEL`
+and `capyJUMP_HOLD` are never multiplied — `qa/l8-catalogue.mjs` says so
+statically, `qa/l8-upgrades.js` live (apex 1.37 ± 0.02 m at every tier).
+Three consumables on one `capy.boon` field ("always replaces, never
+stacks"), T (F and R were both bound) fires the equipped one, a second
+pill `.capyui-item` right of the wallet. Measured: `capy.stamina` is a
+one-way publish from `capyStam` and cost the first two runs of both
+instruments; `page.goto` back to the same origin does not hand a fresh
+module every time and `owned` carried across three "fresh" boots until
+`qaReset` existed; the apex reads 1.32–1.34 under a synthetic 200 ms press
+and needs a saturating 400 ms hold to read 1.37.
+
+**F4. THINGS THAT TURN UP.** `sysDrops` (`game.drops`): a pool of at most
+`capy.dropCap` live drops per biome, rolled from the odds table (yuzu
+36 / rolling 20 / golden 17 / food 10 / twin 13 / bath 4), spawned through
+a new `game.physics.dropSpot` (the scatter ring seventeen chapters already
+trust; a zone fallback for Sydney and Pasto, which have none), never
+inside `sysWHY_R` of the marquee or 12 m of the arrival point. A rolling
+yuzu nudges its own CANNON body every 2.5–4 s on a 3 m tether with a
+4.5 m hard net (measured: a run of same-way nudges put one 20 m out); a
+twin is two yuzu with a shared `pairId` and a 20 s window on the second
+(its despawn a separate 30 s so "after the window, no penalty" is a real
+state); food carries `dropBoon` (the chapter's own edible → SECOND WIND,
+the generic orange → QUICK); the bath is a proximity ritual, simplified
+from the camera-ease-and-hold picture to an instant refill, a steam burst
+and a half swell, said so in the code. Map dots and a star beside the
+marquee ring; `sysHINTS.__drop`. THE FIXUP (8ea6d3e): the fuzz regression
+reported against F4 was not F4 — it was read then as `visibilitychange`
+(the only writer of `game.state.paused`) failing to re-fire after a focus
+steal, and a five-boolean self-heal was added; wave 3 found the real cause
+under the same symptom (see the balance pass below). And a real leak: `dropReset` (the
+natural door-to-door path, never exercised by QA, which goes through
+`dropForget`) truncated the bookkeeping without removing the props — a live
+drop sat solid and grabbable in every chapter entered afterwards. Measured:
+the odds over 300 rolls within 4 points; the cap never exceeded over 30 s;
+the twin pays 1 / 1+2 inside the window and 1 / 1 outside; the bath 10.
+
+**THE BALANCE NUDGE (4891f65), before wave 3.** Wave-1 playtesting stood
+still in Sydney for two minutes and saw one drop, 27 m off — correct to
+spec, and it read as nothing. The cap is now scaled off each chapter's own
+minimap bounds (Sydney 4, Kyoto 8, the three biggest 10 — `dropCapFor`,
+the square root of the area ratio, clamped) and both timers halved twice
+(first drop 7–14 s, refill 21–43 s); the prizes came DOWN more the bigger
+they were — rolling 3→2, golden 5→3, a full twin pair 8→4, the bath 25→10,
+a plain yuzu untouched — so a busier ground is not a richer one. The
+presence pass: spin, bob, a proximity sparkle inside 8 m, a grow-then-gone
+on the take. The roadmap's "~3.7 yuzu per roll" is stale from here on.
+
+**F5. WEAR THAT DOES SOMETHING.** Ten costumes, ten effects, each at the
+site that actually runs it — three of the roadmap's own citations were
+dead or stale, found by grep: `capy.atHelm`'s stamina branch is
+unreachable (the ferrycap's regen lives in `capyHelmPose`), Sydney has no
+`addCritter`'d gull (the sunhat rides the fig-tree lorikeets), and "the
+barrel window" is not a constant (the surfcap stretches the closing
+lambda). Six for sale (scarf 50, bandana 100, bells 75, lantern 65, medal
+85, bow tie 60 — 435) built the `capyWardrobe` way; the peel pouch as its
+own Group outside the exclusive pick, `capy.pouch()`, a greyed row with the
+lifetime-gifted count. The `wardBuild` fix first: a bought costume never
+pushed into `earned`, so it could be owned and never listed or worn.
+Measured: `qa/l8-wear.js`, sixteen before/after pairs, none equal
+(cavehelm ×1.25, bells 21→30 s, the medal's ghost ~6× longer); several are
+real-time slope measurements and flake deep in a long session — bounded
+retry, said in the script.
+
+**THE INCIDENT, UNPROMPTED (2c4a818).** `sysChaosTick`: every 150–240 s per
+live chapter, no wow showing, past the first minute and clear of the
+marquee, a 40 % roll picks one from a per-biome table of five booleans;
+`capy.ward` (the feather) cancels a roll that would have hit, before the
+dice, so "close call." never fires for a miss. What is real per kind,
+verified against the live tree rather than the roadmap: gust (`capy.shove`
+with `sysIMPULSE_BY`'s own naming, eleven chapters), squall (`hud.front(0)`
+where the mood row allows rain), runaway (a ball or cone 12 m out via the
+twin's own `dropSpotNear`, everywhere — no slope helper exists), stampede
+(the loaf's calm-inversion gate bypassed, where a bold critter is
+registered), and thief FALSE everywhere: every `thief` in the codebase is a
+dialogue reaction to the player stealing, not an NPC that runs at you.
+Measured: `qa/l8-chaos.js` drives the timer with `game.tick` (a plain dt
+accumulator) and forces the 40 % dice — 21–24 incidents per 600 s, no two
+consecutive the same, 0 console errors.
+
+**THE PICKUP REWORK (0cfefb7), mid-pass.** Played after the balance nudge,
+a 0.10 m ball on the grass taken by walking up and pressing E read as
+invisible and then as a chore. The mesh is doubled (0.19 / 0.23 m) and
+drawn absolutely every frame from its ground anchor, `sysDROP_LIFT` up at
+eye line with a bob and its own upright yaw; the fruit is `grabbable:false`
+like the bath and taken inside `sysDROP_TOUCH_R` (1.15 m) of the animal,
+grounded or mid-hop, no key — drop-spawned food the same, one rule; the
+anchor loses collision response the frame it is taken so a sprint cannot
+kick what is about to vanish. Its own voice (`yuzu`, a chirp-up plink
+`l7-voices` never sees), THE LADDER as six degrees of a major scale (a
+golden adds its fifth, a twin's second its third, the sixth in a row rings
+the octave), a ring out and a shower up, the fruit drawn INTO the face
+(`dropFlyIn`). Measured live: lift 0.42 m; `grab()` refused; taken at 0.6 m
+with no key, mid-hop too; `qa/l8-drops.js`'s grabRec is now the
+teleport-inside-the-radius it always should have been.
+
+### The balance pass (wave 3), with the numbers as measured
+
+`qa/l8-balance.js` is a NAIVE PLAYER: it reads the paper's visible rows by
+rendered rect, walks the arrow's target with the closed-loop steer, and at
+the target presses E, wheeks, hops and barges for fifteen seconds before
+giving the row up; it diverts to any drop within 40 m and walks through it,
+goes for a bath from anywhere, meets the traveller once. Every credit goes
+through `yuzuAdd`'s own ledger (`game.state.qaYuzuLog`, null until asked
+for), tagged ROWS or GROUND by whether it came through `yuzuAddGround` —
+the pickup, the pair bonus and the bath. ACCELERATED, and said so: driven
+by `game.tick(1/60)` in one-second chunks with the game's own rAF loop
+muted, ~3× real time; every timer it measures is a dt accumulator, so the
+ground half is what real time gives, and the row half is the bot's own
+competence, the same at any speed. Thirty simulated minutes per chapter,
+a fresh file each, three sizes:
+
+| chapter (cap) | rows | of which | ground | of which | total |
+|---|---|---|---|---|---|
+| Sydney (4) | 51 | 8 arrival · 5 traveller · 10 plain × 3 · 4 finds × 2 | 45 | 19 takes: 8 × 1, 3 × 2, 7 × 3, one bath 10 | 96 |
+| Kyoto (8) | 37 | 8 · 5 · 4 plain × 3 · 6 finds × 2 | 21 | 13 takes: 7 × 1, 4 × 2, 2 × 3 | 58 |
+| Quay (10) | 28 | 8 · 5 · 1 plain × 3 · 1 mini × 8 · 2 finds × 2 | 94 | 58 takes: 32 × 1, 16 × 2, 10 × 3 | 122 |
+
+Before the rework the same bot measured Sydney's ground as 0 in a half
+hour — standing a metre from the fruit pressing E, because a dispatched
+keydown+keyup is cancelled by the grab's own next-frame read, and, once the
+press was a 0.35 s hold, 6 in three minutes. After it: 45. Nothing on the
+ground is missed by not pressing a key any more, which is the whole of the
+rework's effect on the economy.
+
+Three chapters, three shapes. Sydney is rows-and-ground about even. Kyoto
+is a run, its rows spread along it, and the bot spent the half hour on
+them (six rows jammed, four given up) with the fruit mostly out of its 40 m
+notice. Quay is the ceiling: with ten live the animal is never far from
+one, the bot took 58 in thirty minutes — every spawn there was, one roll
+per 21–43 s at ~1.6 a take — and ticked two rows for it. The ground pays
+for LOOKING and it costs DOING, which is the trade the roadmap wanted.
+
+**Against the shelf.** The first HALF HOUR (Sydney, 96; 33 of it inside the
+first five minutes, 13 of that the arrival and the handshake) buys three
+cheap rungs, not one — puff I 25, slide I 25, wind I 30. The first HOUR
+(Sydney + Kyoto, ~155; Sydney + Quay, ~220) buys four to six. Hour 3 is
+450–650 cumulative depending on where the player goes and how much they
+look, ~150–250 of it spent on the everyday shelf, so THE SPARE SEAT (300)
+lands between hour 2 and hour 3 — after the everyday six have been felt,
+before anything like a finished game; an engaged player also ticks minis
+(8), a wow (20) and a full plate (27 for Sydney's twenty rows) that this
+bot barely reached. That is the roadmap's own shape. The ground is NOT
+leaner than the roadmap's stale "~130–165 an hour to a looker" — the
+balance nudge halved the timers twice as it cut the prizes, and a
+diligent looker in a big chapter clears ~190 an hour; a naive one in a
+small chapter ~90. **No price, odds or worth moved.**
+The pocketed kind (30 / 15 / 25) reads as "a thermos every ten minutes
+of looking" exactly where the roadmap put it — in a big chapter with the
+player actually looking (Quay, 94 a half hour) — and as one every twenty
+to forty in a small or spread one; the bank caps (3 / 5 / 3) already stop
+"buy fifty on arrival". Left. The gift
+(100 lifetime at 5 a hold) is twenty holds at ~1 per chapter visit: a
+habit, not a grind. The row constants (8 / 5 / 2 / 5 / 15 / 3-8-20, the
+plate formula) are right where they are.
+
+**What the soak found that is not the economy.** Three soaks in a row
+read `maxSpeed 0` ("no input reached the animal") from one chapter to the
+end of the run, the animal parked at the previous chapter's end point,
+`paused` true with every card at opacity 0 — the exact symptom the F4
+fixup had filed under `visibilitychange`. It is THE BAG: the fuzz's eight
+keys include E, the traveller now stands at the way mark in all nineteen
+chapters, a short E on him opens a card that pauses the world and
+swallows every key but Escape, and `qa/fuzz.js` never pressed Escape.
+Soak 1 passed on the luck of the random walk. One line in the fuzz — if
+`paused` and not hidden, Escape — and two fast runs read 19/19 moving;
+the self-heal stays, harmless. Filed here rather than as a game bug
+because a player closes a card.
+
+**What the bot found that is not the economy.** Sydney's fruit spawns on
+both sides of the garden fence and a straight-line walker sits at
+x = 14.3 sliding along it while the fruit is at x 36–52 (16 of 35 drop
+goals given up); Quay's `take-helm` row is ticked by E at the binnacle and
+from then on quay.js owns the body — the first Quay half hour was a ferry
+being steered at fruit (62 stuck events, ground 4) until the bot learned
+the chapter's own line, "E to step away". Both are the harness, not the
+game: a player walks round a fence and steps off a ferry.
+
+**The soak.** Three rows at last (`npm run soak`, 25–28 min each): the
+12 Sep row, 833a9e1 before the rework, and 0cfefb7 after it, fuzz 19/19
+inside the ceiling, ks and load ok. Two rows were dropped on the way: one
+run with the balance bot open in a second session (it read the same
+symptom as the bag, and the file:// boot timed out under the contention),
+one before the fuzz could close the bag. `soak-diff` reports a comparison
+instead of "nothing to compare yet": 74 columns moved more than 30 %
+against the median of the two earlier rows — 36 of them the frame columns
+(`longest` fell in every chapter, mean ratio 0.59, the run being alone),
+16 `after`, 9 `calls` (4 219 → 4 052 in total; Monaco 205 → 371, the cave
+273 → 109, the fuzz's own random walk), 8 `maxSpeed` up (a fuzz that keeps
+moving now meets the gusts), 5 `saves` from zero.
+
+### What the instruments said that the roadmap did not expect
+
+- **The roadmap's citations were stale in three of four features** and
+  every agent grepped rather than trusted: `jrChapInc` counts incidents not
+  tasks (F2); `capy.atHelm`'s stamina branch is unreachable, Sydney has no
+  gull, the barrel window is a lambda (F5); the thief state is a dialogue
+  reaction, not an NPC that takes (chaos, F4's GULL-PROOF — a read point
+  only, said so in its own comment).
+- **The pickup was the wrong verb.** E on a 0.10 m ball read as a chore;
+  the economy was retuned twice before the mechanic was, and the mechanic
+  was the thing.
+- **A press from a probe has to be a hold**, and a held movement key has
+  to be re-sent — the game clears `keys[]` on its own cards. Two half hours
+  of "the ground pays nothing" were the harness.
+- **The stuck-paused freeze was never F4's, and it was not
+  `visibilitychange` either.** It was F2's bag, opened by the fuzz's own E
+  on a traveller who is now everywhere, never closed because the fuzz had
+  no Escape. Two diagnoses, one symptom; the second reproduced alone,
+  three times, and the fix is one line in the harness.
+
+### Held (named, not built)
+
+From the roadmap: a second currency; a shop with stock or timers; selling
+skills; a jump upgrade; a leaderboard; daily anything. Added by this pass:
+the bath's camera ease and 2.6 s hold on `carriedBy`; the `+n`'s bezier
+arc; an always-on paper row for a live drop; a second "empty tub" mesh for
+the bath's 30 s tail; the roadmap's full 400 s × 3-chapter drops soak in
+real time; a thief that actually runs at you (nothing in the tree does);
+a real-time cross-check of the balance bot (SPEED = 0 exists in the probe
+and was not run).
+
+### THE LINK
+https://urbantorque.github.io/capybara-abroad/ — `master` fast-forwarded
+to `lift-pass` at the close.
+
 ## THE SEVENTH LIFT — THE MUSICIAN, THE FIRST ONE ON THE HOUSE, THE WEATHER FRONT AND THE MACHINE (L7 — 14–17 Sep 2026)
 
 Asked for, a seventh time: functional and enjoyable → memorable, beautiful,

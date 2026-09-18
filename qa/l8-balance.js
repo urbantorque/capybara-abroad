@@ -13,8 +13,10 @@ async page => {
   // arrow's target with the closed-loop steer (trap 26), and at the target
   // does what a first-timer does — presses E, wheeks, hops, bumps into the
   // thing — for fifteen seconds before giving up and trying the next row. It
-  // diverts to any drop within NOTICE_M (the minimap's own dots), always goes
-  // for a bath (its pill says so from anywhere), and meets the traveller once.
+  // diverts to any drop within NOTICE_M (the minimap's own dots) and walks
+  // THROUGH it (the pickup rework, 0cfefb7: no key, sysDROP_TOUCH_R), always
+  // goes for a bath (its pill says so from anywhere), and meets the traveller
+  // once.
   // Every credit lands in `game.state.qaYuzuLog` (yuzuAdd's own ledger), with
   // `ground:true` for the pickup listener, the pair bonus and the bath.
   //
@@ -31,14 +33,6 @@ async page => {
   // cross-checking one chapter (see the CONTRACT's L8 closeout for the
   // numbers both ways).
   //
-  // STATE AT THE CHECKPOINT (18 Sep): the first full Sydney half hour ran
-  // while the pickup rework (yuzu taken by walking through, not by E) was
-  // half-landed in the tree — props.js had already made the yuzu
-  // non-grabbable, the proximity credit did not exist yet — so its ground
-  // column read 0 and means nothing. Rows measured 31 (8 arrival, 5
-  // traveller, 4 plain tasks, 3 finds). Re-run once the rework lands; the
-  // rework's own credit must go through yuzuAddGround (systems.js) or the
-  // ledger will file it under rows.
   const PLAY = ['sydney', 'kyoto', 'quay'];   // small / middle / big (dropCapFor 4 / ~7 / 10)
   const SIM_MIN = 30;
   const SPEED = 20;            // extra ticks per real frame; 0 = the game's own clock only
@@ -162,10 +156,28 @@ async page => {
           const prevKind = S.goalKind, prevId = S.goalId;
           const prevGoal = S.goal;
           pickGoal(); S.moveT = 0;
-          if (!(S.goalKind === prevKind && S.goalId === prevId)) { S.atT = 0; S.stuckT = 0; }
+          if (!(S.goalKind === prevKind && S.goalId === prevId)) { S.atT = 0; S.stuckT = 0; S.goalT = 0; S.detoured = false; S.detour = null; }
           if (prevKind === 'drop' && goalGone) S.log.push({ t: +now.toFixed(1), ev: 'took', kind: prevId });
         }
         if (!S.goal) return;
+        // STEP AWAY FROM THE WHEEL. Quay's take-helm row is ticked by E at the
+        // binnacle, and from then on quay.js owns the body — the first Quay
+        // half hour was a ferry being steered at fruit. 'E to step away' is
+        // the chapter's own line; a player who has ticked the row does.
+        if (g.capy.atHelm && S.goalKind !== 'task') { S.helmT = (S.helmT || 0) + sdt; if (S.helmT > 6) { S.helmT = 0; tap('KeyE'); S.log.push({ t: +now.toFixed(1), ev: 'helm-off' }); } return; }
+        // A BUDGET PER GOAL, whatever the stuck test says: the first Sydney half
+        // hour lost twenty minutes circling a target it could walk toward but
+        // never reach (moving, so never 'stuck'; never inside reach, so never
+        // 'at'). A player gives up on a thing they cannot get to.
+        S.goalT = (S.goalT || 0) + sdt;
+        const budget = S.goalKind === 'task' ? 75 : S.goalKind === 'wander' ? 20 : 45;
+        if (S.goalT > budget) {
+          S.log.push({ t: +now.toFixed(1), ev: 'budget', kind: S.goalKind, id: S.goalId });
+          if (S.goalKind === 'task') S.gaveUp[S.goalId] = now;
+          if (S.goalKind === 'trav') S.travTried++;
+          if (S.goalKind === 'drop' || S.goalKind === 'bath') S.gaveUp['drop@' + S.goal.x.toFixed(0)] = now;
+          S.goal = null; S.goalT = 0; S.stuckT = 0; stop(); return;
+        }
         // a rolling yuzu moves: keep its live position
         if (S.goalKind === 'drop' || S.goalKind === 'bath') {
           const ds = g.drops.where();
@@ -175,12 +187,25 @@ async page => {
         }
         if (!S.goal) return;
         const dist = Math.sqrt(d2(p, S.goal));
-        const reach = S.goalKind === 'bath' ? 1.0 : S.goalKind === 'drop' ? 1.6 : S.goalKind === 'trav' ? 2.4 : 2.6;
+        // a drop is WALKED THROUGH (the pickup rework, 0cfefb7): keep steering
+        // until it is gone — sysDROP_TOUCH_R takes it at 1.15 m with no key
+        const reach = S.goalKind === 'bath' ? 0.6 : S.goalKind === 'drop' ? 0.5 : S.goalKind === 'trav' ? 2.4 : 2.6;
         // stuck: no progress while far from the goal
         const moved = Math.hypot(p.x - S.lastX, p.z - S.lastZ);
         S.lastX = p.x; S.lastZ = p.z;
         if (dist > reach + 1 && moved < 0.25 * sdt) S.stuckT += sdt; else S.stuckT = Math.max(0, S.stuckT - sdt * 0.5);
         if (S.stuckT > 3) { tap('Space'); if (S.stuckT > 5) { key('KeyA', rnd() < 0.5); key('KeyD', rnd() < 0.5); } }
+        // WALK ROUND IT. A straight-line walker measured Quay's ground income
+        // as 4 in a half hour, 62 'stuck' events, all along one quay edge with
+        // the fruit 15 m beyond it. The first time a goal jams, detour 25 m
+        // sideways for a while and come back; only the second jam gives up.
+        if (S.stuckT > 8 && !S.detoured && (S.goalKind === 'drop' || S.goalKind === 'bath' || S.goalKind === 'task')) {
+          const gx = S.goal.x - p.x, gz = S.goal.z - p.z, gm = Math.hypot(gx, gz) || 1;
+          const side = rnd() < 0.5 ? 1 : -1;
+          S.detour = { x: p.x + (-gz / gm) * 25 * side, z: p.z + (gx / gm) * 25 * side, back: S.goal, kind: S.goalKind, id: S.goalId, t: 0 };
+          S.detoured = true; S.stuckT = 0;
+          S.log.push({ t: +now.toFixed(1), ev: 'detour', kind: S.goalKind, id: S.goalId });
+        }
         if (S.stuckT > 18) {
           S.log.push({ t: +now.toFixed(1), ev: 'stuck', kind: S.goalKind, id: S.goalId, dist: +dist.toFixed(1) });
           if (S.goalKind === 'task') S.gaveUp[S.goalId] = now;
@@ -188,11 +213,15 @@ async page => {
           if (S.goalKind === 'drop' || S.goalKind === 'bath') S.gaveUp['drop@' + S.goal.x.toFixed(0)] = now;
           S.goal = null; S.stuckT = 0; stop(); return;
         }
+        if (S.detour) {
+          S.detour.t += sdt;
+          const dd = Math.sqrt(d2(p, S.detour));
+          if (dd > 3 && S.detour.t < 10) { steer(S.detour, true); return; }
+          S.detour = null; S.stuckT = 0;
+        }
         if (dist > reach) {
           S.atT = 0;
           steer(S.goal, dist > 10);
-          // a drop right beside the path is grabbed on the way past
-          if (S.goalKind === 'drop' && dist < 3.5) { S.eT += sdt; if (S.eT > 0.5) { S.eT = 0; tap('KeyE'); } }
           return;
         }
         // AT THE TARGET: the first-timer's repertoire
@@ -202,8 +231,9 @@ async page => {
         const wp = wayPt();
         const nearWay = wp && d2(p, wp) < 14 * 14;
         if (S.goalKind === 'drop' || S.goalKind === 'bath') {
-          if (S.eT > 0.5) { S.eT = 0; tap('KeyE'); }
-          if (S.atT > 12) { S.gaveUp['drop@' + S.goal.x.toFixed(0)] = now; S.log.push({ t: +now.toFixed(1), ev: 'left', kind: S.goalId }); S.goal = null; }
+          // standing on the anchor and still not taken: walk a small circle over it
+          const a2 = S.atT * 3; steer({ x: S.goal.x + Math.cos(a2) * 0.8, z: S.goal.z + Math.sin(a2) * 0.8 }, false);
+          if (S.atT > 8) { S.gaveUp['drop@' + S.goal.x.toFixed(0)] = now; S.log.push({ t: +now.toFixed(1), ev: 'left', kind: S.goalId }); S.goal = null; }
           return;
         }
         if (S.goalKind === 'trav') {
@@ -229,7 +259,14 @@ async page => {
       };
       const t0 = g.state.time;
       const simEnd = t0 + cfg.simS;
-      S.t0 = t0; S.simEnd = simEnd;
+      S.t0 = t0; S.simEnd = simEnd; S.samp = []; S.lastSamp = -1;
+      const sample = () => {
+        const rel = g.state.time - t0; const k = Math.floor(rel / 10);
+        if (k === S.lastSamp) return; S.lastSamp = k;
+        const p = pos() || { x: 0, z: 0 };
+        S.samp.push({ t: Math.round(rel), x: +p.x.toFixed(1), z: +p.z.toFixed(1), goal: S.goalKind + ':' + S.goalId,
+                      gd: S.goal ? +Math.sqrt(d2(p, S.goal)).toFixed(1) : null, yuzu: g.state.qaYuzu(), drops: g.drops.where().length, paused: !!g.state.paused });
+      };
       // ACCELERATED: the probe calls run(n) in short evaluates, so the event
       // loop turns between chunks (deferred removals, the pair bonus). The
       // game's own rAF loop is muted meanwhile (its tick+render was eating
@@ -241,6 +278,7 @@ async page => {
       S.run = function (n) {
         try {
           for (let i = 0; i < n && g.state.time < simEnd; i++) { rawTick.call(g, 1 / 60, false); step(1 / 60); }
+          sample();
           if (g.state.time >= simEnd) { stop(); S.done = true; g.tick = rawTick; }
         } catch (e) { S.err = String(e && e.message || e); stop(); S.done = true; }
         return { done: !!S.done, err: S.err || null, t: g.state.time - t0 };
@@ -250,7 +288,7 @@ async page => {
         let last = performance.now();
         const timer = setInterval(() => {
           const now = performance.now(); const dt = Math.min(0.25, (now - last) / 1000); last = now;
-          try { step(dt); if (g.state.time >= simEnd) { clearInterval(timer); stop(); S.done = true; } }
+          try { step(dt); sample(); if (g.state.time >= simEnd) { clearInterval(timer); stop(); S.done = true; } }
           catch (e) { S.err = String(e && e.message || e); clearInterval(timer); stop(); S.done = true; }
         }, 50);
       }
@@ -259,7 +297,14 @@ async page => {
   `;
 
   for (const biome of PLAY) {
-    // fresh file every chapter: the arrival bonus is part of the half hour
+    // fresh file every chapter: the arrival bonus is part of the half hour.
+    // Cleared AFTER a reload as well: a clear before the goto is undone by the
+    // game's own debounced save on the way out (measured: the second chapter
+    // booted onto a carry-on card of the first's half-finished file and its
+    // Begin did nothing for thirty seconds).
+    await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
+    await page.goto('http://localhost:5188/');
+    await page.waitForTimeout(2500);
     await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
     await page.goto('http://localhost:5188/');
     // a loaded machine boots slowly: poll for the game, up to 60 s, rather than a fixed wait
@@ -272,12 +317,12 @@ async page => {
     await page.evaluate(() => { window.__capy.state.qaYuzuLog = []; });
     await page.evaluate(() => { const b = document.querySelector('.capyui-go'); if (b) b.click(); });
     await page.waitForTimeout(3500);
-    let started = await page.evaluate(() => !!(window.__capy && window.__capy.state.started));
-    if (!started) {   // trap 3: the first gesture after a goto sometimes lands on nothing
-      await page.waitForTimeout(4000);
-      await page.evaluate(() => { const b = document.querySelector('.capyui-go'); if (b) b.click(); });
-      await page.waitForTimeout(3500);
+    let started = false;
+    for (let i = 0; i < 10 && !started; i++) {   // trap 3: the first gesture after a goto sometimes lands on nothing
       started = await page.evaluate(() => !!(window.__capy && window.__capy.state.started));
+      if (started) break;
+      await page.evaluate(() => { const b = document.querySelector('.capyui-go'); if (b) b.click(); });
+      await page.waitForTimeout(3000);
     }
     if (!started) throw new Error('l8-balance: the door did not open');
     if (biome !== 'sydney') {
@@ -323,7 +368,7 @@ async page => {
       const dc = g.capy && g.capy.dropCap;
       return { biome: g.biome.current, simS: +(g.state.time - t0).toFixed(0), wallet: g.state.qaYuzu(),
                rows, ground, buckets, tasksDone: done, tasksOf: b.ids.length, travMet: S.travMet,
-               dropCap: dc, dropsLiveNow: g.drops.where().length, botLog: S.log.slice(-60),
+               dropCap: dc, dropsLiveNow: g.drops.where().length, botLog: S.log.slice(-80), samp: S.samp,
                lastError: g.state.lastError || null };
     }, { ids: tasks.map(t => t.id) });
     res.wallS = Math.round((Date.now() - wall0) / 1000);

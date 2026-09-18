@@ -698,3 +698,23 @@ CONTRACT.md with the numbers as measured.
 A second currency; a shop with stock or timers; selling skills; a jump
 upgrade; a leaderboard; daily anything. Named so nobody builds them in
 wave 3 because the numbers looked thin.
+
+Added at the close (18 Sep 2026): the bath's camera ease and 2.6 s hold
+on `carriedBy` (F1.5/F4); the `+n`'s bezier arc (F1.5); an always-on
+paper row for a live drop (F4.4); a second "empty tub" mesh for the bath's
+30 s tail; the roadmap's full 400 s × 3-chapter drops soak in real time;
+a thief that actually runs at you (the chaos table has `thief` false in
+every chapter — nothing in the tree makes one); a real-time cross-check
+of the balance bot (`qa/l8-balance.js` has SPEED = 0 for it, unrun).
+
+## Closed (18 Sep 2026)
+Six features and the incident built and measured across two sessions and
+seven agents; the closeout with the numbers is the L8 section at the top
+of CONTRACT.md. The pickup itself was reworked mid-pass (0cfefb7: the
+fruit floats, is walked into, and is caught — no E) after a playtest, and
+wave 3 was measured against the new mechanic: per half hour, rows / ground
+Sydney 51 / 45, Kyoto 37 / 21, Quay 28 / 94; the first half hour buys three
+everyday rungs, the first hour four to six, THE SPARE SEAT lands between
+hour 2 and hour 3. No price, odds or worth moved in wave 3; the balance
+nudge (4891f65) before it is where the ground was retuned. `soak-history`
+has its post-rework row and `soak-diff` compares.
