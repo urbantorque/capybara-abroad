@@ -1031,14 +1031,21 @@ function physBuildTowel(g) {
 // Chapter-neutral like `poster` above: the currency and none of it scatters
 // from a chapter's own table. A ball plus a leaf nub, same low-poly budget
 // as `dango` — the fruit has to read from 25-70 m (F1's table), not up close.
+// TWICE THE FRUIT (the pickup rework, after playtesting): a 0.10 m ball on
+// the grass was measured invisible from ten metres, and it is no longer a
+// prop you walk up to — it floats (systems.js lifts the MESH, not the body:
+// the body stays a small sphere on the ground, the anchor the spawner and the
+// rolling nudge already work against) and is taken the moment the animal
+// passes through it. The mesh is built around its own origin rather than
+// resting on y=0 so the float and the spin read about the fruit's centre.
 function physBuildYuzu(g) {
-  physAdd(g, physSphG(0.10), PALETTE.yuzu, 0, 0.10, 0);
-  physAdd(g, physBoxG(0.018, 0.05, 0.018), PALETTE.yuzuLeaf, 0.03, 0.19, 0, 0, 0, 0.5);
+  physAdd(g, physSphG(0.19), PALETTE.yuzu, 0, 0, 0);
+  physAdd(g, physBoxG(0.034, 0.10, 0.034), PALETTE.yuzuLeaf, 0.05, 0.19, 0, 0, 0, 0.5);
 }
 function physBuildYuzuGold(g) {
-  physAdd(g, physSphG(0.12), PALETTE.yuzuGold, 0, 0.12, 0);
-  physAdd(g, physSphG(0.122), PALETTE.yuzuGoldDk, 0, 0.12, 0).scale.set(1, 0.94, 1);
-  physAdd(g, physBoxG(0.02, 0.06, 0.02), PALETTE.yuzuLeaf, 0.035, 0.225, 0, 0, 0, 0.5);
+  physAdd(g, physSphG(0.23), PALETTE.yuzuGold, 0, 0, 0);
+  physAdd(g, physSphG(0.233), PALETTE.yuzuGoldDk, 0, 0, 0).scale.set(1, 0.94, 1);
+  physAdd(g, physBoxG(0.04, 0.12, 0.04), PALETTE.yuzuLeaf, 0.06, 0.23, 0, 0, 0, 0.5);
 }
 // THE GENERIC FOOD ROLL (L8, F4): a chapter with no edible of its own in
 // `physBIOME_SCATTER` (iceland, sahara, drift, venice, palawan, goreme,
@@ -1396,9 +1403,14 @@ const physTYPES = {
   // (F4, wave 1), not here; the mesh and the pickup are all this pass builds.
   // deliberately NOT edible: that flag runs physGrazeStep (the bite-by-bite
   // held-food mechanic) and the flock's food-seeking — a coin pickup is
-  // instant, on capy:grab, not nibbled over three seconds of standing still.
-  yuzu:      { name: 'a yuzu',        mass: 0.10, hy: 0.10, shape: ['sph', 0.10],             hold: [0, 0.02, 0.08],  spin: 1.4, build: physBuildYuzu, worth: 1 },
-  yuzugold:  { name: 'a golden yuzu', mass: 0.12, hy: 0.12, shape: ['sph', 0.12],             hold: [0, 0.02, 0.09],  spin: 1.4, build: physBuildYuzuGold, worth: 5 },
+  // instant, not nibbled over three seconds of standing still.
+  // ...AND NOT GRABBABLE EITHER (the pickup rework): like the bath, a yuzu is
+  // taken by walking through it — sysDropsTick's own proximity check — never
+  // by E. The body sphere is kept small on purpose: it is the anchor the
+  // spawner validates and the rolling nudge pushes, while the MESH is twice
+  // its size and floats above it (see physBuildYuzu).
+  yuzu:      { name: 'a yuzu',        mass: 0.10, hy: 0.10, shape: ['sph', 0.10],             hold: [0, 0.02, 0.08],  spin: 1.4, grabbable: false, build: physBuildYuzu, worth: 1 },
+  yuzugold:  { name: 'a golden yuzu', mass: 0.12, hy: 0.12, shape: ['sph', 0.12],             hold: [0, 0.02, 0.09],  spin: 1.4, grabbable: false, build: physBuildYuzuGold, worth: 5 },
   yuzubath:  { name: 'the yuzu bath', mass: 40.0, hy: 0.42, shape: ['box', 1.2, 0.42, 1.2],   hold: [0, 0, 0],        spin: 0,   grabbable: false, receive: true, build: physBuildYuzuBath, worth: 25 },
   // THE GENERIC FOOD ROLL (L8, F4) — see physBuildOrange. `edible: true`
   // like the eleven chapter foods, on purpose: a sysDrops-spawned instance is

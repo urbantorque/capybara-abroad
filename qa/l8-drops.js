@@ -189,22 +189,18 @@ async page => {
   // bonus window, a food boon, THE SPARE SEAT's cap of 3.
   // ===========================================================================
   //
-  // GRABBED DIRECTLY, NOT WALKED UP TO AND PRESSED. `game.physics.grab(prop)`
-  // IS THE SAME FUNCTION capybara.js's own E-key handler calls once it has
-  // found something in reach (`ph.grab(p)`, capybara.js ~7181) — the "walk
-  // over and press E" half is capybara.js's own long-proven mechanic, not
-  // anything this pass built, and simulating it (teleport, wait for
-  // grounded, a real key press, hope `nearestGrabbable` agrees which prop is
-  // nearest) turned out to be the single least reliable part of this whole
-  // instrument: three rewrites, and it still failed a different assertion on
-  // a different run each time — a textbook case of the harness's own "a
-  // teleport is motion" trap compounding with zone-crowded spawn points.
-  // Calling `grab` on the exact prop this test just spawned proves the thing
-  // THIS PASS actually built — the event payload's worth, THE KEEN EYE's
-  // bonus, GULL-PROOF, the boon, the twin bookkeeping — without also
-  // re-proving (unreliably) a pickup mechanic that was never in scope.
+  // WALKED INTO, NOT GRABBED (the pickup rework). This used to call
+  // `game.physics.grab(prop)` directly — the yuzu types are `grabbable:
+  // false` now, and a yuzu is taken by sysDropsTick's own proximity check
+  // the moment the animal is inside sysDROP_TOUCH_R (1.15 m) of its ground
+  // anchor, no key. So the honest test IS the teleport: put the animal 0.5 m
+  // from the anchor, give the tick a few frames, and read `dropTaken` off
+  // the prop. "A teleport is motion" (the harness's own trap) does not bite
+  // here because the take has no stillness or grounded gate at all — that
+  // is the mechanic. `grabRec` keeps its name so the call sites read as
+  // they did.
   function grabRec(rec, kindFilter) {
-    return page.evaluate(([rec, kindFilter]) => {
+    return page.evaluate(async ([rec, kindFilter]) => {
       const g = window.__capy;
       const live = g.state.qaDrops();
       let best = null, bestD = Infinity;
@@ -216,7 +212,11 @@ async page => {
         if (dist < bestD) { bestD = dist; best = d.prop; }
       }
       if (!best) return false;
-      return !!g.physics.grab(best);
+      const b = best.body.position;
+      const cb = g.capy.body;
+      cb.position.set(b.x - 0.5, b.y + 0.3, b.z); cb.velocity.set(0, 0, 0);
+      for (let i = 0; i < 12 && !best.dropTaken; i++) await new Promise(r => setTimeout(r, 30));
+      return !!best.dropTaken;
     }, [rec, kindFilter || null]);
   }
 

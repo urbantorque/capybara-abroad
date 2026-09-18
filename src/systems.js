@@ -4277,6 +4277,7 @@ const sysCUE_TEXT = {
   campanile: 'the campanile', muezzin: 'the call to prayer', organ: 'the organ', cheer: 'a cheer',
   bark: 'a dog', gull: 'gulls', whistle: 'a whistle', thud: 'a thud', splash: 'a splash',
   chime: 'a chime', berg: 'ice, cracking', groan: 'the ice groans', tram: 'a tram bell',
+  yuzu: 'a yuzu, taken',
   cleaver: 'a cleaver', mahjong: 'mahjong tiles', pigeons: 'pigeons, all at once',
   darbuka: 'a drum', cart: 'a cart', vendor: 'a vendor calling', bowls: 'bowls, stacked',
   cicada: 'cicadas', magpie: 'a magpie', lorikeet: 'lorikeets', higurashi: 'evening cicadas',
@@ -9447,6 +9448,18 @@ function sysBuildCSS() {
   'transition:transform 440ms cubic-bezier(.2,.7,.3,1),opacity 440ms ease 220ms;',
   'will-change:transform,opacity;}',
 '.capyui-yzfly.go{opacity:0;}',
+'.capyui-yzfly.mid{font-size:clamp(17px,2.8vw,22px);color:' + sysHex(PALETTE.yuzuGold) + ';}',
+'.capyui-yzfly.big{font-size:clamp(24px,3.8vw,32px);color:' + sysHex(PALETTE.yuzuGold) + ';',
+  'text-shadow:0 0 12px ' + sysRgba(PALETTE.yuzuGold, 0.7) + ',0 1px 2px rgba(0,0,0,.35);}',
+/* ---------- a golden's wash over the frame (the pickup rework) ----------
+   One class flip; the fade-in is 40 ms and the fade-out is the transition.
+   Radial rather than flat so the middle of the frame — where the animal
+   is — brightens most and the edges barely move: a warmth, not a strobe. */
+'.capyui-yzflash{position:fixed;inset:0;z-index:54;pointer-events:none;opacity:0;',
+  'background:radial-gradient(circle at 50% 58%,' + sysRgba(PALETTE.yuzuGold, 0.30) + ',' +
+  sysRgba(PALETTE.yuzuGold, 0) + ' 62%);transition:opacity 260ms ease-out;}',
+'.capyui-yzflash.on{opacity:1;transition:opacity 40ms ease-in;}',
+'@media (prefers-reduced-motion:reduce){.capyui-yzflash{display:none;}}',
 /* ---------- to-do list ---------- */
 '.capyui-todo{position:absolute;left:14px;top:12px;width:clamp(172px,32vw,278px);',
   'background:' + paper + ';border-radius:' + rSm + ';padding:10px 12px 12px;transform:rotate(-1.7deg);',
@@ -14290,6 +14303,36 @@ export function createSystems(game) {
       o.start(st); o2.start(st);
       o.stop(st + rel + 0.05); o2.stop(st + rel + 0.05);
     }
+  }
+
+  /**
+   * THE YUZU'S OWN VOICE (the pickup rework). A coin's plink, not a pitched
+   * `pop`: a sine that chirps UP into its note over 30 ms (the ear reads a
+   * rising onset as "gained", a falling one as "lost"), a glassy partial two
+   * and a half above it that dies in a fifth of a second, and a 0.4 s tail.
+   * The ladder (yuzuLadderStep) hands it a scale degree as `pitch`; a golden
+   * plays it twice, the second a fifth up. Its own name so qa/l7-voices.mjs
+   * — which counts Sydney generics played half an octave off — never sees it.
+   */
+  function sfxYuzu(vol, pitch) {
+    const t = ac.currentTime;
+    const hz = 1046.5 * pitch;                     // C6 at degree one
+    const o = ac.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(hz * 0.84, t);
+    o.frequency.exponentialRampToValueAtTime(hz, t + 0.03);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.17 * vol, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+    const o2 = ac.createOscillator(); o2.type = 'triangle'; o2.frequency.value = hz * 2.5;
+    const g2 = ac.createGain();
+    g2.gain.setValueAtTime(0.0001, t);
+    g2.gain.exponentialRampToValueAtTime(0.045 * vol, t + 0.004);
+    g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.19);
+    o.connect(g); o2.connect(g2);
+    g.connect(acMaster); g2.connect(acMaster);
+    o.start(t); o2.start(t);
+    o.stop(t + 0.5); o2.stop(t + 0.25);
   }
 
   /**
@@ -22321,11 +22364,16 @@ export function createSystems(game) {
     // ...and the eight the places were borrowing (L7, E2). See sfxBell.
     bell: sfxBell, moped: sfxMoped, penguin: sfxPenguin, heron: sfxHeron,
     calve: sfxCalve, crowd: sfxCrowd, kettle: sfxKettle, swell: sfxSwell,
+    // ...and the currency's (L8, the pickup rework). See sfxYuzu.
+    yuzu: sfxYuzu,
   };
   const sfxGap = {
     wheek: 0.16, thud: 0.05, splash: 0.12, gasp: 0.12, pop: 0.05, rustle: 0.08, whistle: 0.2,
     gull: 0.8, bark: 0.35, strum: 0.5, horn: 2.2, hiss: 1.2, chime: 1.5, tick: 0.12,
     cheer: 3.0, organ: 4.0,
+    // a golden's fifth lands 110 ms behind its root, and a twin's third 130 ms
+    // — the gap has to sit under both, and under a sprint through a pair
+    yuzu: 0.03,
     // Four seconds long and at most one per shower, so the gap is a formality;
     // the drip's is real, because the bed schedules it on a jittered timer that
     // at a high drip level can ask for one every third of a second.
@@ -43216,7 +43264,12 @@ export function createSystems(game) {
       if (game.state.qaYuzuLog.length > 20000) game.state.qaYuzuLog.shift();
     }
     if (walletEl) {
-      walletEl.textContent = jrYuzu + ' yuzu';
+      // THE COUNT (the pickup rework): three or more counts UP over a beat
+      // rather than jumping — the wallet's own small pleasure — and the bump
+      // lands with the number. One or two still snaps, or a streak of plain
+      // yuzu would read as a display that never settles.
+      if (Math.abs(n) >= 3) yuzuCountTo(jrYuzu, 360);
+      else { yuzuCountStop(); walletEl.textContent = jrYuzu + ' yuzu'; }
       walletEl.classList.remove('bump');
       void walletEl.offsetWidth;             // restart the animation, not queue it
       walletEl.classList.add('bump');
@@ -43228,6 +43281,27 @@ export function createSystems(game) {
     if (why) toast((n > 0 ? '+' + n : String(n)) + '  ·  ' + why, 'note');
     saveSoon();
   }
+  /** The wallet's count-up: a rAF tween from the number currently SHOWN to
+   *  `target`. Reads `jrYuzu` live at the end so a second credit mid-tween
+   *  simply retargets rather than fighting; any direct write elsewhere
+   *  (buy, restore, the QA doors) is stopped first via yuzuCountStop. */
+  let yuzuCountTok = 0;
+  function yuzuCountTo(target, ms) {
+    const from = parseInt(walletEl.textContent, 10);
+    if (!(from === from)) { walletEl.textContent = target + ' yuzu'; return; }
+    const tok = ++yuzuCountTok;
+    const t0 = performance.now();
+    function step() {
+      if (tok !== yuzuCountTok) return;
+      const t = Math.min(1, (performance.now() - t0) / ms);
+      const e = 1 - (1 - t) * (1 - t);              // ease-out: fast first, settles
+      const v = Math.round(from + (jrYuzu - from) * e);
+      walletEl.textContent = v + ' yuzu';
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  function yuzuCountStop() { yuzuCountTok++; }
   /** The ground's three credits (the pickup, the pair bonus, the bath) come
    *  through here so the ledger above can tell them from the rows'. Same
    *  call, one flag around it — nothing else about the credit changes. */
@@ -43253,6 +43327,9 @@ export function createSystems(game) {
     const el = sysEl('div', 'capyui-yzfly', (n > 0 ? '+' : '') + n);
     el.style.left = x0.toFixed(1) + 'px';
     el.style.top = y0.toFixed(1) + 'px';
+    // a bigger number is a bigger number: +1 at the base size, +3 half again,
+    // +10 (the bath) double, and anything past three in the brighter gold
+    if (n >= 10) el.classList.add('big'); else if (n >= 3) el.classList.add('mid');
     document.body.appendChild(el);
     const dx = (w.left + w.width * 0.5) - x0, dy = (w.top + w.height * 0.5) - y0;
     requestAnimationFrame(function () {
@@ -43327,11 +43404,14 @@ export function createSystems(game) {
   /** THE LADDER: a quick run of pickups climbs in pitch, then resets. A
    *  stepped chime rather than the music engine's own note dispatch — see
    *  ROADMAP-LIFT8.md's note on this being a deliberate simplification. */
-  function yuzuLadderPitch() {
+  function yuzuLadderStep() {
     const now = game.state.time;
     yuzuRunN = (now - yuzuRunAt < sysYUZU_LADDER_GAP) ? (yuzuRunN + 1) % 6 : 0;
     yuzuRunAt = now;
-    return 1.0 + yuzuRunN * 0.09;
+    // six steps of a major scale, not a flat 9 % — a run of pickups plays a
+    // rising line the ear recognises (whole, whole, half, whole, whole)
+    const deg = [1, 1.1225, 1.2599, 1.3348, 1.4983, 1.6818];
+    return { n: yuzuRunN, pitch: deg[yuzuRunN], top: yuzuRunN === 5 };
   }
   /** First-ever entry to chapter `n`. Called in place of a raw `jrSeen[n]=1`
    *  at both of its call sites (startGame's landing, biome:enter) so the
@@ -43367,99 +43447,157 @@ export function createSystems(game) {
     const cp = game.capy && game.capy.position;
     yuzuAdd(sysYUZU_TRAVMET, 'said hello', cp && cp.x, cp && cp.y + 1, cp && cp.z);
   });
-  game.events.on('capy:grab', function (p) {
-    // THE PICKUP. A yuzu is not eaten (physGrazeStep's bite-by-bite mechanic
-    // is gated on `edible`, which these props deliberately do not carry) —
-    // it is collected on the grab itself. The prop is destroyed a tick later
-    // rather than inside this handler: physGrab (props.js) sets
-    // `capy.heldProp = prop`, emits this event, and THEN keeps running
-    // (physStampTouch, the getaway arming) against the same prop object —
-    // removing it synchronously here would pull the rug out from under that
-    // still-executing code. `setTimeout(fn, 0)` runs after physGrab's own
-    // continuation is done, by which point clearing `heldProp` and removing
-    // the prop is exactly as safe as a normal, player-initiated drop.
-    const gp = p && p.prop;
-    if (!gp) return;
+  // ===========================================================================
+  // THE COLLECT (the pickup rework, after playtesting). A yuzu is no longer a
+  // prop you walk up to and press E on: it floats at the animal's eye line
+  // (sysDropsTick lifts the mesh), and the moment the animal passes THROUGH
+  // it — sysDROP_TOUCH_R of the body, grounded or mid-hop, no key — it is
+  // taken. `dropCollect` is the whole of what happens, called from that
+  // proximity check; the `capy:grab` listener below it is kept only as a
+  // safety net (the yuzu types are `grabbable: false` in props.js now, so it
+  // never fires for them in practice).
+  //
+  // THE JUICE, in the order it lands, all from systems that already exist:
+  //   1. the plink — its own voice, `yuzu` (sfxYuzu), not a pitched generic;
+  //      THE LADDER climbs it a step per pickup inside six seconds, a golden
+  //      adds its fifth a beat later, the twin's second fruit its third, and
+  //      the sixth in a row rings an octave up and says so;
+  //   2. the burst — a fast ring outward AND a slow shower rising, a golden
+  //      gets both twice and brighter, plus a soft gold wash over the frame;
+  //   3. the flight — the fruit itself is drawn INTO the animal, growing as
+  //      it goes and vanishing at its face (dropFlyIn), so what you see is
+  //      "I caught it", not "it popped where it was";
+  //   4. the count — the wallet counts up rather than jumps (yuzuAdd's
+  //      tween), the `+n` flies to it (yuzuFly, bigger for a bigger n) and
+  //      the wallet bumps when it lands.
+  // ===========================================================================
+  function dropCollect(gp) {
+    if (!gp || gp.removed || gp.dropTaken) return false;
     const def = game.physics && game.physics.typeOf ? game.physics.typeOf(gp.type) : null;
-    if (!def || typeof def.worth !== 'number') return;
+    if (!def || typeof def.worth !== 'number') return false;
+    gp.dropTaken = true;
     const b = gp.body;
+    const m = gp.mesh;
+    // where the FRUIT is (floating), not where its ground anchor is
+    const fx = m ? m.position.x : (b ? b.position.x : 0);
+    const fy = m ? m.position.y : (b ? b.position.y + 0.5 : 0);
+    const fz = m ? m.position.z : (b ? b.position.z : 0);
     // THINGS THAT TURN UP (L8, F4): `sysDrops` tags every prop it spawns
-    // with `dropKind` and, for rolling/twin, its OWN `dropWorth` — the same
-    // `yuzu` mesh and body as a plain one, worth more, per the roadmap's own
-    // "no new prop kind" rule. THE KEEN EYE's bonus (capy.mods.yuzuBonus,
-    // F3) applies to every ground kind at pickup — the bath never reaches
-    // this listener at all (grabbable: false, its own ritual pays directly).
+    // with `dropKind` and, for rolling/twin, its OWN `dropWorth`. THE KEEN
+    // EYE's bonus (capy.mods.yuzuBonus, F3) applies at pickup — the bath
+    // never comes here (its own ritual pays directly).
     const dropTag = gp.dropKind;
+    const golden = gp.type === 'yuzugold';
     let worth = (typeof gp.dropWorth === 'number') ? gp.dropWorth : def.worth;
     const eyeBonus = (game.capy && game.capy.mods) ? (game.capy.mods.yuzuBonus || 0) : 0;
     if (dropTag) worth += eyeBonus;
-    sfx('pop', { volume: 0.5, pitch: yuzuLadderPitch() });
-    if (b) {
-      const golden = gp.type === 'yuzugold';
-      game.sparks(b.position.x, b.position.y + 0.1, b.position.z, golden ? 16 : 8,
-        { spd: 2.2, up: 1.6, grav: 9, drag: 0.6, life: 0.6, size: 0.16,
-          rgb: golden ? [1.6, 1.35, 0.4] : [1.3, 1.1, 0.35] });
+    const twinIn = dropTag === 'twin' && typeof gp.dropWindowEnd === 'number' && game.state.time <= gp.dropWindowEnd;
+    // 1. the plink, and the ladder
+    const run = yuzuLadderStep();
+    sfx('yuzu', { volume: golden ? 0.95 : 0.75, pitch: run.pitch });
+    if (golden) setTimeout(function () { sfx('yuzu', { volume: 0.7, pitch: run.pitch * 1.5 }); }, 110);
+    if (twinIn) setTimeout(function () { sfx('yuzu', { volume: 0.6, pitch: run.pitch * 1.26 }); }, 130);
+    if (run.top) {
+      setTimeout(function () { sfx('yuzu', { volume: 0.6, pitch: run.pitch * 2 }); }, 220);
+      toast('six in a row.', 'note');
+    }
+    // 2. the burst: a ring out, a shower up
+    const rgb = golden ? [1.7, 1.4, 0.45] : [1.35, 1.15, 0.38];
+    game.sparks(fx, fy, fz, golden ? 26 : 14,
+      { spd: 3.4, up: 0.8, grav: 7, drag: 0.55, life: 0.55, size: golden ? 0.2 : 0.15, rgb: rgb });
+    game.sparks(fx, fy + 0.1, fz, golden ? 16 : 8,
+      { spd: 0.5, up: 2.4, grav: -1.4, drag: 0.85, life: 1.1, size: golden ? 0.11 : 0.085, rgb: rgb });
+    if (golden) {
+      setTimeout(function () {
+        game.sparks(fx, fy, fz, 22, { spd: 4.2, up: 0.5, grav: 5, drag: 0.5, life: 0.5, size: 0.16, rgb: [1.9, 1.8, 1.2] });
+      }, 120);
+      yuzuFlash();
+      if (typeof musSwell === 'function') musSwell(0.25);
     }
     // GULL-PROOF (F4.3): rides on a golden yuzu specifically, on top of its
-    // own worth. See capy.gullProof's own doc comment (capybara.js) for why
-    // it is its own timer rather than another `capy.boon`.
+    // own worth. See capy.gullProof's own doc comment (capybara.js).
     if (dropTag === 'golden' && game.capy) game.capy.gullProof = sysGULL_PROOF_T;
     // THE TWIN (F4.2): the second fruit, taken inside its 20 s window, gets
-    // a second flying number half a second behind the first — the
-    // roadmap's own "rising two-note flourish" — never boosted by THE KEEN
-    // EYE, whose own doc comment names the +4 as unchanged.
-    if (dropTag === 'twin' && typeof gp.dropWindowEnd === 'number' && game.state.time <= gp.dropWindowEnd) {
-      (function (bx, by, bz) {
-        setTimeout(function () { yuzuAddGround(sysDROP_TWIN_BONUS, 'the pair.', bx, by, bz); }, 500);
-      })(b && b.position.x, b && b.position.y + 0.5, b && b.position.z);
+    // its bonus as a second flying number half a second behind the first —
+    // never boosted by THE KEEN EYE, whose own doc comment says so.
+    if (twinIn) {
+      setTimeout(function () { yuzuAddGround(sysDROP_TWIN_BONUS, 'the pair.', fx, fy + 0.4, fz); }, 500);
     }
-    // Said once, ever, for whichever of the five kinds turns up first —
-    // never the bath, which has its own pill on spawn (F4.4/F4.5).
+    // Said once, ever, for whichever kind turns up first — never the bath,
+    // which has its own pill on spawn (F4.4/F4.5).
     if (dropTag && dropTag !== 'bath' && !dropFirstPillSaid) {
       dropFirstPillSaid = true;
       toast('yuzu turn up. the map has them.', 'note');
     }
     if (dropTag) dropTake(gp);
-    yuzuAddGround(worth, null, b && b.position.x, b && b.position.y + 0.3, b && b.position.z);
-    // THE POP (visibility bump): it doesn't just vanish — it grows then
-    // shrinks to nothing over a short beat, bigger and slower the more it
-    // was worth, so a golden reads as a bigger deal than a plain yuzu even
-    // in the half-second before the flying "+n" lands. Still deferred
-    // exactly as long as the removal always was (see the doc comment
-    // above) — physGrab's own continuation runs first, and only once THAT
-    // is done is it safe to freeze the prop and start the tween.
-    const goldenPop = gp.type === 'yuzugold';
-    const popPeak = goldenPop ? 1.55 : (dropTag === 'twin' ? 1.35 : 1.3);
-    const popMs = goldenPop ? 260 : 200;
-    setTimeout(function () {
-      if (gp.removed) return;
-      if (game.capy && game.capy.heldProp === gp) game.capy.heldProp = null;
-      gp.frozen = true;
-      dropPop(gp, popPeak, popMs);
-    }, 0);
+    yuzuAddGround(worth, null, fx, fy, fz);
+    // 3. the flight — into the animal. The body stops being a body first:
+    // no collision response, so an animal running through it cannot kick
+    // the anchor mid-flight, and `frozen` keeps physUpdate's hands off it.
+    if (b) { b.collisionResponse = false; b.velocity.set(0, 0, 0); }
+    if (game.capy && game.capy.heldProp === gp) game.capy.heldProp = null;
+    gp.frozen = true;
+    dropFlyIn(gp, golden ? 1.7 : (dropTag === 'twin' ? 1.45 : 1.4), golden ? 300 : 230);
+    return true;
+  }
+  // The safety net: nothing grabbable carries `worth` any more, but if a
+  // future prop kind does, it is collected on the grab the way it always
+  // was — deferred one tick, because physGrab (props.js) keeps running
+  // against the prop after it emits this event.
+  game.events.on('capy:grab', function (p) {
+    const gp = p && p.prop;
+    if (!gp) return;
+    const def = game.physics && game.physics.typeOf ? game.physics.typeOf(gp.type) : null;
+    if (!def || typeof def.worth !== 'number') return;
+    setTimeout(function () { dropCollect(gp); }, 0);
   });
-  /** THE POP's own tween — a plain rAF loop, matching `yuzuFly`'s DOM-side
-   *  animation next to it rather than anything in the tick system. Cheap,
-   *  self-contained, and correct even if the chapter changes mid-flight:
-   *  `gp.removed` (set by `removeProp`) is checked on every frame and ends
-   *  the loop early if something else has already taken the prop away. */
-  function dropPop(gp, peak, ms) {
+  /** THE FLIGHT's own tween — a plain rAF loop, matching `yuzuFly`'s DOM-side
+   *  animation next to it rather than anything in the tick system. The mesh
+   *  is drawn from where it was to the animal's face (read live, so it
+   *  tracks a running animal), growing to `peak` over the first half and
+   *  shrinking to nothing over the second, spinning hard the whole way;
+   *  then the prop is actually removed. `gp.removed` is checked every frame
+   *  so a chapter change mid-flight ends it cleanly. */
+  const sysYzUp = new THREE.Vector3(0, 1, 0);
+  function dropFlyIn(gp, peak, ms) {
     const mesh = gp.mesh;
+    if (!mesh) {
+      if (game.physics && typeof game.physics.removeProp === 'function') game.physics.removeProp(gp);
+      return;
+    }
+    const x0 = mesh.position.x, y0 = mesh.position.y, z0 = mesh.position.z;
+    let yaw = 0;
     const t0 = performance.now();
+    let last = t0;
     function step() {
       if (gp.removed) return;
-      const t = (performance.now() - t0) / ms;
+      const now = performance.now();
+      const t = (now - t0) / ms;
       if (t >= 1) {
         if (game.physics && typeof game.physics.removeProp === 'function') game.physics.removeProp(gp);
         return;
       }
-      if (mesh && mesh.scale) {
-        const s = t < 0.4 ? 1 + (peak - 1) * (t / 0.4) : peak * (1 - (t - 0.4) / 0.6);
-        mesh.scale.setScalar(Math.max(0.001, s));
-      }
+      const cp = game.capy && game.capy.position;
+      const tx = cp ? cp.x : x0, ty = cp ? cp.y + 0.55 : y0, tz = cp ? cp.z : z0;
+      const e = t * t * (3 - 2 * t);                 // smoothstep: it accelerates in
+      mesh.position.set(x0 + (tx - x0) * e, y0 + (ty - y0) * e, z0 + (tz - z0) * e);
+      yaw += 16 * (now - last) / 1000; last = now;
+      mesh.quaternion.setFromAxisAngle(sysYzUp, yaw);
+      const s = t < 0.5 ? 1 + (peak - 1) * (t / 0.5) : peak * (1 - (t - 0.5) / 0.5);
+      mesh.scale.setScalar(Math.max(0.001, s));
       requestAnimationFrame(step);
     }
     requestAnimationFrame(step);
+  }
+  /** A soft gold wash over the whole frame for a golden — one class flip,
+   *  the CSS transition does the rest. */
+  const yzFlashEl = sysEl('div', 'capyui-yzflash');
+  document.body.appendChild(yzFlashEl);
+  function yuzuFlash() {
+    yzFlashEl.classList.remove('on');
+    void yzFlashEl.offsetWidth;
+    yzFlashEl.classList.add('on');
+    setTimeout(function () { yzFlashEl.classList.remove('on'); }, 70);
   }
   // THINGS THAT TURN UP (L8, F4): the food/boon half of the same pool. These
   // props carry no `worth` — physGrazeStep's bite-by-bite mechanic is what a
@@ -43469,16 +43607,26 @@ export function createSystems(game) {
   // keeps grazing exactly as it always has; the removal below runs well
   // inside physGrazeStep's own 0.9 s settle, so a tagged instance is gone
   // before grazing could ever take its first bite.
+  function dropTakeFood(gp) {
+    if (!gp || gp.removed || gp.dropTaken || !gp.dropBoon) return false;
+    gp.dropTaken = true;
+    if (game.capy) game.capy.boon = { id: gp.dropBoon, t: 75, fresh: true };
+    const b = gp.body, m = gp.mesh;
+    const fx = m ? m.position.x : 0, fy = m ? m.position.y + 0.1 : 0, fz = m ? m.position.z : 0;
+    // a smaller cousin of the yuzu's own juice: one plink low, one burst
+    sfx('yuzu', { volume: 0.6, pitch: 0.75 });
+    game.sparks(fx, fy, fz, 12, { spd: 2.6, up: 1.2, grav: 7, drag: 0.55, life: 0.5, size: 0.14, rgb: [1.3, 1.15, 0.5] });
+    dropTake(gp);
+    if (b) { b.collisionResponse = false; b.velocity.set(0, 0, 0); }
+    if (game.capy && game.capy.heldProp === gp) game.capy.heldProp = null;
+    gp.frozen = true;
+    dropFlyIn(gp, 1.35, 220);
+    return true;
+  }
   game.events.on('capy:grab', function (p) {
     const gp = p && p.prop;
     if (!gp || !gp.dropBoon) return;
-    if (game.capy) game.capy.boon = { id: gp.dropBoon, t: 75, fresh: true };
-    dropTake(gp);
-    setTimeout(function () {
-      if (gp.removed) return;
-      if (game.capy && game.capy.heldProp === gp) game.capy.heldProp = null;
-      if (game.physics && typeof game.physics.removeProp === 'function') game.physics.removeProp(gp);
-    }, 0);
+    setTimeout(function () { dropTakeFood(gp); }, 0);
   });
 
   // ===========================================================================
@@ -43536,6 +43684,14 @@ export function createSystems(game) {
   // in the same family as `sysWHY_R`'s marquee exclusion.
   const sysDROP_ARRIVE_R = 12;
   const sysDROP_BATH_R = 1.5;        // m — the hop-in range
+  // THE PICKUP REWORK: the fruit floats this far above its ground anchor
+  // (the body sits at hy=0.10, so the centre is ~0.55 m up — the animal's
+  // own eye line), and is taken inside this radius of the anchor, no key.
+  // 1.15 m is past the body's own contact distance (a 0.10 sphere against
+  // the animal's ~0.35 half-width), so the take always lands BEFORE the
+  // anchor could be kicked — and it is stripped of collision the same frame.
+  const sysDROP_LIFT = 0.45;
+  const sysDROP_TOUCH_R = 1.15;
   const sysDROP_BATH_COOL = 600000;  // ms (Date.now()) — 10 min, same chapter
   const sysDROP_BATH_QUIET = 120;    // s of this VISIT before a bath may roll
   const sysGULL_PROOF_T = 75;        // s — see capy.gullProof, capybara.js
@@ -43812,28 +43968,64 @@ export function createSystems(game) {
       // again"), so without this the bob would accumulate against a frozen
       // base instead of a fresh one. Ten-ish small sphere bodies staying
       // awake is not a cost this engine notices.
+      // ...REWORKED (the pickup rework): the fruit now FLOATS. The body stays
+      // a small sphere on the ground — the anchor the spawner validated and
+      // the rolling nudge pushes — and the mesh is written ABSOLUTELY every
+      // frame from it: sysDROP_LIFT up, a bob on top, and an upright yaw of
+      // its own instead of the body's tumble. Absolute rather than additive
+      // means it no longer matters whether props.js re-synced the mesh this
+      // frame (a sleeping body is never synced again — the trap the old
+      // additive bob had to `wakeUp()` around); the wake is kept only so a
+      // rolling one's nudge keeps moving its anchor smoothly.
       if (p.body && p.mesh && !p.frozen &&
           (d.kind === 'yuzu' || d.kind === 'rolling' || d.kind === 'golden' || d.kind === 'twin')) {
         const b = p.body;
         const golden = d.kind === 'golden';
         if (b.wakeUp) b.wakeUp();
-        b.angularVelocity.y = golden ? 2.2 : 1.5;
-        d.presT = (d.presT || rand(0, 6.283)) + dt * (golden ? 2.6 : 2.0);
-        p.mesh.position.y += Math.sin(d.presT) * (golden ? 0.05 : 0.035);
+        b.angularVelocity.set(0, 0, 0);
+        d.presT = (d.presT || rand(0, 6.283)) + dt * (golden ? 2.2 : 1.8);
+        d.presYaw = (d.presYaw || rand(0, 6.283)) + dt * (golden ? 2.6 : 1.8);
+        p.mesh.position.set(b.position.x,
+                            b.position.y + sysDROP_LIFT + Math.sin(d.presT) * (golden ? 0.07 : 0.05),
+                            b.position.z);
+        p.mesh.quaternion.setFromAxisAngle(sysYzUp, d.presYaw);
         const cp = game.capy && game.capy.position;
         if (cp) {
           const dx = b.position.x - cp.x, dz = b.position.z - cp.z;
           const dist2 = dx * dx + dz * dz;
+          // THE TOUCH: through it, not up to it. Grounded or mid-hop — a
+          // hop through a floating fruit is the whole Sonic-ring pleasure —
+          // but not from a bridge two storeys over it.
+          if (dist2 < sysDROP_TOUCH_R * sysDROP_TOUCH_R && Math.abs(cp.y - b.position.y) < 1.6) {
+            dropCollect(p);
+            continue;   // dropTake has already spliced this record out
+          }
           if (dist2 < 64) {   // 8 m notice radius
             const near = 1 - Math.sqrt(dist2) / 8;      // 0 far .. 1 at the fruit
             d.sparkT = (d.sparkT || 0) - dt;
             if (d.sparkT <= 0) {
               d.sparkT = Math.max(0.12, (golden ? 0.5 : 0.9) - near * (golden ? 0.32 : 0.5));
-              game.sparks(b.position.x, b.position.y + 0.16, b.position.z, golden ? 3 : 1,
-                { spd: 0.25, up: 0.5, grav: 2, drag: 0.5, life: 0.5,
-                  size: golden ? 0.09 : 0.06,
+              game.sparks(p.mesh.position.x, p.mesh.position.y - 0.05, p.mesh.position.z, golden ? 3 : 1,
+                { spd: 0.3, up: 0.6, grav: 1.5, drag: 0.5, life: 0.55,
+                  size: golden ? 0.1 : 0.07,
                   rgb: golden ? [1.6, 1.35, 0.4] : [1.3, 1.1, 0.35] });
             }
+          }
+        }
+      }
+      // ...and a food drop is taken the same way — through it — so a player
+      // who has learned that fruit is walked into is never made to press E
+      // for the one kind that still looks like a prop. A chapter's own
+      // hand-placed food (no `dropBoon`) is untouched: this is a record in
+      // dropLive, not a type.
+      if (d.kind === 'food' && p.body && !p.frozen && p.dropBoon) {
+        const cp = game.capy && game.capy.position;
+        const b = p.body;
+        if (cp) {
+          const dx = b.position.x - cp.x, dz = b.position.z - cp.z;
+          if (dx * dx + dz * dz < sysDROP_TOUCH_R * sysDROP_TOUCH_R && Math.abs(cp.y - b.position.y) < 1.6) {
+            dropTakeFood(p);
+            continue;
           }
         }
       }
@@ -43859,6 +44051,12 @@ export function createSystems(game) {
                 { spd: 0.6, up: 1.3, grav: -0.3, drag: 0.35, life: 1.4, size: 0.2, rgb: [1.7, 1.7, 1.7] });
               if (typeof musSwell === 'function') musSwell(0.5);
               toast('the yuzu bath.', 'note');
+              // the pickup rework's own beats, at the bath's scale: the gold
+              // wash, and the first bar of the ladder played as a chord-roll
+              yuzuFlash();
+              for (let k = 0; k < 4; k++) {
+                (function (k) { setTimeout(function () { sfx('yuzu', { volume: 0.7, pitch: [1, 1.26, 1.5, 2][k] }); }, k * 90); })(k);
+              }
               yuzuAddGround(10, null, b.position.x, b.position.y + 0.6, b.position.z);  // was 25
             }
           }
