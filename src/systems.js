@@ -8112,6 +8112,12 @@ function sysBuildCSS() {
   const accentDeep = '#9e5f53';
   const tick    = sysHex(PALETTE.leafC);
   const rule    = sysRgba(PALETTE.stoneDark, 0.55);
+  // A quieter edge for the title/picker restraint pass: the same line at
+  // roughly half the ink, for chrome that should read as a card's own paper
+  // edge rather than as a drawn box. `rule` stays at 0.55 everywhere it was
+  // already tuned (dividers, focus states, the legend's kbd) — this is only
+  // for the picker tile's resting border and the foot rail's key caps.
+  const ruleSoft = sysRgba(PALETTE.stoneDark, 0.32);
   const shadow  = sysRgba(PALETTE.screenShadow, 0.16);
   const shadow2 = sysRgba(PALETTE.screenShadow, 0.28);
   const veil    = sysRgba(PALETTE.fog, 0.78);
@@ -8547,11 +8553,17 @@ function sysBuildCSS() {
 /* text-wrap:balance, because at 390 this broke as "...NO / SUPERVISION" and
    left one word on a line of its own under a wordmark. Three lines is the
    spec's limit for balancing and this is never more than two. */
-'.capyui-sub{margin-top:6px;font-size:clamp(11px,2.4vw,14px);letter-spacing:.42em;',
-  'text-transform:uppercase;color:' + accentInk + ';font-weight:700;',
+/* CALMER TRACKING (title/picker restraint pass). .42em of caps under a cut
+   wordmark read as a second shout right under the first one — Untitled Goose
+   Game's own reference is one quiet line under a bold mark, not two loud
+   ones. .32em keeps the tagline legible as tracked caps without competing
+   with the masthead for attention, and 600 rather than 700 keeps it a
+   supporting line rather than a second headline. */
+'.capyui-sub{margin-top:8px;font-size:clamp(11px,2.4vw,14px);letter-spacing:.32em;',
+  'text-transform:uppercase;color:' + accentInk + ';font-weight:600;',
   'text-wrap:balance;}',
 /* the reason (L3, E3): one sentence, lower case, the clue's italic */
-'.capyui-why{margin-top:7px;font-size:clamp(11px,2.2vw,13px);font-style:italic;',
+'.capyui-why{margin-top:9px;font-size:clamp(11px,2.2vw,13px);font-style:italic;',
   'color:' + inkSoft + ';letter-spacing:.02em;text-wrap:balance;}',
 /* ---------- the ornament ----------
    A hairline rule broken in the middle by the animal the game is about. It is
@@ -8559,8 +8571,13 @@ function sysBuildCSS() {
    title, a subtitle and then immediately a control legend, so the top of the
    card read as a form. A printed sheet has a device under its masthead; this
    is one, it is eleven shapes of SVG, and it costs nothing. */
+/* More air around the ornament (restraint pass) — page one has the slack for
+   it (measured: ~150px of headroom to spare at 1280x720 before this change),
+   and the mascot doodle is the one purely decorative beat on the card; it
+   reads calmer with room either side of it rather than packed against the
+   reason line and the buttons. */
 '.capyui-orn{display:flex;align-items:center;justify-content:center;gap:clamp(8px,2vw,14px);',
-  'margin-top:clamp(9px,1.8vw,14px);}',
+  'margin-top:clamp(12px,2.2vw,18px);}',
 '.capyui-orn:before,.capyui-orn:after{content:"";height:1px;flex:1 1 0;max-width:160px;',
   'background:linear-gradient(90deg,transparent,' + sysRgba(PALETTE.ibisHead, 0.42) + ');}',
 '.capyui-orn:after{background:linear-gradient(270deg,transparent,' +
@@ -8596,10 +8613,14 @@ function sysBuildCSS() {
   'font-size:clamp(9.5px,1.9vw,11.5px);color:' + inkSoft + ';font-weight:700;',
   'letter-spacing:.1em;text-transform:uppercase;}',
 '.capyui-foot span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}',
+/* One less shadow on the key caps (restraint pass): the embossed
+   `box-shadow:0 1px 0 rule` under a `border:1px solid rule` was two ways of
+   saying the same edge on a chip this small. The border alone (at the
+   quieter ruleSoft weight) still reads as a printed key stamp. */
 '.capyui-foot kbd{display:inline-flex;align-items:center;justify-content:center;',
   'min-width:19px;height:19px;padding:0 5px;border-radius:' + rMd + ';font:inherit;',
   'font-size:' + tMd + ';letter-spacing:0;color:' + ink + ';background:' + paper2 + ';',
-  'border:1px solid ' + rule + ';box-shadow:0 1px 0 ' + rule + ';}',
+  'border:1px solid ' + ruleSoft + ';}',
 /* the shelf's own "there is more of this" control — see picksFade() */
 '.capyui-more2{display:block;margin:6px auto 0;padding:3px 12px 4px;border-radius:999px;',
   'font:inherit;font-size:' + tSm + ';font-weight:700;letter-spacing:.14em;',
@@ -8646,11 +8667,19 @@ function sysBuildCSS() {
   'gap:4px clamp(8px,1.8vw,14px);}}',
 '.capyui-rule{height:2px;background:' + rule + ';border-radius:' + rSm + ';margin:clamp(14px,3vw,22px) auto;',
   'width:64%;transform:rotate(.4deg);}',
-'.capyui-legend{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;text-align:left;',
-  'align-items:start;',
+'.capyui-legend{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;text-align:left;',
+  'align-items:start;line-height:1.35;',
   'font-size:clamp(11px,2.3vw,13px);color:' + inkSoft + ';margin:0 auto;max-width:360px;}',
 '@media (min-width:640px){.capyui-legend{grid-template-columns:auto 1fr auto 1fr;',
-  'max-width:520px;gap:4px 14px;}}',
+  'max-width:520px;gap:6px 18px;}}',
+/* Room between the legend and the buttons above it (restraint pass) — the
+   legend itself carried no top margin at all and sat flush against "Choose a
+   place", which read as one dense block rather than as the card's four
+   separate beats. Scoped to page one's own top-level legend by the direct-
+   child combinator, so the extras panel's copy (`.capyui-more .capyui-legend`,
+   which already sets its own 9px) and the journal's "all keys" screen
+   (`.capyui-jrkeys .capyui-legend`) are untouched. */
+'.capyui-p1 > .capyui-legend{margin-top:clamp(10px,2vw,14px);}',
 /* and on a short screen — a 720p laptop is the commonest window this game will
    ever open in — the chrome comes down so the tickets stay above the fold */
 /* A 720p laptop is the commonest window this game will ever open in, and the
@@ -8769,7 +8798,7 @@ function sysBuildCSS() {
   'border-top:1px solid ' + inkFaint + ';font-size:.88em;font-weight:700;',
   'letter-spacing:.14em;text-transform:uppercase;color:' + inkSoft + ';}',
 /* the extras, folded. Same disclosure furniture as the journal's own fold. */
-'.capyui-more{margin-top:clamp(7px,1.5vw,11px);text-align:center;}',
+'.capyui-more{margin-top:clamp(9px,1.7vw,13px);text-align:center;}',
 '.capyui-more summary{cursor:pointer;list-style:none;display:inline-block;',
   'font-size:' + tMd + ';color:' + inkSoft + ';font-weight:700;',
   'letter-spacing:.12em;text-transform:uppercase;padding:3px 8px;border-radius:' + rMd + ';',
@@ -8786,35 +8815,42 @@ function sysBuildCSS() {
 /* ---------- page one: the one door ---------- */
 /* The only accented, full-width, unmistakable thing on the page. A player who
    reads nothing else on this card can still not fail to find this. */
+/* ---- FLATTENED, TO MATCH .capyui-carry (restraint pass) ----------------
+   This button and "Carry on" (.capyui-carry, below) are the same control in
+   two states of the same file and they were drawn as two different kinds of
+   object: Carry on is a flat fill with a one-line hover brighten, Begin was
+   that fill PLUS a top-lit gradient sheen and a two-shadow drop, which reads
+   as a web-form button next to everything else on this printed-paper card.
+   Dropped the sheen and the shadow stack; kept the one accent fill (still
+   the only filled, coloured control on the page) and the same hover language
+   Carry on already uses. The contrast math above (M6) is untouched — this is
+   the fill and the text colour, and neither one moved. */
 '.capyui-go{display:flex;flex-direction:column;align-items:center;gap:2px;',
-  'width:100%;margin-top:clamp(12px,2.4vw,18px);padding:clamp(9px,1.8vw,13px) 18px;',
+  'width:100%;margin-top:clamp(14px,2.6vw,20px);padding:clamp(9px,1.8vw,13px) 18px;',
   'border-radius:' + rLg + ';border:1px solid ' + accentDeep + ';background:' + accentDeep + ';',
-  /* A FILLED SLAB OF ONE COLOUR IS A COLOUR SWATCH. Everything else on this
-     card is a printed thing with light on it — the paper has a rake, the
-     pictures now have a sun — and the one control the whole page is built
-     around was the only flat rectangle left. The gradient is four per cent
-     top to bottom and the inset hairline is the highlight along its top edge;
-     together they make it a pressable object rather than a filled div. */
-  'background-image:linear-gradient(180deg,' + sysRgba(0xffffff, 0.16) + ',',
-  sysRgba(PALETTE.screenShadow, 0.07) + ');',
   'color:' + paper + ';font:inherit;cursor:pointer;pointer-events:auto;',
-  'touch-action:manipulation;box-shadow:0 4px 14px ' + shadow2 + ',',
-  '0 1px 0 ' + sysRgba(0xffffff, 0.32) + ' inset;',
-  'transition:transform ' + dFast + ' ' + mSpring + ',box-shadow ' + dFast + ' ease,',
-  'filter ' + dFast + ' ease;}',
+  'touch-action:manipulation;',
+  'transition:transform ' + dFast + ' ' + mSnap + ',filter ' + dFast + ' ease;}',
 '.capyui-go b{font-size:clamp(13px,2.7vw,17px);font-weight:700;letter-spacing:.01em;}',
 '.capyui-go i{font-style:normal;font-size:' + tMd + ';opacity:.82;',
   'letter-spacing:.08em;text-transform:uppercase;font-weight:700;}',
-'.capyui-go:hover{transform:translateY(-2px);filter:brightness(1.06);',
-  'box-shadow:' + shMd + ';}',
+'.capyui-go:hover{transform:translateY(-1px);filter:brightness(1.08);}',
 '.capyui-go:active{transform:translateY(0);}',
 '.capyui-go:focus-visible{outline:2px solid ' + ink + ';outline-offset:3px;}',
-'.capyui-go.alt{background:none;color:' + accentInk + ';box-shadow:none;',
-  'border-color:' + rule + ';}',
-'.capyui-go.alt:hover{border-color:' + accent + ';background:' + veil2 + ';filter:none;}',
-/* an ink ring is right on the filled button and reads as a second border on
-   the outline one, which is what this variant already is */
-'.capyui-go.alt:focus-visible{outline-color:' + accent + ';}',
+/* ---- THE SECOND DOOR IS A ROW, NOT A SECOND BUTTON (restraint pass) ----
+   "Choose a place" / "Go somewhere else" was an outlined pill sitting right
+   under a filled one — two buttons stacked, which is the "web-form" look the
+   Goose Game reference has none of. The border is now transparent until the
+   row is actually touched: at rest it is quiet text in the same terracotta
+   ink the card already uses for secondary emphasis, and the box it always
+   had (same padding, same width, same click target) only draws itself in on
+   hover or focus — so it reads as pressable without standing beside "Begin"
+   as its equal. accentInk is unchanged, so the M6 contrast note above still
+   holds (4.62:1 against the paper). */
+'.capyui-go.alt{background:none;color:' + accentInk + ';font-weight:600;',
+  'border-color:transparent;}',
+'.capyui-go.alt:hover{border-color:' + rule + ';background:' + veil2 + ';}',
+'.capyui-go.alt:focus-visible{outline-color:' + accent + ';border-color:' + rule + ';}',
 '.capyui-go.alt i{opacity:.7;color:' + inkSoft + ';}',
 /* ---------- page two: the way back ---------- */
 /* ---- SCOPED TO THIS CARD, BECAUSE THE NAME IS TAKEN TWICE (F1) --------
@@ -8980,10 +9016,15 @@ function sysBuildCSS() {
 '@media (max-width:520px){.capyui-pick.hero{flex-direction:column;min-height:0;}',
   '.capyui-pick.hero .capyui-pickart{width:100%;flex:none;aspect-ratio:64/22;',
   'border-right:0;border-bottom:1px solid ' + rule + ';}}',
+/* A LIGHTER RESTING EDGE (restraint pass). `rule` is the right weight for a
+   divider or a focus ring; on nineteen tile borders at once it read as
+   nineteen little boxes. `ruleSoft` keeps the tile readable as a card without
+   drawing it as hard — the hover/focus state still switches to full accent
+   below, so the affordance is unchanged. */
 '.capyui-pick{display:flex;flex-direction:column;height:100%;position:relative;',
   'cursor:pointer;pointer-events:auto;width:100%;text-align:left;overflow:hidden;',
   'font:inherit;color:inherit;touch-action:manipulation;',
-  'background:' + paper2 + ';border:1px solid ' + rule + ';border-radius:' + rLg + ';',
+  'background:' + paper2 + ';border:1px solid ' + ruleSoft + ';border-radius:' + rLg + ';',
   'padding:0;box-shadow:' + shSm + ';',
   /* A LIFT SHOULD ARRIVE, NOT SLIDE. Three pixels on a linear ease is a tile
      that moves; the same three on a curve that overshoots by a hair is a tile
