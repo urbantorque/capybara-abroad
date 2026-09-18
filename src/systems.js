@@ -2488,6 +2488,15 @@ const sysKEY_K = 0.35;
 const sysKEY_TAN35 = Math.tan(35 * Math.PI / 180);
 const sysKeyDir = new THREE.Vector3();
 const sysKeyC = new THREE.Color();
+// ROADMAP-WOW G4 — THE ANIMAL'S RIM, WHEN BACKLIT. sysSELF below is a flat
+// per-chapter constant, measured and held twice each (see its own comment);
+// this does not re-base a single row of it. It multiplies that baseline, once
+// a frame, by how backlit the animal currently is — the reference frames'
+// bright edge against a dark background, and the same directional test the
+// leaf term already makes (`sysAxDir`, ground toward the sun) applied at the
+// capybara instead of at a leaf. 0 at the gain's floor is an exact no-op.
+const sysCAPY_RIM_GAIN = 0.9;
+const sysCapyRimV = new THREE.Vector3();
 const sysSELF_DEF = 0.14;
 const sysSELF = {
   // gained: the animal reads brighter than what is behind her here
@@ -38276,8 +38285,24 @@ export function createSystems(game) {
     // runs of this game do not have the people, the props or the carriers in
     // the same places. Nothing in src writes it.
     sysColS.copy(sysColR).lerp(sysRIM_WHITE, sysSELF_WHITE);
-    selfRimTick(game.state.noSelfRim ? 0
-                : (sysSELF[name] === undefined ? sysSELF_DEF : sysSELF[name]), sysColS);
+    {
+      let selfK = game.state.noSelfRim ? 0
+                : (sysSELF[name] === undefined ? sysSELF_DEF : sysSELF[name]);
+      if (selfK > 0 && !game.state.noCapyRim && game.capy && game.capy.group) {
+        const cp = game.capy.group.position;
+        sysCapyRimV.set(camera.position.x - cp.x, camera.position.y - cp.y, camera.position.z - cp.z);
+        const cl = sysCapyRimV.length();
+        if (cl > 0.001) {
+          sysCapyRimV.multiplyScalar(1 / cl);
+          // backlit: the sun sits roughly opposite the camera across the
+          // animal, so the view-to-camera axis and the ground->sun axis point
+          // roughly apart from each other.
+          const backlit = clamp(-sysCapyRimV.dot(sysAxDir), 0, 1);
+          selfK *= 1 + sysCAPY_RIM_GAIN * backlit;
+        }
+      }
+      selfRimTick(selfK, sysColS);
+    }
     // ---- THE CHARACTER KEY (L7, E4 / art #5). See capyKeyWrap. -------------
     // From the animal toward the lens's azimuth, raised 35°, in 0.35 of the
     // key's colour and strength — read here, before the split below, where

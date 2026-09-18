@@ -368,6 +368,18 @@ nothing; the term exists.
   silhouette diffed per pixel (hide-and-diff, not a raycast).
 - **`game.state.noCapyRim`.**
 
+**SHIPPED (19 Sep 2026).** `sysSELF`'s per-chapter baseline
+(`systems.js:2492`) is a measured constant and stays one — this does not
+re-base a row of it. It is multiplied, once a frame, by `1 +
+sysCAPY_RIM_GAIN * backlit` (`systems.js:2489-2496` for the constants,
+the call site at `:38278-38295`), where `backlit` is `dot` of the
+animal-to-camera axis against `sysAxDir` (the leaf term's own
+ground-toward-sun axis, reused rather than re-derived) — zero shader
+work, a JS scalar computed from vectors already in hand. Verified live
+(`qa/wow-capy-rim.js`, Cali, `sysSELF.cali` baseline 0.26): eight
+azimuths around the animal read 0.26–0.3824 with the term on and a flat
+0.26 at every angle with `noCapyRim` set, zero console errors.
+
 ### G5 — THE LIVING ARE ROUND (the one amendment to the law, decided)
 
 *Player: "apply more use of smoother curvature (rather than hard blocky
