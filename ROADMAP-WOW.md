@@ -241,6 +241,23 @@ the description.**
   true` needs a new one added, not a flag on an existing hook. Sized for
   two chapters, not four; still open.
 
+  **Checked 19 Sep 2026, not built.** The vertex-widen trick needs one
+  more thing Quay's mast does not have. `B.cyl(0, 3.4, -0.2, 0.10, 2.2,
+  ...)` (`quay.js:3190`) is one call into the SAME merger as the whole
+  ferry hull — walls, roof, wheel, fenders — and `B.build()` bakes
+  every part's transform into its vertex positions onto ONE
+  `BufferGeometry`/ONE `Mesh`/ONE material (`quay.js:3200`). Reading a
+  vertex's raw local `(x, z)` distance from the origin as "the radius
+  to widen" is meaningless on a baked, merged vertex — the mast's
+  vertices are not centred on the origin any more, and the SAME
+  material would try to widen the wheelhouse wall's vertices by the
+  identical formula. Pasto's cord is very likely the same shape of
+  problem, same file family. The trick needs either its own un-merged
+  `Mesh` per thin part (a real if small change to the ferry/cord
+  builders, one more draw call each) or a per-vertex attribute the
+  merger writes at build time — new plumbing in `makeMerger`, not a
+  `grain()` option. Neither is a one-line change; not attempted.
+
 ### A4 — RAYS, WHERE THE SUBJECT IS A LIGHT
 
 The cave's shaft has motes, which is what makes its beam a beam; four
