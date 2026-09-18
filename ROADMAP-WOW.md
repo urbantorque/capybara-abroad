@@ -175,6 +175,72 @@ edges (texel snap exists; acne on the low suns does not).
 - **`game.state.noStill`** (one switch for all four, plus per-term
   reads for attribution).
 
+**W1 reality check (19 Sep 2026), before building any of the four —
+LIFT10's lesson applied to this item too: check the code before chasing
+the description.**
+
+- **The fwidth fade on the daisies is not a gap. It already ships.**
+  `grain()`'s `speck` term (`shared.js:5991-6006`) has carried a
+  footprint fade since it was written (`skfw = max(fwidth(skq.x),
+  fwidth(skq.y))`, `skM *= clamp(1.0 - skfw*0.9, 0, 1)`) — the same
+  code path every `speck:` call site shares (`environment.js`, `cali.js`,
+  `manly.js`, `kyoto.js`). "The snow flecks, the pale-ground specks"
+  named alongside it do not exist as a distinct ground term anywhere —
+  every `speck:` call site so far is a grass gate (`skM *=
+  smoothstep(0.02, 0.10, diffuseColor.g - max(...))`, `:6004`); a sand
+  or snow variant would be a NEW term, not a missing fade on an old one.
+  Held, not built — the real four-cable-chapter and four-item framing
+  this section opened with does not survive contact with the code
+  unchanged; see the next two notes.
+- **Shadow softening for the three low-sun chapters SHIPPED (19 Sep
+  2026), but not as "a 4-tap rotated-grid PCF" — that already exists
+  and is stronger than what this item asked for.** `sysInstallShadowFilter`
+  (`systems.js:10927`) globally replaces three's stock PCF-soft chunk
+  with a contact-hardening filter — a 5-tap blocker search plus up to a
+  12-tap two-ring rotated disc, penumbra WIDTH scaled by measured caster
+  depth (`sysPEN_K/MIN/MAX`, `:10919-10921`) — wired once from
+  `createSystems()`. What was real and still open: `sysBIO_SH_NB`
+  (`:2654`) was a binary flat/tall pair with no row for a low sun angle,
+  so Iceland (16°), Antarctica (28°) and the Pantanal (30°) took
+  whichever of the two their `cdef.tall` flag happened to give them. A
+  named override table, `sysBIO_SH_NB_BY` (`:2660`, `{ iceland: 0.085,
+  antarctic: 0.09, pantanal: 0.075 }`), reasoned off the same grazing-
+  angle argument the roadmap gave, read ahead of the binary pair in
+  `shadowFitBiome` (`:11256`). Verified live (`qa/wow-shadow-bias.js`):
+  the three named chapters read their new bias, every other chapter's
+  reading is bit-for-bit unchanged, zero console errors.
+- **Alpha-to-coverage on the mote quads is the wrong fix for the code as
+  it stands, and the real bug is different from the one named.**
+  `moteQuad` (`weather.js:647`) is deliberately OPAQUE geometry — no
+  alpha channel at all (`weather.js:608-628`'s own comment: doubling
+  `transparent + DoubleSide` cost was measured and removed on purpose).
+  Alpha-to-coverage converts alpha into MSAA sample coverage; there is
+  no alpha here to convert, so the option would be a silent no-op if
+  set. The actual "crosses a threshold and pops" culprit is more likely
+  the tumble itself: every mote spins on three axes every frame
+  (`weather.js:1058-1059`, `wxE1`/`wxQ1`), so a folded quad periodically
+  presents edge-on to the camera and its screen footprint collapses to
+  a hairline regardless of distance — the same family of problem as
+  A3.1's thin cylinders, one call site over, and possibly the same fix
+  (a minimum-footprint floor) rather than a material flag. Not sized or
+  built this pass; needs its own short instrument (log a mote's screen-
+  space bounding width across one spin cycle) before a fix is guessed
+  at twice.
+- **A3.1 (thin cylinders) narrows, it does not close.** Cali's bunting
+  (`cali.js:1015-1022`) and Hanoi's cables (`hanoi.js:1502-1549`,
+  explicitly `castShadow: false`) are hand-built thin BOXES, not
+  cylinders — a vertex-widen-toward-camera trick keyed to
+  `CylinderGeometry` does not touch them. The real cylinder candidates
+  are Quay's mast (`quay.js:3189`, r 0.10) and rigging poles
+  (`quay.js:1190-1209`), and Pasto's cord (`pasto.js:1621`, r 0.055,
+  whose own comment at `pasto.js:1351` already names "a cord thinner
+  than a shadow-map texel" as a known, previously unaddressed
+  artifact). `grain()` has no vertex-shader injection point today
+  (`onBeforeCompile` only edits `shader.fragmentShader` past its one
+  `#include <begin_vertex>` world-position tap, `:5783-5794`) — `thin:
+  true` needs a new one added, not a flag on an existing hook. Sized for
+  two chapters, not four; still open.
+
 ### A4 — RAYS, WHERE THE SUBJECT IS A LIGHT
 
 The cave's shaft has motes, which is what makes its beam a beam; four

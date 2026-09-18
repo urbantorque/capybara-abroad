@@ -2652,6 +2652,14 @@ const sysBIO_SC_FAR  = [34, 74];   // added to sysSUN_DIST
 // enormous low-poly triangles and a wider kernel finds acne on them.
 const sysBIO_SH_RAD  = [1.0, 3.2];
 const sysBIO_SH_NB   = [0.02, 0.05];
+// ROADMAP-WOW A3.3 — three low-sun chapters (Iceland 16°, Antarctica 28°, the
+// Pantanal 30°) put the star at a grazing angle everywhere, and a grazing
+// angle is where a fixed normalBias finds acne it does not at Sydney's or
+// Pasto's steeper stars — the depth comparison's error is the same in world
+// units but a much larger fraction of one shadow-map texel's depth range at a
+// shallow incidence. Named per chapter, over sysBIO_SH_NB's flat/tall pair,
+// for the three suns this low; every other chapter keeps the pair unchanged.
+const sysBIO_SH_NB_BY = { iceland: 0.085, antarctic: 0.09, pantanal: 0.075 };
 // Sydney is a 140 m harbour seen from 10 m up and 400 was generous. Pasto is 260 m
 // of valley seen from the crater rim, so the far plane has to clear the far ridge
 // AND the altitude-opened fog (320 + 300 = 620 at the ceiling) with room to spare.
@@ -11253,7 +11261,7 @@ export function createSystems(game) {
     sc.updateProjectionMatrix();
     game.state.shadowDirty = true;   // the half-rate pass (main.js) draws this frame
     sun.shadow.radius = sysBIO_SH_RAD[i];
-    sun.shadow.normalBias = sysBIO_SH_NB[i];
+    sun.shadow.normalBias = sysBIO_SH_NB_BY[name] !== undefined ? sysBIO_SH_NB_BY[name] : sysBIO_SH_NB[i];
     // ...and the far box takes the same depth, opened by sysFAR_DEPTH each way:
     // a point seventy metres out along the sun's azimuth is fifty-three metres
     // deeper in light space at a 41-degree star (THE FAR CASCADE).
