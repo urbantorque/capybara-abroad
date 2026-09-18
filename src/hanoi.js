@@ -523,6 +523,28 @@ function hanLaneAtS(L, s, out) {
 }
 const hanTmp = { x: 0, z: 0, yaw: 0 };
 const hanTmp2 = { x: 0, z: 0, yaw: 0 };
+const hanYawTmpA = { x: 0, z: 0, yaw: 0 };
+const hanYawTmpB = { x: 0, z: 0, yaw: 0 };
+/**
+ * The heading lane L is pointing at `s` metres, SMOOTHED.
+ *
+ * hanLaneAtS's own out.yaw is the raw current segment's endpoints, so it
+ * snaps the instant a bike crosses a lane vertex -- the lake ring's turns run
+ * up to 42 degrees, and that is a full frame of heading changing in one tick.
+ * This is a central-difference tangent over a 3 m baseline instead, the exact
+ * pattern cali.js's caliRouteAt (~:1476) uses for its own heading and grade.
+ * hanLaneAtS itself is untouched, on purpose -- pavements, terraces and
+ * shopfronts are all laid out from its position AND yaw at other call sites,
+ * and it already wraps closed lanes / clamps open ones for us, so sampling
+ * s-3 and s+3 through it mirrors that same behaviour for free at the ends.
+ * Its own scratch: never borrow hanTmp/hanTmp2, which callers of hanLaneAtS
+ * are usually mid-read of when they ask this.
+ */
+function hanLaneYawAt(L, s) {
+  const a = hanLaneAtS(L, s - 3, hanYawTmpA);
+  const b = hanLaneAtS(L, s + 3, hanYawTmpB);
+  return Math.atan2(b.x - a.x, b.z - a.z);
+}
 
 /**
  * WHICH STREET AM I IN, AND WHICH WAY IS IT GOING.
@@ -1645,9 +1667,10 @@ function hanSyncBikes() {
       const o = idx[k] * hanBIKE_STRIDE;
       const L = hanBikeData[o] | 0;
       hanLaneAtS(L, hanBikeData[o + 1], hanTmp);
-      const nx = Math.cos(hanTmp.yaw), nz = -Math.sin(hanTmp.yaw);
+      const yawS = hanLaneYawAt(L, hanBikeData[o + 1]);
+      const nx = Math.cos(yawS), nz = -Math.sin(yawS);
       const dir = hanBikeData[o + 2];
-      const yaw = dir > 0 ? hanTmp.yaw : hanTmp.yaw + Math.PI;
+      const yaw = dir > 0 ? yawS : yawS + Math.PI;
       const off = hanBikeData[o + 3];
       const lean = clamp((hanBikeData[o + 4] - off) * 0.28, -0.22, 0.22);
       hanE.set(0, yaw, lean * dir, 'YXZ');
@@ -1687,7 +1710,8 @@ function hanBikeAt(i, out) {
   const o = i * hanBIKE_STRIDE;
   const L = hanBikeData[o] | 0;
   hanLaneAtS(L, hanBikeData[o + 1], hanTmp2);
-  const nx = Math.cos(hanTmp2.yaw), nz = -Math.sin(hanTmp2.yaw);
+  const yawS = hanLaneYawAt(L, hanBikeData[o + 1]);
+  const nx = Math.cos(yawS), nz = -Math.sin(yawS);
   out.set(hanTmp2.x + nx * hanBikeData[o + 3], hanGROUND + 0.9,
           hanTmp2.z + nz * hanBikeData[o + 3]);
   return out;
@@ -1783,9 +1807,12 @@ function hanUpdateTraffic(game, dt, p) {
     h.at(hanMovV3.x, hanMovV3.y, hanMovV3.z);
     // Analytic, not a delta: the lane tangent at the bike's own arclength is
     // exactly the direction it is travelling, and a differenced position would
-    // spike every time the swerve damper moved it sideways.
-    hanLaneAtS(L, hanBikeData[o + 1], hanMovTmp);
-    h.vel(Math.sin(hanMovTmp.yaw) * v * dir, 0, Math.cos(hanMovTmp.yaw) * v * dir);
+    // spike every time the swerve damper moved it sideways. hanLaneYawAt is
+    // still that same analytic tangent -- just averaged over a 3 m baseline
+    // instead of read off one raw segment -- so it keeps the reasoning above
+    // while no longer stepping at every lane vertex.
+    const yawT = hanLaneYawAt(L, hanBikeData[o + 1]);
+    h.vel(Math.sin(yawT) * v * dir, 0, Math.cos(yawT) * v * dir);
     h.set(clamp(v / hanBIKE_V[1], 0, 1));
     h.amp(hanBikeMoverA[j]);
   }
@@ -1932,6 +1959,31 @@ function hanFollowScan(i) {
   return -1;
 }
 
+// ---- DO NOT RECYCLE A BIKE THE PLAYER CAN SEE --------------------------
+//
+// An open lane used to wrap end-to-end the instant a rider ran off it: the
+// far end of most Hanoi streets is nowhere near the near end in world space,
+// so that was a teleport, measured at 144-202 m in one frame, ~45 a minute
+// map-wide, sometimes ~30 m in front of the player. A closed lane (the lake
+// ring) never had this problem -- the modulo above already carries it
+// smoothly round the loop -- so only the open-lane recycle needs gating.
+const HAN_RECYCLE_R = 70;           // m: how far the far end has to be first
+const hanRecycleTmp = { x: 0, z: 0, yaw: 0 };
+function hanBikeFarEnough(L, s, p) {
+  if (!p) return true;
+  hanLaneAtS(L, s, hanRecycleTmp);
+  const dx = hanRecycleTmp.x - p.x, dz = hanRecycleTmp.z - p.z;
+  return dx * dx + dz * dz > HAN_RECYCLE_R * HAN_RECYCLE_R;
+}
+/** Where an open lane's overshoot `s` recycles to -- the far end, but only
+ * once that end is out of sight; held at the kerb (the edge it just ran off)
+ * otherwise, so it waits rather than jumping across the view. */
+function hanRecycleS(L, s, total, p) {
+  const atEnd = s > total;
+  const edge = atEnd ? total : 0;
+  return hanBikeFarEnough(L, edge, p) ? (atEnd ? 0 : total) : edge;
+}
+
 function hanUpdateBikes(game, dt) {
   if (!hanBikeN || dt <= 0) return;
   const capy = game.capy;
@@ -2049,7 +2101,7 @@ function hanUpdateBikes(game, dt) {
           const tot0 = hanLaneTotal[L];
           if (hanLANES[L].closed) hanBikeData[o + 1] = ((hanBikeData[o + 1] % tot0) + tot0) % tot0;
           else if (hanBikeData[o + 1] > tot0 || hanBikeData[o + 1] < 0) {
-            hanBikeData[o + 1] = hanBikeData[o + 1] > tot0 ? 0 : tot0;
+            hanBikeData[o + 1] = hanRecycleS(L, hanBikeData[o + 1], tot0, p);
           }
           continue;
         }
@@ -2140,8 +2192,9 @@ function hanUpdateBikes(game, dt) {
       hanBikeData[o + 1] = ((hanBikeData[o + 1] % total) + total) % total;
     } else if (hanBikeData[o + 1] > total || hanBikeData[o + 1] < 0) {
       // off the end of an open street: come back on at the other end, which is
-      // the whole of this chapter's traffic management
-      hanBikeData[o + 1] = hanBikeData[o + 1] > total ? 0 : total;
+      // the whole of this chapter's traffic management -- but held at the kerb
+      // until that far end is out of the animal's sight (hanRecycleS above).
+      hanBikeData[o + 1] = hanRecycleS(L, hanBikeData[o + 1], total, p);
     }
   }
   hanSyncBikes();
@@ -2699,10 +2752,10 @@ function hanUpdateRide(game, dt) {
       // Measured in a ninety-second random-input soak.
       if (hanRidePark !== bi) { hanRideHave = false; hanRidePark = bi; }
       hanBikeAt(bi, hanV3b);
-      hanLaneAtS(hanBikeData[bi * hanBIKE_STRIDE] | 0,
-                 hanBikeData[bi * hanBIKE_STRIDE + 1], hanTmp2);
+      const yawS = hanLaneYawAt(hanBikeData[bi * hanBIKE_STRIDE] | 0,
+                                 hanBikeData[bi * hanBIKE_STRIDE + 1]);
       const dir = hanBikeData[bi * hanBIKE_STRIDE + 2];
-      const yaw = dir > 0 ? hanTmp2.yaw : hanTmp2.yaw + Math.PI;
+      const yaw = dir > 0 ? yawS : yawS + Math.PI;
       hanPlaceRideBody(hanV3b.x, hanV3b.z, yaw, dt);
     } else if (hanRideHave) {
       hanRidePark = -1;
@@ -2722,9 +2775,9 @@ function hanUpdateRide(game, dt) {
   // were on for half a second is not a ride.
   if (game.recordLive && hanRideDist > 12) game.recordLive('ride-the-flow', hanRideDist);
   hanBikeAt(hanRider, hanV3b);
-  hanLaneAtS(hanBikeData[o] | 0, hanBikeData[o + 1], hanTmp2);
+  const yawS = hanLaneYawAt(hanBikeData[o] | 0, hanBikeData[o + 1]);
   const dir = hanBikeData[o + 2];
-  const yaw = dir > 0 ? hanTmp2.yaw : hanTmp2.yaw + Math.PI;
+  const yaw = dir > 0 ? yawS : yawS + Math.PI;
   hanPlaceRideBody(hanV3b.x, hanV3b.z, yaw, dt);
   hanFrame.x = hanRideBody.velocity.x;
   hanFrame.z = hanRideBody.velocity.z;
@@ -3877,11 +3930,12 @@ function hanUpdateFolk(dt) {
       else if (hanFolkData[o + 1] > total || hanFolkData[o + 1] < 0) hanFolkData[o + 2] *= -1;
     }
     hanLaneAtS(L, hanFolkData[o + 1], hanTmp);
-    const nx = Math.cos(hanTmp.yaw), nz = -Math.sin(hanTmp.yaw);
+    const yawS = hanLaneYawAt(L, hanFolkData[o + 1]);
+    const nx = Math.cos(yawS), nz = -Math.sin(yawS);
     // ON THE PAVEMENT, and the sitters are further out and facing the wall
     const off = (i & 2 ? 1 : -1) * (hanLANES[L].w + (sit ? 2.9 : 1.7));
-    let yaw = sit ? (hanTmp.yaw + (off > 0 ? Math.PI / 2 : -Math.PI / 2))
-                  : (hanFolkData[o + 2] > 0 ? hanTmp.yaw : hanTmp.yaw + Math.PI);
+    let yaw = sit ? (yawS + (off > 0 ? Math.PI / 2 : -Math.PI / 2))
+                  : (hanFolkData[o + 2] > 0 ? yawS : yawS + Math.PI);
     // ---- ...UNLESS SOMETHING IS GOING PAST THAT IS NOT A MOPED (D1) ----
     // The drawn position is computed below from the lane and is NOT touched:
     // hanFolkBodies.step() puts each box where its walker went, and a figure
@@ -4890,6 +4944,22 @@ export function createHanoi(game) {
   // above the awnings (ground + 3.2, 2.2 m deep off every shop): a chase
   // camera at three metres was a red tarpaulin for most of the run
   api.rig = function () { return hanCubOn ? { w: 1, dist: 7.5, pitch: 0.55, raise: 0.9, lambda: 3.0 } : null; };
+  /**
+   * THE SMOOTHING, MEASURED (L9, T). A test hook, like jamTest and bikeDebug
+   * above — nothing in the game calls it. Returns bike `i`'s lane, arclength
+   * and drawn position, plus BOTH the raw per-segment yaw hanLaneAtS itself
+   * still returns (untouched, on purpose) and the smoothed hanLaneYawAt this
+   * pass wired into the five read sites, so a live probe can sample the two
+   * side by side across real frames without re-implementing either.
+   */
+  api.smoothDebug = function (i) {
+    if (!hanBikeN) return null;
+    const idx = Math.max(0, Math.min(hanBikeN - 1, i | 0));
+    const o = idx * hanBIKE_STRIDE;
+    const L = hanBikeData[o] | 0, s = hanBikeData[o + 1];
+    hanLaneAtS(L, s, hanTmp);
+    return { i: idx, L, s, x: hanTmp.x, z: hanTmp.z, yawRaw: hanTmp.yaw, yawSmooth: hanLaneYawAt(L, s) };
+  };
   game.hanoi = api;
   return api;
 }

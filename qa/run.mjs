@@ -67,6 +67,15 @@ const ASSERTS = [
   // everyday six sum to 730, the three capstones add 1020, the hop apex's own
   // two constants never multiplied by a mod.
   ['qa/l8-catalogue.mjs',   'sysUPGRADES: ids read, the everyday/capstone sums, the apex untouched'],
+  // HANOI, SMOOTHED (L9, T): hanLaneYawAt is a real 3 m central difference,
+  // hanLaneAtS's own position/yaw outputs are untouched, all five read sites
+  // (bikes, the ride, the folk) actually call it, and the open-lane recycle
+  // is distance-gated rather than an unconditional teleport.
+  ['qa/l9-hanoi-smooth.js', 'Hanoi lane heading: the smoothing wiring and the recycle gate'],
+  // THE YUZU, SEEN (L9, V): the ×1.6 scale and its leaf nubs, the 0.85-1.0
+  // lift, the pooled aura's size/colour/pulse, the shaft's borrowed geometry
+  // gated to three biomes, the widened sparkle radius, the minimap dot.
+  ['qa/l9-yuzu-visible.js', 'the yuzu scale/lift/aura/shaft/sparkle/minimap wiring'],
   ['build.mjs',           'the one-file build: wraps, splices, no collisions, writes dist/'],
 ];
 const REPORTS = [
