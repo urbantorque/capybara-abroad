@@ -43249,12 +43249,46 @@ export function createSystems(game) {
     }
     if (dropTag) dropTake(gp);
     yuzuAdd(worth, null, b && b.position.x, b && b.position.y + 0.3, b && b.position.z);
+    // THE POP (visibility bump): it doesn't just vanish — it grows then
+    // shrinks to nothing over a short beat, bigger and slower the more it
+    // was worth, so a golden reads as a bigger deal than a plain yuzu even
+    // in the half-second before the flying "+n" lands. Still deferred
+    // exactly as long as the removal always was (see the doc comment
+    // above) — physGrab's own continuation runs first, and only once THAT
+    // is done is it safe to freeze the prop and start the tween.
+    const goldenPop = gp.type === 'yuzugold';
+    const popPeak = goldenPop ? 1.55 : (dropTag === 'twin' ? 1.35 : 1.3);
+    const popMs = goldenPop ? 260 : 200;
     setTimeout(function () {
       if (gp.removed) return;
       if (game.capy && game.capy.heldProp === gp) game.capy.heldProp = null;
-      if (game.physics && typeof game.physics.removeProp === 'function') game.physics.removeProp(gp);
+      gp.frozen = true;
+      dropPop(gp, popPeak, popMs);
     }, 0);
   });
+  /** THE POP's own tween — a plain rAF loop, matching `yuzuFly`'s DOM-side
+   *  animation next to it rather than anything in the tick system. Cheap,
+   *  self-contained, and correct even if the chapter changes mid-flight:
+   *  `gp.removed` (set by `removeProp`) is checked on every frame and ends
+   *  the loop early if something else has already taken the prop away. */
+  function dropPop(gp, peak, ms) {
+    const mesh = gp.mesh;
+    const t0 = performance.now();
+    function step() {
+      if (gp.removed) return;
+      const t = (performance.now() - t0) / ms;
+      if (t >= 1) {
+        if (game.physics && typeof game.physics.removeProp === 'function') game.physics.removeProp(gp);
+        return;
+      }
+      if (mesh && mesh.scale) {
+        const s = t < 0.4 ? 1 + (peak - 1) * (t / 0.4) : peak * (1 - (t - 0.4) / 0.6);
+        mesh.scale.setScalar(Math.max(0.001, s));
+      }
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
   // THINGS THAT TURN UP (L8, F4): the food/boon half of the same pool. These
   // props carry no `worth` — physGrazeStep's bite-by-bite mechanic is what a
   // hand-placed sandwich or empanada normally uses — so the listener above
@@ -43286,7 +43320,42 @@ export function createSystems(game) {
   // state above). See ROADMAP-LIFT8.md, F4.
   // ===========================================================================
   const sysDROP_ODDS = [['yuzu', 36], ['rolling', 20], ['golden', 17], ['food', 10], ['twin', 13], ['bath', 4]];
-  const sysDROP_TWIN_BONUS = 4;
+  // THE FIRST BALANCE NUDGE (post-wave-1 playtesting, before wave 3's own real
+  // pass): the wave-1 build shipped so sparse a player standing still for two
+  // minutes in Sydney saw exactly one drop, 27 m away — correct to spec, and
+  // still read as "there's nothing here". Cap and timing go up a fair bit
+  // everywhere (see `dropCapFor`/the shortened `dropT` rolls below); the
+  // three biggest single-item prizes come DOWN, more so the bigger the prize
+  // is, so a much busier ground does not also mean a much richer one. Plain
+  // yuzu (the baseline, and the floor of the whole table) is untouched.
+  const sysDROP_TWIN_BONUS = 2;      // was 4 — see the per-fruit worth below
+  // THE MAP SIZE FACTOR. A bigger place should have more to find in it —
+  // Quay's harbour crossing is roughly fifteen times Sydney's lawn by area,
+  // and a flat cap everywhere made it read exactly as empty as Sydney despite
+  // being enormous. `sysMAP_WORLDS`'s own minimap bounds (x0/x1/z0/z1 — the
+  // one canonical size every biome already publishes, for the minimap's own
+  // scale) give a free per-chapter size with no new authored number. Sydney,
+  // the smallest chapter, is the reference — factor 1 there — and it rises
+  // with the SQUARE ROOT of the area ratio (linear map size, not raw area),
+  // clamped so the three biggest chapters (quay, antarctic, monaco) don't ask
+  // for eight or nine live drops at once.
+  const sysDROP_SIZE_REF = (function () {
+    const s = sysMAP_WORLDS.sydney;
+    return Math.abs(s.x1 - s.x0) * Math.abs(s.z1 - s.z0);
+  })();
+  function dropSizeFactor(biome) {
+    const spec = sysMAP_WORLDS[biome];
+    if (!spec) return 1;
+    const area = Math.abs(spec.x1 - spec.x0) * Math.abs(spec.z1 - spec.z0);
+    return clamp(Math.sqrt(area / sysDROP_SIZE_REF), 1, 2.6);   // clamp was 2.2
+  }
+  // THE SECOND BALANCE NUDGE (same day, more of the same medicine): another
+  // 40% on top of the first nudge, split between a bigger base cap and a
+  // wider size clamp — Sydney-scale chapters go from 3 live to 4, the
+  // biggest three from 7 to up to 10.
+  const sysDROP_CAP_BASE = 4;   // was 3 (originally a flat 2)
+  const sysDROP_CAP_SEAT = 1;   // THE SPARE SEAT still adds exactly one
+  function dropCapFor(biome) { return Math.round(sysDROP_CAP_BASE * dropSizeFactor(biome)); }
   // "Never the spawn ring" (the roadmap's own rule, F4.1) names a point this
   // codebase has no single canonical object for — grepped: no `spawnRing`,
   // no per-biome SPAWN constant read from outside its own chapter file. This
@@ -43343,7 +43412,7 @@ export function createSystems(game) {
     const cp = game.capy && game.capy.position;
     dropArriveX = cp ? cp.x : 0;
     dropArriveZ = cp ? cp.z : 0;
-    dropT = rand(20, 40);   // the first drop, 20-40 s after arrival (F4.1)
+    dropT = rand(7, 14);   // the first drop — was 20-40 s, then 10-20, now /1.4 again
   }
   /** THE QA DOOR (`qaReset`, above) and a fresh boot both want the pool gone
    *  without waiting for the next tick's biome-change check. */
@@ -43451,8 +43520,11 @@ export function createSystems(game) {
       return;
     }
     const pairId = 'twin' + (dropPairSeq++);
-    p1.dropKind = 'twin'; p1.dropWorth = 2; p1.dropPairId = pairId; p1.dropPairFirst = true;
-    p2.dropKind = 'twin'; p2.dropWorth = 2; p2.dropPairId = pairId; p2.dropPairFirst = false;
+    // was 2 each (+ a 4 bonus) — the balance nudge above cuts a fully-taken
+    // pair from 8 down to 4, the largest proportional cut on the table bar
+    // the bath's, since a twin is two rolls' worth of luck for one item type.
+    p1.dropKind = 'twin'; p1.dropWorth = 1; p1.dropPairId = pairId; p1.dropPairFirst = true;
+    p2.dropKind = 'twin'; p2.dropWorth = 1; p2.dropPairId = pairId; p2.dropPairFirst = false;
     dropLive.push({ prop: p1, kind: 'twin', x: spot1.x, z: spot1.z, despawnT: 150, pairId: pairId });
     dropLive.push({ prop: p2, kind: 'twin', x: spot2.x, z: spot2.z, despawnT: 150, pairId: pairId });
   }
@@ -43495,7 +43567,7 @@ export function createSystems(game) {
     const prop = dropSpawnAt(golden ? 'yuzugold' : 'yuzu', spot.x, spot.z);
     if (!prop) return;
     prop.dropKind = kind;
-    prop.dropWorth = kind === 'rolling' ? 3 : golden ? 5 : 1;
+    prop.dropWorth = kind === 'rolling' ? 2 : golden ? 3 : 1;  // was 3 : 5 : 1
     if (kind === 'rolling') {
       prop.dropSpawnX = spot.x; prop.dropSpawnZ = spot.z;
       prop.dropNudgeT = rand(2.5, 4);
@@ -43541,6 +43613,57 @@ export function createSystems(game) {
       const p = d.prop;
       if (!p || p.removed) { dropLive.splice(i, 1); continue; }
       if (p.held) continue;   // being carried — no timer runs while held
+      // ---- THE PRESENCE PASS (visibility bump, after real playtesting) ----
+      // Every yuzu-family ground drop (not the bath, which is furniture and
+      // already gets a map star and a pill; not food, which reads as an
+      // ordinary prop on purpose) gets a small, continuous "this is a
+      // pickup" tell — a Mario-Kart-box/Sonic-ring read rather than a fruit
+      // sitting still and hoping to be noticed:
+      //   - a slow Y-AXIS spin, driven on the physics body's own angular
+      //     velocity. Nothing else ever asks for angular velocity on a
+      //     resting body, so this cannot fight anything, and spinning about
+      //     the vertical axis through a sphere's own contact point has no
+      //     lever arm to walk the body sideways via friction — the one spin
+      //     axis that is free to drive forever with no drift.
+      //   - a small vertical BOB, added to the mesh's position AFTER this
+      //     frame's physics sync (props.js runs before systems.js in
+      //     main.js's updater list — see sysDropsTick's own doc comment —
+      //     so `p.mesh.position` already holds the fresh synced value by the
+      //     time this runs; adding a transient offset on top never
+      //     compounds, because next frame starts from a fresh sync again).
+      //   - a PROXIMITY SPARKLE, thickening as the animal gets close, from
+      //     the same `game.sparks` pool the pickup's own confetti uses.
+      // `wakeUp()` every frame is deliberate: a body that is allowed to
+      // sleep only gets ONE mesh sync at the moment it settles and then
+      // NONE after (physUpdate's own "a sleeping body is never synced
+      // again"), so without this the bob would accumulate against a frozen
+      // base instead of a fresh one. Ten-ish small sphere bodies staying
+      // awake is not a cost this engine notices.
+      if (p.body && p.mesh && !p.frozen &&
+          (d.kind === 'yuzu' || d.kind === 'rolling' || d.kind === 'golden' || d.kind === 'twin')) {
+        const b = p.body;
+        const golden = d.kind === 'golden';
+        if (b.wakeUp) b.wakeUp();
+        b.angularVelocity.y = golden ? 2.2 : 1.5;
+        d.presT = (d.presT || rand(0, 6.283)) + dt * (golden ? 2.6 : 2.0);
+        p.mesh.position.y += Math.sin(d.presT) * (golden ? 0.05 : 0.035);
+        const cp = game.capy && game.capy.position;
+        if (cp) {
+          const dx = b.position.x - cp.x, dz = b.position.z - cp.z;
+          const dist2 = dx * dx + dz * dz;
+          if (dist2 < 64) {   // 8 m notice radius
+            const near = 1 - Math.sqrt(dist2) / 8;      // 0 far .. 1 at the fruit
+            d.sparkT = (d.sparkT || 0) - dt;
+            if (d.sparkT <= 0) {
+              d.sparkT = Math.max(0.12, (golden ? 0.5 : 0.9) - near * (golden ? 0.32 : 0.5));
+              game.sparks(b.position.x, b.position.y + 0.16, b.position.z, golden ? 3 : 1,
+                { spd: 0.25, up: 0.5, grav: 2, drag: 0.5, life: 0.5,
+                  size: golden ? 0.09 : 0.06,
+                  rgb: golden ? [1.6, 1.35, 0.4] : [1.3, 1.1, 0.35] });
+            }
+          }
+        }
+      }
       if (d.kind === 'bath') {
         if (!d.used) {
           const cp = game.capy && game.capy.position;
@@ -43563,7 +43686,7 @@ export function createSystems(game) {
                 { spd: 0.6, up: 1.3, grav: -0.3, drag: 0.35, life: 1.4, size: 0.2, rgb: [1.7, 1.7, 1.7] });
               if (typeof musSwell === 'function') musSwell(0.5);
               toast('the yuzu bath.', 'note');
-              yuzuAdd(25, null, b.position.x, b.position.y + 0.6, b.position.z);
+              yuzuAdd(10, null, b.position.x, b.position.y + 0.6, b.position.z);  // was 25
             }
           }
         }
@@ -43623,7 +43746,7 @@ export function createSystems(game) {
       dropT -= dt;
       if (dropT <= 0) {
         dropAttemptSpawn();
-        dropT = (typeof forced === 'number') ? forced : rand(60, 120);
+        dropT = (typeof forced === 'number') ? forced : rand(21, 43);  // was 60-120, then 30-60
       }
     }
   }
@@ -43646,7 +43769,7 @@ export function createSystems(game) {
     const before = dropLive.length;
     game.state.qaForceDropKind = kind || null;
     dropAttemptSpawn();
-    dropT = rand(60, 120);   // else the next natural tick fires a second spawn
+    dropT = rand(21, 43);   // else the next natural tick fires a second spawn
     return dropLive.length > before ? dropLive[dropLive.length - 1] : null;
   };
   // THE MAP OVERLAY (F4.4) and THE HINT ROW's own `where()` both read this —
@@ -44959,8 +45082,13 @@ export function createSystems(game) {
       if (owned.indexOf('eye') >= 0) m.yuzuBonus = 1;
       // THE SPARE SEAT: not a mod, a separate published field — see its own
       // doc comment on `capy.dropCap` in capybara.js. `sysDrops` (F4) is the
-      // only reader.
-      game.capy.dropCap = owned.indexOf('seat') >= 0 ? 3 : 2;
+      // only reader. Scaled by the live chapter's own map size (`dropCapFor`,
+      // declared with the rest of `sysDrops` below) rather than a flat
+      // number — `dropBiome` may still be null for one frame right after
+      // boot, before `sysDropsTick` has run once, so this falls back to
+      // whatever `game.biome` already knows.
+      game.capy.dropCap = dropCapFor(dropBiome || (game.biome && game.biome.current)) +
+                           (owned.indexOf('seat') >= 0 ? sysDROP_CAP_SEAT : 0);
       // ---- THE HUD'S ONE EXCEPTION (L8, F3) --------------------------------
       // BOTTOMLESS PUFF earns the single deliberate new HUD element this
       // pass allows — see the roadmap's own "never a new number... except"

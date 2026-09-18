@@ -124,9 +124,13 @@ async page => {
     await page.waitForTimeout(5000);
     const n = await page.evaluate(() => window.__capy.state.qaDrops().length);
     if (n > 0) sawAny = true;
-    if (n > 2) capOverflow = true;
+    if (n > 4) capOverflow = true;
   }
-  assertTrue('the live cap (2, seat unowned) is never exceeded over 30 s real time', !capOverflow);
+  // Sydney's own dropCap is map-size-scaled (dropCapFor, systems.js) — Sydney
+  // is the smallest chapter and the size factor's own reference point, so
+  // its cap is exactly the base (4, after the second balance nudge), seat or
+  // no seat here.
+  assertTrue('the live cap (4, seat unowned, Sydney is the size-factor reference) is never exceeded over 30 s real time', !capOverflow);
   assertTrue('at least one real spawn landed in that window', sawAny);
   const dropsWhere2 = await page.evaluate(() => ({ n: window.__capy.state.qaDrops().length, w: window.__capy.drops.where().length }));
   assertTrue('game.drops.where().length matches the live count', dropsWhere2.n === dropsWhere2.w);
@@ -219,7 +223,7 @@ async page => {
   await page.evaluate(() => { window.__capy.state.qaReset(); });
   await page.evaluate(() => { window.__capy.state.qaForceOwned = ['eye']; });
   await page.waitForTimeout(300);
-  for (const [kind, base, keen] of [['yuzu', 1, 2], ['rolling', 3, 4], ['golden', 5, 6]]) {
+  for (const [kind, base, keen] of [['yuzu', 1, 2], ['rolling', 2, 3], ['golden', 3, 4]]) {
     const rec = await page.evaluate((kind) => {
       const g = window.__capy;
       window.__qaClearPool();
@@ -293,14 +297,16 @@ async page => {
   assertTrue('a twin pair spawns (2 records)', !!inWindow);
   if (inWindow) {
     assertTrue('both grabs succeeded (in-window run)', inWindow.g1 && inWindow.g2);
-    assertTrue('the first fruit pays 2', inWindow.firstPay === 2);
-    assertTrue('the second, inside the 20 s window, pays 2 + 4 = 6, got ' + inWindow.secondPay, inWindow.secondPay === 6);
+    // was 2 / 2+4=6 — the balance nudge cut a twin's per-fruit worth to 1
+    // and the bonus to 2, so a fully-taken pair is 4 total, not 8.
+    assertTrue('the first fruit pays 1', inWindow.firstPay === 1);
+    assertTrue('the second, inside the 20 s window, pays 1 + 2 = 3, got ' + inWindow.secondPay, inWindow.secondPay === 3);
   }
   const outWindow = await takeTwinPair(21000);
   if (outWindow) {
     assertTrue('both grabs succeeded (out-of-window run)', outWindow.g1 && outWindow.g2);
-    assertTrue('the second, past the 20 s window (still inside the 30 s despawn), pays 2 with no bonus, got ' +
-      outWindow.secondPay + ' (debug: ' + JSON.stringify(outWindow.debug2) + ')', outWindow.secondPay === 2);
+    assertTrue('the second, past the 20 s window (still inside the 30 s despawn), pays 1 with no bonus, got ' +
+      outWindow.secondPay + ' (debug: ' + JSON.stringify(outWindow.debug2) + ')', outWindow.secondPay === 1);
   }
 
   // ---- the bath: proximity, the refill, the payout, the 30 s tail ----------
@@ -370,7 +376,7 @@ async page => {
       used: (window.__capy.state.qaDrops().find(d => d.kind === 'bath') || {}).used,
     }));
     assertTrue('the bath refills stamina (was ' + stamBefore.toFixed(2) + ', now ' + afterBath.stamina.toFixed(2) + ')', afterBath.stamina > 0.95);
-    assertTrue('the bath pays 25, unaffected by anything else on the wallet', afterBath.yuzu - yuzuBefore === 25);
+    assertTrue('the bath pays 10, unaffected by anything else on the wallet', afterBath.yuzu - yuzuBefore === 10);  // was 25
     assertTrue('the record is marked used (the 30 s tail, not despawned yet)', afterBath.used === true);
   }
 
@@ -380,7 +386,8 @@ async page => {
   await page.evaluate(() => { window.__capy.state.qaForceOwned = ['seat']; });
   await page.waitForTimeout(300);
   const seatCap = await page.evaluate(() => window.__capy.capy.dropCap);
-  assertTrue('capy.dropCap reads 3 with seat forced', seatCap === 3);
+  // Sydney's base is 4 now (map-size scaled); the seat still adds exactly 1.
+  assertTrue('capy.dropCap reads 5 with seat forced (Sydney base 4 + 1)', seatCap === 5);
   const seatSpawns = await page.evaluate(() => {
     const g = window.__capy;
     g.state.qaSpawnDrop('yuzu');
