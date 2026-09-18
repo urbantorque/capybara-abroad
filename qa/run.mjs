@@ -76,6 +76,13 @@ const ASSERTS = [
   // lift, the pooled aura's size/colour/pulse, the shaft's borrowed geometry
   // gated to three biomes, the widened sparkle radius, the minimap dot.
   ['qa/l9-yuzu-visible.js', 'the yuzu scale/lift/aura/shaft/sparkle/minimap wiring'],
+  // THE PAPER, TUCKED and THE CHART, READ AT A GLANCE (L9, H/M): the tuck
+  // rule's inversion and its two folds, the item pill's hide-vs-dim split,
+  // the phone-width home collision fix; the chart's resize, hover-only door
+  // label, deepened frame, narrowed cone, five distinct glyphs, hover/hold
+  // legend, hold-to-zoom, live/quiet fade, single-band trail, and the
+  // `mapMarkPos` `live` resolver contract Wave 3's shop will read.
+  ['qa/l9-hud-map.js',    'the paper\'s tuck/fold/pill fixes and the chart\'s M1-M9 pass'],
   ['build.mjs',           'the one-file build: wraps, splices, no collisions, writes dist/'],
 ];
 const REPORTS = [

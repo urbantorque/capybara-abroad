@@ -7606,7 +7606,7 @@ const sysNUDGE_T = 150;
 const sysMAP_HZ = 12;               // redraws a second
 const sysMAP_TRAIL = 64;            // breadcrumbs kept
 const sysMAP_TRAIL_D = 3.0;         // metres between them — distance, not time
-const sysMAP_TRAIL_BANDS = 3;       // age bands the track fades through
+// sysMAP_TRAIL_BANDS retired (M9, LIFT9): the trail is one band now, not three.
 const sysMAP_ROSE = 4;              // ticks on the compass rose (N E S W)
 
 // ---------------------------------------------------------------------------
@@ -9404,6 +9404,7 @@ function sysBuildCSS() {
    root rather than separate screens — reads as "0 yuzu" bleeding through
    the menu, which it was. */
 '.capyui-wallet{position:absolute;left:14px;top:46px;display:flex;align-items:center;gap:5px;',
+  'min-height:44px;box-sizing:border-box;',
   'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:999px;',
   'padding:5px 12px 5px 10px;font-size:' + tXs + ';font-weight:700;color:' + ink + ';',
   'box-shadow:' + shMd + ';transform:rotate(-1deg);cursor:pointer;opacity:0;pointer-events:none;',
@@ -9423,6 +9424,7 @@ function sysBuildCSS() {
 /* Same `.show`/`started` gate as the wallet just above — see its own
    comment; the same bleed-through bug applied to this pill too. */
 '.capyui-item{position:absolute;left:120px;top:46px;display:flex;align-items:center;gap:6px;',
+  'min-height:44px;box-sizing:border-box;',
   'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:999px;',
   'padding:5px 12px 5px 8px;font-size:' + tXs + ';font-weight:700;color:' + ink + ';',
   'box-shadow:' + shMd + ';transform:rotate(1deg);cursor:pointer;opacity:0;pointer-events:none;',
@@ -9431,12 +9433,14 @@ function sysBuildCSS() {
 '.capyui-item:hover{transform:rotate(1deg) scale(1.04);}',
 '.capyui-item-dot{width:9px;height:9px;border-radius:50%;flex:none;',
   'background:' + sysRgba(PALETTE.yuzuGold, 0.9) + ';}',
-/* dim = nothing equipped, OR equipped but the bank reads zero — the roadmap's
-   own rule is that the dimmed icon is the only feedback a spent-out press
-   gets. Qualified with `.show` (three classes) so this outranks `.show`'s
-   own `opacity:1` (two classes) — without it, the empty/dim treatment went
-   invisible the moment the pill was allowed to show at all. */
-'.capyui-item.show.capyui-item-empty,.capyui-item.show.capyui-item-dim{opacity:0.42;}',
+/* H3 (LIFT9): "nothing pocketed" used to dim to 0.42 — 127px of furniture
+   saying nothing, since it is the pill's normal state. Hidden outright now;
+   `.show` alone (two classes) beats this so the base rule still governs
+   every other case. `.capyui-item-dim` — equipped, but the bank reads zero —
+   keeps the old dimmed-not-gone treatment: that one IS the feedback a
+   spent-out press gets, so it has to stay visible to say so. */
+'.capyui-item.show.capyui-item-empty{display:none;}',
+'.capyui-item.show.capyui-item-dim{opacity:0.42;}',
 '.capyui-item-empty .capyui-item-dot{background:' + sysRgba(PALETTE.ibisHead, 0.35) + ';}',
 '.capyui-item.flash{animation:capyui-itemflash 260ms ' + mSpring + ';}',
 '@keyframes capyui-itemflash{0%{transform:rotate(1deg) scale(1);}',
@@ -9466,14 +9470,23 @@ function sysBuildCSS() {
   'box-shadow:' + shMd + ';border:1px solid ' + paper2 + ';',
   'transition:opacity ' + dSlow + ' ease;opacity:0;}',
 '.capyui-todo.show{opacity:1;}',
-/* THE PAPER TUCKS (L3, E5). In forty-one settled frames the card covered a
-   fifth of the width and up to half the height, top-left, where the eye
-   enters. After four seconds of walking with nothing ticked it collapses to
-   one line — the row you are on, its arrow and its metres — and comes back
-   the moment you stop, tick something, or something opens. The list is what
-   you read standing still; the arrow is what you read moving. */
+/* THE PAPER TUCKS (L3, E5; inverted H1, LIFT9). In forty-one settled frames
+   the card covered a fifth of the width and up to half the height, top-left,
+   where the eye enters. It used to tuck WHILE WALKING and pop back the
+   instant the animal stopped — reverting exactly when the player had
+   stopped to read it. Flipped: six seconds after the animal settles
+   (arrival), it collapses to one line — the row you are on, its arrow and
+   its metres — unless a task just ticked or the marquee just opened
+   (`todoAwayHold`, set at both). A tap of the tab, or the journal key,
+   always brings the full sheet back either way. */
 '.capyui-todo .capyui-tab{display:none;align-items:center;gap:8px;font-size:' + tMd + ';',
-  'font-weight:600;color:' + ink + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+  'font-weight:600;color:' + ink + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;',
+  // H1 (LIFT9): the tab is the one thing on the sheet a tucked player can
+  // still tap — bringing the full sheet back, same as the journal key.
+  // `#hud` itself is `pointer-events:none` (every interactive HUD piece
+  // opts in on its own, the wallet/item/map's own established pattern), so
+  // the click handler below needs this or the canvas eats the tap.
+  'cursor:pointer;pointer-events:auto;}',
 '.capyui-todo .capyui-tab .capyui-txt{overflow:hidden;text-overflow:ellipsis;min-width:0;}',
 '.capyui-todo.away{width:clamp(150px,26vw,240px);padding:7px 12px 8px;transform:rotate(-1.2deg) scale(.96);}',
 '.capyui-todo.away .capyui-tab{display:flex;}',
@@ -9488,6 +9501,12 @@ function sysBuildCSS() {
    sheet only while it carries a CLOCK (.when) — a countdown is not a remark. */
 '.capyui-todo:not(.away) .capyui-finds{display:none;}',
 '.capyui-todo:not(.away) .capyui-marq:not(.when) .capyui-marqsay{display:none;}',
+/* H2 (LIFT9): the record lines get the same fold — a live attempt is a real
+   line, but it is one more block on a sheet the review already measured as
+   busy, and it rides under the tab (todoTuckTick's `sub`) exactly like the
+   where-line and the finds count just above, instead of sitting on the full
+   sheet as its own bordered block. */
+'.capyui-todo:not(.away) .capyui-rec{display:none;}',
 /* ...and while the where-line IS a clock, it stands in for the sentence: the
    name says what, the where-line says where and when. Measured in Venice:
    the two together were four lines of the nineteen on the arrival sheet. */
@@ -10456,11 +10475,24 @@ function sysBuildCSS() {
    complaint about this chart reduces to not being able to see it. At 118-164
    it is still furniture rather than a screen, and every mark on it is half
    again as legible. */
-'.capyui-map{position:absolute;right:16px;bottom:16px;width:clamp(118px,18vw,164px);',
-  'aspect-ratio:1/1;border-radius:' + rXl + ';overflow:hidden;background:' + paper + ';',
+// M1 (LIFT9): 118-164 -> 132-190. Still furniture, not a screen, but the
+// second sweep still measured every mark on it as "half again as legible"
+// wanting more room once the glyphs became distinct (M5) and the door's
+// label went hover-only (M2) rather than eating the width outright.
+'.capyui-map{position:absolute;right:16px;bottom:16px;width:clamp(132px,20vw,190px);',
+  'aspect-ratio:1/1;border-radius:16px;overflow:hidden;background:' + paper + ';',
   'border:1px solid ' + paper2 + ';box-shadow:' + shMd + ';',
-  'opacity:0;transition:opacity ' + dSlow + ' ease;pointer-events:none;transform:rotate(.4deg);}',
-'.capyui-map.show{opacity:.95;}',
+  // M8: one opacity transition serves the show/hide fade AND the live/quiet
+  // dim below, both need to move fast enough that neither reads as a delay.
+  'opacity:0;transition:opacity .2s ease;pointer-events:none;transform:rotate(.4deg);}',
+// M6/M2/M7: the chart takes input now — hover or hold reveals the door's
+// label and the legend, and a hold halves the fit span around the animal.
+'.capyui-map.show{opacity:.95;pointer-events:auto;}',
+// M8: dim to 0.72 when nothing on the chart needs a look (no pinned goal, no
+// live drop, no marquee ring) — back to .95 within the same fast transition
+// the instant any of the three returns. Written by the per-frame tick, not
+// by mapDraw, so it never waits on the redraw dedup.
+'.capyui-map.show.quiet{opacity:.72;}',
 '.capyui-map canvas{display:block;width:100%;height:100%;}',
 /* The paper edge. A chart printed on the same stock as the to-do card and the
    place cards should look like it has been FOLDED INTO a corner of the screen,
@@ -10469,9 +10501,15 @@ function sysBuildCSS() {
    inset shadows: it has to be its own layer rather than a shadow on .capyui-map,
    because the canvas is a child and would paint straight over an inset shadow
    set on its parent. */
-'.capyui-mapv{position:absolute;inset:0;pointer-events:none;border-radius:' + rXl + ';',
-  'box-shadow:inset 0 0 10px ' + sysRgba(PALETTE.screenShadow, 0.30) + ',',
-  'inset 0 0 0 1px ' + sysRgba(PALETTE.sail, 0.55) + ';}',
+// M3 (LIFT9): deepened the vignette (10px/.30 -> 16px/.38), raised the
+// corner radius past the sheet's own largest token (rXl, 12px) to 16px so
+// the frame reads as folded paper rather than a HUD rectangle, and added a
+// third inset ring in a warm tone (PALETTE.sand) just inside the existing
+// cool rim — the "warm 1px rim" the sweep asked for.
+'.capyui-mapv{position:absolute;inset:0;pointer-events:none;border-radius:16px;',
+  'box-shadow:inset 0 0 16px ' + sysRgba(PALETTE.screenShadow, 0.38) + ',',
+  'inset 0 0 0 1px ' + sysRgba(PALETTE.sail, 0.55) + ',',
+  'inset 0 0 0 2px ' + sysRgba(PALETTE.sand, 0.4) + ';}',
 '.capyui-mapn{position:absolute;left:50%;top:1px;transform:translateX(-50%);',
   // 8 -> 10.5 (L6, E4): the one letter on the arrival frame under the floor
   'font-size:10.5px;font-weight:700;letter-spacing:.12em;color:' + inkSoft + ';',
@@ -10483,7 +10521,7 @@ function sysBuildCSS() {
 '@media (hover:none) and (pointer:coarse){.capyui-map{bottom:auto;',
   'top:calc(12px + env(safe-area-inset-top,0px));',
   'right:calc(12px + env(safe-area-inset-right,0px));',
-  'width:clamp(92px,24vw,124px);}}',
+  'width:clamp(110px,30vw,148px);}}',
 /* ---------- how far, and to what ----------
    The card in the top left has carried the metres since the day it was built,
    and the chart in the bottom right has carried the direction - so answering
@@ -10511,6 +10549,33 @@ function sysBuildCSS() {
 '@media (hover:none) and (pointer:coarse){.capyui-mapnote{bottom:auto;top:calc(100% + 4px);}}',
 '.capyui-mapdist i{flex:0 0 auto;width:6px;height:6px;border-radius:50%;',
   'background:' + accent + ';text-decoration:none;}',
+/* M6 (LIFT9): the chart resolves nineteen worlds and explains none of them —
+   five glyphs sharing one grey ink, until M5 gave each its own shape. This is
+   the key to that shape, and it costs no permanent furniture: a sibling of
+   the chart rather than a child (so it is never clipped by the chart's own
+   `overflow:hidden`), hidden until the same hover/hold that reveals the
+   door's label (M2) turns it on. Anchored above the chart at its own current
+   width, so it never has to guess where the corner is. */
+'.capyui-maplegend{position:absolute;right:16px;',
+  'bottom:calc(16px + clamp(132px,20vw,190px) + 10px);',
+  'display:flex;flex-direction:column;gap:5px;padding:8px 11px;border-radius:' + rLg + ';',
+  'background:' + paper + ';border:1px solid ' + paper2 + ';box-shadow:' + shMd + ';',
+  'opacity:0;pointer-events:none;transform:translateY(4px) rotate(.3deg);',
+  'transition:opacity ' + dFast + ' ease,transform ' + dFast + ' ease;z-index:41;}',
+'.capyui-maplegend.on{opacity:1;transform:translateY(0) rotate(.3deg);}',
+'@media (hover:none) and (pointer:coarse){.capyui-maplegend{bottom:auto;',
+  'top:calc(12px + env(safe-area-inset-top,0px) + clamp(110px,30vw,148px) + 8px);',
+  'right:calc(12px + env(safe-area-inset-right,0px));}}',
+'.capyui-mlrow{display:flex;align-items:center;gap:7px;font-size:' + tXs + ';',
+  'color:' + ink + ';white-space:nowrap;}',
+'.capyui-mlswatch{flex:0 0 auto;display:inline-block;width:10px;height:10px;}',
+'.capyui-mlswatch-tri{width:0;height:0;border-left:4.5px solid transparent;',
+  'border-right:4.5px solid transparent;border-bottom:8px solid var(--mlc);}',
+'.capyui-mlswatch-boat{width:12px;height:5px;border-radius:2px 7px 2px 7px;background:var(--mlc);}',
+'.capyui-mlswatch-ring{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--mlc);}',
+'.capyui-mlswatch-leaf{width:10px;height:6px;border-radius:70% 0 70% 0;',
+  'background:var(--mlc);transform:rotate(40deg);}',
+'.capyui-mlswatch-faint{width:8px;height:8px;border-radius:50%;border:1px solid var(--mlc);}',
 
 /* ---------- stamina ----------
    Bottom left, thin, and ABSENT while it is full: a bar that is always on screen
@@ -10704,7 +10769,7 @@ function sysBuildCSS() {
   // 12px to clear the notch + the chart's own height + 20px of air. The chart
   // carries a distance pill on its bottom edge, so a gap sized to the chart
   // alone reads as crowded even though the boxes do not touch.
-  'top:calc(32px + env(safe-area-inset-top,0px) + clamp(92px,24vw,124px));',
+  'top:calc(32px + env(safe-area-inset-top,0px) + clamp(110px,30vw,148px));',
   'width:58px;height:58px;font-size:10px;',
   'background:' + sysRgba(PALETTE.sail, 0.42) + ';border-style:dashed;',
   'border-color:' + sysRgba(PALETTE.ibisHead, 0.34) + ';box-shadow:none;opacity:.62;}',
@@ -10716,7 +10781,7 @@ function sysBuildCSS() {
    to pause, volume, the journal, the ledger, the album, the records and the
    title. Solid edge, full opacity, same 58px so the column reads as a column. */
 '.capyui-menu{right:calc(12px + env(safe-area-inset-right,0px));',
-  'top:calc(32px + env(safe-area-inset-top,0px) + clamp(92px,24vw,124px) + 70px);',
+  'top:calc(32px + env(safe-area-inset-top,0px) + clamp(110px,30vw,148px) + 70px);',
   'width:58px;height:58px;font-size:10px;',
   'background:' + sysRgba(PALETTE.sail, 0.78) + ';',
   'border-color:' + sysRgba(PALETTE.ibisHead, 0.28) + ';opacity:.9;}',
@@ -10726,14 +10791,15 @@ function sysBuildCSS() {
    you are meant to find — but a shade quieter than it, because a menu is a door
    and this is a lens. Same 58px, so the column stays a column. */
 '.capyui-look{right:calc(12px + env(safe-area-inset-right,0px));',
-  'top:calc(32px + env(safe-area-inset-top,0px) + clamp(92px,24vw,124px) + 140px);',
+  'top:calc(32px + env(safe-area-inset-top,0px) + clamp(110px,30vw,148px) + 140px);',
   'width:58px;height:58px;font-size:10px;',
   'background:' + sysRgba(PALETTE.sail, 0.68) + ';',
   'border-color:' + sysRgba(PALETTE.ibisHead, 0.24) + ';opacity:.82;}',
 '.capyui-look.press{opacity:1;background:' + sysRgba(PALETTE.cloth1, 0.9) + ';}',
 /* ---------- A PHONE ON ITS SIDE HAS NO COLUMN (X7) ----------
-   Measured at 844x390 and 740x360. The right-hand column is chart (124) + three
-   58px buttons + their gaps = 300px of a 390px screen, and the WHEEK — 96px at
+   Measured at 844x390 and 740x360. The right-hand column is chart (now 148,
+   M1) + three 58px buttons + their gaps = 300px of a 390px screen, and the
+   WHEEK — 96px at
    bottom:26px — starts at 268. So MENU has been sitting ON TOP of the wheek in
    landscape since R5, and adding the eye put a second button there.
 
@@ -10747,11 +10813,11 @@ function sysBuildCSS() {
    is the same 58 + 12 the column used vertically. */
 '@media (max-height:520px){',
   '.capyui-back{top:calc(12px + env(safe-area-inset-top,0px));',
-    'right:calc(24px + env(safe-area-inset-right,0px) + clamp(92px,24vw,124px));}',
+    'right:calc(24px + env(safe-area-inset-right,0px) + clamp(110px,30vw,148px));}',
   '.capyui-menu{top:calc(12px + env(safe-area-inset-top,0px));',
-    'right:calc(94px + env(safe-area-inset-right,0px) + clamp(92px,24vw,124px));}',
+    'right:calc(94px + env(safe-area-inset-right,0px) + clamp(110px,30vw,148px));}',
   '.capyui-look{top:calc(12px + env(safe-area-inset-top,0px));',
-    'right:calc(164px + env(safe-area-inset-right,0px) + clamp(92px,24vw,124px));}}',
+    'right:calc(164px + env(safe-area-inset-right,0px) + clamp(110px,30vw,148px));}}',
 
 /* Phone: tighter leading and smaller tick boxes. Five rows fit anywhere, so the
    card no longer needs a scroll of its own at any size. */
@@ -10768,7 +10834,20 @@ function sysBuildCSS() {
   '.capyui-count{margin-top:5px;}',
   '.capyui-task.capyui-fold{margin-top:-1px;}',
   '.capyui-fly{right:8px;width:84px;padding:6px 8px 7px;}',
-  '.capyui-home{font-size:10px;padding:5px 12px;gap:8px;}',
+  /* H4 (LIFT9): at 390px the centred sentence reached into both
+     `.capyui-map` (right) and `.capyui-pips` (left) — measured 44x25 and
+     23x7 px of overlap. A max-width alone cannot clear both corners at once
+     at this width without wrapping the sentence onto four or five lines
+     (the map alone, at its new M1 size, leaves under 100px of clearance on
+     either side of centre) — so the real fix is vertical: `.capyui-map`'s
+     phone-and-under clamp bottoms out at 132px (M1) regardless of viewport
+     width across this whole media query, so one fixed offset clears it (and
+     the shorter `.capyui-pips` beneath it) at every width this block
+     covers. The max-width still caps the sentence so it never spans
+     edge-to-edge on the narrowest phones. */
+  '.capyui-home{font-size:10px;padding:6px 12px;gap:6px;max-width:78vw;',
+  'white-space:normal;text-align:center;line-height:1.3;flex-wrap:wrap;justify-content:center;',
+  'bottom:162px;}',
   '.capyui-toasts{left:auto;right:8px;bottom:auto;top:8px;transform:none;',
   'align-items:flex-end;width:min(50vw,220px);}}',
 '@media (max-height:520px){.capyui-task{font-size:10px;line-height:1.12;}}',
@@ -24776,8 +24855,17 @@ export function createSystems(game) {
   const todoTabSub = sysEl('div', 'capyui-tabsub', '');
   todoEl.appendChild(todoTabSub);
   let todoAway = false, todoAwayT = 0, todoAwayHold = 0;
-  const sysTUCK_AFTER = 4.0;    // s of walking before the paper tucks
-  const sysTUCK_V = 1.0;        // m/s: walking, not shuffling on the spot
+  // H1 (LIFT9): INVERTED. This used to tuck the paper after `sysTUCK_AFTER`
+  // seconds of WALKING and pop it back the instant the animal stopped —
+  // reverting exactly when the player had stood still to read it. Now it
+  // tucks `sysTUCK_AFTER` seconds after the animal SETTLES (arrival), and
+  // stays open while moving. `todoAwayHold` (set on a tick and on a fresh
+  // marquee, below) is unchanged — it still means "a fresh payout is up,
+  // don't tuck over it" — but now it also holds the sheet open across the
+  // handful of frames right after the animal stops, if that stop was itself
+  // caused by, say, a completed task.
+  const sysTUCK_AFTER = 6.0;    // s of standing still before the paper tucks
+  const sysTUCK_V = 1.0;        // m/s: below this counts as stopped, not walking
   const sysTUCK_HOLD = 5.0;     // s the paper stays open after a tick
   function todoTuckTick(dt) {
     const capy = game.capy;
@@ -24785,7 +24873,8 @@ export function createSystems(game) {
     const spd = v ? Math.hypot(v.x, v.z) : 0;
     if (todoAwayHold > 0) todoAwayHold -= dt;
     const busy = !started || transBusy || jrShown || ledShown || albShown || pauseShown || game.state.paused;
-    if (busy || todoAwayHold > 0 || spd < sysTUCK_V) todoAwayT = 0;
+    const stopped = spd < sysTUCK_V;
+    if (busy || todoAwayHold > 0 || !stopped) todoAwayT = 0;
     else todoAwayT += dt;
     const want = todoAwayT > sysTUCK_AFTER;
     if (want !== todoAway) {
@@ -24808,14 +24897,27 @@ export function createSystems(game) {
       todoTabAim.style.display = on ? '' : 'none';
       if (on && todoTabArrow.style.transform !== sysArrowLast) todoTabArrow.style.transform = sysArrowLast;
       // the remark: the top row's armed state first, then the marquee's
-      // where while it is a rumour, else the finds
+      // where while it is a rumour, then a live record attempt (H2, LIFT9 —
+      // the same fold `.capyui-rec` never had before), else the finds
       const sub = (top && top.armed && sysArmedOn[todoTopId]) ? top.armed.textContent
                 : (marqId && marqEl.classList.contains('on') && !marqEl.classList.contains('row') && marqSayEl.textContent)
                   ? marqSayEl.textContent
-                  : (findsEl.classList.contains('on') ? findsEl.textContent : '');
+                  : (recEl.classList.contains('on') ? recNowEl.textContent
+                  : (findsEl.classList.contains('on') ? findsEl.textContent : ''));
       if (todoTabSub.textContent !== sub) { todoTabSub.textContent = sub; todoTabSub.classList.toggle('on', !!sub); }
     }
   }
+  // H1 (LIFT9): a tap of the tab brings the full sheet back immediately,
+  // the same door the journal key already is (Tab, handled where jrShow is
+  // called) — one press, either direction, nothing new to learn. Only wired
+  // while tucked; the tab is not the thing you tap to tuck it early, so a
+  // stray click on the full sheet's own header does nothing here.
+  todoTab.addEventListener('click', function (e) {
+    if (!todoAway) return;
+    e.preventDefault();
+    todoAwayHold = sysTUCK_HOLD;
+    todoAwayT = 0;
+  });
   // ---- THE HEADING SAYS WHAT KIND OF THING IT IS (V2) ----------------------
   // The kicker under the marquee is the live ACT's name — THE CITY, THE
   // VALLEY, MONG KOK — and it changes every few tasks with nothing on the card
@@ -26485,6 +26587,60 @@ export function createSystems(game) {
     mapNoteT = setTimeout(function () { mapNoteEl.classList.remove('show'); mapNoteT = 0; }, 3000);
   }
   hudRoot.appendChild(mapEl);
+  // ---- M6/M2/M7 (LIFT9): THE CHART TAKES INPUT ----------------------------
+  // A canvas has no native hover, so "hover or hold" is read off the wrapping
+  // element (`.capyui-map`, now `pointer-events:auto` while shown) and kept
+  // as one flag three things read: the door's label goes from
+  // pinned-goal-only to always-on (M2), a small legend fades in explaining
+  // the five glyphs (M6, built below), and a hold halves the fit span around
+  // the animal for a closer look (M7, read in mapDraw). `pointerdown`/`up`
+  // covers touch (a hold, with no hover at all) and a mouse click alike;
+  // `pointerenter`/`leave` covers a mouse that never presses.
+  const mapLegendEl = sysEl('div', 'capyui-maplegend');
+  mapLegendEl.setAttribute('aria-hidden', 'true');
+  // Same five kinds mapDraw's own glyphs use (M5) — the swatch shapes below
+  // are the CSS approximation of the canvas paths, not a new vocabulary.
+  // Written out rather than read off `mapC` (declared further down this
+  // closure, after the bake/draw functions): this block runs at HUD build
+  // time, synchronously, and `mapC` would still be in its temporal dead
+  // zone here. Same values `mapC.ink`/`mapC.deep`/`mapC.faint` resolve to.
+  const mapLegendRows = [
+    { shape: 'tri', color: sysHex(PALETTE.ibisHead), label: 'peak / star' },
+    { shape: 'boat', color: sysHex(PALETTE.ibisHead), label: 'boat' },
+    { shape: 'ring', color: sysHex(PALETTE.seaMid), label: 'water' },
+    { shape: 'leaf', color: sysHex(PALETTE.leafB), label: 'leaf' },
+    { shape: 'faint', color: sysRgba(PALETTE.ibisHead, 0.22), label: 'faint' },
+  ];
+  for (let mi = 0; mi < mapLegendRows.length; mi++) {
+    const row = mapLegendRows[mi];
+    const rowEl = sysEl('div', 'capyui-mlrow');
+    const sw = sysEl('i', 'capyui-mlswatch capyui-mlswatch-' + row.shape);
+    sw.style.setProperty('--mlc', row.color);
+    rowEl.appendChild(sw);
+    rowEl.appendChild(sysEl('span', null, row.label));
+    mapLegendEl.appendChild(rowEl);
+  }
+  hudRoot.appendChild(mapLegendEl);
+  let mapHoverOn = false, mapHeld = false, mapInteract = false;
+  function mapInteractPaint() {
+    const want = mapHoverOn || mapHeld;
+    if (want === mapInteract) return;
+    mapInteract = want;
+    mapLegendEl.classList.toggle('on', mapInteract);
+    // force the next scheduled mapDraw to redraw even if nothing else about
+    // the frame changed — hover/hold are not part of the redraw signature.
+    mapLastX = NaN;
+  }
+  mapEl.addEventListener('pointerenter', function () { mapHoverOn = true; mapInteractPaint(); });
+  mapEl.addEventListener('pointerleave', function () { mapHoverOn = false; mapInteractPaint(); });
+  mapEl.addEventListener('pointerdown', function (e) {
+    mapHeld = true; mapInteractPaint();
+    try { mapEl.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  function mapReleaseHold() { if (mapHeld) { mapHeld = false; mapInteractPaint(); } }
+  mapEl.addEventListener('pointerup', mapReleaseHold);
+  mapEl.addEventListener('pointercancel', mapReleaseHold);
+  mapEl.addEventListener('lostpointercapture', mapReleaseHold);
   const mapCtx = mapCv.getContext('2d');
   const mapBase = document.createElement('canvas');
   mapBase.width = sysMAP_PX; mapBase.height = sysMAP_PX;
@@ -26495,7 +26651,7 @@ export function createSystems(game) {
   let mapBakedFor = null;            // biome name the base layer belongs to
   let mapBakedTide = -1;             // and, in Venice, WHICH TIDE it belongs to
   let mapSpec = null;                // the sysMAP_WORLDS entry in force
-  let mapT = 0, mapShown = false, mapCssW = 0;
+  let mapT = 0, mapShown = false, mapCssW = 0, mapLiveShown = true;
   // ---- WHERE YOU HAVE BEEN -------------------------------------------------
   // A chart tells you where things are. The one thing it could not tell you was
   // where YOU have been, which in a world you are exploring on foot is at least
@@ -26535,7 +26691,9 @@ export function createSystems(game) {
     high: sysHex(PALETTE.stoneDark), ink: sysHex(PALETTE.ibisHead),
     soft: sysRgba(PALETTE.ibisHead, 0.5), faint: sysRgba(PALETTE.ibisHead, 0.22),
     you: sysHex(PALETTE.capy), goal: sysHex(PALETTE.cloth1),
-    cone: sysRgba(PALETTE.sail, 0.34),
+    // M4 (LIFT9): narrower wedge, not a wash — half/reach/alpha all cut
+    // together in mapDraw's cone (0.42/26u/0.34 -> 0.26/18u/0.22).
+    cone: sysRgba(PALETTE.sail, 0.22),
   };
 
   // World -> baked-pixel, and world -> displayed-canvas. Uniform scale on both
@@ -26543,7 +26701,11 @@ export function createSystems(game) {
   function mapFit(spec, w) {
     const sx = (spec.x1 - spec.x0), sz = (spec.z1 - spec.z0);
     const span = (sx > sz ? sx : sz) + spec.pad * 2;
-    return { cx: (spec.x0 + spec.x1) / 2, cz: (spec.z0 + spec.z1) / 2, k: w / span };
+    // `span` carried on the result too (M7, LIFT9): hold-to-zoom needs the
+    // world span this fit was built from to compute a half-span crop, and
+    // re-deriving it from `spec` a second time would be the same three lines
+    // twice rather than one value read off the fit it already has.
+    return { cx: (spec.x0 + spec.x1) / 2, cz: (spec.z0 + spec.z1) / 2, k: w / span, span: span };
   }
 
   // Bake water/land/relief for the live biome. One pass, on entry, never in a
@@ -26697,6 +26859,30 @@ export function createSystems(game) {
   // a getter runs arbitrary biome code twelve times a second and a chart that
   // can take the frame down with it is worse than a chart missing a dot.
   function mapMarkPos(m) {
+    // WAVE 3 CONTRACT (LIFT9, M10 — for the shop, not built here). `get`
+    // below reads a per-biome property off `game[mapBakedFor]`, which is the
+    // right shape for something every world publishes its own row for. A
+    // fixture that exists the same way in EVERY biome — the traveller's
+    // stall, `game.travWhere()` — would need a per-biome table row for
+    // nothing, which is the exact staleness class `mapMarkAudit` exists to
+    // catch. `live` reads a named function straight off `game` instead, so
+    // a future `shop: {live:'shopWhere', t:'the bag'}` row on a
+    // `sysMAP_WORLDS` entry resolves with no per-biome plumbing. Checked
+    // first so a mark could in principle carry both and this wins; nothing
+    // in the game does yet. Tested with a throwaway `game.testLive = () =>
+    // ({x:0,z:0})` stub and removed once the branch proved out — see
+    // qa/l9-hud-map.js.
+    if (m.live) {
+      const back = typeof m.x === 'number' ? m : null;
+      const f = game[m.live];
+      if (typeof f !== 'function') return back;
+      let v;
+      try { v = f(); } catch (e) { return back; }
+      if (!v) return back;
+      if (typeof v.x === 'number') return v;
+      if (v.position && typeof v.position.x === 'number') return v.position;
+      return back;
+    }
     if (!m.get) return m;
     // ...and a mark may carry BOTH a getter and a literal, in which case the
     // literal is the fallback for every way the getter can come back empty.
@@ -26792,8 +26978,31 @@ export function createSystems(game) {
     g2.clearRect(0, 0, w, w);
     if (!mapSpec) return;
     g2.imageSmoothingEnabled = true;
-    g2.drawImage(mapBase, 0, 0, sysMAP_PX, sysMAP_PX, 0, 0, w, w);
-    const f = mapFit(mapSpec, w);
+    // M7 (LIFT9): HOLD-TO-ZOOM. The baked raster (`mapBase`) only ever covers
+    // the whole spec at `baseFit`'s scale, so a closer look means CROPPING a
+    // quarter of its area (half the span on both axes, centred on the
+    // animal) rather than re-fitting — `srcW`/`srcH` come out constant
+    // regardless of where the animal stands, because the crop is always half
+    // of the same baked image. The runtime fit (`f`, used by every PX/PZ
+    // below) is rebuilt from the ACTUAL drawn window rather than the animal's
+    // raw position, so a crop clamped against a world edge still lines the
+    // marks up with the terrain under them.
+    let f;
+    if (mapHeld) {
+      const baseFit = mapFit(mapSpec, sysMAP_PX);
+      const srcW = sysMAP_PX / 2, srcH = srcW;
+      const bx = (p.x - baseFit.cx) * baseFit.k + sysMAP_PX / 2;
+      const bz = (p.z - baseFit.cz) * baseFit.k + sysMAP_PX / 2;
+      const srcX = clamp(bx - srcW / 2, 0, sysMAP_PX - srcW);
+      const srcY = clamp(bz - srcH / 2, 0, sysMAP_PX - srcH);
+      g2.drawImage(mapBase, srcX, srcY, srcW, srcH, 0, 0, w, w);
+      const cx = baseFit.cx + (srcX + srcW / 2 - sysMAP_PX / 2) / baseFit.k;
+      const cz = baseFit.cz + (srcY + srcH / 2 - sysMAP_PX / 2) / baseFit.k;
+      f = { cx: cx, cz: cz, k: w / (baseFit.span / 2) };
+    } else {
+      g2.drawImage(mapBase, 0, 0, sysMAP_PX, sysMAP_PX, 0, 0, w, w);
+      f = mapFit(mapSpec, w);
+    }
     const PX = (x) => (x - f.cx) * f.k + w / 2;
     const PZ = (z) => (z - f.cz) * f.k + w / 2;
     const u = w / 128;                          // one unit of "map pixel"
@@ -26804,41 +27013,31 @@ export function createSystems(game) {
     // absorbed rather than as something drawn on top of it. One stroked path,
     // fading toward the far end: a track that is uniformly dark says every part
     // of it is equally recent, which is the one thing it must not say.
-    // THREE PATHS, NOT SIXTY-FOUR SEGMENTS. The first cut stroked every pair on
-    // its own so the alpha could ramp per segment, and at this scale a stroked
-    // two-point path with round caps is a DASH: the track came out as a dotted
-    // line with the gaps in it that a separate stroke leaves behind. A polyline
-    // is one path. The fade survives as three bands — old, middle, recent —
-    // which is as much gradient as a hundred-pixel chart can show anyway, and
-    // each band starts on the last point of the one before it so the joins
-    // close.
+    // ONE PATH, ONE BAND (M9, LIFT9). This used to fade through three bands
+    // (0.05-0.27) to say "this end is older" — barely visible over light
+    // ground even at its brightest stop, and three strokes of the same
+    // polyline for one line's worth of information a hundred pixels across.
+    // A polyline is one path (the ORIGINAL fix this comment used to explain:
+    // a stroked two-point path per segment draws as a dotted DASH, not a
+    // line, because of the round caps) — now it is also only drawn once.
     if (mapTrailN > 1) {
       g2.lineCap = 'round';
       g2.lineJoin = 'round';
-      const at = function (i) {
-        return (mapTrailHead - mapTrailN + i + sysMAP_TRAIL * 2) % sysMAP_TRAIL;
-      };
-      for (let band = 0; band < sysMAP_TRAIL_BANDS; band++) {
-        const i0 = Math.floor(mapTrailN * band / sysMAP_TRAIL_BANDS);
-        const i1 = Math.floor(mapTrailN * (band + 1) / sysMAP_TRAIL_BANDS);
-        if (i1 - i0 < 2) continue;
-        const age = (band + 1) / sysMAP_TRAIL_BANDS;      // 0 oldest .. 1 newest
-        g2.strokeStyle = sysRgba(PALETTE.ibisHead, 0.05 + age * 0.22);
-        g2.lineWidth = (0.6 + age * 0.8) * u;
-        g2.beginPath();
-        for (let i = i0; i < i1; i++) {
-          const k = at(i) * 2;
-          const x = PX(mapTrail[k]), y = PZ(mapTrail[k + 1]);
-          if (i === i0) g2.moveTo(x, y); else g2.lineTo(x, y);
-        }
-        g2.stroke();
+      g2.strokeStyle = sysRgba(PALETTE.ibisHead, 0.22);
+      g2.lineWidth = 1.0 * u;
+      g2.beginPath();
+      for (let i = 0; i < mapTrailN; i++) {
+        const k = ((mapTrailHead - mapTrailN + i + sysMAP_TRAIL * 2) % sysMAP_TRAIL) * 2;
+        const x = PX(mapTrail[k]), y = PZ(mapTrail[k + 1]);
+        if (i === 0) g2.moveTo(x, y); else g2.lineTo(x, y);
       }
+      g2.stroke();
     }
 
     // ---- the camera's cone, so "which way am I looking" is answerable ----
     const px = PX(p.x), pz = PZ(p.z);
     const vx = -Math.sin(camYawNow), vz = -Math.cos(camYawNow);
-    const half = 0.42, reach = 26 * u;
+    const half = 0.26, reach = 18 * u;   // M4 (LIFT9): a wedge, not a wash
     g2.fillStyle = mapC.cone;
     g2.beginPath();
     g2.moveTo(px, pz);
@@ -26875,6 +27074,10 @@ export function createSystems(game) {
       if (!q) continue;
       const mx = PX(q.x), mz = PZ(q.z);
       g2.lineWidth = 1.2 * u;
+      // M5 (LIFT9): five kinds, one grey ink, until now. Peak/star keep the
+      // triangle — it was already right. The other four each get a shape a
+      // player can tell apart at a glance rather than a colour swap on the
+      // same dot, matched by the legend beside the chart (M6).
       if (m.k === 'star' || m.k === 'peak') {
         g2.fillStyle = m.k === 'peak' ? mapC.high : mapC.ink;
         g2.beginPath();
@@ -26882,12 +27085,42 @@ export function createSystems(game) {
         g2.moveTo(mx, mz - r); g2.lineTo(mx + r * 0.92, mz + r * 0.72); g2.lineTo(mx - r * 0.92, mz + r * 0.72);
         g2.closePath(); g2.fill();
       } else if (m.k === 'boat') {
+        // a hull, not a rectangle: a deck's width at the top, tapering to a
+        // rounded keel — a silhouette rather than a box standing in for one.
         g2.fillStyle = mapC.ink;
-        g2.fillRect(mx - 2.2 * u, mz - 1.3 * u, 4.4 * u, 2.6 * u);
+        const bw = 2.6 * u, bh = 1.5 * u;
+        g2.beginPath();
+        g2.moveTo(mx - bw, mz - bh * 0.3);
+        g2.lineTo(mx - bw * 0.5, mz - bh);
+        g2.lineTo(mx + bw * 0.5, mz - bh);
+        g2.lineTo(mx + bw, mz - bh * 0.3);
+        g2.lineTo(mx + bw * 0.55, mz + bh);
+        g2.lineTo(mx - bw * 0.55, mz + bh);
+        g2.closePath(); g2.fill();
+      } else if (m.k === 'water') {
+        // a ring: water is a place you look INTO, not a mark you look AT.
+        g2.strokeStyle = mapC.deep;
+        g2.lineWidth = 1.4 * u;
+        g2.beginPath(); g2.arc(mx, mz, 2.3 * u, 0, 6.284); g2.stroke();
+      } else if (m.k === 'leaf') {
+        // a leaf tick: a vesica, not a dot — two arcs meeting at a point top
+        // and bottom rather than a circle in the leaf's own colour.
+        g2.fillStyle = sysHex(PALETTE.leafB);
+        const lr = 2.1 * u;
+        g2.beginPath();
+        g2.moveTo(mx, mz - lr);
+        g2.quadraticCurveTo(mx + lr, mz, mx, mz + lr);
+        g2.quadraticCurveTo(mx - lr, mz, mx, mz - lr);
+        g2.closePath(); g2.fill();
+      } else if (m.k === 'faint') {
+        // hollow, same as the word: a thin ring in the softest ink on the
+        // chart, where a filled dot the same colour all but disappeared.
+        g2.strokeStyle = mapC.faint;
+        g2.lineWidth = 1.0 * u;
+        g2.beginPath(); g2.arc(mx, mz, 1.9 * u, 0, 6.284); g2.stroke();
       } else {
-        g2.fillStyle = m.k === 'faint' ? mapC.faint : m.k === 'leaf' ? sysHex(PALETTE.leafB)
-                     : m.k === 'water' ? mapC.deep : mapC.soft;
-        g2.beginPath(); g2.arc(mx, mz, (m.k === 'faint' ? 1.7 : 2.1) * u, 0, 6.284); g2.fill();
+        g2.fillStyle = mapC.soft;
+        g2.beginPath(); g2.arc(mx, mz, 2.1 * u, 0, 6.284); g2.fill();
       }
     }
 
@@ -26994,7 +27227,14 @@ export function createSystems(game) {
         // stroked in the paper colour underneath so it stays legible over the
         // dark half of a chart without needing a box drawn round it.
         const wt = wm.t;
-        if (wt) {
+        // M2 (LIFT9): the label used to run 47-75% of the chart's width on
+        // every door, at rest, whether or not it was the thing anybody was
+        // being sent to. Now it draws at rest only when the door IS the
+        // pinned goal (the arrow and the ring already agree it is worth
+        // naming); hovering or holding the chart (M6/M7's same interact
+        // flag) always shows it, on any door, on request.
+        const doorIsGoal = !!(goal && Math.hypot(goal.x - wq.x, goal.z - wq.z) < 1.0);
+        if (wt && (mapInteract || doorIsGoal)) {
           // IT IS THE DISTANCE PILL, NOT A NEW THING. `.capyui-mapdist` is
           // already text on this chart — 9 px, 700, ink on 86% sail, fully
           // rounded — so the door's label is that component drawn on the
@@ -31953,6 +32193,10 @@ export function createSystems(game) {
       const mq = cdef && cdef.marquee;
       marqSay = sysSay((mq && mq.say) || '');
       marqSayEl.textContent = marqSay;
+      // H1 (LIFT9): a fresh marquee is exactly the "something just opened"
+      // case the tuck rule is required not to hide — same hold a task tick
+      // gets, below.
+      todoAwayHold = sysTUCK_HOLD; todoAwayT = 0;
     } else if (!marqOn) {
       marqId = '';
       marqSay = '';
@@ -48385,6 +48629,18 @@ export function createSystems(game) {
       }
       const wantMap = !!mapSpec && !transBusy;
       if (wantMap !== mapShown) { mapShown = wantMap; mapEl.classList.toggle('show', wantMap); }
+      // M8 (LIFT9): the chart dims to 0.72 when nothing on it needs a look —
+      // no pinned goal, no live drop, no marquee ring — and back to .95 the
+      // instant any of the three returns. Read here, not inside mapDraw:
+      // mapDraw skips its own body most frames (the redraw dedup), and a
+      // class toggle that only fires on the frames that happen to redraw
+      // would lag the actual state by up to 1/sysMAP_HZ for no reason.
+      const dropsLive = !!(game.drops && typeof game.drops.where === 'function' && game.drops.where().length);
+      const mapIsLive = mapGoal.ok || dropsLive || !!marqChartPoint();
+      if (mapIsLive !== mapLiveShown) {
+        mapLiveShown = mapIsLive;
+        mapEl.classList.toggle('quiet', !mapIsLive);
+      }
     }
 
     // ---- the wallet / the pocketed kind ----
