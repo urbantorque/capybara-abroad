@@ -435,6 +435,50 @@ A subject passes on 5 of 6. The uplift for a failing subject is written
 INTO THE SHEET'S FINDINGS TABLE, per subject, with the read it fails —
 not decided in advance here.
 
+### ONE PERSON — the people standard (added 19 Sep 2026, from the player: "in Marrakech their heads seem too small and the quality is low compared to Sydney")
+
+It is structural, not a slip. There are at least THREE ways a human is
+built in this tree: the roster figure ( — a 0.32 m box
+head with a nose, a neck, hair with a part, and the v54 face: both eyes in
+one instanced mesh, brows in another; torso with shoulders, hem and
+placket bands), the hand-built locals (their own meshes, a collar, a
+hat), and two chapters that roll their own crowd from nothing —
+Marrakech (, sahara.js:1873: a 0.27 m SPHERE head on
+6-segment cylinders, a hood cone, a nose block — no eyes, no brows, no
+hair, no neck) and Rio (, rio.js:2732, the same shape of
+thing). Head-to-height is 0.20 in Sydney and 0.17 in the square, and a
+sphere reads smaller than a box of the same width; that is exactly the
+"too small, lower quality" the player saw, measured.
+
+**The standard, written once and read by every builder:**  in
+npc.js — head 0.32 box-class with the v54 face (eyes, brows, nose,
+neck), hair with a part, shoulders/hem/placket bands on the torso, the
+ 1.22 ratio for children, 0.92–1.09 height jitter (the
+square's own "not everybody is the same height" rule, kept). A chapter's
+costume is a GARMENT LAYER over that skeleton — the djellaba and hood in
+Marrakech, the bikini and the canga in Rio, the parka in Antarctica —
+never a different skeleton.  and  keep
+their own instanced pools, their own AI data strides and their own
+behaviour (the halqa rings, the fidget clock — none of that moves); only
+the GEOMETRY they instance comes from , plus the face meshes
+wired the way the roster already wires them. Hand-built locals get the
+same head and face parts as a drop-in.
+
+- **The reads it fixes on the sheet:** the face (eyes + a highlight
+  fleck at every distance), two colours on every garment (the bands),
+  the head ratio — and consistency, which is not a read but is what a
+  player notices between chapters.
+- **Cost:** the roster head is 40-odd triangles; a hundred and seventy
+  Marrakech figures at that is ~7 k, one draw. The face meshes are two
+  more instanced draws per chapter, as in Sydney. Nothing per frame.
+- **Instrument:**  — every chapter, every instanced
+  person pool, head bounding-box height / figure height within
+  0.19–0.21; eyes present; ≥ 2 distinct colours per torso. One static
+  row in 's style: every chapter's crowd builder
+  imports .
+- **Wave:** the first item of W4 after the animal — the sheet (W0) will
+  name any chapter beyond those two that also drifted.
+
 ### What is on the sheet, per chapter (the subjects; the findings come from W0)
 
 | # | chapter | hero structure | marquee mover | NPC kinds to shoot | costume |
