@@ -4233,13 +4233,19 @@ function cavUpdateEcho(game, dt) {
   // A HARD ATTACK AND A LONG TAIL. A light that fades UP is a torch; a light
   // that arrives all at once and goes is a noise.
   const env = t < 0.06 ? t / 0.06 : Math.pow(1 - (t - 0.06) / 0.94, 1.7);
+  // THE CAVING HELMET AND THE LANTERN (L8, F5): x1.25 / x1.5 on the reach the
+  // wheek-torch already has, read once here rather than at cavECHO_REACH's
+  // own declaration so a costume change mid-echo takes effect immediately.
+  const wornReachK = (game.capy && game.capy.worn === 'cavehelm') ? 1.25
+                    : (game.capy && game.capy.worn === 'lantern') ? 1.5 : 1;
+  const cavEchoReachNow = cavECHO_REACH * wornReachK;
   if (cavEchoLight) {
     cavEchoLight.position.set(cavEchoX, cavEchoY + 1.4, cavEchoZ);
     cavEchoLight.intensity = env * 11;
-    cavEchoLight.distance = lerp(12, cavECHO_REACH, cavSmooth(t * 1.5));
+    cavEchoLight.distance = lerp(12, cavEchoReachNow, cavSmooth(t * 1.5));
   }
   if (cavEchoRing) {
-    const r = lerp(1.5, cavECHO_REACH * 0.95, cavSmooth(t));
+    const r = lerp(1.5, cavEchoReachNow * 0.95, cavSmooth(t));
     cavEchoRing.position.set(cavEchoX, cavTerrain(cavEchoX, cavEchoZ) + 0.35, cavEchoZ);
     cavEchoRing.scale.set(r, 1, r);
     cavEchoRingMat.opacity = env * 0.42 * (1 - t * 0.4);
@@ -4936,6 +4942,8 @@ export function createCave(game) {
 
     /** 0..1 — how hard the echo is ringing. systems.js lifts the room on it. */
     echo() { return cavEchoT < 0 ? 0 : Math.pow(clamp(1 - cavEchoT / cavECHO_LIFE, 0, 1), 1.6); },
+    /** THE WHEEK-TORCH'S LIVE REACH, in metres — cavehelm/lantern (L8, F5), for the harness. */
+    torchReach() { return cavEchoLight ? cavEchoLight.distance : 0; },
     /**
      * 0..1 — HOW FAR THE RIG SHOULD CRANE UP. See cavSKY_DOLINE and CONTRACT.
      *

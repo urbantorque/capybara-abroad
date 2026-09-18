@@ -5449,7 +5449,12 @@ export function createNPCs(game) {
       }
       if (capy && capy.carriedBy === r) capy.carriedBy = null;
       r.escT = -1;
-      r.marCool = npcMAR_COOL;
+      // THE DINNER JACKET (L8, F5): doubles the carry cooldown, worn — read
+      // once at the site that already sets it. Not scoped to the doorman by
+      // name: the mechanism is shared by every `authority` local in the game
+      // (see the block above THE ESCORT), and a dressed-up capybara is
+      // memorable to any of them, not only Monaco's own.
+      r.marCool = npcMAR_COOL * (capy && capy.worn === 'black-tie' ? 2 : 1);
       r.tx = r.ax; r.tz = r.az;
     }
   }
@@ -7627,9 +7632,14 @@ export function createNPCs(game) {
         try { game.events.emit('npc:travMet', { biome: r.biome, n: npcTravCount() }); } catch (e) { /* a listener */ }
       }
       // ---- and they say something the first time you arrive -------------
+      // THE BOW TIE (L8, F5): every greeting becomes their `praise` line
+      // instead — falling back to the ordinary greeting pool for anybody with
+      // no `praise` line of their own, since an empty pool is not a costume
+      // failure.
       if (near && !r.was && r.cd <= 0 && r.lines) {
         r.cd = r.cool * rand(0.8, 1.4);
-        localLine(r, r.lines);
+        const bowTie = game.capy && game.capy.worn === 'bow-tie';
+        localLine(r, (bowTie && r.praise) ? r.praise : r.lines);
       }
       r.was = near;
       // ---- THE BAG (L8, F2): the fifteen new cameos stay hidden until

@@ -3082,7 +3082,15 @@ function manUpdateBarrel(game, dt, p, riding, speed) {
   if (!manBarrelG) return;
   const carveShare = manRideDist > 4 ? manCarveDist / manRideDist : 0;
   const want = (manBarrelForce || (riding && manTookOff && carveShare > 0.38 && manWave.foam > 0.45 && speed > 4.2)) ? 1 : 0;
-  manBarrel = damp(manBarrel, want, want ? 3.5 : 5.0, dt);
+  // THE SURF CAP (L8, F5): "the barrel window is +0.4s" — there is no
+  // discrete window constant to extend (checked: `want` is a live gate, not
+  // a timer), so the real number this multiplies is the CLOSING lambda below
+  // — 5.0 is how fast `manBarrel` collapses once `want` drops, and stretching
+  // that decay is what makes an already-open barrel linger roughly the
+  // claimed extra length rather than snapping shut the instant the wave
+  // conditions lapse.
+  const closeLambda = 5.0 * (game.capy && game.capy.worn === 'surfcap' ? 0.72 : 1);
+  manBarrel = damp(manBarrel, want, want ? 3.5 : closeLambda, dt);
   const on = manBarrel > 0.02;
   if (on !== manBarrelG.visible) manBarrelG.visible = on;
   if (!on) {

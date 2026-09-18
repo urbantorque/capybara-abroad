@@ -3961,6 +3961,131 @@ export function createCapybara(game) {
     }
   }
 
+  // =========================================================================
+  // WEAR THAT DOES SOMETHING (L8, F5) — six bought in the bag, built the same
+  // way the ten above are: two Groups, PALETTE colours, no textures. Each has
+  // one line's worth of mechanical effect, read at the chapter site that
+  // already owns the constant it multiplies — see systems.js/venice.js/
+  // goreme.js/manly.js/cave.js/quay.js/npc.js for where. None of the six adds
+  // a biome column: a bought costume has no earning task, so `sysWARDROBE`'s
+  // row for it carries a `price` instead of a `task`.
+  // =========================================================================
+
+  // ---- the scarf: SECOND WIND boon x1.1, 50 --------------------------------
+  // A dangling knit scarf over the front, the same "loop of boxes on the
+  // chest" shape Cappadocia's flying scarf already uses, in its own colours.
+  {
+    const mScA = mat(PALETTE.capyScarfA);
+    const mScB = mat(PALETTE.capyScarfB);
+    const o = capyCostume('scarf');
+    capyAddPart(o.head, capyGeoBox, mScA, 0, -0.242, 0.330, 0.170, 0.058, 0.084);
+    for (let i = 0; i < 3; i++) {
+      const sc = capyAddPart(o.body, capyGeoBox, i % 2 ? mScB : mScA,
+                             0.018 * i, 0.560 - i * 0.075, 0.240 - i * 0.050,
+                             0.130 - i * 0.014, 0.060, 0.120);
+      sc.rotation.x = -0.10;
+    }
+  }
+
+  // ---- the bandana: GULL-PROOF always on, 100 ------------------------------
+  // Tied at the throat, a point hanging under the jaw — a beach-town accessory
+  // that has nothing to do with a gull except that the roadmap says so.
+  {
+    const mBan = mat(PALETTE.capyBandana);
+    const mBanDk = mat(PALETTE.capyBandanaDk);
+    const o = capyCostume('bandana');
+    capyAddPart(o.head, capyGeoBox, mBan, 0, -0.240, 0.328, 0.176, 0.052, 0.088);
+    const tail = capyAddPart(o.head, capyGeoBox, mBanDk, 0, -0.300, 0.372, 0.070, 0.090, 0.028);
+    tail.rotation.x = 0.20;
+  }
+
+  // ---- bells: the herd's hold 21 -> 30 s, 75 -------------------------------
+  // A leather strap round the neck with four small brass bells on it, so the
+  // sound the herd already answers to is a sound the animal is now wearing.
+  {
+    const mStrap = mat(PALETTE.capyBellStrap);
+    const mBell = mat(PALETTE.capyBellGold);
+    const o = capyCostume('bells');
+    capyAddPart(o.head, capyGeoBox, mStrap, 0, -0.250, 0.330, 0.180, 0.040, 0.080);
+    for (let s = -1; s <= 1; s += 1) {
+      capyAddPart(o.head, capyGeoBead, mBell, s * 0.075, -0.300, 0.352, 0.034, 0.034, 0.034);
+    }
+  }
+
+  // ---- the lantern: the cave's torch x1.5, 65 ------------------------------
+  // A brass hand-lantern on a strap across the chest, for a chapter with no
+  // helmet in it. It has no head part at all, the same way the snorkel has no
+  // body part — not every costume needs both groups full.
+  {
+    const mBrass = mat(PALETTE.capyLanternBrass);
+    const mGlow = mat(PALETTE.capyLanternGlow, { emissive: PALETTE.capyLanternGlow, emissiveIntensity: 1 });
+    const o = capyCostume('lantern');
+    const strap = capyAddPart(o.body, capyGeoBox, mBrass, 0.10, 0.60, 0.05, 0.03, 0.03, 0.52);
+    strap.rotation.z = 0.55;
+    const lant = capyAddPart(o.body, capyGeoBox, mBrass, 0.34, 0.30, 0.10, 0.075, 0.100, 0.075);
+    lant.castShadow = true;
+    capyDisc(o.body, mGlow, 0.34, 0.30, 0.145, 0.040, 0.024, Math.PI * 0.5);
+  }
+
+  // ---- the medal: the record ghost lingers longer, 85 ----------------------
+  // A ribbon round the neck and a gold disc hanging on the chest — the one
+  // costume that is a trophy rather than an outfit.
+  {
+    const mRibbon = mat(PALETTE.capyMedalRibbon);
+    const mGold = mat(PALETTE.capyMedalGold);
+    const o = capyCostume('medal');
+    capyAddPart(o.head, capyGeoBox, mRibbon, 0, -0.238, 0.332, 0.130, 0.044, 0.070);
+    capyDisc(o.head, mGold, 0, -0.330, 0.360, 0.062, 0.018, Math.PI * 0.5);
+    capyDisc(o.head, mRibbon, 0, -0.330, 0.352, 0.066, 0.010, Math.PI * 0.5);
+  }
+
+  // ---- the bow tie: every greeting is their praise line, 60 ----------------
+  // Black-tie's own wing collar and bow, standalone and in its own colour —
+  // a dinner jacket needs the jacket to read; a bow tie alone is the joke.
+  {
+    const mShirt = mat(PALETTE.capyShirt);
+    const mBow = mat(PALETTE.capyBowTie);
+    const o = capyCostume('bow-tie');
+    capyAddPart(o.head, capyGeoBox, mShirt, 0, -0.248, 0.342, 0.150, 0.048, 0.086);
+    capyAddPart(o.head, capyGeoBox, mBow, 0, -0.264, 0.394, 0.052, 0.052, 0.042);
+    for (let s = -1; s <= 1; s += 2) {
+      const wing = capyAddPart(o.head, capyGeoBox, mBow, s * 0.068, -0.264, 0.390,
+                               0.080, 0.068, 0.034);
+      wing.rotation.z = s * 0.36;
+    }
+  }
+
+  // =========================================================================
+  // THE PEEL POUCH (L8, F2.6/F5) — gift-only, never for sale, and the one
+  // wardrobe entry that is NOT part of the exclusive pick. A satchel at the
+  // hip has nothing to do with what is on the animal's head, so it lives
+  // outside `capyWardrobe`/`capyWear`'s "one at a time" rule entirely: its own
+  // Group, its own visibility, toggled by `capy.pouch(on)` and read every
+  // frame by systems.js from `owned.indexOf('peel-pouch')`, independent of
+  // `sysWearPick`. It stacks with ANY hat worn at the same time, on purpose —
+  // see the roadmap's own "a hat must clear the head; the pouch is not a hat".
+  // =========================================================================
+  const capyPouchGrp = new THREE.Group();
+  capyPouchGrp.visible = false;
+  capySquash.add(capyPouchGrp);
+  {
+    const mLeather = mat(PALETTE.capyPouch);
+    const mLeatherDk = mat(PALETTE.capyPouchDk);
+    // the strap, over the opposite shoulder from the lantern's so the two
+    // never fight for the same six centimetres if a future pass lets a
+    // pocketed item ride alongside it too
+    const strap = capyAddPart(capyPouchGrp, capyGeoBox, mLeatherDk, -0.10, 0.60, 0.02, 0.03, 0.03, 0.50);
+    strap.rotation.z = -0.55;
+    // the satchel itself, at the hip, standing proud of the flank the way the
+    // tux's jacket skirt stands proud of the rump — the same "shell cut from
+    // the body's own table, inflated" would be overkill for a bag this small.
+    const bag = capyAddPart(capyPouchGrp, capyGeoBox, mLeather, -0.32, 0.20, 0.04, 0.110, 0.130, 0.075);
+    bag.castShadow = true;
+    capyAddPart(capyPouchGrp, capyGeoBox, mLeatherDk, -0.32, 0.275, 0.04, 0.112, 0.030, 0.077);
+  }
+  /** THE PEEL POUCH, ON OR OFF — independent of every other worn thing. */
+  function capyPouch(on) { capyPouchGrp.visible = !!on; }
+
   // ---- and the one verb -----------------------------------------------------
   let capyWorn = null;
   function capyWear(id) {
@@ -4198,7 +4323,9 @@ export function createCapybara(game) {
     // perfectly `visible: true`, and traverse does not stop at an invisible
     // node. Both belts are worn — this one and the parent walk inside the loop.
     const wasWorn = capyWorn;
+    const wasPouch = capyPouchGrp.visible;
     capyWear(null);
+    capyPouch(false);
     try {
       const parts = [];
       capyModel.updateWorldMatrix(true, true);
@@ -4256,6 +4383,7 @@ export function createCapybara(game) {
       return mesh;
     } catch (e) { return null; } finally {
       capyWear(wasWorn);
+      capyPouch(wasPouch);
     }
   }
 
@@ -4514,6 +4642,13 @@ export function createCapybara(game) {
     wear(id) { capyWear(id); },
     /** The v39 name for `wear('black-tie')`. Chapter 18 still calls it. */
     dress(on) { capyWear(on ? 'black-tie' : null); },
+    /**
+     * THE PEEL POUCH, ON OR OFF (L8, F2.6/F5). Independent of `wear` — see
+     * the doc comment over `capyPouchGrp` above for why it is not part of the
+     * exclusive pick. Safe to call every frame; idempotent past the first.
+     */
+    get pouchOn() { return capyPouchGrp.visible; },
+    pouch(on) { capyPouch(on); },
 
     /**
      * WHAT THE PLACES TAUGHT YOU. See capySkill for the nine and the rules.
@@ -5187,6 +5322,19 @@ export function createCapybara(game) {
     // the helm is not settling, and a wheek from the wheel is not a soft one.
     capyStillT = 0; capyRestT = 0;
     capy.stillT = 0; capy.restT = 0; // ...and the calm reads the published ones
+    // THE FERRY MASTER'S CAP (L8, F5): the ONLY reachable site for a
+    // helm-scoped effect — see the long comment over the stamina block's own
+    // dead `atHelm` term for why that one is not it. Bare, the bar simply
+    // freezes at the wheel (this function returns before the stamina block
+    // ever runs); the cap gives it a slow regen instead, doubled worn, so
+    // standing at the wheel undoes a hard sprint rather than just holding it.
+    capyStam = Math.min(1, capyStam + capySTAM_REGEN * 0.5 * (capyWorn === 'ferrycap' ? 2 : 1) * dt);
+    // The normal per-frame PUBLISH of capyStam onto capy.stamina happens
+    // further down capyUpdate, which this pose never reaches (capyUpdate
+    // returns right after calling capyHelmPose) — without this line the
+    // regen above was real but invisible, the same one-way-mirror trap
+    // qa/l8-upgrades.js's own `settle()` already documents from the read side.
+    capy.stamina = capyStam;
     capyLoaf = 0; capy.loaf = 0; capy.loafAsk = 0;   // ...and the loaf. See THE LOAF.
     capyNap = 0; capy.nap = 0; capyNapWake = 0;      // ...and THE NAP (N4)
     capyShakePend = 0; capyShakeP = -1;
@@ -5723,14 +5871,23 @@ export function createCapybara(game) {
         capyBoonDrainZero = true;                        // drain reads exactly ×0
       } else if (capy.boon.id === 'mango' || capy.boon.id === 'second-wind') {
         capyBoonRegenMul = 2.0; capyBoonDrainMul = 0.5;   // SECOND WIND shape
+        // THE SCARF (L8, F5): the same boon, x1.1 — one number, scaled once,
+        // the same way DEEP BREATH scales the snorkel's own constant above.
+        if (capyWorn === 'scarf') { capyBoonRegenMul *= 1.1; capyBoonDrainMul /= 1.1; }
       } else if (capy.boon.id === 'quick') {
         capyBoonRunMul = 1.12;                            // QUICK (F4.3)
       }
       // 'bath' itself multiplies nothing — it is spent the instant it starts.
     }
     // GULL-PROOF (L8, F4.3): its own timer, independent of `capy.boon` — see
-    // its doc comment above where it is declared.
-    if (capy.gullProof > 0) { capy.gullProof -= dt; if (capy.gullProof < 0) capy.gullProof = 0; }
+    // its doc comment above where it is declared. THE BANDANA (L8, F5) pins
+    // it on for as long as it is worn rather than letting it tick down — the
+    // flag itself has no reader anywhere in the tree yet (see `gullProof`'s
+    // own "honestly left open" doc comment), so this is the wardrobe half of
+    // a mechanic F4 left for a future wave to finish, made honestly measurable
+    // in the meantime: the number itself moves, whatever reads it later.
+    if (capyWorn === 'bandana') { capy.gullProof = 1e6; }
+    else if (capy.gullProof > 0) { capy.gullProof -= dt; if (capy.gullProof < 0) capy.gullProof = 0; }
 
     if (capyDiving) {
       capyStamHold = capySTAM_DELAY;
@@ -5741,6 +5898,15 @@ export function createCapybara(game) {
       capyStamHold = 0;
       let regenK = capy.mods.regenMul;
       if (capyBoonRegenMul !== 1) regenK = Math.min(regenK * capyBoonRegenMul, capyREGEN_MOD_CAP);
+      // (THE FERRY MASTER'S CAP's effect (L8, F5) is NOT reachable from here —
+      // `capy.atHelm` never gets this far: this whole function returns at the
+      // helm branch above capyHelmPose's own call, before any of the stamina
+      // block runs at all, so the bar simply FREEZES at the wheel, drain and
+      // regen alike, and `stamFree`'s `|| !!capy.atHelm` term here is dead
+      // code that reads true and is never asked. "The helm hold costs no
+      // puff" was already true for that reason, not because of a free regen —
+      // and the cap's actual effect lives in capyHelmPose, the function that
+      // IS live at the wheel. See it there.)
       capyStam += capySTAM_REGEN * regenK * dt;
       if (capyStam > 1) capyStam = 1;
     } else if (stamWantRun && !capyStamBlown) {
@@ -5759,6 +5925,18 @@ export function createCapybara(game) {
       // to nothing at all while it runs, ahead of any of these multipliers.
       if (!capyBoonDrainZero) {
         let drainK = capy.mods.drainMul * (capySkill.lungs ? 0.71 : 1);
+        // THE PARKA (L8, F5): x0.85 in the cold chapters. No cold-drain term
+        // existed anywhere in this file before this line — `cold` only ever
+        // drove the shiver idle (capyIdlePick) — so this is a new multiplier
+        // on the existing drain constant, not a fix to one that was silently
+        // wrong. Gated at cold >= 0.9 so it reads for Iceland and Antarctica
+        // (both 1.00 in wxMOOD) and not for the merely damp likes of Son
+        // Doong (0.70) or Cappadocia's pre-dawn (0.85).
+        if (capyWorn === 'parka') {
+          const mood = game.weather && typeof game.weather.mood === 'function' ? game.weather.mood() : null;
+          const cold = mood && typeof mood.cold === 'number' ? mood.cold : 0;
+          if (cold >= 0.9) drainK *= 0.85;
+        }
         if (capyBoonDrainMul !== 1) drainK = Math.max(drainK * capyBoonDrainMul, capyDRAIN_MOD_FLOOR);
         capyStam -= capySTAM_DRAIN * drainK * dt;
       }

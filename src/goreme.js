@@ -4528,7 +4528,10 @@ function gorUpdateBalloon(game, dt) {
   // seconds to nine tenths — which is roughly what a real one takes and,
   // much more importantly, the number that turns this from a lift into a puzzle:
   // you commit to a layer before you can see whether it was the right one.
-  let wantVY = lerp(gorSINK_V, gorBURN_V, gorBalBurn);
+  // THE FLYING CAP (L8, F5): the burner climbs 6% faster, worn. One
+  // multiplier on the constant the burner already reads.
+  const gorBurnV = gorBURN_V * (game.capy && game.capy.worn === 'flycap' ? 1.06 : 1);
+  let wantVY = lerp(gorSINK_V, gorBurnV, gorBalBurn);
   if (!gorAboard && gorBalY > groundY + 0.2) wantVY = gorSINK_V * 0.55;   // it settles
   gorBalVY = damp(gorBalVY, wantVY, gorBURN_LAG, dt);
 

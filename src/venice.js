@@ -5074,7 +5074,12 @@ function venUpdateTide(game, dt) {
   if (!venFloodDone) {
     const cp0 = game.capy && game.capy.position;
     const low = venPhase < venTIDE_WARN - 0.02 || venPhase >= venTIDE_FALL1;
-    if (low && cp0 && venInZone('square', cp0.x, cp0.z)) rate = venHURRY;
+    // THE BOATER (L8, F5): x0.85 on the hurry itself — a gondolier's hat is
+    // not in a rush. Read at the one site that already names the effect
+    // (venHURRY, "THE TIDE HURRIES FOR YOU" above), multiplied once.
+    if (low && cp0 && venInZone('square', cp0.x, cp0.z)) {
+      rate = venHURRY * (game.capy && game.capy.worn === 'boater' ? 0.85 : 1);
+    }
   }
   venPhase += dtEff * rate / venTIDE_PERIOD;
   while (venPhase >= 1) venPhase -= 1;

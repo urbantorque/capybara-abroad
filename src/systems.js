@@ -9394,11 +9394,20 @@ function sysBuildCSS() {
    from one tucked row to six rows of an active marquee, and a fixed offset
    collided with it (measured live, see that function's comment). 46px here
    is only the frame before the first layout pass reads a real number. */
+/* Hidden until `.show` (the `started` gate, same pattern every other HUD
+   piece uses — .capyui-map.show, .capyui-home.show, .capyui-stam.show — see
+   the per-frame writer next to `stamEl`'s own `want = started && ...`).
+   Missed in the original wave-0 build: with no default-hidden state at all,
+   the wallet (and F6's item slot beside it) sat drawn on TOP of the title
+   card and the chapter picker, both of which are overlays on the same HUD
+   root rather than separate screens — reads as "0 yuzu" bleeding through
+   the menu, which it was. */
 '.capyui-wallet{position:absolute;left:14px;top:46px;display:flex;align-items:center;gap:5px;',
   'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:999px;',
   'padding:5px 12px 5px 10px;font-size:' + tXs + ';font-weight:700;color:' + ink + ';',
-  'box-shadow:' + shMd + ';transform:rotate(-1deg);cursor:pointer;',
+  'box-shadow:' + shMd + ';transform:rotate(-1deg);cursor:pointer;opacity:0;pointer-events:none;',
   'transition:transform ' + dFast + ' ' + mSpring + ',opacity ' + dMed + ' ease;}',
+'.capyui-wallet.show{opacity:1;pointer-events:auto;}',
 '.capyui-wallet:hover{transform:rotate(-1deg) scale(1.04);}',
 '.capyui-wallet.bump{animation:capyui-walletbump 260ms ' + mSpring + ';}',
 '@keyframes capyui-walletbump{0%{transform:rotate(-1deg) scale(1);}',
@@ -9410,17 +9419,23 @@ function sysBuildCSS() {
    many digits "47 yuzu" is this session (measured collision class, see
    wave 0's own note on the wallet vs. the paper). +1deg rather than the
    wallet's -1deg: two pills leaning the same way read as one stretched one. */
+/* Same `.show`/`started` gate as the wallet just above — see its own
+   comment; the same bleed-through bug applied to this pill too. */
 '.capyui-item{position:absolute;left:120px;top:46px;display:flex;align-items:center;gap:6px;',
   'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:999px;',
   'padding:5px 12px 5px 8px;font-size:' + tXs + ';font-weight:700;color:' + ink + ';',
-  'box-shadow:' + shMd + ';transform:rotate(1deg);cursor:pointer;opacity:1;',
+  'box-shadow:' + shMd + ';transform:rotate(1deg);cursor:pointer;opacity:0;pointer-events:none;',
   'transition:transform ' + dFast + ' ' + mSpring + ',opacity ' + dMed + ' ease;}',
+'.capyui-item.show{opacity:1;pointer-events:auto;}',
 '.capyui-item:hover{transform:rotate(1deg) scale(1.04);}',
 '.capyui-item-dot{width:9px;height:9px;border-radius:50%;flex:none;',
   'background:' + sysRgba(PALETTE.yuzuGold, 0.9) + ';}',
 /* dim = nothing equipped, OR equipped but the bank reads zero — the roadmap's
-   own rule is that the dimmed icon is the only feedback a spent-out press gets */
-'.capyui-item-empty,.capyui-item-dim{opacity:0.42;}',
+   own rule is that the dimmed icon is the only feedback a spent-out press
+   gets. Qualified with `.show` (three classes) so this outranks `.show`'s
+   own `opacity:1` (two classes) — without it, the empty/dim treatment went
+   invisible the moment the pill was allowed to show at all. */
+'.capyui-item.show.capyui-item-empty,.capyui-item.show.capyui-item-dim{opacity:0.42;}',
 '.capyui-item-empty .capyui-item-dot{background:' + sysRgba(PALETTE.ibisHead, 0.35) + ';}',
 '.capyui-item.flash{animation:capyui-itemflash 260ms ' + mSpring + ';}',
 '@keyframes capyui-itemflash{0%{transform:rotate(1deg) scale(1);}',
@@ -17183,8 +17198,14 @@ export function createSystems(game) {
       // (CONTRACT.md), so a distance computed against it is a number from
       // nowhere, not "how far into the next chapter you'd have to walk." A
       // flat 0.25 (roughly -12 dB) is the roadmap's own number for the crossing.
+      // THE PLUMES (L8, F5): Rio's crowd bed rises 0.1 nearer, worn — the
+      // near/far window itself shrunk by 10% so the bed reaches full volume
+      // (and starts fading in) closer than it would bare. Keyed on
+      // `rio:desfile` specifically (there are two other `crowd`-kind movers,
+      // Pasto's and Marrakech's, and the roadmap names Rio's alone).
+      const plumesK = (m.key === 'rio:desfile' && game.capy && game.capy.worn === 'plumes') ? 0.9 : 1;
       m.want = jcut ? sysMOVER_JCUT_GAIN * m.level * m.amp
-                    : audioPlace(m.x, m.y, m.z, m.near, m.far) * m.level * m.amp;
+                    : audioPlace(m.x, m.y, m.z, m.near * plumesK, m.far * plumesK) * m.level * m.amp;
       // A bed comes up as the world settles, because it IS the world; a vehicle
       // going past does not, because a scooter does not get louder when you
       // sit down. (G6, and the two halves are genuinely different questions;
@@ -24364,31 +24385,70 @@ export function createSystems(game) {
   // opens, because what has been earned changes.
   const wardRow = sysEl('div', 'capyui-setsave capyui-ward');
   const wardSplit = sysEl('div', 'capyui-setsplit', 'and what it wears');
+  const wardLine = sysEl('span', 'capyui-setnote', '');
   pauseSet.appendChild(wardSplit);
   pauseSet.appendChild(wardRow);
+  pauseSet.appendChild(wardLine);
+  /** The gift row, appended once, below the picker. See wardBuild. */
+  const wardPouchRow = sysEl('div', 'capyui-setsave capyui-ward');
+  pauseSet.appendChild(wardPouchRow);
+  function wardWearOf(id) {
+    for (let i = 0; i < sysWARDROBE.length; i++) if (sysWARDROBE[i].wear === id) return sysWARDROBE[i];
+    return null;
+  }
   function wardBuild() {
     while (wardRow.firstChild) wardRow.removeChild(wardRow.firstChild);
+    while (wardPouchRow.firstChild) wardPouchRow.removeChild(wardPouchRow.firstChild);
     const earned = [];
     for (let i = 0; i < sysWARDROBE.length; i++) {
       const w = sysWARDROBE[i];
+      if (w.giftOnly) continue;                 // the peel pouch has its own row, below
       const r = taskRec[w.task];
-      if (r && r.done) earned.push(w.wear);
+      // THE FIX (L8, F5): a bought row has no `task` at all \u2014 `taskRec[undefined]`
+      // was never going to be `.done`, so a row gated purely on this line never
+      // pushed a bought costume into `earned` and buying one of the six for-sale
+      // costumes did nothing a player could see. Earned-by-task OR owned-by-price,
+      // the same OR the frame resolver above (in `tick`) now uses for `sysWearPick`.
+      const boughtOk = typeof w.price === 'number' && owned.indexOf(w.wear) >= 0;
+      if ((r && r.done) || boughtOk) earned.push(w.wear);
     }
     const hide = earned.length === 0;
-    wardSplit.hidden = hide; wardRow.hidden = hide;
-    if (hide) return;
-    const opts = [''].concat(earned);
-    for (let i = 0; i < opts.length; i++) {
-      const id = opts[i];
-      const b = sysEl('button', 'capyui-pausebtn small' + (id === sysWearPick ? ' on' : ''), id ? (sysWEAR_NAMES[id] || id) : 'the place\u2019s own');
-      b.type = 'button';
-      b.setAttribute('aria-pressed', id === sysWearPick ? 'true' : 'false');
-      b.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
-      b.addEventListener('click', function (e) {
-        e.preventDefault(); e.stopPropagation();
-        sysWearPick = id; prefsSoon(); wardBuild();
-      });
-      wardRow.appendChild(b);
+    wardSplit.hidden = hide; wardRow.hidden = hide; wardLine.hidden = hide;
+    if (!hide) {
+      const opts = [''].concat(earned);
+      for (let i = 0; i < opts.length; i++) {
+        const id = opts[i];
+        const b = sysEl('button', 'capyui-pausebtn small' + (id === sysWearPick ? ' on' : ''), id ? (sysWEAR_NAMES[id] || id) : 'the place\u2019s own');
+        b.type = 'button';
+        b.setAttribute('aria-pressed', id === sysWearPick ? 'true' : 'false');
+        b.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+        b.addEventListener('click', function (e) {
+          e.preventDefault(); e.stopPropagation();
+          sysWearPick = id; prefsSoon(); wardBuild();
+        });
+        wardRow.appendChild(b);
+      }
+      // ONE LINE, FOR THE CURRENT PICK (F5.1: "each is ... written on the
+      // wardrobe picker as its one line"). '' (the place's own) has none of
+      // its own \u2014 it is whichever chapter's default, or bare.
+      const cur = sysWearPick ? wardWearOf(sysWearPick) : null;
+      wardLine.textContent = cur && cur.line ? cur.line : '';
+    }
+    // ---- THE PEEL POUCH (L8, F2.6/F5.3): a gift, not a purchase -----------
+    // Its own row, always shown once the wardrobe split itself is (so a
+    // player who has earned nothing yet does not see a stray row with
+    // nothing above it): OWNED once `owned` has it, greyed with the lifetime
+    // gifted count otherwise. It is never part of `opts` above \u2014 it is not a
+    // "pick one," it stacks with whatever hat is.
+    const pouchRow = wardWearOf('peel-pouch');
+    if (pouchRow) {
+      const got = owned.indexOf('peel-pouch') >= 0;
+      const label = sysEl('span', 'capyui-setnote',
+        'the peel pouch \u2014 a gift, not a purchase' +
+        (got ? ' \u2014 worn.' : ' \u2014 ' + jrGifted + '/100 given so far.'));
+      if (!got) label.style.opacity = '0.6';
+      wardPouchRow.appendChild(label);
+      wardPouchRow.hidden = false;
     }
   }
   pauseSet.appendChild(sysEl('div', 'capyui-setnote',
@@ -27100,6 +27160,7 @@ export function createSystems(game) {
   stamEl.setAttribute('aria-label', 'puff');
   hudRoot.appendChild(stamLblEl);
   let stamShown = false, stamLow = false, stamBlownCls = false, stamFullT = 0;
+  let walletShown = false;   // THE YUZU/POCKETED KIND (L8): the title/picker bleed-through fix
   let stamLblLast = '';
 
   // --- the chain, while it is open (B4) ---
@@ -32882,10 +32943,20 @@ export function createSystems(game) {
   function ghTick(dt) {
     const capy = game.capy;
     if (!capy || !capy.ghost) return;
+    // THE MEDAL (L8, F5): "the record ghost shows in every chapter" — checked,
+    // and a cross-chapter ghost is not reachable from a cosmetic item without
+    // restructuring recordLive/recordEnd's own per-chapter scoping (each
+    // chapter only ever calls recordLive while ITS OWN attempt is live), which
+    // is out of proportion for a wardrobe line. What the medal does instead,
+    // on the same fade this file already has: a finished attempt's ghost
+    // lingers about six times as long before it fades out, so "your best
+    // runs stick around" reads true even though it is still one chapter at a
+    // time.
+    const ghFadeOut = sysGHOST_FADE * (capy.worn === 'medal' ? 6 : 1);
     if (!recLiveId) {
       ghWasOpen = false;
       if (ghFade > 0) {
-        ghFade = Math.max(0, ghFade - dt / sysGHOST_FADE);
+        ghFade = Math.max(0, ghFade - dt / ghFadeOut);
         if (ghFade <= 0) capy.ghost.hide();
       }
       return;
@@ -32918,8 +32989,8 @@ export function createSystems(game) {
     if (i >= ghPlayN - 1) {
       // The ghost finished. It does not linger at the post: it fades out
       // wherever it got to, which is the only honest thing a finished run can
-      // do while yours is still going.
-      ghFade = Math.max(0, ghFade - dt / sysGHOST_FADE);
+      // do while yours is still going. (THE MEDAL stretches ghFadeOut above.)
+      ghFade = Math.max(0, ghFade - dt / ghFadeOut);
       if (ghFade <= 0) { capy.ghost.hide(); return; }
     } else {
       ghFade = Math.min(1, ghFade + dt / sysGHOST_FADE);
@@ -33160,27 +33231,62 @@ export function createSystems(game) {
     sunhat: 'the sun hat', ferrycap: 'the ferry cap', plumes: 'the plumes', boater: 'the boater',
     snorkel: 'the snorkel', flycap: 'the flying cap', surfcap: 'the surf cap', cavehelm: 'the caving helmet',
     parka: 'the parka', 'black-tie': 'the dinner jacket',
+    // THE SIX FOR SALE, and the gift (L8, F5)
+    scarf: 'the scarf', bandana: 'the bandana', bells: 'the bells', lantern: 'the lantern',
+    medal: 'the medal', 'bow-tie': 'the bow tie', 'peel-pouch': 'the peel pouch',
   };
   // THE BAG's WEAR SHELF (L8, F2/F5): a row becomes purchasable in the bag
   // the moment it carries a numeric `price` field (yuzu) — `bagWearRow`/
   // `bagBuyWear` in the bag's own code already read it, and a row with no
   // `price` renders exactly as it does today, task-earned and free. An
   // optional `shopLine` overrides the bag's row description (falls back to
-  // `line` — currently unused by any row, since none of these ten have
-  // one) for a costume whose shop pitch differs from its wardrobe caption.
-  // None of the current ten carry `price` — F5 (wave 2) is what adds six
-  // for-sale rows, so the bag's wear shelf is correctly empty until then.
+  // `line`) for a costume whose shop pitch differs from its wardrobe caption.
+  // `line` is ALSO what `wardBuild` prints under the picker's own button —
+  // "each is one multiplier ... written on the wardrobe picker as its one
+  // line" (the roadmap's own words for F5.1) — so every row below carries
+  // one now, task-earned or bought alike.
   const sysWARDROBE = [
-    { biome: 'sydney',    task: 'steal-hat',    wear: 'sunhat' },
-    { biome: 'quay',      task: 'manly-voyage', wear: 'ferrycap' },
-    { biome: 'rio',       task: 'samba-parade', wear: 'plumes' },
-    { biome: 'venice',    task: 'gondola-ride', wear: 'boater' },
-    { biome: 'palawan',   task: 'first-dive',   wear: 'snorkel' },
-    { biome: 'goreme',    task: 'sunrise',      wear: 'flycap' },
-    { biome: 'manly',     task: 'all-the-way',  wear: 'surfcap' },
-    { biome: 'cave',      task: 'the-doline',   wear: 'cavehelm' },
-    { biome: 'antarctic', task: 'orca-ride',    wear: 'parka' },
-    { biome: 'monaco',    task: 'black-tie',    wear: 'black-tie' },
+    { biome: 'sydney',    task: 'steal-hat',    wear: 'sunhat',
+      line: 'gulls keep further off.' },
+    { biome: 'quay',      task: 'manly-voyage', wear: 'ferrycap',
+      line: 'the stamina bar fills faster at the wheel.' },
+    { biome: 'rio',       task: 'samba-parade', wear: 'plumes',
+      line: 'the parade crowd feels closer.' },
+    { biome: 'venice',    task: 'gondola-ride', wear: 'boater',
+      line: 'the tide is in less of a hurry.' },
+    { biome: 'palawan',   task: 'first-dive',   wear: 'snorkel',
+      line: 'a longer breath, and it stacks with DEEP BREATH.' },
+    { biome: 'goreme',    task: 'sunrise',      wear: 'flycap',
+      line: 'the balloon climbs a little quicker.' },
+    { biome: 'manly',     task: 'all-the-way',  wear: 'surfcap',
+      line: 'a barrel holds a little longer.' },
+    { biome: 'cave',      task: 'the-doline',   wear: 'cavehelm',
+      line: 'the wheek-torch reaches further.' },
+    { biome: 'antarctic', task: 'orca-ride',    wear: 'parka',
+      line: 'the cold costs a little less puff.' },
+    { biome: 'monaco',    task: 'black-tie',    wear: 'black-tie',
+      line: 'authority takes longer to try again.' },
+    // ---- SIX FOR SALE (L8, F5.2) --------------------------------------------
+    // A bought row's gate is `owned`, not a task — see the fix to `wardBuild`
+    // just below this table (the one that lets any of these six actually be
+    // WORN once bought, not only listed as owned).
+    { wear: 'scarf',   price: 50,
+      line: 'SECOND WIND runs a little stronger.' },
+    { wear: 'bandana', price: 100,
+      line: 'GULL-PROOF, always.' },
+    { wear: 'bells',   price: 75,
+      line: 'the herd stays with you longer.' },
+    { wear: 'lantern', price: 65,
+      line: 'the wheek-torch reaches further still.' },
+    { wear: 'medal',   price: 85,
+      line: 'your best run lingers a little longer.' },
+    { wear: 'bow-tie', price: 60,
+      line: 'every greeting is their warmest line.' },
+    // ---- THE GIFT (L8, F2.6/F5.3) -------------------------------------------
+    // Not for sale at any price: `giftOnly` is the gate `wardBuild` renders
+    // specially, below. No `line` about gulls, cold or hurry — it moves
+    // nothing on the animal, only the two F6 bank caps (capy.itemCap).
+    { wear: 'peel-pouch', giftOnly: true },
   ];
 
   // =========================================================================
@@ -40654,6 +40760,11 @@ export function createSystems(game) {
     // a soft wheek carries, but not as far
     const R = herdEARSHOT * ((e && e.soft === true) ? 0.6 : 1);
     let led = game.herdCount();
+    // BELLS (L8, F5): the herd's hold 21 -> 30 s, worn — one number, read at
+    // both sites that set it below. Published for the harness the same way
+    // `qaDrops`/`qaChaos` are — nothing else in src reads it.
+    const herdHoldNow = capy.worn === 'bells' ? 30 : herdHOLD;
+    game.state.qaHerdHold = herdHoldNow;
     // the answers: a fresh pool per wheek, the nearest eight kept in order
     for (let k = 0; k < herdANS_MAX; k++) { herdAns[k].rec = null; herdAns[k].d = 1e9; }
     herdAnsLog.length = 0;
@@ -40682,12 +40793,12 @@ export function createSystems(game) {
             a.rec = rec; a.i = i; a.d = d;
           }
         }
-        if (s.led) { s.hold = herdHOLD; continue; }     // already yours: refreshed
+        if (s.led) { s.hold = herdHoldNow; continue; }     // already yours: refreshed
         s.heard++;
         s.heardT = herdHEARD_T;
         if (s.heard >= rec.obey && led < herdMAX) {
           s.led = true;
-          s.hold = herdHOLD;
+          s.hold = herdHoldNow;
           s.order = led;
           led++;
         }
@@ -45269,14 +45380,33 @@ export function createSystems(game) {
         if (r && r.done) put = w.wear;
         break;                          // one chapter, one row, one answer
       }
-      // ...unless the player picked one they have earned (L3-7)
+      // ...unless the player picked one they have earned (L3-7) — OR BOUGHT
+      // (L8, F5): a row with a numeric `price` has no `task` at all, so
+      // `taskRec[undefined]` was never going to be `.done` and a bought
+      // costume could be picked on the settings card (once wardBuild's own
+      // gate below is fixed) and still never actually appear on the animal.
+      // Same gate as wardBuild's earned list: earned-by-task OR owned-by-price.
       if (sysWearPick) {
         for (let i = 0; i < sysWARDROBE.length; i++) {
           const w = sysWARDROBE[i];
           if (w.wear !== sysWearPick) continue;
           const r = taskRec[w.task];
-          if (r && r.done) put = w.wear;
+          const boughtOk = typeof w.price === 'number' && owned.indexOf(w.wear) >= 0;
+          if ((r && r.done) || boughtOk) put = w.wear;
         }
+      }
+      // ---- THE PEEL POUCH (L8, F2.6/F5.3) --------------------------------
+      // Independent of the exclusive pick above: it stacks with whatever hat
+      // (or nothing) `put` resolved to. Read straight from `owned` every
+      // frame, the same way everything else in this block is.
+      if (typeof game.capy.pouch === 'function') game.capy.pouch(owned.indexOf('peel-pouch') >= 0);
+      // `game.state.qaForceWear` (L8, F5's own QA force-door, the
+      // `qaForceOwned`/`qaAddYuzu` naming pattern): a string id, worn
+      // regardless of task or purchase, so `qa/l8-wear.js` can test a
+      // costume's EFFECT without also having to earn or buy it first.
+      // Harmless in a real session: nothing ever sets it outside qa/.
+      if (game.state && typeof game.state.qaForceWear === 'string' && game.state.qaForceWear) {
+        put = game.state.qaForceWear;
       }
       // ---- AND PUTTING IT ON WAS SILENT TOO (P4) -------------------------
       // Ten costumes, each earned by a specific task, and the animal simply
@@ -47845,6 +47975,18 @@ export function createSystems(game) {
       }
       const wantMap = !!mapSpec && !transBusy;
       if (wantMap !== mapShown) { mapShown = wantMap; mapEl.classList.toggle('show', wantMap); }
+    }
+
+    // ---- the wallet / the pocketed kind ----
+    // Same `started` gate as the stamina bar just below — missed on the
+    // original build, which left both pills with no default-hidden state at
+    // all (see the CSS comment at `.capyui-wallet`) and visible on top of
+    // the title card and the chapter picker, both HUD-root overlays rather
+    // than separate screens.
+    if (started !== walletShown) {
+      walletShown = started;
+      if (walletEl) walletEl.classList.toggle('show', started);
+      if (itemEl) itemEl.classList.toggle('show', started);
     }
 
     // ---- stamina readout ----

@@ -4296,6 +4296,11 @@ function quayUpdateApronGulls(game, dt) {
     // like a radius that is not supposed to. See THE LOAF and addCritter.
     quayAGCrit = game.addCritter({ biome: 'quay', r: quayAG_NEAR, bold: 0.9 });
   }
+  // (THE SUN HAT's effect (L8, F5) lives in environment.js's fig-tree
+  // lorikeets instead of here — see envLoriStep. These apron gulls are
+  // chapter 3's own [`isActive('quay')` gates this whole file's update()],
+  // not chapter 1's, and `steal-hat` [sunhat's earning task] is a generic
+  // prop-theft check with nothing to do with this flock.)
   const agNear = quayAGCrit ? quayAGCrit.near : quayAG_NEAR;
   const agNear2 = agNear * agNear;
   for (let i = 0; i < quayAG_N; i++) {

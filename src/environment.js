@@ -1856,11 +1856,19 @@ function envLoriStep(game, dt) {
   // under it takes it too, but the cooldown means a lap of the gardens is a
   // handful of separate flushes and not one continuous shriek.
   const wheeked = !!(game.input && game.input.honkPressed);
+  // THE SUN HAT (L8, F5): "gulls keep 2 m further off" — the actual flee
+  // radius Sydney has is this one, the fig-tree lorikeets' own (the code
+  // already calls their voice "a gull's, a fifth higher" — see envFlushTree);
+  // there is no `addCritter`-registered gull anywhere in the `sydney` biome
+  // to multiply instead. +2 m added straight on, matching the roadmap's own
+  // wording ("further off", not a percentage).
+  const loriHatK = (game.capy && game.capy.worn === 'sunhat') ? 2 : 0;
+  if (game.state) game.state.qaLoriR = envLORI_R + loriHatK;
   for (let t = 0; t < nT; t++) {
     if (T[t * 5 + 3] > 0) { T[t * 5 + 3] -= dt; continue; }
     if (!cp) continue;
     const dx = cp.x - T[t * 5], dz = cp.z - T[t * 5 + 1];
-    const r = wheeked ? envLORI_R * 2.6 : envLORI_R;
+    const r = (wheeked ? envLORI_R * 2.6 : envLORI_R) + loriHatK;
     const inside = dx * dx + dz * dz <= r * r;
     // ---- A FLUSH IS AN ARRIVAL, NOT A PLACE YOU CAN STAND ----------------
     // The test was `is the capybara within r`, so a player standing under a

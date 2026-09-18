@@ -134,6 +134,22 @@ export const PALETTE = {
   capyParka:    0xc4453d,      // ch17 and the ruff is the whole point
   capyParkaDk:  0x8f322c,
   capyFur:      0xd9cdb4,
+  // ---- WEAR THAT DOES SOMETHING (L8, F5) — six sold in the bag, and the
+  // peel pouch, gift-only. Same rule as the ten above: a colour a capybara's
+  // own browns are not.
+  capyScarfA:   0xc25a3e,      // the scarf, in two reds so the wind rounds read
+  capyScarfB:   0x9c4530,
+  capyBandana:  0xcf6a2e,      // the bandana, tied at the throat
+  capyBandanaDk:0xa8531f,
+  capyBellStrap:0x6b4a30,      // bells: a leather strap, brass bells
+  capyBellGold: 0xd4af37,
+  capyLanternBrass: 0x8a6a3a, // the lantern: brass fittings, warm glass
+  capyLanternGlow:  0xffcf7a,
+  capyMedalRibbon:  0x3a5fa0, // the medal: a blue ribbon, a gold disc
+  capyMedalGold:    0xe0bb52,
+  capyBowTie:   0xb5333f,     // the bow tie, red rather than black-tie's midnight
+  capyPouch:    0x8a6a45,     // the peel pouch, worn leather
+  capyPouchDk:  0x6c4f30,
 
   // people
   skin1:        0xf3cca4,
