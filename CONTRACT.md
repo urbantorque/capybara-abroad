@@ -1,3 +1,59 @@
+## THE NINTH LIFT — SEEN, NOT JUST BUILT (L9 — 18–19 Sep 2026)
+
+Not a new mechanic, a review sweep: five agents measured the loop LIFT8
+shipped and found it worked but wasn't legible. The yuzu were round, not
+bright — 1.17:1 contrast against Sydney's grass, 7–9 px at 40 m ahead,
+softened further by a depth-of-field blur nobody had budgeted for. The
+HUD's "busy" feeling traced to one element, not ten — the to-do paper at
+44–54% of screen height, tucking only while moving and reverting the
+instant a player could read it. The minimap resolved every mark cleanly
+and still read as a grey smudge — the door's own label ran 47–75% of the
+chart's width. The traveller already was the shop and had no stall, no
+mesh, no minimap glyph. Hanoi's bikes measured a 42.4° instant heading
+snap at the lake ring's sharpest vertex — confirmed, not guessed, against
+a straight-street control that measured zero. And one real leak sat in
+code LIFT8 called done: `chaosFireRunaway` spawned a physics prop with no
+despawn, forever, in all nineteen chapters.
+
+ROADMAP-LIFT9.md is the synthesis, six items, all lifts of what already
+existed rather than new systems: **V** the yuzu scaled ×1.6, lifted to
+0.8–1 m, wrapped in a pooled additive billboard aura (tuned twice — the
+first pass's 0.9/1.3 m sizes measured 13–22 px against the roadmap's own
+25 px target under the live camera's fov, not the review's rest-lens
+estimate; landed at 1.6/2 m, confirmed 24–31 px) plus a light shaft in the
+three sightline-blocked biomes; **T** one smoothed-heading function
+(`hanLaneYawAt`, a 3 m central-difference tangent, the pattern Cali's
+`caliRouteAt` already used) wired into five call sites without touching
+the position function pavements are laid out from, plus a fix for bikes
+teleporting 144–202 m into view on lane recycle; **C** the runaway leak
+closed with a bounded despawn list, two smaller `chaosReset` timer leaks,
+two motion effects wired to the game's own calm toggle, a stale-save
+fixture for LIFT8's seven keys; **H** the paper's tuck rule inverted
+(after arrival, not after stopping) with the never-urgent rows folded
+off it and the "pocketed kind" pill hidden instead of dimmed; **M** nine
+minimap readability fixes — a bigger frame, a hover-only door label,
+distinct glyphs per landmark kind, a heading wedge instead of a wash, a
+hover/hold legend and hold-to-zoom — plus a `live` resolver on
+`mapMarkPos` so a mark can read a global function instead of needing a
+row in all nineteen `sysMAP_WORLDS` tables; **S** one shared stall
+(posts, table, awning, a static collider under the table only) attached
+to the traveller's own group in all nineteen chapters, so it inherits
+placement, capture-tag and gating for free, with one placement fix
+(Kyoto's bridge deck — the stall's default offset put it over water;
+moved along the deck's long axis instead) and one placement confirmed
+clean by measurement rather than assumption (Pantanal's flood margins).
+Buying stays reachable from anywhere, per LIFT8's own Held list holding a
+shop with stock or timers — the stall is the landmark and the in-person
+gift, not a gate.
+
+Built as three waves across five agents plus one direct follow-up: wave 1
+in three disjoint regions — V at 936faae (tuned further at 4b08de3), T at
+711f0cb, C at 4c7b0c1; wave 2 as one agent across the shared HUD/minimap
+region — H+M at 4e82587; wave 3 — S at 3a093d4, built on the `live`
+resolver wave 2 had just added. `npm test` grew from 22 checks to 24
+(`qa/l9-hanoi-smooth.js`, `qa/l9-yuzu-visible.js`, `qa/l9-hud-map.js`,
+`qa/l9-shop-static.mjs`) and was green at every commit.
+
 ## THE EIGHTH LIFT — THE YUZU, THE BAG, THE ANIMAL THAT GETS BETTER, THE THINGS THAT TURN UP, THE WEAR AND THE INCIDENT (L8 — 17–18 Sep 2026)
 
 Asked for, an eighth time, and a different thing: not another lift of

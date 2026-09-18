@@ -350,3 +350,35 @@ as worth the same heading-smoothing check as Hanoi but not measured this
 pass; a legend/zoom affordance beyond hover-hold (M6/M7 are the minimum,
 not the ceiling) if the shop makes the chart feel crowded once it's
 built.
+
+## Closed (19 Sep 2026)
+All six items built and measured, three waves, five agents plus one
+direct follow-up, `npm test` 22→24, green at every commit. **V** shipped
+in two passes — the first pass's aura (0.9/1.3 m) measured 13–22 px
+against its own 25 px-at-52 m target under the live camera's actual fov
+(not the review's rest-lens estimate); resized to 1.6/2 m and reconfirmed
+24–31 px, then eyeballed at 8 m and 25 m in Sydney — a clear, obvious
+glowing orb, the Mario-Kart-box read the brief asked for. **T** measured
+clean: raw heading still snaps 42.4°/frame at the lake ring's sharpest
+vertex (the untouched control, proving the diagnosis), the smoothed path
+holds to 1.32°/frame max over a 700-frame run, and the wrap-teleport
+dropped from ~45/min to 0/min within 70 m of the camera. **C**'s leak
+fix was proven, not asserted — thirteen forced incidents in the cave (the
+runaway's only live chapter) took the physics world's body count from
+231 to a peak of 249 and back to 235, every watched prop confirmed
+`.removed === true`. **H+M** landed together since they share one region
+of `systems.js`; verified live across three chapters at both 1280×760
+and 390 px wide — the paper visibly shrinks from a 44–54%-height card to
+a two-line tab, and the minimap's new frame, glyphs and hold-to-zoom all
+render correctly; one real bug (`mapC` read before initialization in the
+legend code) was caught in the same pass and fixed before commit. **S**
+placed a shared stall in all nineteen chapters via the traveller's own
+group, found and fixed one real placement bug (Kyoto's default offset
+put the stall over the water — moved along the bridge deck's long axis
+instead) and confirmed Pantanal's flood-margin placement clean by
+measurement, not assumption; used the roadmap's own "single shared
+default" option for the minimap glyph rather than nineteen per-world
+rows. Buying was never gated — confirmed still reachable from anywhere
+after the stall landed. Nothing here touched Monaco's identical
+step-function yaw bug (a named follow-on, not required) or Quay's crowd
+tangent.
