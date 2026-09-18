@@ -5199,8 +5199,19 @@ function kyoBuild(game) {
     // at Uji'). The opposite rail, facing back across it. Hidden until
     // Kyoto's own first real tick (gateChap).
     if (typeof game.addTraveller === 'function') {
+      // LIFT9, S2: the deck here is only ~8.4 m wide in x (kyoIsOverWater's
+      // own bridge box: |x - kyoBRIDGE_X| < 4.2, i.e. x in [-0.2, 8.2]) and
+      // this cameo already stands at x=7, 1.2 m from that edge, BECAUSE they
+      // face across the narrow width ("the opposite rail, facing back across
+      // it"). The stall's default offset (1.6 m straight behind, along
+      // `face`) would walk it to x≈8.6 — off the deck, over the river.
+      // `shopAngle` cancels `face` so the effective offset direction is 0
+      // rad: the stall moves along Z instead (the deck's long, 46 m-wide
+      // axis: |z - kyoRIVER_Z| < kyoRIVER_HZ + 8 = 23), where 1.6 m is
+      // nothing. Checked against kyoIsOverWater at both ends of the stall's
+      // own footprint, not just its centre — see qa/l9-shop.js.
       game.addTraveller({ biome: 'kyoto', x: kyoBRIDGE_X + 3.0, y: 3.16,
-        z: kyoRIVER_Z + 2.5, face: -1.6,
+        z: kyoRIVER_Z + 2.5, face: -1.6, shopAngle: 1.6,
         gateChap: 4,
         lines: ['The bridge at Uji. I have crossed a lot of bridges. This might be the one.',
                 'Somebody told me the river used to flood this whole valley. I believe them.'],

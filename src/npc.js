@@ -2980,6 +2980,79 @@ export function createNPCs(game) {
     rec.umbG = g;
     return g;
   }
+  // ---- THE SHOP (LIFT9, S1): ONE STALL, ATTACHED TO THE TRAVELLER EVERYWHERE.
+  // Same lazy-shared-geometry idiom as npcMakeUmbrella just above — built once
+  // on whichever chapter reaches it first, reused (by geometry, never by
+  // instance) in the other eighteen. Posts, a table, a striped awning: the
+  // pasto stall's own vocabulary (pasto.js: pastoStallStatic/pastoStallAwning),
+  // rebuilt in plain THREE primitives here because pasto's own box/part
+  // batching helpers are module-local to pasto.js and not exported.
+  //
+  // Attached as a CHILD of rec.group at a LOCAL offset, not a world one:
+  // rec.group already carries rotation.y = face (see addLocal, below), so a
+  // local (0, 0, -1.6) lands 1.6 m BEHIND the traveller in world space with no
+  // trig needed here — the same rotation that turns local +z into world
+  // (sin(face), cos(face)) (see fx/fz at npcSay's caller, `:8000`) turns local
+  // -z into the opposite point. Behind is deliberate (S2): the traveller's own
+  // 3.2 m interact radius (npcTRAV_MET_R) is normally approached from the
+  // front, and a stall on the far side of them never sits between the player
+  // and the reach test.
+  let npcStallPostGeo = null, npcStallTopGeo = null, npcStallRoofGeo = null,
+      npcStallStripeGeo = null;
+  const npcSTALL_ROOF = PALETTE.cloth6;     // one tint, reads on grass/sand/stone alike
+  const npcSTALL_STRIPE = PALETTE.sail;
+  // S5: the in-person gift is the one real reason to visit and it was never
+  // said out loud. Not a new field on the fragile lines/gift/praise state
+  // machine documented a few hundred lines down (see npcTRAV_GIFT_HOLD's own
+  // note on a prior collision there) — appended to the SAME bag `lines`
+  // already draws from, so it is just one more thing they sometimes say,
+  // house voice, no exclamation.
+  const npcTRAV_STALL_LINE = 'leave something with me sometime, if you like.';
+  // `angle`/`dist` are the escape hatch S2 asks for: most chapters take the
+  // default (straight behind, 1.6 m) with no call-site changes at all, but
+  // Kyoto's bridge deck is only ~8.4 m wide and the traveller already stands
+  // within 1.2 m of its edge (facing ACROSS the narrow width, "the opposite
+  // rail, facing back across it") — straight-behind there walks the stall
+  // off the deck into the river. `angle` rotates the offset direction away
+  // from `face` (in radians, before `dist` is applied) so a chapter can move
+  // the stall along whichever axis of its own geometry is actually safe,
+  // without changing the traveller's own placement or facing.
+  function npcMakeStall(rec, angle, dist) {
+    if (!npcStallPostGeo) {
+      npcStallPostGeo = new THREE_.CylinderGeometry(0.04, 0.045, 1.0, 6);
+      npcStallTopGeo = new THREE_.BoxGeometry(1.7, 0.08, 0.95);
+      npcStallRoofGeo = new THREE_.BoxGeometry(1.95, 0.07, 1.2);
+      npcStallStripeGeo = new THREE_.BoxGeometry(0.34, 0.075, 1.22);
+    }
+    const g = new THREE_.Group();
+    const postMat = npcLocMat(PALETTE.woodDark);
+    const px = [-0.78, 0.78], pz = [-0.4, 0.4];
+    for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) {
+      const pm = new THREE_.Mesh(npcStallPostGeo, postMat);
+      pm.position.set(px[a], 0.5, pz[b]);
+      pm.castShadow = true;
+      g.add(pm);
+    }
+    const top = new THREE_.Mesh(npcStallTopGeo, npcLocMat(PALETTE.wood));
+    top.position.y = 1.0;
+    top.castShadow = true;
+    g.add(top);
+    const roof = new THREE_.Mesh(npcStallRoofGeo, npcLocMat(npcSTALL_ROOF));
+    roof.position.y = 1.55;
+    roof.castShadow = true;
+    g.add(roof);
+    for (let k = -1; k <= 1; k += 2) {
+      const st = new THREE_.Mesh(npcStallStripeGeo, npcLocMat(npcSTALL_STRIPE));
+      st.position.set(k * 0.62, 1.555, 0);
+      g.add(st);
+    }
+    const a = angle || 0, d = (typeof dist === 'number') ? dist : -1.6;
+    g.position.set(d * Math.sin(a), 0, d * Math.cos(a));
+    g.rotation.y = a;
+    rec.group.add(g);
+    rec.stallG = g;
+    return g;
+  }
   /**
    * @param o {biome, x, y, z, group?, lines?, wheek?, near?, cool?, face?}
    *   biome  which chapter this person is standing in - they exist nowhere else
@@ -3029,6 +3102,22 @@ export function createNPCs(game) {
       }
       return undefined;
     };
+    // LIFT9, S6: a QA-only peephole into the stall's own visibility — same
+    // shape as `qaGiftT` just above. `visible` mirrors `rec.group.visible`,
+    // which the stall (a child of that group, see npcMakeStall) inherits for
+    // free, so this is really asking the same gateChap question the figure
+    // itself answers. Undefined if the traveller for that biome has never
+    // been built.
+    game.state.qaStallInfo = function (biome) {
+      for (let i = 0; i < locals.length; i++) {
+        const r = locals[i];
+        if (r.trav && r.biome === biome) {
+          return { built: !!r.stallG, visible: !!(r.stallG && r.group && r.group.visible),
+                   hasBody: !!r.stallBody };
+        }
+      }
+      return undefined;
+    };
   }
   // THE BAG (L8, F2): a tap on E in reach opens the bag in person; held for
   // this long instead, it gives. The roadmap's own citation for a
@@ -3064,6 +3153,11 @@ export function createNPCs(game) {
     if (!p || !game.biome || !game.biome.isActive(b)) return null;
     return p;
   }
+  // LIFT9, S3: the shop's map mark, resolved through `mapMarkPos`'s `live`
+  // branch (systems.js) exactly the way `travWhere` already is — a thin
+  // wrapper, and nothing else, because the shop IS the traveller's stall and
+  // has no position of its own to publish.
+  function npcShopWhere(biome) { return npcTravWhere(biome); }
   // Two of the four is the bar for "you know each other". One is a stranger you
   // walked past; two is a coincidence you have both noticed, which is the whole
   // joke of the character and is what the closing lines assume.
@@ -3099,6 +3193,40 @@ export function createNPCs(game) {
     if (rec && rec.group && o.gateChap) {
       rec.gateChap = o.gateChap;
       rec.group.visible = false;
+    }
+    // ---- THE SHOP (LIFT9, S1) — built here, not in addLocal, so only a real
+    // traveller ever grows a stall. The visual half is a child of rec.group
+    // (npcMakeStall) and inherits the capture tag, the shadow registration and
+    // the gateChap visibility toggle above for free, same as the umbrella. The
+    // physics half cannot be a child of anything — CANNON has no parenting —
+    // so its position is worked out here in world space, by the same
+    // face-rotation the group's own local offset resolves for free.
+    if (rec && rec.group) {
+      const shopAngle = o.shopAngle || 0, shopDist = (typeof o.shopDist === 'number') ? o.shopDist : -1.6;
+      npcMakeStall(rec, shopAngle, shopDist);
+      // S5, appended rather than replacing (see npcTRAV_STALL_LINE's own
+      // note): one more thing they sometimes say, never the only thing.
+      if (rec.lines) rec.lines = rec.lines.concat(npcTRAV_STALL_LINE);
+      if (game.world) {
+        const face = (o.face || 0) + shopAngle;
+        const sx = (o.x || 0) + shopDist * Math.sin(face);
+        const sz = (o.z || 0) + shopDist * Math.cos(face);
+        const sy = o.y || 0;
+        const sb = new CANNON.Body({
+          mass: 0,
+          position: new CANNON.Vec3(sx, sy + 0.5, sz),
+          material: (game.mats && game.mats.npc) ? game.mats.npc : undefined,
+        });
+        // Under the table only (S1) — half extents roughly table-sized, NOT
+        // the roof/posts, so a low hop still clears the awning's own height.
+        sb.addShape(new CANNON.Box(new CANNON.Vec3(0.85, 0.5, 0.45)));
+        sb.quaternion.setFromEuler(0, face, 0);
+        sb.previousPosition.copy(sb.position);
+        sb.interpolatedPosition.copy(sb.position);
+        sb.userData = { stall: rec };
+        game.world.addBody(sb);
+        rec.stallBody = sb;
+      }
     }
     return rec;
   }
@@ -15690,6 +15818,8 @@ export function createNPCs(game) {
            // ...and where they are standing in the live chapter, for the
            // notebook's pointer and sysHINTS.traveller (L6, F4).
            travWhere: npcTravWhere,
+           // LIFT9, S3: same spot, a different name — see npcShopWhere.
+           shopWhere: npcShopWhere,
            addLocal: addLocal, addTraveller: addTraveller,
            addExchange: addExchange, say: sayAt, sayNear: saySomebodyNear, heat: npcHeat,
            // ---- THE RUMOUR FROM THE LAST PLACE (B15) ----

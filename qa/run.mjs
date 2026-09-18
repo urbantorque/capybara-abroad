@@ -83,6 +83,12 @@ const ASSERTS = [
   // legend, hold-to-zoom, live/quiet fade, single-band trail, and the
   // `mapMarkPos` `live` resolver contract Wave 3's shop will read.
   ['qa/l9-hud-map.js',    'the paper\'s tuck/fold/pill fixes and the chart\'s M1-M9 pass'],
+  // A SHOP, EVERY BIOME, ON THE MAP (L9, S): the shared stall (posts/table,
+  // a static body, never a physTYPES prop), the per-chapter angle/dist
+  // escape hatch Kyoto's bridge deck needed, the map's live-resolved sixth
+  // glyph and its off-map arrow, the paper's sysSHOP_ID row gated on
+  // chapDoneHere and cheapestUnowned(), and no new save key.
+  ['qa/l9-shop-static.mjs', 'the shop: the shared stall, the map glyph, the paper row, no new save key'],
   ['build.mjs',           'the one-file build: wraps, splices, no collisions, writes dist/'],
 ];
 const REPORTS = [

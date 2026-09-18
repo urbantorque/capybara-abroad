@@ -7647,6 +7647,10 @@ const sysTRAV_ID = 'traveller';
 // and a `const` declared inside sysDrops's own block (much further down)
 // would still be in its temporal dead zone when that assignment runs.
 const sysDROP_ID = '__drop';
+// ...and the shop's (LIFT9, S4): a fourth pseudo-row on the same terms, for
+// the same reason its three siblings are declared up here rather than beside
+// their own reader.
+const sysSHOP_ID = '__shop';
 const sysMAP_WORLDS = {
   // Sydney publishes zones rather than landmarks, so these come from the world
   // layout table in the contract.
@@ -25216,6 +25220,25 @@ export function createSystems(game) {
     taskRec[sysTRAV_ID] = { def: null, li: li, txt: txt, done: false, chapter: 0, tilt: '',
                             shown: false, aim: aim, arrow: arrow, dist: dist };
   }
+  // ...and the shop's (LIFT9, S4): the same row, built the same way, on the
+  // paper only while there is something to afford and somewhere gated-visible
+  // to go and get it. See A SHOP, EVERY BIOME, ON THE MAP.
+  {
+    const li = sysEl('li', 'capyui-task capyui-way capyui-shop capyui-hidden');
+    const tw = sysEl('span', 'capyui-tw');
+    const txt = sysEl('span', 'capyui-txt', 'the shop');
+    tw.appendChild(txt);
+    li.appendChild(tw);
+    const aim = sysEl('span', 'capyui-aim');
+    const arrow = sysEl('i', 'capyui-arrow');
+    const dist = sysEl('span', null, '');
+    aim.appendChild(arrow);
+    aim.appendChild(dist);
+    li.appendChild(aim);
+    listEl.appendChild(li);
+    taskRec[sysSHOP_ID] = { def: null, li: li, txt: txt, done: false, chapter: 0, tilt: '',
+                            shown: false, aim: aim, arrow: arrow, dist: dist };
+  }
   for (let i = 0; i < TASKS.length; i++) {
     const r = taskRec[TASKS[i].id];
     if (!r) continue;
@@ -26685,6 +26708,12 @@ export function createSystems(game) {
   // calm switch would have moved everything decorative in the game EXCEPT the
   // ring in the corner — the one thing on the screen that was pulsing.
   function mapPulse(amp) { return sysCalmOn() ? 0 : Math.sin(game.state.time * 4) * amp; }
+  // LIFT9, S3: the shop's own mark, resolved through `mapMarkPos`'s `live`
+  // branch rather than a `sysMAP_WORLDS` row — the same fixture in all
+  // nineteen worlds needs no per-biome table entry, and the resolver already
+  // falls back to null (drawing nothing) the moment `game.shopWhere()` does,
+  // which is every chapter the stall is not gated visible in yet.
+  const sysSHOP_MARK = { live: 'shopWhere', t: 'the bag' };
   const mapC = {                     // colours, resolved once
     water: sysHex(PALETTE.water), deep: sysHex(PALETTE.seaMid),
     lowLand: sysHex(PALETTE.sand), midLand: sysHex(PALETTE.leafC),
@@ -27299,6 +27328,59 @@ export function createSystems(game) {
           g2.textAlign = 'start';
           g2.textBaseline = 'alphabetic';
         }
+      }
+    }
+
+    // ---- AND THE SHOP (LIFT9, S3), THE SIXTH GLYPH, AFTER THE DOOR --------
+    // Resolved through `mapMarkPos`'s `live` branch (a fixture the same in
+    // all nineteen worlds needs no per-biome table row) rather than a mark in
+    // `mapSpec.marks`. Drawn as a coin — a filled disc with a ring inside it,
+    // in the wallet's own gold — because the five landmark shapes, the boat
+    // and the door's own broken ring are all spoken for and a coin is legible
+    // at this size without a legend entry of its own.
+    //
+    // PULSES ONLY WHEN WORTH A DETOUR: `cheapestUnowned` (below) is the same
+    // price the paper's shop row gates on, so the chart and the paper agree
+    // about when there is something new to go and buy. Steady otherwise —
+    // the stall is always a landmark, only sometimes an errand.
+    const sm = mapMarkPos(sysSHOP_MARK);
+    if (sm) {
+      const sxp = PX(sm.x), szp = PZ(sm.z);
+      const sMargin = 5.0 * u;
+      const shopInside = sxp > sMargin && sxp < w - sMargin && szp > sMargin && szp < w - sMargin;
+      const shopCu = cheapestUnowned();
+      const shopAfford = shopCu !== null && jrYuzu >= shopCu;
+      const shopPr = shopAfford ? mapPulse(0.8) : 0;
+      if (shopInside) {
+        const rr = 2.8 * u + shopPr * 0.4;
+        g2.fillStyle = mapC.ink;
+        g2.beginPath(); g2.arc(sxp, szp, rr, 0, 6.284); g2.fill();
+        g2.strokeStyle = sysHex(PALETTE.yuzuGold);
+        g2.lineWidth = 1.15 * u;
+        g2.beginPath(); g2.arc(sxp, szp, rr * 0.55, 0, 6.284); g2.stroke();
+      } else {
+        // OFF THE DRAWN SQUARE — the hold-to-zoom crop (M7), or a fixture
+        // past a chart's own bounds the way several `way` marks already are
+        // (see the comment on `goal`, just below). Reuses that exact
+        // cast-to-the-rim-and-clamp arrow rather than inventing a second one:
+        // same centre, same inset, same arrowhead, this mark's own colour.
+        const c = w / 2;
+        let dx = sxp - c, dz = szp - c;
+        const len = Math.hypot(dx, dz) || 1;
+        dx /= len; dz /= len;
+        const lim = c - sMargin;
+        const t = Math.min(Math.abs(dx) > 1e-4 ? lim / Math.abs(dx) : 1e9,
+                           Math.abs(dz) > 1e-4 ? lim / Math.abs(dz) : 1e9);
+        const ax = c + dx * t, az = c + dz * t;
+        const r = 4.2 * u + shopPr * 0.4;
+        g2.fillStyle = sysRgba(PALETTE.sail, 0.85);
+        g2.beginPath(); g2.arc(ax, az, r + 1.4 * u, 0, 6.284); g2.fill();
+        g2.fillStyle = sysHex(PALETTE.yuzuGold);
+        g2.beginPath();
+        g2.moveTo(ax + dx * r, az + dz * r);
+        g2.lineTo(ax - dz * r * 0.72 - dx * r * 0.5, az + dx * r * 0.72 - dz * r * 0.5);
+        g2.lineTo(ax + dz * r * 0.72 - dx * r * 0.5, az - dx * r * 0.72 - dz * r * 0.5);
+        g2.closePath(); g2.fill();
       }
     }
 
@@ -29537,6 +29619,32 @@ export function createSystems(game) {
     try { p = typeof game.travWhere === 'function' ? game.travWhere() : null; } catch (e) { p = null; }
     return !!p;
   }
+  /**
+   * LIFT9, S4: the shop's own row-on test. Gated on `chapDoneHere` — the same
+   * "first REAL tick" check `addTraveller`'s `gateChap` uses to reveal the
+   * stall itself (npc.js) — so the paper never names a place before the
+   * stall standing there is actually visible, and on there being something
+   * to afford (`cheapestUnowned`, below) that is not already owned, so the
+   * row never points a player at a shop with nothing new in it. Unlike
+   * `travRowOn` this is not limited to act one or to being met once: a shop
+   * is not a one-time introduction, it is worth a nudge back to it every time
+   * the wallet clears a new price.
+   */
+  function shopRowOn() {
+    const b = game.biome && game.biome.current;
+    if (!b) return false;
+    const n = chapterOf(b);
+    if (typeof game.chapDoneHere !== 'function' || !game.chapDoneHere(n)) return false;
+    const cu = cheapestUnowned();
+    if (cu === null || jrYuzu < cu) return false;
+    let p = null;
+    try { p = typeof game.shopWhere === 'function' ? game.shopWhere() : null; } catch (e) { p = null; }
+    return !!p;
+  }
+  // A QA-only peephole, same shape as `qaGiftT`/`qaStallInfo` (npc.js) — the
+  // paper row's own DOM class is one step removed from the gate that decides
+  // it, and a probe should be able to ask the gate directly.
+  game.state.qaShopRowOn = shopRowOn;
   function nbTravPin() {
     nbTravArm = (game.biome && game.biome.current) || '';
     if (!travRowOn()) return;
@@ -31182,6 +31290,19 @@ export function createSystems(game) {
       return p ? hintAt(p.x, p.z, p.y) : null;
     },
   };
+  // ---- ...AND THE SHOP (LIFT9, S3/S4) ------------------------------------
+  // Physically the traveller's own stall (`game.shopWhere` is a thin wrapper
+  // over `game.travWhere`, npc.js), so the same null-in-the-wrong-chapter
+  // answer applies. `shopRowOn`, below, is what actually decides whether this
+  // is worth showing; the `where` here only has to resolve a point once it is.
+  sysHINTS[sysSHOP_ID] = {
+    clue: 'hold E there to leave something, or open the bag to spend',
+    where: function () {
+      let p = null;
+      try { p = typeof game.shopWhere === 'function' ? game.shopWhere() : null; } catch (e) { p = null; }
+      return p ? hintAt(p.x, p.z, p.y) : null;
+    },
+  };
   // ---- ...AND THINGS THAT TURN UP (L8, F4.4) ------------------------------
   // The bath first, then a twin whose window is still open, then whatever is
   // nearest — the roadmap's own priority order — so the arrow, if anything
@@ -31954,6 +32075,8 @@ export function createSystems(game) {
     // F reaches them like any open row, and the pseudo-row is on the paper
     // only for as long as it is the one pointed at.
     if (travRowOn()) open.push(sysTRAV_ID);
+    // ...and the shop, on the same terms (LIFT9, S4).
+    if (shopRowOn()) open.push(sysSHOP_ID);
     if (open.length < 2) return;              // nothing to choose between
     let i = open.indexOf(todoTopId);
     if (i < 0) i = 0;
@@ -32083,8 +32206,10 @@ export function createSystems(game) {
     // while the row is on (same chapter, unmet, page read here) and the
     // window under it is the live act's, as with no pin at all.
     const travPin = todoPin === sysTRAV_ID && travRowOn();
-    let pi = (todoPin && !travPin) ? openIds.indexOf(todoPin) : -1;
-    if (pi < 0 && !travPin) todoPin = '';
+    // ...and the shop's pin, on the same terms (LIFT9, S4).
+    const shopPin = todoPin === sysSHOP_ID && shopRowOn();
+    let pi = (todoPin && !travPin && !shopPin) ? openIds.indexOf(todoPin) : -1;
+    if (pi < 0 && !travPin && !shopPin) todoPin = '';
     let winIds, top;
     if (pi >= 0) {
       // CLAMPED, NOT WRAPPED. The rows are built once and live in a fixed DOM
@@ -32163,6 +32288,20 @@ export function createSystems(game) {
       if (trec.txt.textContent !== tt) trec.txt.textContent = tt;
       // the way on's grey until it is the thing pointed at
       trec.li.classList.toggle('soon', !travPin);
+    }
+    // ...and the shop's row, on the paper while shopRowOn says there is
+    // something to afford and somewhere gated-visible to go get it (LIFT9,
+    // S4), taking the arrow only while pinned — same manners as the
+    // traveller's row just above, after it for the same reason the traveller
+    // comes after the way on: a pin is a choice and neither pseudo-row is
+    // ever a default.
+    if (shopRowOn()) {
+      if (shopPin) top = sysSHOP_ID;
+      show[sysSHOP_ID] = true;
+      const stxt = 'the shop  ·  ' + (sysTRAV_PLACE[cdef.biome] || 'find the stall');
+      const srec = taskRec[sysSHOP_ID];
+      if (srec.txt.textContent !== stxt) srec.txt.textContent = stxt;
+      srec.li.classList.toggle('soon', !shopPin);
     }
     for (let i = 0; i < winIds.length; i++) show[winIds[i]] = true;
     // ---- THE MARQUEE LINE (B1) --------------------------------------------
@@ -33722,6 +33861,45 @@ export function createSystems(game) {
     saveSoon();
     return true;
   }
+  /**
+   * LIFT9, S3/S4: the cheapest price across everything the wallet has not
+   * already cleared — the one number the shop's minimap pulse (mapDraw) and
+   * paper row (shopRowOn) both gate on. Three tables, three different shapes
+   * of "unowned":
+   *   sysUPGRADES — the next tier's price, only once its prereq (if any) is
+   *     actually met; a locked capstone is not a thing the wallet CAN afford
+   *     regardless of price, so it never sets the floor.
+   *   sysCONSUM   — always "for sale" (a consumable is never fully owned),
+   *     excluded only once its live cap (`capy.itemCap`) is already full.
+   *   sysWARDROBE — only the six `price` rows (F5.2); the ten task-earned
+   *     costumes and the gift-only peel pouch have no price to clear.
+   * Returns null with nothing left to buy at any price (every tier maxed,
+   * every consumable capped, every costume owned) rather than Infinity, so a
+   * caller can `=== null` instead of remembering the sentinel.
+   */
+  function cheapestUnowned() {
+    let best = Infinity;
+    for (let i = 0; i < sysUPGRADES.length; i++) {
+      const d = sysUPGRADES[i];
+      const t = upgradeTier(d.id);
+      if (t >= d.tiers.length || !upgradePrereqOk(d.id)) continue;
+      const p = d.tiers[t].price;
+      if (p < best) best = p;
+    }
+    for (let i = 0; i < sysCONSUM.length; i++) {
+      const d = sysCONSUM[i];
+      const cap = (game.capy && typeof game.capy.itemCap === 'function') ? game.capy.itemCap(d.id) : d.cap;
+      if ((inv[d.id] || 0) >= cap) continue;
+      if (d.price < best) best = d.price;
+    }
+    for (let i = 0; i < sysWARDROBE.length; i++) {
+      const w = sysWARDROBE[i];
+      if (typeof w.price !== 'number' || owned.indexOf(w.wear) >= 0) continue;
+      if (w.price < best) best = w.price;
+    }
+    return best === Infinity ? null : best;
+  }
+  game.state.qaShopCheapest = cheapestUnowned;
   // ---- QA HOOKS (L8, F3 + F6) ----------------------------------------------
   // `owned`/`inv`/`jrYuzu` are closures with no other door in from outside —
   // real play only ever reaches them through the bag (F2, not built yet) and

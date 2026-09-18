@@ -2121,6 +2121,9 @@ function mainBoot() {
     game.travMet = npcs.travMet;
     // L6, F4: where they are standing in the live chapter, for the arrow.
     game.travWhere = npcs.travWhere;
+    // LIFT9, S3: the shop's map mark — same spot as the traveller, a
+    // different name, wired the same way.
+    game.shopWhere = npcs.shopWhere;
     // B11 (5d): the one way to make the people near a point jump, from
     // outside npc.js. systems.js's herd loop is the only caller.
     game.startlePeople = npcs.startlePeople;
