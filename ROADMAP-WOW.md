@@ -1,4 +1,4 @@
-# ROADMAP-WOW — the third beauty pass: reflections, the foreground, grass, still pixels, and nineteen beats (19 Sep 2026)
+# ROADMAP-WOW — the third beauty pass: reflections, the foreground, grass, still pixels, the model sheet, and nineteen beats (19 Sep 2026)
 
 The brief: every chapter noticeably more beautiful — "like 40 % better,
 smoother-looking graphics and more wow factor." LIFT10's audit
@@ -367,9 +367,144 @@ frame or it is not a beat.
 | 18 | Monaco | "across the basin at a hundred and thirty feet of somebody else's money, the terrace lit above it" | THE BASIN MIRRORED — the open item since the first pass; the terrace lights doubled and the yacht's own; the chandeliers' rays through the salt haze (A4) | A1, A4 | reflection diff over the basin mask |
 | 19 | Hanoi | "across the water at the tower and the red bridge" | HOAN KIEM MIRRORED (A1) — the tower, the bridge and the lanterns doubled; the shower's rain-slick road takes the Kowloon treatment while wet; a lantern string as foreground | A1, A2 | reflection diff over the lake mask |
 
+## Part C — the model sheet: structures, movers, NPCs and the animal, biome by biome (added 19 Sep 2026)
+
+*Asked for alongside Part A′: "another deep biome-by-biome review and
+uplift on key structures, NPCs (the moving objects and side characters)
+and major character details (the capybara, the condor, any other key
+marquee characters, boats, helicopters etc.)."*
+
+Everything above is about light and air. This is about the THINGS — the
+hero building each chapter is built around, the marquee mover its big
+one rides on, the people and animals that make it a place, and the
+capybara itself. It is a review first and an uplift second, and it goes
+FIRST (W0, below), because it is the one part of this pass that has to
+be looked at before it can be sized.
+
+### The sheet — how each subject is photographed
+
+`qa/art-review.js` already does this for Sydney, Pasto, Venice, Monaco,
+Antarctica and Kyoto: its own camera, the raw scene render with no
+composite, so a model is judged as a model (`window.__art.cam / render /
+capyShot / personShot`). `qa/wow-sheet.js` extends it to all nineteen:
+per chapter, at three angles each (front three-quarter at the play
+angle of ~35° overhead-behind, side, and a close head/detail shot):
+
+1. **the hero structure** — the thing the spawn comment points the
+   lens at;
+2. **the marquee mover** — what the big one rides, drives or flies;
+3. **three NPC kinds** — one instanced roster figure (`npcMakeGeo`, the
+   24-triangle person with hem and placket), one hand-built local
+   (their own meshes — a collar, a hat), and the chapter's own animal
+   or vehicle-with-a-driver;
+4. **the capybara in that chapter's costume**, and once, at the start
+   of the sheet, the plain animal at eight azimuths (the wardrobe pass's
+   own eight-shot contact sheet, re-taken).
+
+Roughly 19 × 8 raw frames plus the animal's eight, read by eye — the
+memory's own rule (`capy3-visibility-metrics`): no automated proxy has
+ever judged a silhouette correctly here.
+
+### The rubric — six reads per subject, each a yes/no at the play distance
+
+- **Silhouette.** Readable from the fixed 35° lens at the distance it is
+  normally seen. The aesthetic law's first line, and the only one that
+  matters at 40 m.
+- **Secondary forms.** A hero needs at least THREE sub-shapes that read
+  at distance (the Opera House has its shells and its podium; a box
+  with a roof has one). Movers need their moving part as a form:
+  rotor, wheels, wake, wings, a flag.
+- **Two colours on anything a person wears or drives.** Beauty pass 2's
+  finding, generalised: one hex from shoulders to hips reads as a
+  bollard. Vehicles the same — a hull and a deck, a body and a roof.
+- **Something on every mover moves that is not the whole.** Wheels
+  turn, a rotor spins, a wake trails, a flag or a pennant or an aerial
+  sways, a rider's head turns. A vehicle that translates as one rigid
+  block is a prop, not a mover.
+- **One asymmetry.** A satchel on one shoulder, a dent, a patch, a
+  different-coloured shutter — the whimsy law's "slightly oversized,
+  exaggerated" needs one thing on each subject that is not mirrored.
+- **The face.** For the animal and anything with a head: eyes with a
+  highlight fleck (an `EMIT_OVER` dot reads at every distance), a nose,
+  a mood the pose already carries. For the capybara specifically:
+  ears, the blunt muzzle, the eye line, a second colour band on the
+  belly, toenails, the tail nub — the six things that make it a
+  capybara rather than a loaf.
+
+A subject passes on 5 of 6. The uplift for a failing subject is written
+INTO THE SHEET'S FINDINGS TABLE, per subject, with the read it fails —
+not decided in advance here.
+
+### What is on the sheet, per chapter (the subjects; the findings come from W0)
+
+| # | chapter | hero structure | marquee mover | NPC kinds to shoot | costume |
+|---|---|---|---|---|---|
+| 1 | Sydney | the Opera House (shells, podium, steps) | — (the concert is a place) | roster tourist, the gardener, the ibis / the jogger | the sunhat |
+| 2 | Pasto | Galeras and the plaza fountain | THE CONDOR (`condor.js`) — wings, primaries, ruff, head | pasto local, the llama, the dog | the ruana |
+| 3 | Quay | the Harbour Bridge and the wharf | THE FERRY — hull, deck, wheelhouse, wake, the skipper | the skipper, roster commuter, the gull | — |
+| 4 | Kyoto | the torii tunnel, the pavilion, the bridge at Uji | the raft (THE RIVER RUN) | the kyoto local, the heron, the koi | — |
+| 5 | Cali | the Ermita and the painted street | THE PARTY BUS — body, roof deck, wheels, lights | the salsa dancers, the cat, the lulada seller | — |
+| 6 | Rio | Sugarloaf, the kiosk, the wave paving | THE FRIGATEBIRD | the biscoito Globo man, roster bather, the football | — |
+| 7 | Iceland | the church (Hallgrímskirkja), the hot-dog stand, the pier | the whale; the aurora (a light, not a model) | the stand's vendor, roster local under a lamp, the puffins | the parka |
+| 8 | Sahara | the Koutoubia, the souk, the desert camp | THE JETPACK (and its rings) | the orange-cart man, the snake charmer, the acrobats | — |
+| 9 | the Drift | the lantern plinth, the broken jetty, the islands | the lampflies; the wind itself | the (few) locals of the Shelf | — |
+| 10 | Venice | the Basilica, the Campanile, the two columns | the duckboards; the tide (water) | the Piazzetta roster (140), a hand-built local, the pigeons | — |
+| 11 | Kowloon | the big sign, the scaffold, the bakery | THE HELICOPTER — rotor, tail, skids, the pilot | the bakery tray, roster shopper, the lion dancers, the bus | — |
+| 12 | Palawan | the karst, the bangka, the jetty | THE MANTA; the bangka (outriggers, the boatman) | the boatman, the clam, the fish | — |
+| 13 | Goreme | the fairy chimneys, the launch field | THE BALLOON — envelope, basket, burner, ropes, the pilot | the tea man, the mare and the horses, the pigeons | — |
+| 14 | Manly | the lifeguard tower, the Norfolk pines, the flags | THE BIG WAVE (water) ; the surfboard | the lifeguard, roster swimmer, the sandcastle | — |
+| 15 | the Pantanal | the Transpantaneira bridge, the pen | THE HERD (the other capybaras — each a model) | the cattle, the jacaré, the jabiru, the cowbird | — |
+| 16 | the cave | the shaft, the doline, the slot | the log (the drop) | the swiftlets, the glow-worms, the fish | — |
+| 17 | Antarctica | the station huts, the jetty, the pack ice | THE ORCA POD; the orange boat (tiller, the skipper) | the gentoos, the station crew, the skua | the parka |
+| 18 | Monaco | the Casino, the terrace, the yacht | the red car (THE GRAND PRIX) — wheels, wing, driver | the casino staff, the yacht's crew, roster promenader | the black tie |
+| 19 | Hanoi | Long Biên bridge, the Turtle Tower, the shophouses | the train (THE PHO RUN alley); the pho scooter | scooter riders (baskets, helmets), the barber, the pho vendor | — |
+
+The capybara's own row is every chapter: the eight-azimuth sheet once,
+then in-costume per chapter where a costume exists (the wardrobe pass
+shipped ten, and its own memory lists four ways a hat fails — those are
+the first four reads to repeat).
+
+### The uplifts this will most likely name (so the waves can be sized — written as guesses, to be replaced by the sheet)
+
+- **The animal:** a belly band (a second, paler hex on the underside —
+  one `c` multiplier in the existing geometry, the roster figure's
+  hem/placket trick), an eye highlight fleck, toenails, whisker nubs;
+  the ears already flatten and the face already has a mood. The single
+  highest-value model in the game and the cheapest to lift.
+- **Movers:** wheels that turn (the party bus, the red car, the
+  scooters, the tractor-class props), a rotor that spins and a tail
+  rotor (the helicopter), a wake (the ferry, the orange boat, the
+  bangka — a trailing quad pair on the water's own material), wing
+  primaries that fan (the condor, the frigatebird — five fingered tips
+  as one extra `c`-banded fan each), a pennant on every hull.
+- **Heroes:** secondary forms where a hero is one box — window bands,
+  a cornice, a base course, a roofline break — reusing the merger's
+  `jitter` and the beauty pass's bay-and-course treatment (the Quay
+  apron's eleven bays) rather than new geometry types.
+- **NPCs:** the roster figure already has hem and placket; the sheet
+  will say whether it needs a third band (a collar) and whether the
+  hand-built locals each carry one asymmetric thing. Vehicle riders
+  (Hanoi's scooters) get a head that turns toward the animal on the
+  existing `npc` gaze channel.
+
+### Waves
+
+- **W0 — the sheet.** Before W1. `qa/wow-sheet.js`, ~160 raw frames,
+  read by eye, findings table appended to this file under "The sheet
+  said", one row per failing read. Two hours of looking; nothing built.
+- **W4 — the uplifts**, per chapter file, alongside Part B's beats and
+  Part A′'s G5 — same files, same agent per chapter. The animal's own
+  uplift is its own item in W4 (capybara.js, one agent, first).
+- **`qa/rv-geom.js`'s baseline is invalidated by any geometry change**
+  — re-baseline after W4, not before, and say so in the commit.
+
 ## Order and ownership
 
-Five waves. A1 is the biggest and the riskiest, so it does not go first.
+Six waves. W0 is a review (Part C's sheet) and builds nothing; A1 is the biggest and the riskiest, so it does not go first.
+
+- **W0 — the model sheet** (Part C). ~160 raw own-camera frames across
+  all nineteen chapters, read by eye, findings appended to Part C. Sizes
+  W4.
 
 - **W1 — A3 + A2 (safe, measurable, six chapters).** Still pixels
   everywhere; foreground in Sydney, Kyoto, Cali, Kowloon, Hanoi, Manly.
