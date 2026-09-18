@@ -43428,6 +43428,7 @@ export function createSystems(game) {
   let dropArriveX = 0, dropArriveZ = 0;
   let dropFirstPillSaid = false;
   let sysDropsErrAt = 0;        // rate-limits the tick's own catch, below
+  let sysChaosErrAt = 0;        // ...and sysChaosTick's own catch, beside it
   let dropPairSeq = 0;
 
   /** A fresh pool for a newly-(re)entered biome — everything about the OLD
@@ -43827,6 +43828,266 @@ export function createSystems(game) {
       }
       return out;
     },
+  };
+
+  // ===========================================================================
+  // THE CHAOS, SAID SEPARATELY (L8, wave 2) — not a feature with a shelf, a
+  // roll. Every 150-240 s, while the chapter is live, no `wow` is showing and
+  // the animal has been here over a minute, a 40 % roll picks ONE incident
+  // from the chapter's own table below. See ROADMAP-LIFT8.md, "the chaos,
+  // said separately" — three of its four citations for what already exists
+  // were stale by the time this landed, and the doc comments on each
+  // `chaosFire*` below say what was actually found instead:
+  //   - the gust really is `sysIMPULSE_BY` / `capy.shove` (systems.js:73,
+  //     capybara.js's shove()), as named.
+  //   - "the thief NPC state, already written in six chapters" does not
+  //     exist: `capy.gullProof`'s own doc comment (capybara.js) says so in
+  //     as many words — "nothing in this tree yet makes a thief or a gull
+  //     take a held prop away from the animal at all (grepped thief/steal/
+  //     snatch/heldProp across every chapter before writing this)". `thief`
+  //     everywhere in the tree is a dialogue REACTION to the PLAYER stealing
+  //     something (steal-hat, picnic-thief, steal-empanada, ruana-thief) —
+  //     not an NPC that runs at you. `sysCHAOS_BY` marks `thief: false`
+  //     everywhere, honestly, and `chaosAttempt` below has no live branch for
+  //     it — there is nothing to wire.
+  //   - `calmAudit` (systems.js, not npc.js) is read-only and reports no
+  //     vector at all — `r`, `near`, `bold`, `appr` per critter. The real
+  //     mechanism is THE LOAF's own calm-inversion block near the bottom of
+  //     `update()` (search `AND PAST A THRESHOLD THE REGISTRY INVERTS`):
+  //     `inv` there is a scalar, gated on `capy.loaf`, that damps every
+  //     live, bold-species critter's `appr` toward 1 and its flee radius
+  //     (`cr.near`) toward 0 — "the fleeing half of the inversion needs no
+  //     biome file to change at all" is that file's own comment. The
+  //     stampede below is the one-line change the roadmap actually meant:
+  //     bypass the loaf gate for `sysCHAOS_STAMPEDE_T` seconds so the SAME
+  //     inversion the loaf earns fires on the chaos roll instead, in
+  //     whichever chapters registered a critter with `bold > 0` at all.
+  //   - the squall is exactly `hud.front(0)` / `game.weather.frontForce`,
+  //     as named — confirmed live below.
+  // ===========================================================================
+  const sysCHAOS_ODDS = 0.40;
+  const sysCHAOS_PERIOD_MIN = 150, sysCHAOS_PERIOD_MAX = 240;
+  const sysCHAOS_QUIET = 60;          // s since arrival before a roll may fire
+  const sysCHAOS_STAMPEDE_T = 6;      // s the calm-inversion bypass holds open
+  const sysCHAOS_SQUALL_HOLD = 8;     // s `hud.front` is pinned at the line
+  const sysCHAOS_GUST_V = 4.5;        // m/s handed to capy.shove — see chaosFireGust
+  const sysCHAOS_KINDS = ['gust', 'thief', 'stampede', 'squall', 'runaway'];
+  // ---- THE TABLE, READ HONESTLY OFF WHAT EACH CHAPTER ACTUALLY HAS --------
+  // `gust`: true only where `sysIMPULSE_BY` (systems.js:73) already carries a
+  //   named cause for this biome — `capy.shove()` with no `src` works
+  //   everywhere (it falls back to "something back there"/"the swell"), but
+  //   an un-named shove reads as a bug, not an incident, so the other eight
+  //   are marked false rather than faked.
+  // `thief`: false everywhere. See the block comment above.
+  // `stampede`: true only where a critter was registered with `bold > 0`
+  //   (`game.addCritter`, grepped fresh across every chapter file) — the
+  //   inversion's own gate. `pantanal`'s caiman (`bold: 0`) does not count;
+  //   its jabiru (`bold: 0.6`) does, so the chapter as a whole does.
+  // `squall`: true only where the chapter's own `wxMOOD` row (weather.js) has
+  //   `rain.odds > 0` — the exact gate `front()` itself uses; a chapter with
+  //   `odds: 0` (sahara, drift, goreme, cave, antarctic) has `wxFront` nailed
+  //   to -1 forever and `hud.front(0)` cannot make it rain there.
+  // `runaway`: true everywhere — `game.physics.dropSpotNear` + `spawnProp`
+  //   are the exact same chapter-neutral primitives F4's own drops already
+  //   trust in all nineteen chapters.
+  const sysCHAOS_BY = {
+    sydney:    { gust: true,  thief: false, stampede: false, squall: true,  runaway: true },
+    pasto:     { gust: false, thief: false, stampede: false, squall: true,  runaway: true },
+    quay:      { gust: true,  thief: false, stampede: true,  squall: true,  runaway: true },
+    kyoto:     { gust: true,  thief: false, stampede: true,  squall: true,  runaway: true },
+    cali:      { gust: true,  thief: false, stampede: false, squall: true,  runaway: true },
+    rio:       { gust: false, thief: false, stampede: false, squall: true,  runaway: true },
+    iceland:   { gust: true,  thief: false, stampede: true,  squall: true,  runaway: true },
+    sahara:    { gust: false, thief: false, stampede: true,  squall: false, runaway: true },
+    drift:     { gust: false, thief: false, stampede: true,  squall: false, runaway: true },
+    venice:    { gust: true,  thief: false, stampede: true,  squall: true,  runaway: true },
+    kowloon:   { gust: false, thief: false, stampede: false, squall: true,  runaway: true },
+    palawan:   { gust: true,  thief: false, stampede: false, squall: true,  runaway: true },
+    goreme:    { gust: false, thief: false, stampede: true,  squall: false, runaway: true },
+    manly:     { gust: true,  thief: false, stampede: true,  squall: true,  runaway: true },
+    pantanal:  { gust: false, thief: false, stampede: true,  squall: true,  runaway: true },
+    cave:      { gust: false, thief: false, stampede: false, squall: false, runaway: true },
+    antarctic: { gust: true,  thief: false, stampede: true,  squall: false, runaway: true },
+    monaco:    { gust: true,  thief: false, stampede: false, squall: true,  runaway: true },
+    hanoi:     { gust: true,  thief: false, stampede: false, squall: true,  runaway: true },
+  };
+
+  let chaosBiome = null;
+  let chaosArriveT = -1;       // s since this visit's window went live — the sysDrops pattern
+  let chaosT = rand(sysCHAOS_PERIOD_MIN, sysCHAOS_PERIOD_MAX);
+  let chaosLastKind = null;    // never the same kind twice running
+  let chaosStampedeT = 0;      // s left of the forced calm-inversion bypass — read by THE CALM block
+  let chaosSquallReleaseT = 0; // s until a forced front is handed back to the weather's own roll
+
+  function chaosReset(biome) {
+    chaosBiome = biome;
+    chaosArriveT = 0;
+    chaosT = rand(sysCHAOS_PERIOD_MIN, sysCHAOS_PERIOD_MAX);
+    chaosLastKind = null;
+  }
+
+  /** One kind from this biome's own table, never the one that just fired —
+   *  unless that is the ONLY kind this chapter supports at all, in which case
+   *  "never twice in a row" cannot mean "never again". */
+  function chaosPickKind() {
+    const row = sysCHAOS_BY[chaosBiome];
+    if (!row) return null;
+    const all = [];
+    for (let i = 0; i < sysCHAOS_KINDS.length; i++) if (row[sysCHAOS_KINDS[i]]) all.push(sysCHAOS_KINDS[i]);
+    if (!all.length) return null;
+    const avail = all.filter(function (k) { return k !== chaosLastKind; });
+    const from = avail.length ? avail : all;
+    return from[randInt(0, from.length - 1)];
+  }
+
+  /** THE GUST — capy.shove() with no `src`, so the existing "that was X" pill
+   *  (sysIMPULSE_BY, THE SHOVE, NAMED, above) names it itself; no separate
+   *  pill here or it would say the thing twice. */
+  function chaosFireGust() {
+    const capy = game.capy;
+    if (!capy || typeof capy.shove !== 'function') return false;
+    let dir = rand(0, Math.PI * 2);
+    if (game.weather && typeof game.weather.mood === 'function') {
+      const row = game.weather.mood();
+      if (row && typeof row.dir === 'number') dir = row.dir;
+    }
+    capy.shove(Math.sin(dir) * sysCHAOS_GUST_V, Math.cos(dir) * sysCHAOS_GUST_V);
+    return true;
+  }
+
+  /** THE STAMPEDE — see the block comment above. Refuses (does nothing, no
+   *  pill) if this live biome has no bold critter registered at all, which
+   *  `sysCHAOS_BY`'s own table should already have kept it from reaching. */
+  function chaosFireStampede() {
+    const live = game.biome && game.biome.current;
+    let any = false;
+    for (let i = 0; i < sysCritters.length; i++) {
+      if (sysCritters[i].biome === live && sysCritters[i].bold > 0) { any = true; break; }
+    }
+    if (!any) return false;
+    chaosStampedeT = sysCHAOS_STAMPEDE_T;
+    toast('a stampede runs through.', 'note');
+    return true;
+  }
+
+  /** THE SQUALL — `hud.front(0)` pins the front at the crossing line for one
+   *  frame, which is all `weather.js`'s own trigger
+   *  (`row.rain.odds > 0 && wxFront >= 0 && !wxFrontFired`) needs to start
+   *  the chapter's own shower at its own hold and peak; held a few seconds
+   *  longer than that so the cloud/gust build read as "arriving" rather than
+   *  a single-frame twitch, then handed back to the weather's own roll
+   *  (`hud.front(-2)`) so this does not park the front there for good.
+   *  Refuses if a shower is already running — a forced front on top of a
+   *  live one would fire the pill for nothing visibly new. */
+  function chaosFireSquall() {
+    if (!game.hud || typeof game.hud.front !== 'function' || !game.weather) return false;
+    const row = typeof game.weather.mood === 'function' ? game.weather.mood() : null;
+    if (!row || !row.rain || !(row.rain.odds > 0)) return false;
+    if (typeof game.weather.ringAudit === 'function') {
+      const ra = game.weather.ringAudit();
+      if (ra && ra.rainT > 0.05) return false;
+    }
+    game.hud.front(0);
+    chaosSquallReleaseT = sysCHAOS_SQUALL_HOLD;
+    toast('a squall, blowing in.', 'note');
+    return true;
+  }
+
+  /** THE RUNAWAY — a `ball` or `cone` (`physTYPES`, props.js), spawned at a
+   *  validated point ~12 m from the animal via the exact same
+   *  `game.physics.dropSpotNear` sysDrops already trusts for a twin's second
+   *  fruit (no per-chapter "which way is upslope" helper exists anywhere in
+   *  the tree — grepped fresh, nothing), then pushed toward wherever the
+   *  animal is standing AT THE MOMENT IT SPAWNS. That reads as "something
+   *  came loose and is headed for you" without needing real terrain-gradient
+   *  code — the documented fallback the brief allowed for. */
+  function chaosFireRunaway() {
+    const capy = game.capy;
+    if (!capy || !capy.position || !game.physics ||
+        typeof game.physics.dropSpotNear !== 'function' || typeof game.physics.spawnProp !== 'function') return false;
+    const type = Math.random() < 0.5 ? 'ball' : 'cone';
+    const spot = game.physics.dropSpotNear(capy.position.x, capy.position.z, 10, 14, 0.4);
+    if (!spot) return false;
+    const prop = game.physics.spawnProp(type, spot.x, spot.z, undefined, rand(0, Math.PI * 2));
+    if (!prop) return false;
+    const dx = capy.position.x - spot.x, dz = capy.position.z - spot.z;
+    const d = Math.hypot(dx, dz) || 1;
+    const spd = rand(3.0, 4.2);
+    if (prop.body) {
+      prop.body.wakeUp();
+      prop.body.velocity.x = dx / d * spd;
+      prop.body.velocity.z = dz / d * spd;
+    }
+    toast('something got loose.', 'note');
+    return true;
+  }
+
+  function chaosAttempt() {
+    const kind = chaosPickKind();
+    if (!kind) return;
+    let ok = false;
+    if (kind === 'gust') ok = chaosFireGust();
+    else if (kind === 'stampede') ok = chaosFireStampede();
+    else if (kind === 'squall') ok = chaosFireSquall();
+    else if (kind === 'runaway') ok = chaosFireRunaway();
+    // 'thief' never reaches here: no row in sysCHAOS_BY ever sets it true.
+    if (ok) {
+      chaosLastKind = kind;
+      if (Array.isArray(game.state.qaChaosLog)) {
+        game.state.qaChaosLog.push({ kind: kind, t: game.state.time });
+        if (game.state.qaChaosLog.length > 2000) game.state.qaChaosLog.shift();
+      }
+    }
+  }
+
+  /** Once a frame, from `update()`, only while the chapter is actually live —
+   *  the same gate `sysDropsTick` runs under, right beside it. */
+  function sysChaosTick(dt) {
+    const biome = (game.biome && game.biome.current) || 'sydney';
+    if (biome !== chaosBiome) chaosReset(biome);
+    chaosArriveT += dt;
+    if (chaosStampedeT > 0) chaosStampedeT -= dt;
+    if (chaosSquallReleaseT > 0) {
+      chaosSquallReleaseT -= dt;
+      if (chaosSquallReleaseT <= 0 && game.hud && typeof game.hud.front === 'function') game.hud.front(-2);
+    }
+    // qaForceChaosT (l8-chaos.js): forces the period short, following
+    // qaForceDropT's own naming (F4, above).
+    const forced = game.state.qaForceChaosT;
+    if (typeof forced === 'number') chaosT = Math.min(chaosT, forced);
+    chaosT -= dt;
+    if (chaosT > 0) return;
+    chaosT = (typeof forced === 'number') ? forced : rand(sysCHAOS_PERIOD_MIN, sysCHAOS_PERIOD_MAX);
+    if (wowLiveOn) return;                    // never while a marquee is live
+    if (chaosArriveT < sysCHAOS_QUIET) return; // never in the first minute
+    const capy = game.capy;
+    if (capy && capy.position) {
+      const mq = sysMarqueePoint();
+      if (mq) {
+        const dx = capy.position.x - mq.x, dz = capy.position.z - mq.z;
+        if (dx * dx + dz * dz < sysWHY_R * sysWHY_R) return;   // never at the marquee point
+      }
+    }
+    // The dice are thrown BEFORE the ward is asked: capy.ward (F6.3) cancels
+    // a roll that was actually GOING to fire, never one that would have
+    // missed anyway — a feather spent on a quiet chapter should not read as
+    // "close call." for nothing. See capy.ward's own doc comment
+    // (capybara.js) and the T-key writer (systems.js, KeyT).
+    const roll = game.state.qaForceChaosRoll ? true : rand(0, 1) < sysCHAOS_ODDS;
+    if (!roll) return;
+    if (capy && (capy.ward || 0) > 0) {
+      capy.ward -= 1;
+      toast('close call.', 'note');
+      return;
+    }
+    chaosAttempt();
+  }
+  game.state.qaForceChaosT = null;
+  game.state.qaForceChaosRoll = false;
+  game.state.qaChaosLog = null;   // set to [] by a probe that wants the fired-kind log
+  game.state.qaChaos = function () {
+    return { biome: chaosBiome, arriveT: chaosArriveT, t: chaosT, last: chaosLastKind,
+             stampedeT: chaosStampedeT, squallT: chaosSquallReleaseT };
   };
 
   game.events.on('npc:startled', function (p) {
@@ -45189,6 +45450,17 @@ export function createSystems(game) {
         if (!sysDropsErrAt || nowS - sysDropsErrAt > 4) {
           sysDropsErrAt = nowS;
           console.error('[sysDropsTick] threw — skipped this frame', e);
+        }
+      }
+      // THE CHAOS, SAID SEPARATELY (L8, wave 2) — same gate, same own
+      // try/catch for the same reason sysDropsTick's own doc comment gives:
+      // a throw here must only skip this feature's own turn, never the rest
+      // of update().
+      try { sysChaosTick(dt); } catch (e) {
+        const nowS = sysWall();
+        if (!sysChaosErrAt || nowS - sysChaosErrAt > 4) {
+          sysChaosErrAt = nowS;
+          console.error('[sysChaosTick] threw — skipped this frame', e);
         }
       }
     }
@@ -48753,7 +49025,12 @@ export function createSystems(game) {
       // frame the loaf wobbles — the one thing that would make this read as a
       // glitch rather than as an animal.
       const loafNow = (game.capy && game.capy.loaf) || 0;
-      const inv = clamp((loafNow - sysCALM_INVERT) / (1 - sysCALM_INVERT), 0, 1);
+      // THE STAMPEDE (L8, wave 2 chaos) bypasses the loaf gate for
+      // `chaosStampedeT` seconds, forcing the SAME inversion the loaf earns —
+      // see sysChaosTick's own block comment (above sysCHAOS_BY) for why this
+      // one line, not a new critter AI, is the whole of that incident.
+      const inv = chaosStampedeT > 0 ? 1 :
+                  clamp((loafNow - sysCALM_INVERT) / (1 - sysCALM_INVERT), 0, 1);
       for (let i = 0; i < sysCritters.length; i++) {
         const cr = sysCritters[i];
         if (cr.biome !== live) {
