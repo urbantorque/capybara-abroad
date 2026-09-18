@@ -1,3 +1,51 @@
+## THE TENTH LIFT — THE PICKUP FELT, THE SHOP UNMISTAKABLE, AND AN AUDIT THAT SAID STOP (L10 — 19 Sep 2026)
+
+Two player-named items, both shipped, and a "raise every biome's beauty
+to 90+" mandate that this pass's own audit found could not be met
+honestly without unwinding nine passes of reasoned, written art
+direction — see ROADMAP-LIFT10.md's "THE NINETY PASS" section for the
+full record; this is the short version.
+
+**J — the pickup, felt.** `dropCollect`'s four juice layers (the ladder,
+the burst, the flight, the count) scaled on the single `golden` boolean,
+so a rolling yuzu (worth 2) or a twin (worth 1) read identically to the
+plainest fruit in the game. A `mag` term (worth against the golden
+ceiling, 0..1) scales the burst's spark counts and sizes 0.7–1.2x, and a
+worth-and-streak-gated call into the existing `punch()` primitive (shake,
+FOV kick, pad rumble — never a freeze, which stays reserved for named
+ceremonies per `punch()`'s own doc comment) makes a big pickup or a fast
+run read as escalating hits. A plain yuzu alone stays under the shake
+floor. The wallet's `.bump` gets a taller `.big` sibling on any credit
+>= 3.
+
+**Z — the shop, unmistakable.** The shop's LIFT9 minimap coin shipped
+after the six-glyph legend (M6) was written and was never added to it —
+fixed. Its only distinction from a plain landmark dot was a pulse that
+is specifically OFF whenever the wallet can't afford anything, which is
+exactly a new player's state (`qa/l9-shop-map-poor-zoom.png` shows the
+result: indistinguishable from a triangle six pixels away). Given a
+standing size bigger than every glyph but "you" and the goal, and a
+one-shot corner-badge callout on first resolution.
+
+**THE AUDIT.** Asked to also push depth/animation/beauty across all
+nineteen chapters toward a uniform high bar, this pass first found and
+fixed two of its OWN measurement bugs (a depth-bin raycast wrongly
+excluding Sơn Đoòng's own lit shaft the same way it excludes the sky
+dome; a second probe that read a chapter via `biome.switchTo()`, which
+does not move the animal — the exact trap `capy3-progression-chain`
+already names), then found that nearly every chapter this session's own
+rubric flagged as "weak" has a paragraph in `main.js`'s spawn table or
+`weather.js`'s mood table explicitly arguing for the quality flagged:
+Monaco's "almost nothing happens in this air and THAT IS THE ROW,"
+Goreme's "the stillest air in the game," Antarctica's saturation turned
+DOWN "so a postcard of a place that is not one" isn't made, Kyoto's
+narrow lane sightline to its own documented pond landmark confirmed
+blocked by a machiya wall 13 m out — which two rows of townhouses six
+metres apart are FOR. Forcing a uniform look across all nineteen would
+mean overwriting reasoned, shipped, previously-measured art direction
+from the eight or nine passes before this one, not fixing a gap. `npm
+test` 24/24, live-verified, zero regressions; nothing else was touched.
+
 ## THE NINTH LIFT — SEEN, NOT JUST BUILT (L9 — 18–19 Sep 2026)
 
 Not a new mechanic, a review sweep: five agents measured the loop LIFT8

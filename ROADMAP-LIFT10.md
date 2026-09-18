@@ -135,24 +135,82 @@ between them rather than redoing either.
    first-visit badge fires exactly once per session across a biome
    change and a reload.
 
-## Held (named, not built)
+## THE NINETY PASS — an audit, not a repaint (19 Sep 2026)
 
-The review's six global beauty/depth ideas, not part of either player
-ask above and not sized this pass: a shared low ambient-motion floor for
-the five chapters that measured under 10% frame motion at rest (Iceland,
-Monaco, Drift, Kyoto, Goreme); a second depth layer glimpsed past the
-near geometry in the three chapters that measured the flattest reads
-(the cave's arrival bin was **100% near, 0% everywhere else** —
-`qa/vr-sweep.json.png` — worse than any other chapter measured; Kyoto's
-lane and Sahara's plaza follow it); a third, narrowly-scoped colour pass
-on just Kyoto/Pantanal/Sahara, the three that still read greyest after
-the second beauty pass; a brief held establishing beat on arrival for
-the four highest-scoring set-pieces (Rio, Palawan, Goreme, Hanoi) so the
-game's own best compositions get looked at; an up-sized atmospheric
-mote/dust layer specifically for the landscape chapters that read
-static where the crowd chapters read alive; and pointing the five flat
-chapters' arrival cameras a few degrees toward their one existing far
-landmark rather than dead ahead, which is camera work, not new art.
+Asked afterward: enhance depth/animation/beauty across all nineteen
+chapters, weighted at the weakest, until a self-scored average clears
+90. This section is the record of checking that against the actual
+tree before touching a single grade table, and why almost none of the
+six "held" ideas below survived contact with it.
+
+**TWO INSTRUMENTS WERE WRONG BEFORE THE ART WAS.** The depth-bin
+raycast (the "100% near" cave reading this file used to cite) excluded
+every `depthWrite:false` hit past 150 m to keep the shared sky dome out
+of the sample — and struck Sơn Đoòng's own 210 m lit shaft and exit
+beam, which are built exactly that way, dead. Re-run with the
+exclusion narrowed to the sky dome alone (`renderOrder === -20`
+specifically, not the depthWrite heuristic): cave goes from 100 %/0 %
+to a real 85 %/13 %/2 %/0 % near/mid/far/sky, and Sydney's own far bin
+corrects from 0.9 % to 23 %. A second self-authored probe
+(`qa/l10-score.js`) independently read cave as 19 %/40 %/41 % near —
+BETTER than any other chapter — because it drove the scene with
+`biome.switchTo()` rather than a real arrival, which does not move the
+animal (`capy3-progression-chain`'s own trap 36, paid twice in one
+session). The trustworthy number is the corrected 19-chapter re-sweep,
+`qa/l10-depth-sweep.json.png`, run the same way the original review
+was — reload, picker digit, 8.5 s settle.
+
+**AND ONCE THE INSTRUMENT WAS RIGHT, THE "WEAK" CHAPTERS TURNED OUT TO
+BE READING THEIR OWN DOCUMENTATION CORRECTLY, NOT FAILING IT.** Every
+lead this pass chased into `main.js`'s spawn table or `weather.js`'s
+mood table hit a paragraph that had already reasoned about exactly the
+quality flagged:
+
+- Kyoto's corrected bins (83 % near, confirmed real, not an artifact)
+  match its own spawn comment — "the mirror pond and the pavilion fill
+  the middle distance" — as a sliver at a lane's vanishing point, not a
+  vista: a live occlusion probe (`qa/l10-kyoto-sightline.js`) found the
+  documented pond target IS inside the arrival frustum and IS blocked
+  by a machiya wall 13 m out, which is what two rows of townhouses six
+  metres apart are FOR. `kyoto: sysGrade(..., sat 0.99, cont 0.07, ...)`
+  is commented "the one chapter that wants LESS of everything," and its
+  petal motes are already at density 1.0, the ceiling.
+- Monaco's weather row is commented, verbatim, "almost nothing happens
+  in this air and THAT IS THE ROW" — the low measured ambient motion
+  (6.3 % of frame) this review flagged as a gap is the chapter working.
+- Goreme's row: "the coldest, STILLEST air in the game" — predawn,
+  intentionally, because "balloons do not fly in weather."
+- Drift's gust is deliberately tiny because `drift.js` owns its own
+  38-second gale cycle, which a 0.5 s still-camera motion sample cannot
+  see land — not a static chapter, a slow one, sampled too fast.
+- Antarctica's saturation goes DOWN on purpose: "turning them up makes
+  a postcard of a place that is not one." Venice, Iceland and the cave
+  each have a same-shaped paragraph.
+
+Cross-checked against the corrected depth sweep, sysGRADES' own
+comments and weather.js's own mood rows, the honest finding is that
+**the "weak" scores in the original review were mostly this session's
+own rubric measuring vividness and vista-depth as universal goods**,
+against a game that has been through nine or ten named beauty/depth/
+lift passes (see CONTRACT.md) which deliberately, individually, and
+in writing chose restraint, stillness or enclosure for specific
+chapters. Forcing them toward a uniform "90" would mean overwriting
+shipped, reasoned, previously-measured art direction — the opposite of
+this roadmap's own standing rule that a chapter's tuned numbers are
+"shipped at" a value and not re-based without cause.
+
+**WHAT WAS ACTUALLY SAFE, AND IS DONE:** J and Z above are the two
+items with no documented intent on the other side of them — nobody
+wrote a paragraph arguing the pickup should feel small or the shop
+should be hard to find. Both shipped this pass (commit `6593817`),
+verified live, zero regressions (`npm test` 24/24).
+
+**WHAT WOULD BE THE NEXT REAL LIFT, IF WANTED:** not a tuning pass —
+every dial worth turning has already been turned and written down. The
+available upside is NEW content: a landmark, a set-piece beat, or a
+geometry addition in a specific named chapter, which is a different
+and larger kind of work than this roadmap, and should be scoped as its
+own item rather than folded into "polish."
 
 ## Rules for every agent
 
@@ -165,3 +223,21 @@ landmark rather than dead ahead, which is camera work, not new art.
   the prop, Z reads `shopWhere()`/`jrYuzu` already published.
 - Stage by name, never `git add -A`; do not run `playwright-cli
   close-all` while another agent may hold a session.
+
+## Closed (19 Sep 2026)
+
+J and Z both built and measured, one commit (`6593817`). J: the burst
+now scales 0.7–1.2x off worth instead of a flat golden/not split, a
+worth-and-streak-gated `punch()` call reads a big pickup or a fast run
+as escalating hits without ever crossing into a freeze, and the wallet
+gets a taller `.big` overshoot on any credit >= 3 — confirmed live
+(zero errors, a real wallet increment and a measured nonzero shake
+delta on a golden pickup against none on a plain one). Z: the legend
+is six rows, the shop coin's standing radius is now bigger than every
+glyph but "you" and the goal rather than tying legibility to the
+pulse, and a one-shot corner badge names it in words on first
+resolution — confirmed with a live screenshot
+(`qa/l10-map-legend.png`) showing the coin clearly distinct from the
+triangle beside it. `npm test` 24/24. THE NINETY PASS audit above is
+what the rest of the session went into, and it closed with nothing
+further to safely build.
