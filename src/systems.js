@@ -10111,6 +10111,10 @@ function sysBuildCSS() {
   'opacity:0 !important;transform:none !important;}',
 '.capy-calm .capyui-pflash,.capy-calm .capyui-pflash.show{opacity:0 !important;',
   'transition:none !important;}',
+// LIFT9, C3: `.capyui-yzflash` had the OS `prefers-reduced-motion` rule
+// (above, this file) but no `.capy-calm` counterpart, unlike its sibling
+// flash class just above — same treatment, copied.
+'.capy-calm .capyui-yzflash{opacity:0 !important;transition:none !important;}',
 
 /* ---------- the souvenir card, at the end of a place (v18) ----------
    The chapter ceremony's second beat. Composed like the moment card — a
@@ -26940,8 +26944,12 @@ export function createSystems(game) {
           g2.moveTo(dxp, dzp - rr); g2.lineTo(dxp + rr * 0.92, dzp + rr * 0.72); g2.lineTo(dxp - rr * 0.92, dzp + rr * 0.72);
           g2.closePath(); g2.fill();
         } else {
-          g2.fillStyle = sysHex(PALETTE.yuzu);
-          g2.beginPath(); g2.arc(dxp, dzp, 1.7 * u, 0, 6.284); g2.fill();
+          // THE FIVE-POINT PRIZE GETS ITS OWN INK (L9, V6): a golden drop
+          // used to draw in the same flat PALETTE.yuzu as a one-pointer, so
+          // the chart could not tell them apart. 1.7 -> 2.4 u also just
+          // undersized the dot full stop.
+          g2.fillStyle = sysHex(d.kind === 'golden' ? PALETTE.yuzuGold : PALETTE.yuzu);
+          g2.beginPath(); g2.arc(dxp, dzp, 2.4 * u, 0, 6.284); g2.fill();
         }
       }
     }
@@ -36169,7 +36177,12 @@ export function createSystems(game) {
       puffEver = !!jrFile.puff;
       // ...and THE YUZU (L8, F1): the `ms`-style number-or-zero guard, and
       // the full-plate ledger read back the same way `pal`/`pho` are above.
-      jrYuzu = Math.max(0, typeof jrFile.yuzu === 'number' ? Math.round(jrFile.yuzu) : 0);
+      // LIFT9, C4 bonus finding: this was the one writer of jrYuzu with no
+      // upper bound — yuzuAdd (this file) and the other credit path both
+      // clamp to 99999 on every normal write; a shape-valid but hand-edited
+      // file with a huge finite `yuzu` restored straight past that cap and
+      // the wallet showed it. Same ceiling as `gifted`, just below.
+      jrYuzu = Math.max(0, Math.min(99999, typeof jrFile.yuzu === 'number' ? Math.round(jrFile.yuzu) : 0));
       // PAINTED HERE, NOT JUST SET: yuzuAdd is the only other writer of the
       // wallet's textContent, and a restore that doesn't fire a fresh award
       // (jrSeen already has this chapter, so jrMarkSeen pays nothing) would
@@ -43330,7 +43343,12 @@ export function createSystems(game) {
     // a bigger number is a bigger number: +1 at the base size, +3 half again,
     // +10 (the bath) double, and anything past three in the brighter gold
     if (n >= 10) el.classList.add('big'); else if (n >= 3) el.classList.add('mid');
-    document.body.appendChild(el);
+    // LIFT9, C3: `hudRoot` (`#hud.capyui`), not `document.body` — this element
+    // is `position:fixed` already, so moving it inside costs nothing visually,
+    // and it is what puts it under BOTH the OS `prefers-reduced-motion`
+    // `.capyui *` rule and the in-game `.capy-calm .capyui *` rule (both
+    // above, this file) instead of under neither.
+    hudRoot.appendChild(el);
     const dx = (w.left + w.width * 0.5) - x0, dy = (w.top + w.height * 0.5) - y0;
     requestAnimationFrame(function () {
       el.classList.add('go');
@@ -43690,8 +43708,74 @@ export function createSystems(game) {
   // 1.15 m is past the body's own contact distance (a 0.10 sphere against
   // the animal's ~0.35 half-width), so the take always lands BEFORE the
   // anchor could be kicked — and it is stripped of collision the same frame.
-  const sysDROP_LIFT = 0.45;
+  const sysDROP_LIFT = 0.9;
   const sysDROP_TOUCH_R = 1.15;
+
+  // THE YUZU, SEEN (L9, V3/V4): the ×1.6 scale and the higher float (above)
+  // are the size fix; this is the CONTRAST fix. Two pooled, additive,
+  // camera-facing meshes — a disc every live drop gets, a vertical shaft the
+  // three sightline-blocked biomes get on top — built the same way
+  // `sparkMesh` already is (~line 12537): MeshBasicMaterial,
+  // toneMapped:false, fog:false, depthWrite:false, AdditiveBlending, an
+  // over-1.0 colour so the bloom pass takes them in every biome including
+  // the two night chapters. One InstancedMesh each, fixed max, unused
+  // instances parked off-screen rather than resized per chapter.
+  const sysDROP_AURA_MAX = 16;            // dropCapFor tops out at 10
+  const sysDROP_AURA_D = 0.9;             // m across, plain yuzu
+  const sysDROP_AURA_GOLD_D = 1.3;        // m across, golden yuzu
+  const sysDROP_AURA_RGB = [1.5, 1.25, 0.45];
+  const sysDROP_AURA_GOLD_RGB = [1.9, 1.6, 0.5];
+  const sysDROP_AURA_HZ = 1.1;            // pulse rate, ~beacon's own (:47344)
+  const sysDROP_SHAFT_RGB = [1.8, 1.5, 0.4];
+  const sysDROP_SHAFT_SPIN = 0.6;         // rad/s, same as beaconShaft
+  const sysDROP_SHAFT_BIOMES = { monaco: true, kowloon: true, hanoi: true };
+  const dropAuraMesh = new THREEx.InstancedMesh(
+    new THREEx.CircleGeometry(0.5, 20),
+    new THREEx.MeshBasicMaterial({ color: 0xffffff, side: THREEx.DoubleSide, transparent: true, opacity: 0.45,
+                                   depthWrite: false, fog: false, toneMapped: false, blending: THREEx.AdditiveBlending }),
+    sysDROP_AURA_MAX);
+  dropAuraMesh.castShadow = false;
+  dropAuraMesh.receiveShadow = false;
+  dropAuraMesh.frustumCulled = false;
+  dropAuraMesh.renderOrder = 4;
+  dropAuraMesh.instanceMatrix.setUsage(THREEx.DynamicDrawUsage);
+  dropAuraMesh.count = sysDROP_AURA_MAX;
+  scene.add(dropAuraMesh);
+  // reused so a stray zero-scale instance never rasterises as a lit pixel
+  const dropAuraM4 = new THREEx.Matrix4(), dropAuraV = new THREEx.Vector3(), dropAuraS = new THREEx.Vector3();
+  const dropAuraParkS = new THREEx.Vector3(0, 0, 0);
+  const dropAuraQId = new THREEx.Quaternion();
+  for (let i = 0; i < sysDROP_AURA_MAX; i++) {
+    dropAuraM4.compose(dropAuraV.set(0, -900, 0), dropAuraQId, dropAuraParkS);
+    dropAuraMesh.setMatrixAt(i, dropAuraM4);
+    dropAuraMesh.setColorAt(i, sysColA.setRGB(sysDROP_AURA_RGB[0], sysDROP_AURA_RGB[1], sysDROP_AURA_RGB[2]));
+  }
+  dropAuraMesh.instanceMatrix.needsUpdate = true;
+  if (dropAuraMesh.instanceColor) dropAuraMesh.instanceColor.needsUpdate = true;
+
+  const dropShaftMesh = new THREEx.InstancedMesh(
+    new THREEx.CylinderGeometry(0.10, 0.26, 3.0, 8, 1, true),
+    new THREEx.MeshBasicMaterial({ color: 0xffffff, side: THREEx.DoubleSide, transparent: true, opacity: 0.4,
+                                   depthWrite: false, fog: false, toneMapped: false, blending: THREEx.AdditiveBlending }),
+    sysDROP_AURA_MAX);
+  dropShaftMesh.castShadow = false;
+  dropShaftMesh.receiveShadow = false;
+  dropShaftMesh.frustumCulled = false;
+  dropShaftMesh.renderOrder = 4;
+  dropShaftMesh.instanceMatrix.setUsage(THREEx.DynamicDrawUsage);
+  dropShaftMesh.count = sysDROP_AURA_MAX;
+  scene.add(dropShaftMesh);
+  const dropShaftM4 = new THREEx.Matrix4(), dropShaftV = new THREEx.Vector3(), dropShaftQ = new THREEx.Quaternion();
+  const dropShaftS = new THREEx.Vector3(1, 1, 1);
+  for (let i = 0; i < sysDROP_AURA_MAX; i++) {
+    dropShaftM4.compose(dropShaftV.set(0, -900, 0), dropAuraQId, dropAuraParkS);
+    dropShaftMesh.setMatrixAt(i, dropShaftM4);
+    dropShaftMesh.setColorAt(i, sysColA.setRGB(sysDROP_SHAFT_RGB[0], sysDROP_SHAFT_RGB[1], sysDROP_SHAFT_RGB[2]));
+  }
+  dropShaftMesh.instanceMatrix.needsUpdate = true;
+  if (dropShaftMesh.instanceColor) dropShaftMesh.instanceColor.needsUpdate = true;
+  let dropAuraCount = 0, dropShaftCount = 0;
+
   const sysDROP_BATH_COOL = 600000;  // ms (Date.now()) — 10 min, same chapter
   const sysDROP_BATH_QUIET = 120;    // s of this VISIT before a bath may roll
   const sysGULL_PROOF_T = 75;        // s — see capy.gullProof, capybara.js
@@ -43937,6 +44021,13 @@ export function createSystems(game) {
     const biome = (game.biome && game.biome.current) || 'sydney';
     if (biome !== dropBiome) dropReset(biome);
     dropArriveT += dt;
+    dropAuraCount = 0;
+    dropShaftCount = 0;
+    const dropShaftHere = !!sysDROP_SHAFT_BIOMES[biome];
+    // shared pulse for every live aura this frame — 0.35..0.55, ~1.1 Hz
+    const dropAuraAlpha = 0.45 + Math.sin(game.state.time * sysDROP_AURA_HZ * 6.2832) * 0.10;
+    dropAuraMesh.material.opacity = dropAuraAlpha;
+    const dropShaftYaw = game.state.time * sysDROP_SHAFT_SPIN;
     for (let i = dropLive.length - 1; i >= 0; i--) {
       const d = dropLive[i];
       const p = d.prop;
@@ -43989,6 +44080,34 @@ export function createSystems(game) {
                             b.position.y + sysDROP_LIFT + Math.sin(d.presT) * (golden ? 0.07 : 0.05),
                             b.position.z);
         p.mesh.quaternion.setFromAxisAngle(sysYzUp, d.presYaw);
+        // THE AURA (L9, V3): one billboard disc per live drop, camera-facing,
+        // pooled — position it here, right where the float/bob/spin above
+        // already computed this frame's mesh position, so it can never drift
+        // a frame behind the fruit it marks.
+        if (dropAuraCount < sysDROP_AURA_MAX) {
+          const gd = golden ? sysDROP_AURA_GOLD_D : sysDROP_AURA_D;
+          dropAuraM4.compose(p.mesh.position, camera.quaternion, dropAuraS.set(gd, gd, gd));
+          dropAuraMesh.setMatrixAt(dropAuraCount, dropAuraM4);
+          dropAuraMesh.setColorAt(dropAuraCount, golden
+            ? sysColA.setRGB(sysDROP_AURA_GOLD_RGB[0], sysDROP_AURA_GOLD_RGB[1], sysDROP_AURA_GOLD_RGB[2])
+            : sysColA.setRGB(sysDROP_AURA_RGB[0], sysDROP_AURA_RGB[1], sysDROP_AURA_RGB[2]));
+          dropAuraCount++;
+        }
+        // THE SHAFT (L9, V4): only where a ground-level marker gets hidden by
+        // the terrain itself — Monaco's terraces, Kowloon's towers, Hanoi's
+        // traffic — reusing beaconShaft's own geometry and spin verbatim.
+        if (dropShaftHere && dropShaftCount < sysDROP_AURA_MAX) {
+          // based on the ground under the anchor, same convention as
+          // beaconShaft (position.y = sysHINT_Y, half its own height) — not
+          // centred on the floating mesh, so the beam actually rises FROM
+          // the ground through the fruit rather than hovering around it.
+          const gy = sysGroundY(b.position.x, b.position.z);
+          dropShaftV.set(b.position.x, gy + 1.5, b.position.z);
+          dropShaftQ.setFromAxisAngle(sysYzUp, dropShaftYaw);
+          dropShaftM4.compose(dropShaftV, dropShaftQ, dropShaftS);
+          dropShaftMesh.setMatrixAt(dropShaftCount, dropShaftM4);
+          dropShaftCount++;
+        }
         const cp = game.capy && game.capy.position;
         if (cp) {
           const dx = b.position.x - cp.x, dz = b.position.z - cp.z;
@@ -44000,8 +44119,11 @@ export function createSystems(game) {
             dropCollect(p);
             continue;   // dropTake has already spliced this record out
           }
-          if (dist2 < 64) {   // 8 m notice radius
-            const near = 1 - Math.sqrt(dist2) / 8;      // 0 far .. 1 at the fruit
+          if (dist2 < 400) {   // 20 m notice radius (was 8 m) — the aura now
+                                // carries the far read, so the spark channel
+                                // can fire from where the player is actually
+                                // looking rather than the last 8 m of it.
+            const near = 1 - Math.sqrt(dist2) / 20;      // 0 far .. 1 at the fruit
             d.sparkT = (d.sparkT || 0) - dt;
             if (d.sparkT <= 0) {
               d.sparkT = Math.max(0.12, (golden ? 0.5 : 0.9) - near * (golden ? 0.32 : 0.5));
@@ -44107,6 +44229,20 @@ export function createSystems(game) {
       d.despawnT -= dt;
       if (d.despawnT <= 0) { dropRemove(d); dropLive.splice(i, 1); }
     }
+    // park every instance this tick didn't claim — scale 0 is not enough on
+    // its own (a degenerate matrix can still rasterise a stray pixel on some
+    // GPUs), so it also moves off to y = -900.
+    for (let i = dropAuraCount; i < sysDROP_AURA_MAX; i++) {
+      dropAuraM4.compose(dropAuraV.set(0, -900, 0), dropAuraQId, dropAuraParkS);
+      dropAuraMesh.setMatrixAt(i, dropAuraM4);
+    }
+    dropAuraMesh.instanceMatrix.needsUpdate = true;
+    if (dropAuraMesh.instanceColor) dropAuraMesh.instanceColor.needsUpdate = true;
+    for (let i = dropShaftCount; i < sysDROP_AURA_MAX; i++) {
+      dropShaftM4.compose(dropShaftV.set(0, -900, 0), dropAuraQId, dropAuraParkS);
+      dropShaftMesh.setMatrixAt(i, dropShaftM4);
+    }
+    dropShaftMesh.instanceMatrix.needsUpdate = true;
     const cap = (game.capy && game.capy.dropCap) || 2;
     if (dropLive.length < cap) {
       // qaForceDropT (l8-drops.js): forces the refill period short so a
@@ -44200,6 +44336,7 @@ export function createSystems(game) {
   const sysCHAOS_STAMPEDE_T = 6;      // s the calm-inversion bypass holds open
   const sysCHAOS_SQUALL_HOLD = 8;     // s `hud.front` is pinned at the line
   const sysCHAOS_GUST_V = 4.5;        // m/s handed to capy.shove — see chaosFireGust
+  const sysCHAOS_RUNAWAY_T = 75;      // s a spawned runaway prop is allowed to stay loose — F4 fixup's own despawn window, same order of magnitude
   const sysCHAOS_KINDS = ['gust', 'thief', 'stampede', 'squall', 'runaway'];
   // ---- THE TABLE, READ HONESTLY OFF WHAT EACH CHAPTER ACTUALLY HAS --------
   // `gust`: true only where `sysIMPULSE_BY` (systems.js:73) already carries a
@@ -44247,8 +44384,38 @@ export function createSystems(game) {
   let chaosLastKind = null;    // never the same kind twice running
   let chaosStampedeT = 0;      // s left of the forced calm-inversion bypass — read by THE CALM block
   let chaosSquallReleaseT = 0; // s until a forced front is handed back to the weather's own roll
+  // THE RUNAWAY LEAK (LIFT9, C1). `chaosFireRunaway` spawns a solid physics
+  // prop through `spawnProp` and, unlike every other chaos kind, never wrote
+  // down what it made — a `ball`/`cone` per incident, forever, in the one
+  // kind that is live in every chapter (`runaway: true`, all 19 rows above).
+  // `chaosLoose` is the exact same list-plus-timestamp shape `dropLive`
+  // already uses for the identical leak class (sysDrops, this file): one
+  // record per spawned prop with the sim clock it was born at, walked every
+  // tick below and despawned once it has been loose longer than
+  // `sysCHAOS_RUNAWAY_T`.
+  let chaosLoose = [];
 
   function chaosReset(biome) {
+    // Biomes share one coordinate space (physCrowded's own doc comment, and
+    // dropReset's identical fix above for the same leak class) — a runaway
+    // abandoned here without being removed sits exactly where it was in
+    // every chapter entered afterwards, for as long as the session runs.
+    for (let i = 0; i < chaosLoose.length; i++) {
+      const p = chaosLoose[i].prop;
+      if (p && !p.removed && game.physics && typeof game.physics.removeProp === 'function') game.physics.removeProp(p);
+    }
+    chaosLoose.length = 0;
+    // THE TIMERS LEAK TOO (LIFT9, C2). A squall or stampede mid-flight when
+    // the player leaves does not belong to the next chapter: a squall in
+    // its hold window handed `hud.front` a forced value that must be given
+    // back to the weather's own roll NOW, same as the natural release at
+    // sysChaosTick's own `:hud.front(-2)` below, rather than firing 0-8 s
+    // late in whatever chapter comes next; a stampede's calm-inversion
+    // bypass (THE CALM block, above) simply stops rather than running
+    // abroad.
+    if (chaosSquallReleaseT > 0 && game.hud && typeof game.hud.front === 'function') game.hud.front(-2);
+    chaosStampedeT = 0;
+    chaosSquallReleaseT = 0;
     chaosBiome = biome;
     chaosArriveT = 0;
     chaosT = rand(sysCHAOS_PERIOD_MIN, sysCHAOS_PERIOD_MAX);
@@ -44347,6 +44514,7 @@ export function createSystems(game) {
       prop.body.velocity.x = dx / d * spd;
       prop.body.velocity.z = dz / d * spd;
     }
+    chaosLoose.push({ prop: prop, t: game.state.time });
     toast('something got loose.', 'note');
     return true;
   }
@@ -44379,6 +44547,20 @@ export function createSystems(game) {
     if (chaosSquallReleaseT > 0) {
       chaosSquallReleaseT -= dt;
       if (chaosSquallReleaseT <= 0 && game.hud && typeof game.hud.front === 'function') game.hud.front(-2);
+    }
+    // THE RUNAWAY LEAK'S DESPAWN (LIFT9, C1) — same walk-and-splice shape
+    // sysDropsTick uses for dropLive, right beside it in spirit if not in
+    // file position: an entry already gone (caught, flashed away by
+    // something else) is dropped from the bookkeeping without a second
+    // removeProp call; one still loose past its window is actually removed.
+    for (let i = chaosLoose.length - 1; i >= 0; i--) {
+      const rec = chaosLoose[i];
+      const p = rec.prop;
+      if (!p || p.removed) { chaosLoose.splice(i, 1); continue; }
+      if (game.state.time - rec.t >= sysCHAOS_RUNAWAY_T) {
+        if (game.physics && typeof game.physics.removeProp === 'function') game.physics.removeProp(p);
+        chaosLoose.splice(i, 1);
+      }
     }
     // qaForceChaosT (l8-chaos.js): forces the period short, following
     // qaForceDropT's own naming (F4, above).
@@ -44416,8 +44598,12 @@ export function createSystems(game) {
   game.state.qaChaosLog = null;   // set to [] by a probe that wants the fired-kind log
   game.state.qaChaos = function () {
     return { biome: chaosBiome, arriveT: chaosArriveT, t: chaosT, last: chaosLastKind,
-             stampedeT: chaosStampedeT, squallT: chaosSquallReleaseT };
+             stampedeT: chaosStampedeT, squallT: chaosSquallReleaseT, loose: chaosLoose.length };
   };
+  // A probe forcing several runaways in a row wants the raw list, not just a
+  // count — spawn times included, so it can also check the despawn window
+  // rather than only the leak.
+  game.state.qaChaosLoose = function () { return chaosLoose; };
 
   game.events.on('npc:startled', function (p) {
     // A gasp from behind you is one of the funniest things this game does and

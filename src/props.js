@@ -1039,13 +1039,13 @@ function physBuildTowel(g) {
 // passes through it. The mesh is built around its own origin rather than
 // resting on y=0 so the float and the spin read about the fruit's centre.
 function physBuildYuzu(g) {
-  physAdd(g, physSphG(0.19), PALETTE.yuzu, 0, 0, 0);
-  physAdd(g, physBoxG(0.034, 0.10, 0.034), PALETTE.yuzuLeaf, 0.05, 0.19, 0, 0, 0, 0.5);
+  physAdd(g, physSphG(0.30), PALETTE.yuzu, 0, 0, 0);
+  physAdd(g, physBoxG(0.034, 0.10, 0.034), PALETTE.yuzuLeaf, 0.08, 0.30, 0, 0, 0, 0.5);
 }
 function physBuildYuzuGold(g) {
-  physAdd(g, physSphG(0.23), PALETTE.yuzuGold, 0, 0, 0);
-  physAdd(g, physSphG(0.233), PALETTE.yuzuGoldDk, 0, 0, 0).scale.set(1, 0.94, 1);
-  physAdd(g, physBoxG(0.04, 0.12, 0.04), PALETTE.yuzuLeaf, 0.06, 0.23, 0, 0, 0, 0.5);
+  physAdd(g, physSphG(0.34), PALETTE.yuzuGold, 0, 0, 0);
+  physAdd(g, physSphG(0.345), PALETTE.yuzuGoldDk, 0, 0, 0).scale.set(1, 0.94, 1);
+  physAdd(g, physBoxG(0.04, 0.12, 0.04), PALETTE.yuzuLeaf, 0.09, 0.34, 0, 0, 0, 0.5);
 }
 // THE GENERIC FOOD ROLL (L8, F4): a chapter with no edible of its own in
 // `physBIOME_SCATTER` (iceland, sahara, drift, venice, palawan, goreme,
