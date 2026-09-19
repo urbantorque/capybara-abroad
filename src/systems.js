@@ -3086,6 +3086,7 @@ const sysREFLECT = {
   cali:     { y: -1.5, k: 1.0, lift: 0.08, box: [-210, -9, 210, 9] },      // the Río Cali (caliRIVER_Y; ripple amp 0.10)
   kowloon:  { y: 0.01, k: 1.0, lift: 0.05, box: [-6.5, -44, 6.5, 62] },    // NOT a sea: the wet carriageway (hkBuildStreet's road plane; the material's own k is 0.55, blur 4)
   antarctic: { y: -0.6, k: 1.0, lift: 0.08, box: [-212, -512, 212, 122] }, // the sea between the floes (antWATER, a constant; swell amp 0.23, FrontSide)
+  cave:     { y: -7.4, k: 1.0, lift: 0.05, box: [-38, -96, -2, 44] },       // the river under the shaft (cavWATER; the sheet is flat, the drifting term carries the wobble)
 };
 const sysLENS = {
   //             wide  splitW splitC
@@ -3138,7 +3139,8 @@ for (const k in sysLENS) {
 //   src   'sun'                     the chapter's star, at sysAxDir (skySunMesh)
 //         function(game) -> {x,y,z} a named emitter the chapter publishes
 //         { spill: {x, z} }         the sysSpillScan cluster nearest that xz
-//         { spill: 'near' }         the nearest in-frame sysSpillScan cluster
+//         { spill: 'near' }         the in-frame sysSpillScan cluster the frame is
+//                                   about: strength / (0.15 + ndc^2), highest
 //         [a, b, ...]               candidates in order; the first one whose
 //                                   projection is inside the frame wins
 //
@@ -3163,7 +3165,13 @@ const sysRAYS = {
   // noon, 61 degrees up: off the frame at the walking lens by construction,
   // present the moment the lens is pitched at the sky (a helm, the postcard)
   sahara:  { k: 0.45, len: 0.50, r: 0.14, src: 'sun' },
-  kowloon: { k: 0.42, len: 0.42, r: 0.12, src: function (g) { return g.kowloon && g.kowloon.sign || null; } },
+  // the big one (hkSIGN, published as kowloon.sign) is 9.2 m up and 41 m out
+  // at arrival: 12.5 degrees of elevation against a walking lens whose top
+  // edge is +7 (measured: it reaches the margin band at one yaw, live 0.055,
+  // with its seed off the frame). So, as Goreme: the big one when the lens
+  // has it, else the nearest lit cluster in frame — a street of signs always
+  // has one.
+  kowloon: { k: 0.30, len: 0.42, r: 0.12, src: [function (g) { return g.kowloon && g.kowloon.sign || null; }, { spill: 'near' }] },
   iceland: { k: 0.50, len: 0.36, r: 0.10, src: { spill: 'near' } },
   monaco:  { k: 0.48, len: 0.40, r: 0.12, src: function (g) {
     return g.monaco && g.monaco.casino ? { spill: { x: g.monaco.casino.x, z: g.monaco.casino.z } } : null;
@@ -3199,15 +3207,24 @@ function sysRaysSource(src, game, camera) {
   if (src.spill) {
     let best = null, bd = Infinity;
     if (src.spill === 'near') {
-      // the nearest cluster whose projection is inside the frame's margin
+      // THE CLUSTER THE FRAME IS ABOUT, not the nearest and not the biggest.
+      // Nearest picked a window bank in Kowloon's top-left corner over the
+      // pink sign in the middle of the street (0.16 % of the frame moved);
+      // strength x reach / distance picked the same bank (score 1.32 against
+      // the sign's 0.28 — a lone saturated tube has a small reach and a
+      // small k, bulk wins). What a frame is about is what sits in its
+      // middle: strength over centrality, in front of the lens and inside
+      // the margin.
       const m = 1 + sysRAYS_MARGIN;
+      bd = -Infinity;
       for (let i = 0; i < sysSplFound.length; i++) {
         const f = sysSplFound[i];
+        sysRaysQ.set(f.x, f.y, f.z).applyMatrix4(camera.matrixWorldInverse);
+        if (sysRaysQ.z > -0.5) continue;
         sysRaysQ.set(f.x, f.y, f.z).project(camera);
-        if (sysRaysQ.z >= 1 || sysRaysQ.z <= -1 || Math.abs(sysRaysQ.x) > m || Math.abs(sysRaysQ.y) > m) continue;
-        const dx = f.x - camera.position.x, dy = f.y - camera.position.y, dz = f.z - camera.position.z;
-        const d2 = dx * dx + dy * dy + dz * dz;
-        if (d2 < bd) { bd = d2; best = f; }
+        if (Math.abs(sysRaysQ.x) > m || Math.abs(sysRaysQ.y) > m) continue;
+        const sc = (f.cr + f.cg + f.cb) / (0.15 + sysRaysQ.x * sysRaysQ.x + sysRaysQ.y * sysRaysQ.y);
+        if (sc > bd) { bd = sc; best = f; }
       }
     } else {
       const ax = src.spill.x, az = src.spill.z;
@@ -11938,6 +11955,26 @@ export function createSystems(game) {
     }
     bounceTick(sysBncOut, N);
   }
+  /** The rays row's view of the spill scan (ROADMAP-WOW A4), for a probe:
+   *  every cluster, its projection, and the 'near' score. */
+  game.raysAudit = function () {
+    const m = 1 + sysRAYS_MARGIN, rows = [];
+    for (let i = 0; i < sysSplFound.length; i++) {
+      const f = sysSplFound[i];
+      sysRaysQ.set(f.x, f.y, f.z).applyMatrix4(camera.matrixWorldInverse);
+      const front = sysRaysQ.z < -0.5;
+      sysRaysQ.set(f.x, f.y, f.z).project(camera);
+      const dx = f.x - camera.position.x, dy = f.y - camera.position.y, dz = f.z - camera.position.z;
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const nd2 = sysRaysQ.x * sysRaysQ.x + sysRaysQ.y * sysRaysQ.y;
+      rows.push({ at: [+f.x.toFixed(1), +f.y.toFixed(1), +f.z.toFixed(1)], r: +f.r.toFixed(1),
+                  c: [+f.cr.toFixed(3), +f.cg.toFixed(3), +f.cb.toFixed(3)], d: +d.toFixed(1),
+                  ndc: front ? [+sysRaysQ.x.toFixed(2), +sysRaysQ.y.toFixed(2)] : null,
+                  inFrame: front && Math.abs(sysRaysQ.x) <= m && Math.abs(sysRaysQ.y) <= m,
+                  score: front ? +((f.cr + f.cg + f.cb) / (0.15 + nd2)).toFixed(3) : 0 });
+    }
+    return { biome: game.biome && game.biome.current, live: game.state.raysLive, at: game.state.raysAt, clusters: rows };
+  };
   /** What the bounce found and what it is doing, for a probe. */
   game.bounceAudit = function () {
     return { biome: game.biome && game.biome.current, found: sysBncFound.length,
