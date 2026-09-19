@@ -196,21 +196,24 @@ async page => {
       // parent of the wheel meshes' shared geometry: name it from here.
       rec.take = await page.evaluate(() => window.__capy.hanoi.cubDebug({ take: true }))
       await page.waitForTimeout(800)
-      await page.keyboard.down('KeyW')
-      await page.waitForTimeout(2200)
       const C = (a) => { const o = window.__capy.scene.getObjectByName('hanCub'); return o ? window.__art.objShot(o, a[0], a[1], a[2], a[3], a[4]) : '' }
       const Wh = () => { const o = window.__capy.scene.getObjectByName('hanCub'); if (!o) return null; const w = o.children.filter(c => c.rotation.order === 'YXZ'); return { n: w.length, f: +w[0].rotation.x.toFixed(3), r: +w[1].rotation.x.toFixed(3), fy: +w[0].rotation.y.toFixed(3) } }
+      // the bars over first, while she is still by the stall (three seconds
+      // of W puts her into the shophouses, which is where the first cut of
+      // this shot was taken from — inside a wall)
+      await page.keyboard.down('KeyA')
+      await page.keyboard.down('KeyW')
+      await page.waitForTimeout(900)
+      await shot('MOV2-hanoi-3', C, [-4.5, 1.5, 2.6, 0.5, 32])     // from ahead: the front wheel turned with the bars
+      rec.steer = await page.evaluate(Wh)
+      await page.keyboard.up('KeyA')
+      await page.waitForTimeout(1200)
       const w0 = await page.evaluate(Wh)
       await shot('MOV2-hanoi-1', C, [0.6, 4.2, 0.9, 0.5, 30])
       await page.waitForTimeout(300)
       await shot('MOV2-hanoi-2', C, [0.6, 4.2, 0.9, 0.5, 30])
       const w1 = await page.evaluate(Wh)
       rec.wheels = { w0, w1, cub: await page.evaluate(() => { const c = window.__capy.hanoi.cub(); return { on: c.on, v: +c.v.toFixed(2) } }) }
-      await page.keyboard.down('KeyA')
-      await page.waitForTimeout(700)
-      await shot('MOV2-hanoi-3', C, [-4.5, 1.5, 2.6, 0.5, 32])     // from ahead: the front wheel turned with the bars
-      rec.steer = await page.evaluate(Wh)
-      await page.keyboard.up('KeyA')
       await shot('MOV2-hanoi-4', C, [5.0, 2.5, 2.4, 0.7, 34])      // the play angle, behind-above
       await page.keyboard.up('KeyW')
     }

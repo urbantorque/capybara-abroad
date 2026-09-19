@@ -287,6 +287,7 @@ const hanCUB_COLD  = 150;       // s the pho takes to go cold — the timer, not
 // the three drops, each at a road's edge: x, z, name
 const hanDROPS = [[60, 22.5, 'the bia hoi corner'], [-52, 83.5, 'the market'], [40, -24.5, 'the water puppets']];
 let hanCubG = null, hanCubBowls = null, hanCubOn = false, hanCubCool = 0;
+let hanCubWheels = null;          // [front, rear], spun by the road (ROADMAP-WOW Part C)
 let hanCubX = hanCUB.x, hanCubZ = hanCUB.z, hanCubYaw = hanCUB.yaw, hanCubV = 0, hanCubLean = 0;
 let hanCubNext = 0, hanCubDone = false, hanCubT = 0, hanCubHold = -1, hanCubHornT = 0, hanCubKerbT = 0;
 let hanCubMover = null, hanDropMeshes = null, hanDropMats = null, hanDropT = 0, hanCubBest = 0;
@@ -2379,9 +2380,10 @@ function hanBuildCub(game, root) {
   const g = new THREE.Group();
   const K = hanMerger();
   const body = PALETTE.hanLantern, chrome = PALETTE.hanChrome;
-  K.cyl(0, 0.30, 0.62, 0.30, 0.12, PALETTE.hanTyre, 0, 0, Math.PI / 2, 8);
-  K.cyl(0, 0.30, -0.60, 0.30, 0.12, PALETTE.hanTyre, 0, 0, Math.PI / 2, 8);
+  // the wheels are their own meshes now — see below the merge
   K.box(0, 0.40, 0, 0.26, 0.26, 1.30, body);
+  K.box(0, 0.46, 0.60, 0.06, 0.30, 0.06, chrome, 0.35, 0, 0);          // the fork
+  K.box(0, 0.44, -0.58, 0.06, 0.20, 0.06, chrome);                     // the swingarm
   K.box(0, 0.62, -0.34, 0.34, 0.20, 0.62, PALETTE.hanSeat);
   K.box(0, 0.60, 0.30, 0.30, 0.34, 0.34, body);
   K.box(0, 0.88, 0.46, 0.62, 0.06, 0.08, chrome);
@@ -2391,6 +2393,31 @@ function hanBuildCub(game, root) {
   const m = new THREE.Mesh(K.build(), hanVC());
   m.castShadow = true; m.receiveShadow = true;
   g.add(m);
+  // ---- THE WHEELS TURN (ROADMAP-WOW Part C, the movers uplift) -----------
+  // Two cylinders baked into the body: the pho run's whole vehicle slid down
+  // the alley as one block. Two meshes on one shared geometry, spun about X
+  // by the signed distance rolled (hanCubV * dt over the 0.30 m radius — she
+  // backs up, and v carries the sign) in hanUpdateCub; the FRONT one also
+  // yaws with the bars ('YXZ', so the steer is applied outside the spin). A
+  // chrome hub and a lug on the rim so the turn reads at the play distance.
+  // The two hundred and forty traffic scooters are six instanced merges and
+  // stay as they are — a wheel per instance is not wanted (ROADMAP-WOW).
+  {
+    const W = hanMerger();
+    W.cyl(0, 0, 0, 0.30, 0.12, PALETTE.hanTyre, 0, 0, Math.PI / 2, 8);
+    W.cyl(0, 0, 0, 0.13, 0.14, chrome, 0, 0, Math.PI / 2, 6);
+    W.box(0, 0.22, 0, 0.14, 0.08, 0.07, chrome);                        // the lug
+    const wg = W.build();
+    hanCubWheels = [];
+    for (let k = 0; k < 2; k++) {
+      const wm = new THREE.Mesh(wg, hanVC());
+      wm.position.set(0, 0.30, k === 0 ? 0.62 : -0.60);
+      wm.rotation.order = 'YXZ';
+      wm.castShadow = true;
+      g.add(wm);
+      hanCubWheels.push(wm);
+    }
+  }
   // three bowls on the rack, stacked; one comes off per delivery
   hanCubBowls = [];
   for (let i = 0; i < 3; i++) {
@@ -2405,6 +2432,7 @@ function hanBuildCub(game, root) {
   g.position.set(hanCubX, hanGROUND, hanCubZ);
   g.rotation.y = hanCubYaw;
   root.add(g);
+  g.name = 'hanCub';   // the probes find it by name (qa/wow-movers2.js)
   hanCubG = g;
   // the lanterns: a pole, a red lantern, a ring on the road
   hanDropMeshes = []; hanDropMats = [];
@@ -2636,6 +2664,12 @@ function hanUpdateCub(game, dt) {
   hanCubLean = damp(hanCubLean, -steer * auth * 0.22, 6, dt);
   hanCubG.position.set(hanCubX, hanGROUND, hanCubZ);
   hanCubG.rotation.set(0, hanCubYaw, hanCubLean);
+  // the wheels roll with the road, and the front one turns with the bars
+  if (hanCubWheels) {
+    const dth = hanCubV * dt / 0.30;
+    hanCubWheels[0].rotation.x += dth; hanCubWheels[1].rotation.x += dth;
+    hanCubWheels[0].rotation.y = damp(hanCubWheels[0].rotation.y, -steer * 0.38, 10, dt);
+  }
   if (capy && capy.body) {
     const cb = capy.body;
     cb.position.set(hanCubX - Math.sin(hanCubYaw) * 0.3, hanGROUND + 1.42, hanCubZ - Math.cos(hanCubYaw) * 0.3);
