@@ -1,9 +1,8 @@
 async page => {
   // Part D: pinned own-camera looks at named places after a real title-card
   // arrival. Edit KEY/LOOKS between runs.
-  const KEY = 'Slash'
-  const LOOKS = [{ n: 'hanoi-tower', p: [-52, 6, -70], t: [-8, 7, -58] },
-                 { n: 'hanoi-tower-close', p: [-26, 5, -66], t: [-8, 7, -58] }]
+  const KEY = 'Semicolon'
+  const LOOKS = [{ n: 'pantanal-gate', p: [-13, 4.6, 70], t: [3, 1.5, 76.5] }]
   await page.setViewportSize({ width: 1280, height: 760 })
   await page.evaluate(() => { try { localStorage.clear() } catch (e) {} })
   await page.reload()

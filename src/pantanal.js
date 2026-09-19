@@ -1386,6 +1386,22 @@ function panBuildRoad(game, root) {
       for (let s = -1; s <= 1; s += 2) {
         M.box(cx + s * panROAD_W, panROAD_Y + 0.62, zc, 0.16, 0.16, SEG, PALETTE.panPost);
         M.box(cx + s * panROAD_W, panROAD_Y + 0.3, zc - 1.4, 0.14, 0.7, 0.14, PALETTE.panPost);
+        // ROADMAP-WOW Part C (Heroes): a post every TWO metres, not four —
+        // one post a bay is a kerb with a stick in it; at two the rail reads
+        // as a rail from the campo. And THE PILES: a bridge is a deck on
+        // something, and from the water or the bank these had nothing under
+        // them. Two hardwood piles a bay from the bed to the stringers, one
+        // cross-brace between them, panTrunk against the panPost stringers.
+        M.box(cx + s * panROAD_W, panROAD_Y + 0.3, zc + 0.6, 0.14, 0.7, 0.14, PALETTE.panPost);
+        const pb = panBedH(cx + s * (panROAD_W - 0.5), zc);
+        const ptop = panROAD_Y - 0.14;
+        M.cyl(cx + s * (panROAD_W - 0.5), (pb + ptop) * 0.5, zc, 0.15, ptop - pb, PALETTE.panTrunk, 0, 0, 0, 4);
+      }
+      {
+        const bl = panBedH(cx - (panROAD_W - 0.5), zc), br = panBedH(cx + (panROAD_W - 0.5), zc);
+        const yb = Math.max(bl, br) + 0.3, yt = panROAD_Y - 0.3, span = (panROAD_W - 0.5) * 2;
+        M.box(cx, (yb + yt) * 0.5, zc, Math.hypot(span, yt - yb), 0.10, 0.10, PALETTE.panTrunk,
+              0, 0, Math.atan2(yt - yb, span));
       }
       panStaticBox(game, cx, panROAD_Y - 0.15, zc, panROAD_W * 2, 0.3, SEG);
     } else {
@@ -1461,6 +1477,36 @@ function panBuildRoad(game, root) {
                      panROAD_W * 2 + 1.6, 1.0, SEG * 3);
       }
     }
+  }
+  // ---- THE BRIDGE HEADS (ROADMAP-WOW Part C, Heroes) ------------------------
+  // Every Transpantaneira bridge starts and ends with a pair of heavy posts
+  // where the timber meets the dirt — the thing that tells a driver at night
+  // where the deck begins. Taller than the rail by a metre, panTrunk, one
+  // pooled body for all twenty. And the ONE ASYMMETRY per bridge: a spare
+  // baulk leaning on the rail at the north end of every bridge that has all
+  // its planks — the one that is missing one has no spare, which is the joke
+  // the peao has been making since February.
+  {
+    const bh = panPoolBody(game);
+    for (let i = 0; i < panBRIDGES.length; i++) {
+      const b = panBRIDGES[i];
+      for (let e = -1; e <= 1; e += 2) {
+        const z = b.z + e * (b.len * 0.5 + 0.3), cx = panRoadX(z);
+        for (let s = -1; s <= 1; s += 2) {
+          const px = cx + s * (panROAD_W + 0.05);
+          M.cyl(px, panROAD_Y + 0.75, z, 0.17, 2.3, PALETTE.panTrunk, 0, 0, 0, 5);
+          M.box(px, panROAD_Y + 1.92, z, 0.42, 0.10, 0.42, PALETTE.panPost);
+          panPoolBox(bh, px, panROAD_Y + 0.75, z, 0.18, 1.15, 0.18);
+        }
+      }
+      if (b.gap === 0) {
+        const z = b.z + b.len * 0.5 - 1.2, cx = panRoadX(z);
+        // one end on the deck, the other on the rail: pitched about x
+        M.box(cx - panROAD_W + 0.45, panROAD_Y + 0.38, z, 0.26, 0.07, 2.6,
+              PALETTE.panPlank, 0.27, 0.22, 0);
+      }
+    }
+    panPoolDone(game, bh);
   }
   // ---- THE MARKER POSTS ---------------------------------------------------
   // The Transpantaneira is 147 km long and every kilometre of it has a post
@@ -1551,7 +1597,11 @@ function panBuildFazenda(game, root) {
     const ph = panBedH(px, pz);
     M.cyl(px, ph + 0.8, pz, 0.11, 1.6, PALETTE.panPost, 0, 0, 0, 4);
     panPoolBox(bF, px, ph + 0.8, pz, 0.16, 0.8, 0.16);
-    if (i % 2 === 0 && i !== 10) {
+    // ROADMAP-WOW Part C (Heroes): rails in EVERY bay, not every other one.
+    // Half the ring had two rails and half had none, which from the road read
+    // as posts with the fence missing — a pen eleven nelore could walk out
+    // of. The only bays without rails are the two either side of the gate.
+    if (i !== 10 && i !== 11) {
       const a2 = ((i + 1) / 22) * Math.PI * 2;
       const qx = CORX + Math.cos(a2) * CORR, qz = CORZ + Math.sin(a2) * CORR;
       const len = Math.hypot(qx - px, qz - pz), ry = Math.atan2(qx - px, qz - pz);
@@ -1568,6 +1618,34 @@ function panBuildFazenda(game, root) {
     const ph = panBedH(px, pz);
     M.cyl(px, ph + 1.25, pz, 0.16, 2.5, PALETTE.panTrunk, 0, 0, 0, 6);
     panPoolBox(bF, px, ph + 1.25, pz, 0.2, 1.25, 0.2);
+  }
+  // ROADMAP-WOW Part C (Heroes): THE PORTEIRA. Two tall posts were a gap
+  // you could see; a gate is a lintel across them and a leaf hung off one of
+  // them — a stile, three rails and the diagonal every ranch gate has — and
+  // it stands OPEN, swung INTO the pen off the north post, the way the peao
+  // left it after the count (the road is a metre from the posts, so an
+  // outward leaf would lie across the shoulder the animal walks). That is
+  // the pen's one asymmetry; nothing hangs off the other post. No collider
+  // on the leaf: the nelore are not bodies and neither is a gate you walk by.
+  {
+    const aG = (11 / 22) * Math.PI * 2;
+    const gx = CORX + Math.cos(aG) * CORR, gz = CORZ + Math.sin(aG) * CORR;
+    const gh = panBedH(gx, gz);
+    // the lintel, along the ring's tangent at the gate
+    const tYaw = Math.atan2(-Math.sin(aG), Math.cos(aG));   // tangent (−sin a, cos a) as a yaw
+    M.box(gx, gh + 2.55, gz, 0.18, 0.16, CORR * 2 * Math.PI * (1.1 / 22) + 0.6, PALETTE.panTrunk, 0, tYaw, 0);
+    // the leaf: hinged on the post at +0.55, swung 70 degrees inward
+    const aH = ((11 + 0.55) / 22) * Math.PI * 2;
+    const hx = CORX + Math.cos(aH) * CORR, hz = CORZ + Math.sin(aH) * CORR;
+    const gap = CORR * 2 * Math.PI * (1.1 / 22) - 0.3;     // the leaf's length
+    const leafYaw = tYaw + (Math.PI + 1.22);                 // 70 degrees off the closed line, inward
+    const dx = Math.sin(leafYaw), dz = Math.cos(leafYaw);
+    const mx = hx + dx * gap * 0.5, mz = hz + dz * gap * 0.5;
+    for (let r = 0; r < 3; r++) {
+      M.box(mx, gh + 0.55 + r * 0.55, mz, 0.08, 0.12, gap, PALETTE.panFence, 0, leafYaw, 0);
+    }
+    M.box(hx + dx * (gap - 0.1), gh + 0.95, hz + dz * (gap - 0.1), 0.10, 1.5, 0.12, PALETTE.panFence, 0, leafYaw, 0);
+    M.box(mx, gh + 0.95, mz, 0.07, 0.10, Math.hypot(gap, 1.1), PALETTE.panFence, Math.atan2(1.1, gap), leafYaw, 0);
   }
   // the mango tree everything on this farm sits under
   {
