@@ -1244,6 +1244,18 @@ function sahBuildSquare(game, root) {
     // a number — there are a hundred of them and they are licensed
     M.box(x - 1.5, 2.30, z - 1.6, 0.7, 0.44, 0.06, PALETTE.sahTileWhite);
     M.box(x - 1.5, 2.30, z - 1.62, 0.28, 0.26, 0.02, tc);
+    // ---- THE GROUND IN FRONT OF IT (ROADMAP-WOW Part D) --------------------
+    // The W0 arrival frame (qa/WOW-sahara-hero-arrive.png): fourteen stalls
+    // standing on a plane with nothing between their legs and the sand. Every
+    // pitch on that square puts a rug down where the customers stand and
+    // stacks its crates at the end of the trestle — the two things that make
+    // a stall a PLACE rather than a table. Both flat, both in the merger, no
+    // draw call; a rug is two boxes and the crates are two.
+    const zr = z + (z > 4 ? -3.0 : 3.0);          // the rug, out front
+    M.box(x + 0.3, 0.025, zr, 2.4, 0.05, 1.5, i % 2 ? PALETTE.sahRug1 : PALETTE.sahDye4);
+    M.box(x + 0.3, 0.05, zr, 1.7, 0.03, 0.9, i % 2 ? PALETTE.sahRug2 : PALETTE.sahRug1);
+    M.box(x + 2.25, 0.34, z - 0.5, 0.66, 0.68, 0.66, PALETTE.sahCedar, 0, 0.35 + i * 0.5, 0);
+    M.box(x + 2.25, 0.95, z - 0.5, 0.58, 0.54, 0.58, PALETTE.sahCedarDk, 0, 0.9 + i * 0.5, 0);
     // ---- AND A LAMP UNDER EVERY ONE ---------------------------------------
     // The chapter ends after dark at the desert camp and its third act begins
     // with the storm, so the medina is seen under a dusk sky for a good part of
@@ -1288,6 +1300,7 @@ function sahBuildSquare(game, root) {
     // the square and why the capybara, whose collider tops out at 0.68, only
     // just caught the underside of the counter. A stall reaches the floor.
     stallGrp.add(x, 1.15, z, 3.4, 2.3, 2.4);
+    stallGrp.add(x + 2.25, 0.62, z - 0.5, 0.66, 1.24, 0.66);   // the crate stack, solid too
     // the man behind it, and the two people eating at it
     sahAddPerson(x - Math.cos(a) * 1.4, 0, z - Math.sin(a) * 1.4,
                  Math.atan2(Math.cos(a), Math.sin(a)), sahPPL_STAND);
@@ -1295,6 +1308,135 @@ function sahBuildSquare(game, root) {
       sahAddPerson(x + Math.cos(a) * 1.9 + rand(-0.6, 0.6), 0,
                    z + Math.sin(a) * 1.9 + rand(-0.6, 0.6),
                    Math.atan2(-Math.cos(a), -Math.sin(a)), sahPPL_STAND);
+    }
+  }
+
+  // ==== ROADMAP-WOW PART D — THE DETAIL, THE GROUND AND THE MIDDLE PLANE ====
+  // The W0 sheet read this arrival frame as "a flat orange plane, six stalls;
+  // nothing between the stalls and the horizon" and the corrected depth bins
+  // agreed: 41.9 % near, 13.7 % mid, 12.8 % far, 31.6 % sky, from a resting
+  // lens at (6.4, 3.9, -1.7) looking along (-0.55, -0.12, 0.83) — south-west
+  // across the square, where the ring of stalls ends at z = 22 and the ochre
+  // runs unbroken to the fog. Three things, all in this merger (no material,
+  // no draw call) and in the stalls' own compound body (no new body):
+  //
+  //  1. THE SQUARE HAS A FLOOR. The wear is paint in the ground mesh (see
+  //     sahBuildGround) and that is right, but paint has no pattern, and a
+  //     square this size that is one field of noise reads as a plane. A grid
+  //     of paving strips on a four-metre bay — flat boxes 5 cm proud, in the
+  //     worn colour the wear already lerps toward — and, in the bays in front
+  //     of the spawn, every other bay a paler flag. Straight strips, not
+  //     rings: the octagon lesson above stands. 34 boxes.
+  //  2. A SECOND ROW OF STALLS along the south edge, z = 30, six of them,
+  //     33–51 m from the resting lens — inside the mid bin, and the first
+  //     thing the eye finds past the ring. Simpler than the ring's (no lamp,
+  //     no samovar, no tagines — at forty metres a trestle, four poles, a
+  //     folded awning, a valance and sacks are what read).
+  //  3. A CARAVAN, COUCHED. The live one (sahBuildCaravan) is an hour's walk
+  //     from the gate to the camp and is in this frame for none of it. Six
+  //     loaded camels kneeling at a tethering post at ~39 m, the way they
+  //     wait at the edge of the square before the evening leg: the chapter's
+  //     own camel geometry (sahCamelGeo), painted, dropped 0.86 m onto folded
+  //     legs. One hump-and-neck silhouette is the desert's whole signature.
+  //
+  // Measured (qa/partd-probe.js, same title-card arrival): see the commit.
+  //
+  //  4. AND THE SQUARE HAS AN EDGE. The first cut of this block put the row
+  //     and the camels in and the bins did not move — mid+far 0.265 → 0.248 —
+  //     because the horizon sits at the eye's own height (3.9 m) and nothing
+  //     under three metres tall can take a ray off the sky at forty metres:
+  //     it only turns a far ground hit into a mid one. What Jemaa el-Fnaa has
+  //     on that side is the thing that does — the ring of two-storey riads
+  //     and cafés with roof terraces, seven to nine metres, ochre, a parapet,
+  //     windows under cedar lintels and one good door each. Seven of them
+  //     along z ≈ 48, 45–70 m out, in the wall colours the souk uses.
+  //
+  // Measured (qa/partd-probe.js, same title-card arrival): see the commit.
+  {
+    // the joints darker, the flags no paler than the worn ground already is:
+    // the first cut used sahPlaster and the square read as a checkerboard
+    const joint = PALETTE.sahOchreDk, flag = PALETTE.sahOchrePale;
+    for (let k = 0; k <= 13; k++) M.box(sahSQ_X0 + k * 4, 0.02, 4, 0.14, 0.05, 36, joint);
+    for (let k = 0; k <= 9; k++) M.box(0, 0.02, sahSQ_Z0 + k * 4, 52, 0.05, 0.14, joint);
+    for (let ix = 0; ix < 5; ix++) {
+      for (let iz = 0; iz < 4; iz++) {
+        if ((ix + iz) % 2) continue;
+        M.box(-16 + ix * 4, 0.015, 0 + iz * 4, 3.7, 0.03, 3.7, flag);
+      }
+    }
+    // the second row, centre to right of the resting frame
+    for (let i = 0; i < 6; i++) {
+      const x = -46 + i * 6.4, z = 30;
+      const tc = trim[(i + 3) % trim.length];
+      M.box(x, 1.1, z, 3.4, 0.14, 2.4, PALETTE.sahCedar);
+      for (let k = -1; k <= 1; k += 2) {
+        M.cyl(x + k * 1.5, 1.3, z - 1.0, 0.07, 2.6, PALETTE.sahCedarDk, 0, 0, 0, 4);
+        M.cyl(x + k * 1.5, 1.3, z + 1.0, 0.07, 2.6, PALETTE.sahCedarDk, 0, 0, 0, 4);
+      }
+      for (let s2 = -1; s2 <= 1; s2 += 2) {
+        M.box(x, 2.62, z + s2 * 0.88, 4.3, 0.09, 1.85, awnSlab[(i + 1) % 3], s2 * 0.13, 0, 0);
+      }
+      M.box(x, 2.80, z, 4.35, 0.12, 0.34, tc);
+      for (let k = 0; k < 6; k++) {
+        M.box(x - 1.75 + k * 0.7, 2.51, z - 1.72, 0.6, 0.32, 0.05, k % 2 ? tc : awn[(i + k) % 3]);
+      }
+      // sacks on the trestle and a rug and a crate on the ground
+      for (let k = 0; k < 3; k++) M.cone(x - 0.9 + k * 0.9, 1.45, z, 0.42, 0.6, k % 2 ? PALETTE.sahCanvas : PALETTE.sahAwning, 0, 0, 0, 4);
+      M.box(x - 0.2, 0.025, z - 3.0, 2.4, 0.05, 1.5, i % 2 ? PALETTE.sahDye4 : PALETTE.sahRug1);
+      M.box(x + 2.2, 0.34, z + 0.4, 0.66, 0.68, 0.66, PALETTE.sahCedar, 0, 0.4 + i * 0.7, 0);
+      stallGrp.add(x, 1.15, z, 3.4, 2.3, 2.4);
+      stallGrp.add(x + 2.2, 0.34, z + 0.4, 0.66, 0.68, 0.66);
+      sahAddPerson(x, 0, z + 1.9, Math.PI, sahPPL_STAND);
+    }
+    // the couched caravan
+    const camel = sahCamelGeo();
+    const m4 = new THREE.Matrix4();
+    for (let i = 0; i < 6; i++) {
+      const cx = -11 + i * 2.6 + (i % 2) * 0.6, cz = 35 + (i % 2) * 2.4, yaw = -0.9 + (i % 3) * 0.25;
+      const g = camel.clone();
+      m4.compose(new THREE.Vector3(cx, -0.86, cz), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0)),
+                 new THREE.Vector3(1, 1, 1));
+      g.applyMatrix4(m4);
+      M.addPainted(g);
+      g.dispose();
+      // the folded legs, either side under the barrel
+      const cy = Math.cos(yaw), sy = Math.sin(yaw);
+      for (let s = -1; s <= 1; s += 2) {
+        M.box(cx + s * 0.52 * cy, 0.18, cz - s * 0.52 * sy, 0.30, 0.36, 1.9, PALETTE.sahCamelDk, 0, yaw, 0);
+      }
+      stallGrp.add(cx, 0.9, cz, 1.3, 1.8, 2.8, yaw);
+    }
+    camel.dispose();
+    // the tethering post, and the cameleers sitting by it
+    M.cyl(-13.6, 0.8, 37.5, 0.12, 1.6, PALETTE.sahCedarDk, 0, 0, 0, 4);
+    M.box(-13.6, 1.62, 37.5, 0.5, 0.12, 0.5, PALETTE.sahCedar);
+    sahAddPerson(-14.6, 0, 36.4, 0.7, sahPPL_SIT);
+    sahAddPerson(-12.8, 0, 38.6, 2.6, sahPPL_SIT);
+    // the riads along the south edge
+    const wc = [PALETTE.sahOchre, PALETTE.sahOchrePale, PALETTE.sahOchreDust, PALETTE.sahOchreDk];
+    let hx = -52;                     // ...to x ≈ 30: clear of the jet ring at (38, 42)
+    for (let i = 0; i < 7; i++) {
+      const w = 9 + (i % 3) * 1.5, h = 7.2 + ((i * 5) % 4) * 0.7, d = 9;
+      const x = hx + w * 0.5, z = 48 + (i % 2) * 1.2;
+      const col = wc[i % 4];
+      M.box(x, h * 0.5, z, w, h, d, col);
+      M.box(x, h + 0.35, z, w + 0.3, 0.7, d + 0.3, PALETTE.sahOchreDk);          // the parapet
+      M.box(x - w * 0.22, h + 1.2, z + 1.5, 3.2, 2.4, 3.2, col);                 // the stair head on the terrace
+      M.box(x - w * 0.22, h + 2.5, z + 1.5, 3.5, 0.3, 3.5, PALETTE.sahOchreDk);
+      // windows under cedar lintels, on the face toward the square
+      const nw = w > 10 ? 3 : 2;
+      for (let k = 0; k < nw; k++) {
+        const wx = x - (nw - 1) * 1.4 + k * 2.8;
+        M.box(wx, h - 2.4, z - d * 0.5 - 0.05, 1.0, 1.4, 0.12, PALETTE.sahCedarDk);
+        M.box(wx, h - 1.55, z - d * 0.5 - 0.12, 1.4, 0.22, 0.26, PALETTE.sahCedar);
+        M.box(wx, 2.4, z - d * 0.5 - 0.05, 0.9, 1.2, 0.12, PALETTE.sahCedarDk);
+      }
+      // one good door, with the tiled band over it
+      M.box(x + w * 0.28, 1.35, z - d * 0.5 - 0.06, 1.5, 2.7, 0.14, PALETTE.sahCedar);
+      M.box(x + w * 0.28, 2.95, z - d * 0.5 - 0.12, 2.1, 0.5, 0.26, PALETTE.sahTileGreen);
+      M.box(x + w * 0.28, 0.08, z - d * 0.5 - 0.5, 2.0, 0.16, 0.9, PALETTE.sahPlaster);   // the step
+      stallGrp.add(x, h * 0.5, z, w, h, d);
+      hx += w + 1.6;
     }
   }
 
