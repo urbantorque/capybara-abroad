@@ -1137,7 +1137,33 @@ function hkBuildStreet(game, root) {
   }
 
   // ---- the road ------------------------------------------------------------
-  M.box(0, -0.02, (hkST_Z0 + hkST_Z1) * 0.5, hkST_HALF * 2, 0.06, hkST_Z1 - hkST_Z0, PALETTE.hkWet);
+  // THE ROAD IS ITS OWN MESH, AND IT IS A MIRROR (ROADMAP-WOW A1). It used to
+  // be one box in the merger with everything else in the street, and the
+  // planar reflection is an option on a MATERIAL: put on hkVC() it would have
+  // mirrored every wall and roof in Mong Kok. So the carriageway's top is a
+  // plane of its own at the height the slab's top was (0.01), on the same
+  // grain as the rest of the world plus `reflect` — blur HIGH, because the
+  // fake spill's own comment in shared.js says why a smeared reflection under
+  // neon is right: a wet road at a metre and a half is a mirror at a very
+  // shallow incidence, and what it shows is the signs as long broken streaks
+  // running toward you, never a sharp picture. grain()'s reflect path has no
+  // wetness gate (it is on outgoingLight, before opaque_fragment, with no
+  // uGrainWet term), so this is always on at a low k — which is also true
+  // of the road: the palette calls it hkWet "which is always wet". The
+  // slab's old sides sat under the kerbs and were never seen; the ground
+  // plane (hkBuild, y 0) is a centimetre under this and was under the slab.
+  // Never clone this material: the clone drops the hook.
+  {
+    const rg = new THREE.PlaneGeometry(hkST_HALF * 2, hkST_Z1 - hkST_Z0);
+    rg.rotateX(-Math.PI / 2);
+    rg.translate(0, 0.01, (hkST_Z0 + hkST_Z1) * 0.5);
+    const rm = new THREE.Mesh(rg, grain(mat(PALETTE.hkWet),
+      { scale: 0.5, amount: 0.085, warp: 0.6, near: 0.34, nearScale: 6, contact: 1, broad: 0.07, broadM: 14,
+        reflect: { k: 0.55, pow: 1.4, wobble: 1.5, blur: 4 } }));
+    rm.receiveShadow = true;
+    rm.frustumCulled = false;
+    root.add(rm);
+  }
   for (let i = 0; i < 22; i++) {
     const z = hkST_Z0 + 3 + i * ((hkST_Z1 - hkST_Z0 - 6) / 21);
     M.box(0, 0.03, z, 0.4, 0.05, 2.4, PALETTE.hkLaundry);

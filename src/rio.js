@@ -2954,6 +2954,16 @@ function rioUpdatePeople(dt) {
 const rioBIRD_N = 9;
 let rioBirdMesh = null, rioBirdSeed = null;
 let rioBirdT = 0, rioBirdCall = 7;
+// THE FORK IS A MOVING PART (ROADMAP-WOW Part C, the movers uplift). The
+// tail was baked into the bird, so nine birds banked and rose as nine rigid
+// W's — the rubric's "a vehicle that translates as one block is a prop". The
+// two blades are their own instanced mesh now, hinged at the tail root:
+// they SCISSOR (a frigatebird steers with its fork — closed in a straight
+// glide, spread wide in the turn) and pitch up with the bank. Nine more
+// matrices a frame on a loop that already writes nine, one more draw call.
+let rioBirdTail = null;
+const rioBirdM2 = new THREE.Matrix4();
+const rioBIRD_TAIL_Z = -0.47;      // where the fork leaves the body
 
 function rioBuildBirds(root) {
   const M = rioMerger();
@@ -2965,9 +2975,36 @@ function rioBuildBirds(root) {
   M.cone(0, 0.01, 0.92, 0.06, 0.34, PALETTE.rioGraniteDk, Math.PI / 2, 0, 0, 4);
   for (let s = -1; s <= 1; s += 2) {
     M.box(s * 0.62, 0.06, 0.06, 1.10, 0.05, 0.46, PALETTE.rioPaveDark, 0, s * 0.14, s * 0.10);
-    M.box(s * 1.48, 0.02, -0.16, 0.72, 0.05, 0.30, PALETTE.rioGraniteDk, 0, s * 0.42, s * 0.16);
-    // the fork
-    M.box(s * 0.13, 0, -0.78, 0.10, 0.05, 0.62, PALETTE.rioPaveDark, 0, s * 0.20, 0);
+    // the outer panel, shorter than it was: the last half-metre is fingers.
+    // Lifted to meet the inner panel's outboard end (its 0.10 rad dihedral
+    // puts that at y 0.115): the old one sat 13 cm under it, a step nobody
+    // saw from above and a GAP from the side, once there was a side worth
+    // looking from.
+    M.box(s * 1.36, 0.14, -0.12, 0.50, 0.05, 0.30, PALETTE.rioGraniteDk, 0, s * 0.42, s * 0.16);
+    // FIVE TWO-TONE FINGERS (ROADMAP-WOW Part C, the condor's pattern in
+    // condor.js). A frigatebird's hand is the one part of the W anybody can
+    // name, and a single slab out there read as a paddle from this camera,
+    // which looks DOWN on them. Five slim primaries off the wrist, rooted
+    // along the panel's chord (all five from one point overlapped into a
+    // paddle again — measured on the first sheet) and splayed 0.21 rad
+    // apart, the inboard half in the wing's dark and the outboard half in
+    // the granite dark, so the fan carries a band where the fingers
+    // separate. Baked into the merge — nine birds is one draw call.
+    const wx = s * 1.60, wz = -0.20, wy = 0.18;            // the wrist
+    const swp = s * 0.42;                                  // the panel's own sweep
+    const cs = Math.cos(swp), ss = Math.sin(swp);          // ...and its chord axis
+    for (let i = 0; i < 5; i++) {
+      const a = swp + s * (i - 2) * 0.21;                  // splay about the sweep
+      const k = (i - 2) * 0.062;                           // the root along the chord
+      const rx = wx + k * ss, rz = wz + k * cs;
+      const len0 = 0.30, len1 = 0.26;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      // the finger runs outboard along its own swept axis; each half at its
+      // own centre along that line
+      const d0 = len0 * 0.5, d1 = len0 + len1 * 0.5;
+      M.box(rx + s * d0 * ca, wy, rz - s * d0 * sa, len0, 0.045, 0.075, PALETTE.rioPaveDark, 0, a, s * 0.16);
+      M.box(rx + s * d1 * ca, wy, rz - s * d1 * sa, len1, 0.040, 0.062, PALETTE.rioGraniteDk, 0, a, s * 0.16);
+    }
   }
   rioBirdMesh = new THREE.InstancedMesh(M.build(), rioVC(), rioBIRD_N);
   rioBirdMesh.name = 'rioFragatas';
@@ -2976,6 +3013,22 @@ function rioBuildBirds(root) {
   rioBirdMesh.castShadow = false;     // a shadow at 40 m over sand is a smudge
   rioBirdMesh.userData.noShadow = true;   // ...and this is what makes it stick
   root.add(rioBirdMesh);
+  // the fork: two blades hinged at the root, built about the hinge so a
+  // scale.x scissors them and a rotation.x pitches them (see rioUpdateBirds)
+  const F = rioMerger();
+  for (let s = -1; s <= 1; s += 2) {
+    // a yaw of -s*0.20 spreads the blades AFT (a +s yaw, which is what the
+    // baked fork had, converged them toward the tip — a spike, not a fork)
+    F.box(s * 0.13, 0, -0.31, 0.10, 0.05, 0.62, PALETTE.rioPaveDark, 0, -s * 0.20, 0);
+    F.box(s * 0.17, 0.005, -0.50, 0.06, 0.04, 0.26, PALETTE.rioGraniteDk, 0, -s * 0.20, 0);   // the tips, the second tone
+  }
+  rioBirdTail = new THREE.InstancedMesh(F.build(), rioVC(), rioBIRD_N);
+  rioBirdTail.name = 'rioFragataTails';
+  rioBirdTail.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  rioBirdTail.frustumCulled = false;
+  rioBirdTail.castShadow = false;
+  rioBirdTail.userData.noShadow = true;
+  root.add(rioBirdTail);
   rioBirdSeed = [];
   for (let i = 0; i < rioBIRD_N; i++) {
     // three loose groups: over the point, over the break, and over the far end
@@ -3002,14 +3055,34 @@ function rioUpdateBirds(dt) {
     const x = s.cx + Math.cos(a) * rr;
     const z = s.cz + Math.sin(a) * rr * 0.72;
     const y = s.y + Math.sin(rioBirdT * 0.11 + s.b) * 4.2;
-    const yaw = Math.atan2(-Math.sin(a), Math.cos(a) * 0.72) + Math.PI * 0.5;
+    // THE BEAK LEADS (ROADMAP-WOW Part C). The heading is atan2(vx, vz) — the
+    // yaw that puts the bird's own +z (the beak, see rioBuildBirds' cone)
+    // along its velocity. The old line added a quarter turn to it, so nine
+    // frigatebirds circled the point BROADSIDE, beak out to the side of the
+    // circle; at 40 m over sand a W is nearly symmetric and nobody saw it,
+    // and a fork that now moves would have been steering sideways.
+    const yaw = Math.atan2(-Math.sin(a), Math.cos(a) * 0.72);
     // they bank into the turn and they almost never flap: one lazy beat every
     // ten seconds or so, which is what makes the rest of it read as soaring
     const flap = Math.sin(rioBirdT * 0.34 + s.b * 3) > 0.93
                  ? Math.sin(rioBirdT * 4.4) * 0.30 : 0;
+    // the circle runs clockwise from above (a increasing carries +z toward
+    // -x, a right turn), and a positive roll about the beak axis lifts the
+    // +x wing, which facing +z is the LEFT one: right wing down, into the
+    // turn. (Checked dead astern on the sheet — the first guess had it out.)
     rioBirdMesh.setMatrixAt(i, rioXform(x, y, z, flap * 0.25, yaw, 0.34 + flap, 1, 1, 1));
+    // the fork: the bird's own matrix, then the hinge. It scissors on a slow
+    // cycle of its own (a fork steers, and a bird holding a circle is always
+    // steering a little) and spreads wide on the beat; it pitches up with it.
+    if (rioBirdTail) {
+      rioBirdM2.copy(rioM);
+      const open = 0.80 + Math.sin(rioBirdT * 1.1 + s.b * 2) * 0.25 + Math.abs(flap) * 1.6;
+      rioBirdM2.multiply(rioXform(0, 0, rioBIRD_TAIL_Z, -0.12 + flap * 0.9, 0, 0, open, 1, 1));
+      rioBirdTail.setMatrixAt(i, rioBirdM2);
+    }
   }
   rioBirdMesh.instanceMatrix.needsUpdate = true;
+  if (rioBirdTail) rioBirdTail.instanceMatrix.needsUpdate = true;
 
   // ---- and one of them says something about it, occasionally ---------------
   rioBirdCall -= dt;
@@ -4645,7 +4718,15 @@ export function createRio(game) {
       tasks: { summon: 'fragata', ride: 'fragata-ride' },
       plume: {
         wing: 0x14161a,     // black, with the faintest blue in it
-        body: 0x1b1d22,     // ...and a shade up, so the two read apart at all
+        // ...and the body a WARM dark, not a shade up from the same blue-black
+        // (ROADMAP-WOW Part C). condor.js's five fingers are `wing` inboard
+        // and `body` outboard, and at 0x1b1d22 against 0x14161a the band was
+        // five units of grey — unreadable, so the ridden fragata had the
+        // condor's fan and none of its two tones. A frigatebird's upperwing
+        // carries a brown alar bar over the black; this is that, on the
+        // body and the fingertips, and it separates the torso from the wing
+        // from behind, which is where the passenger's camera lives.
+        body: 0x352a24,
         ruff: 0xb3242a,     // THE POUCH. The only colour on the bird
         skin: 0x1b1d22,
         beak: 0x8d949c,     // long, grey, and hooked at the end
