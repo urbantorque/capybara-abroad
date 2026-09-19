@@ -205,6 +205,9 @@ let antOnFloe = -1, antFloeRideX = 0, antFloeRideZ = 0, antFloeRide = 0, antFloe
 let antHauled = false;
 
 let antPodGroup = null, antPodParts = null;
+// ROADMAP-WOW Part C: per animal, the flukes on a hinge and the dorsal on a
+// hinge — the two parts of an orca that move that are not the whole orca.
+let antPodFlukes = null, antPodFins = null;
 let antPodX = null, antPodZ = null, antPodPh = null, antPodOffX = null, antPodOffZ = null;
 let antPodCX = 0, antPodCZ = -300, antPodYaw = 0, antPodU = 0;
 let antPodState = 'patrol';
@@ -2291,6 +2294,8 @@ function antBuildBoat(game, root) {
 function antBuildPod(root) {
   antPodGroup = new THREE.Group();
   antPodParts = [];
+  antPodFlukes = []; antPodFins = [];
+  antPodGroup.name = 'antPod';         // findable from the harness (qa/wow-movers.js)
   antPodX = new Float32Array(antPOD_N);
   antPodZ = new Float32Array(antPOD_N);
   antPodPh = new Float32Array(antPOD_N);
@@ -2339,25 +2344,45 @@ function antBuildPod(root) {
     }
     // the saddle, immediately behind the fin, and it is the read from above
     M.box(0, 0.52 * s, -L * 0.10, 1.02 * s, 0.16 * s, 1.5 * s, PALETTE.antOrcaSaddle);
-    // the dorsal. A bull's is 1.8 m and it is straight; a female's is half
-    // that and it hooks.
-    if (bull) {
-      M.box(0, 1.10 * s, -L * 0.02, 0.20 * s, 2.10 * s, 0.90 * s, PALETTE.antOrca, 0.10, 0, 0);
-    } else {
-      M.box(0, 0.70 * s, -L * 0.02, 0.18 * s, 1.15 * s, 0.80 * s, PALETTE.antOrca, 0.30, 0, 0);
-    }
-    // pectorals and flukes
+    // pectorals
     for (let sd = -1; sd <= 1; sd += 2) {
       M.box(sd * 0.95 * s, -0.34 * s, L * 0.20, 1.30 * s, 0.14 * s, 0.85 * s,
             PALETTE.antOrca, 0, sd * 0.32, sd * 0.22);
     }
-    M.box(0, 0, -L * 0.50, 2.30 * s, 0.16 * s, 0.75 * s, PALETTE.antOrca);
 
     const mesh = new THREE.Mesh(M.build(), antVC());
     mesh.castShadow = true;
     mesh.frustumCulled = false;
     antPodGroup.add(mesh);
     antPodParts.push(mesh);
+
+    // THE DORSAL, ON A HINGE (ROADMAP-WOW Part C). A bull's is 1.8 m and it
+    // is straight; a female's is half that and it hooks. Its own mesh on a
+    // pivot at the back, so it can lean through the breach's roll the way
+    // two metres of unsupported cartilage does when the animal leaves the
+    // water — the one thing on a breaching orca that moves against the body.
+    const D = antMerger();
+    if (bull) {
+      D.box(0, 1.05 * s, 0, 0.20 * s, 2.10 * s, 0.90 * s, PALETTE.antOrca, 0.10, 0, 0);
+    } else {
+      D.box(0, 0.58 * s, 0, 0.18 * s, 1.15 * s, 0.80 * s, PALETTE.antOrca, 0.30, 0, 0);
+    }
+    const fin = new THREE.Mesh(D.build(), mesh.material);
+    fin.position.set(0, (bull ? 0.05 : 0.12) * s, -L * 0.02);
+    fin.castShadow = true; fin.frustumCulled = false;
+    mesh.add(fin);
+    antPodFins.push(fin);
+    // ...AND THE FLUKES BEAT. The tail was a slab baked on the end of the
+    // body; it is on a hinge at the tail-stock now and pitches on the same
+    // porpoising phase the body rises on, a quarter ahead of it — the stroke
+    // that drives the rise, drawn.
+    const F = antMerger();
+    F.box(0, 0, -0.40 * s, 2.30 * s, 0.16 * s, 0.75 * s, PALETTE.antOrca);
+    const fl = new THREE.Mesh(F.build(), mesh.material);
+    fl.position.set(0, 0, -L * 0.50 + 0.40 * s);
+    fl.castShadow = true; fl.frustumCulled = false;
+    mesh.add(fl);
+    antPodFlukes.push(fl);
   }
   root.add(antPodGroup);
 
@@ -4617,6 +4642,12 @@ function antUpdatePod(game, dt) {
     }
     mesh.position.set(antPodX[i], y, antPodZ[i]);
     mesh.rotation.set(pitch, antPodYaw, roll, 'YXZ');
+    // the flukes drive the rise: pitched a quarter ahead of the body, and
+    // harder in the escort's 2.2 s cycle than the patrol's 4.2
+    if (antPodFlukes) antPodFlukes[i].rotation.x = Math.cos(ph) * (escort ? 0.42 : 0.30);
+    // the dorsal leans against the roll — flat on a porpoising back, well
+    // over on a breaching one (roll up to 1.9 rad there)
+    if (antPodFins) antPodFins[i].rotation.z = clamp(-roll * 0.45, -0.85, 0.85);
 
     // ---- AND SIX TONNES OF ANIMAL MOVES SOME WATER ----------------------
     //
@@ -6106,6 +6137,8 @@ export function createAntarctic(game) {
       antPodState = 'escort'; antPodStateT = 0; antPodRide = 0; antSlowT = 0;
       return antPodState;
     },
+    /** The harness (ROADMAP-WOW Part C): breach animal i now, through the same queue antPodAnswers uses. */
+    podBreach(i) { antBreachQueue.length = 0; antBreachQueue.push(Math.max(0, Math.min(antPOD_N - 1, i | 0))); antBreachWait = 0.05; return true; },
     /** The harness (L6, F2): put the tender at (x, z) now — the calving window is 140 m from the berth. */
     boatForce(x, z) { antBoatX = x; antBoatZ = z; antBoatSpeed = 0; return [antBoatX, antBoatZ]; },
     podDebug() {

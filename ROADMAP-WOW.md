@@ -967,6 +967,10 @@ the first four reads to repeat).
   bangka — a trailing quad pair on the water's own material), wing
   primaries that fan (the condor, the frigatebird — five fingered tips
   as one extra `c`-banded fan each), a pennant on every hull.
+  *Landed 19 Sep 2026 for the six whose files were free — see "The
+  movers uplift" under "The sheet said" below: condor, ferry, party bus,
+  helicopter, manta + bangka, orca pod. The red car, the scooters, the
+  frigatebird and the balloon are in files other agents hold this round.*
 - **Heroes:** secondary forms where a hero is one box — window bands,
   a cornice, a base course, a roofline break — reusing the merger's
   `jitter` and the beauty pass's bay-and-course treatment (the Quay
@@ -1073,6 +1077,62 @@ a hat and a two-tone robe, no worse than the Sydney roster. The gap is
 exactly where ONE PERSON already said it is: the two chapters that roll
 their own crowd from nothing, not the hand-built locals and not the
 shared roster elsewhere.
+**The movers uplift (19 Sep 2026, Part C's "Movers" bullet, six
+chapters; `qa/wow-movers.js`, one row per chapter, two raw own-camera
+frames ~300 ms apart while the mover moves, read by eye, 0 console
+errors in every row):**
+
+- **Pasto, the condor** (`condor.js`): five fingers not four, each the
+  wing black inboard and the body's warmer dark outboard — an honest
+  band but a subtle one, because both hexes are near-black by the
+  bird's own law; the ruff gets the beak's tan on its rim. The fan pivot
+  now trails the beat (a damped copy of the dihedral, the difference is
+  the flex). **Finding, and it was the real defect:** the un-mounted bird
+  NEVER DREW A FLAP — `condorFlapT` was only ever set in mounted flight,
+  while the AI's sustentation already pulsed on `sin(condorFlapPhase*2)`.
+  A summoned condor climbed forty metres on rigid wings. `condorAiBeat`
+  (0..1 from the seek's climb demand) blends the glide pose toward that
+  same phase; measured, the fan moved against the shoulder in 50/60
+  samples (was 3/60) with a 0.50 rad swing (was 0.13).
+- **Quay, the ferry** (`quay.js`): she already had a wake ring, a
+  rudder-driven wheel and a streaming ensign — the sheet's guess was
+  already met. Added the masthead pennant (`hangThing('sock')`, house
+  colours, streams aft with speed and leans with the rudder) and one
+  asymmetry, a lifebuoy on the port bulwark aft.
+- **Cali, the party bus** (`cali.js`): the wheels were baked into the
+  body. Four separate meshes now, spun by the ROUTE-DISTANCE delta (not
+  `v`, which is unsigned on the return leg where she backs down). A
+  spare wheel on the starboard flank, amidships — the first cut put it
+  at the rear axle and it read as a doubled wheel in the frame.
+- **Kowloon, the helicopter** (`kowloon.js`): the main rotor already
+  spun; the TAIL rotor was a disc baked into the hull. Its own mesh, spun
+  about X at 52 rad/s × the spool. Skids were already the second colour;
+  the pilot is the animal, so the head-turn row is moot.
+- **Palawan** (`palawan.js`): the manta's only motion was a scale.y
+  breath on the whole animal. The outer three segments a side are hinged
+  tips now, curling on the body's own sine a quarter behind it, on both
+  mantas. A shadow disc on the sand: the contact pool cannot be fed from a
+  chapter (systems.js gathers capy/props/npcs only) and gates out a metre
+  above the base, so it is a flat transparent circle placed on the seabed
+  and faded with clearance. The bangka: the tiller and the boatman's arm
+  on a pivot, a trailing foam-quad pair, one blue band on the port float.
+- **Antarctica** (`antarctic.js`): the orange boat already had a wake, a
+  rudder-driven tiller and a streaming flag — nothing honest to add, so
+  nothing added. Each orca's flukes are on a hinge at the tail-stock,
+  pitched a quarter ahead of the porpoise; each dorsal is on a hinge and
+  leans against the roll, which is flat on a porpoising back and 0.7 rad
+  over on the bull's breach. `podBreach(i)` added to the api for the
+  harness.
+- **Instrument traps paid this round:** `objShot` from a mover's OWN
+  frame follows its roll — a breaching orca dragged the camera into its
+  flank; frame from a world point off its quarter instead. A wake trails
+  ~9 m astern, which is exactly where a "behind the boat" camera sits:
+  the bangka's first pair had the wake out of shot. And a top-level
+  `window.` in a run-code script is trap 17's family: it dies before
+  the post and the OLD sheet is what you read.
+- **`qa/rv-geom.js`'s baseline** is invalidated by all six commits; not
+  re-baselined (the rule below).
+
 - **W4 — the uplifts**, per chapter file, alongside Part B's beats and
   Part A′'s G5 — same files, same agent per chapter. The animal's own
   uplift is its own item in W4 (capybara.js, one agent, first).

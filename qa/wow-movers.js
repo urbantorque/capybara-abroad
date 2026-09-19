@@ -93,7 +93,7 @@ async page => {
 
   // ---- the rows: which chapters to run is the literal below (trap 14: no
   // argv in run-code) ----
-  const RUN = ['palawan']
+  const RUN = ['antarctic']
   const errAt = () => errs.length
 
   for (let ci = 0; ci < RUN.length; ci++) {
@@ -231,6 +231,36 @@ async page => {
       await shot('MOV-palawan-6', Bk, [17, -9, 7.5, 0.3, 38])
       await shot('MOV-palawan-7', Bk, [6, -6, 2.6, 0.9, 34])
       rec.tiller = await page.evaluate(() => { const g = window.__capy.scene.getObjectByName('palBangka'); const kids = g.children; return { n: kids.length, tillerY: +kids[1].rotation.y.toFixed(3), wakeVis: kids[2].visible, wakeLen: +kids[2].scale.z.toFixed(2) } })
+    }
+
+    if (name === 'antarctic') {
+      // THE ORCA POD: on patrol (escort ends at once at the berth — the
+      // boat is north of z -40), porpoising on a 4.2 s cycle 300 m south.
+      // Pick the animal highest out of the water at shot time and frame it
+      // from a WORLD point off its quarter (its own frame pitches and rolls);
+      // the same index 300 ms later. Then the bull's breach via podBreach(4),
+      // twice, from a world point on its port side.
+      const P = (a) => {
+        const T = window.__capy.THREE, o = window.__capy.scene.getObjectByName('antPod')
+        if (!o) return ''
+        let idx = a[5]
+        if (idx < 0) { let by = -9; for (let i = 0; i < 6; i++) { if (o.children[i].position.y > by) { by = o.children[i].position.y; idx = i } } window.__movIdx = idx }
+        const m = o.children[idx]
+        return window.__art.ptShot(m.position.x, m.position.y, m.position.z, m.rotation.y, a[0], a[1], a[2], a[3], a[4])
+      }
+      const yaw0 = await page.evaluate(() => { const o = window.__capy.scene.getObjectByName('antPod'); return o ? +o.children[0].rotation.y.toFixed(2) : null })
+      await shot('MOV-antarctic-1', P, [10, 5, 3.0, 0.3, 36, -1])
+      const idx = await page.evaluate(() => window.__movIdx)
+      await page.waitForTimeout(300)
+      await shot('MOV-antarctic-2', P, [10, 5, 3.0, 0.3, 36, idx])
+      rec.pod = await page.evaluate((i) => { const o = window.__capy.scene.getObjectByName('antPod'); const m = o.children[i]; return { i, y: +m.position.y.toFixed(2), fluke: +m.children[1].rotation.x.toFixed(3), fin: +m.children[0].rotation.z.toFixed(3), st: window.__capy.antarctic.podDebug().st } }, idx)
+      rec.breach = await page.evaluate(() => window.__capy.antarctic.podBreach(4))
+      await page.waitForTimeout(1500)
+      await shot('MOV-antarctic-3', P, [12, -9, 3.0, 2.0, 38, 4])
+      await page.waitForTimeout(350)
+      await shot('MOV-antarctic-4', P, [12, -9, 3.0, 2.0, 38, 4])
+      rec.bull = await page.evaluate(() => { const o = window.__capy.scene.getObjectByName('antPod'); const m = o.children[4]; return { y: +m.position.y.toFixed(2), roll: +m.rotation.z.toFixed(3), fin: +m.children[0].rotation.z.toFixed(3) } })
+      rec.yaw0 = yaw0
     }
 
     rec.errs = errs.slice(e0)
