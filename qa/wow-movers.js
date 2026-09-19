@@ -93,7 +93,7 @@ async page => {
 
   // ---- the rows: which chapters to run is the literal below (trap 14: no
   // argv in run-code) ----
-  const RUN = ['kowloon']
+  const RUN = ['palawan']
   const errAt = () => errs.length
 
   for (let ci = 0; ci < RUN.length; ci++) {
@@ -202,6 +202,35 @@ async page => {
       await shot('MOV-kowloon-3', H, [3.0, 4.0, 1.0, 1.9, 30])
       await shot('MOV-kowloon-4', H, [14, 0, 9, 1.5, 36])
       await page.keyboard.up('Space')
+    }
+
+    if (name === 'palawan') {
+      // THE MANTA: always on its lap, 6 m down. Two raw frames 700 ms apart
+      // from behind-above (the tips curl on a 0.9 rad/s sine), a side shot,
+      // and one from above the sand for the shadow disc.
+      const Mn = (a) => { const o = window.__capy.scene.getObjectByName('palManta'); return o ? window.__art.objShot(o, a[0], a[1], a[2], a[3], a[4]) : '' }
+      await shot('MOV-palawan-1', Mn, [9, 3.5, 3.0, 0.0, 36])
+      await page.waitForTimeout(700)
+      await shot('MOV-palawan-2', Mn, [9, 3.5, 3.0, 0.0, 36])
+      await shot('MOV-palawan-3', Mn, [0.5, 8.5, 0.8, 0.0, 34])
+      await shot('MOV-palawan-4', Mn, [4, 0, 9, -2.5, 40])
+      rec.manta = await page.evaluate(() => { const g = window.__capy.scene.getObjectByName('palManta'); const tips = g.children.filter(o => !o.isMesh); return { y: +g.position.y.toFixed(2), tips: tips.map(t => +t.rotation.z.toFixed(3)) } })
+      // THE BANGKA: wait for her to be under way (she holds 11 s at each
+      // berth), then two frames 300 ms apart from the port quarter — tiller,
+      // wake, the banded float.
+      let sp = 0
+      for (let i = 0; i < 16; i++) {
+        sp = await page.evaluate(() => { const b = window.__capy.palawan.bangka(); const g = window.__capy.scene.getObjectByName('palBangka'); return g && g.userData._px !== undefined ? Math.hypot(b.x - g.userData._px, b.z - g.userData._pz) / 0.8 : (g && (g.userData._px = b.x, g.userData._pz = b.z), 0) })
+        if (sp > 0.6) break
+        await page.waitForTimeout(800)
+      }
+      rec.bangkaSp = +sp.toFixed(2)
+      const Bk = (a) => { const o = window.__capy.scene.getObjectByName('palBangka'); return o ? window.__art.objShot(o, a[0], a[1], a[2], a[3], a[4]) : '' }
+      await shot('MOV-palawan-5', Bk, [17, -9, 7.5, 0.3, 38])
+      await page.waitForTimeout(300)
+      await shot('MOV-palawan-6', Bk, [17, -9, 7.5, 0.3, 38])
+      await shot('MOV-palawan-7', Bk, [6, -6, 2.6, 0.9, 34])
+      rec.tiller = await page.evaluate(() => { const g = window.__capy.scene.getObjectByName('palBangka'); const kids = g.children; return { n: kids.length, tillerY: +kids[1].rotation.y.toFixed(3), wakeVis: kids[2].visible, wakeLen: +kids[2].scale.z.toFixed(2) } })
     }
 
     rec.errs = errs.slice(e0)

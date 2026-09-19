@@ -143,6 +143,7 @@ const palShaftPools = [];
 let palTurtle = null, palTurtleT = 0;
 let palClamGroup = null, palClamOpen = 0, palPearl = null, palPearlTaken = false;
 let palBangkaGroup = null, palBangkaBody = null;
+let palBangkaTiller = null, palBangkaWake = null;     // ROADMAP-WOW Part C: the boatman's arm swings, a wake trails
 let palBangkaT = 0, palBangkaDir = 1, palBangkaRideT = 0, palBangkaFrom = 0;
 let palBangkaHold = 0;
 let palBangkaOff = 0;
@@ -2325,6 +2326,14 @@ let palMantaLean = 0;
 let palLeapOn = false, palLeapPeak = 0, palLeapY0 = 0, palLeapT = 0, palLeapBest = 0;
 let palManta2Group = null;
 const palManta2Pos = new THREE.Vector3();
+// THE WINGTIPS (ROADMAP-WOW Part C): the outer three segments a side are their
+// own pivots now, [m1L, m1R, m2L, m2R], curled on a slow sine — the one part of
+// the manta that moves that is not the whole animal. And a shadow on the sand
+// under the first one: a flat disc, not the contact pool (which only gathers
+// capy/props/npcs and gates out a metre above the base — a manta cruises 2.3 m
+// or more off the seabed).
+let palMantaTips = null;
+let palMantaShade = null;
 let palMantaSlowed = false;
 
 function palBuildManta(root) {
@@ -2355,6 +2364,13 @@ function palBuildManta(root) {
   const sweepAt = t => -1.70 * t * t;
   const thickAt = t => 0.46 * (1 - t) * (1 - t) + 0.09;
   const droopAt = t => -0.52 * t * t;
+  // The outer three segments a side (i >= palMANTA_TIP) go into their own
+  // merge per side, built relative to a pivot at the segment boundary, so the
+  // tip can curl on a hinge and the body stays one mesh.
+  const palMANTA_TIP = 5;
+  const tP = palMANTA_TIP / palMANTA_N;
+  const pivX = MX0 + (MX1 - MX0) * tP, pivZ = sweepAt(tP), pivY = droopAt(tP);
+  const TL = palMerger(), TR = palMerger();
   for (let i = 0; i < palMANTA_N; i++) {
     const t0 = i / palMANTA_N, t1 = (i + 1) / palMANTA_N, tm = (t0 + t1) * 0.5;
     const x0 = MX0 + (MX1 - MX0) * t0, x1 = MX0 + (MX1 - MX0) * t1;
@@ -2362,14 +2378,33 @@ function palBuildManta(root) {
     const span = Math.hypot(dx, dz), yawSeg = Math.atan2(dz, dx);
     const cx = (x0 + x1) * 0.5, cz = (sweepAt(t0) + sweepAt(t1)) * 0.5;
     const th = thickAt(tm), ch = chordAt(tm), dy = droopAt(tm);
+    const tip = i >= palMANTA_TIP;
     for (let s = -1; s <= 1; s += 2) {
-      M.box(s * cx, dy, cz, span, th, ch, PALETTE.palWreckDk,
+      const G = tip ? (s < 0 ? TL : TR) : M;
+      const ox = tip ? pivX : 0, oy = tip ? pivY : 0, oz = tip ? pivZ : 0;
+      G.box(s * (cx - ox), dy - oy, cz - oz, span, th, ch, PALETTE.palWreckDk,
             0, -s * yawSeg, s * (0.06 + tm * 0.42));
       // the pale underside, inset so the dark edge still draws the outline
-      M.box(s * cx, dy - th * 0.46, cz, span * 0.94, th * 0.36, ch * 0.86,
+      G.box(s * (cx - ox), dy - oy - th * 0.46, cz - oz, span * 0.94, th * 0.36, ch * 0.86,
             PALETTE.palClam, 0, -s * yawSeg, s * (0.06 + tm * 0.42));
     }
   }
+  const tipGeo = [TL.build(), TR.build()];
+  palMantaTips = [];
+  /** the two tip pivots on one manta group, sharing the two tip geometries */
+  const addTips = function (grp, matr, sc) {
+    const k = sc || 1;
+    for (let s = -1; s <= 1; s += 2) {
+      const piv = new THREE.Object3D();
+      piv.position.set(s * pivX * k, pivY * k, pivZ * k);
+      piv.scale.setScalar(k);
+      const tm = new THREE.Mesh(tipGeo[s < 0 ? 0 : 1], matr);
+      tm.castShadow = true;
+      piv.add(tm);
+      grp.add(piv);
+      palMantaTips.push(piv);
+    }
+  };
   // The two marks on the shoulders. Every manta has a different pair and it is
   // how one is told from another — but at 0.44 by 0.70 they read as skylights
   // on a barge, so they are thin angled bars and not patches.
@@ -2399,7 +2434,17 @@ function palBuildManta(root) {
   palMantaGroup = new THREE.Group();
   palMantaGroup.name = 'palManta';
   palMantaGroup.add(mesh);
+  addTips(palMantaGroup, mesh.material);
   root.add(palMantaGroup);
+  // the shadow on the sand: a flat disc in the cave dark, the quay wake's own
+  // material approach (transparent, no depth write, no texture). Placed on
+  // the seabed under the manta each frame and faded with its clearance.
+  palMantaShade = new THREE.Mesh(new THREE.CircleGeometry(2.6, 14),
+    mat(PALETTE.palCaveDark, { transparent: true, opacity: 0.26, depthWrite: false }));
+  palMantaShade.rotation.x = -Math.PI / 2;
+  palMantaShade.castShadow = false; palMantaShade.receiveShadow = false;
+  palMantaShade.userData.noShadow = true;
+  root.add(palMantaShade);
   // the second one: the same geometry and material, its own transform (L5)
   palManta2Group = new THREE.Group();
   palManta2Group.name = 'palManta2';
@@ -2407,6 +2452,7 @@ function palBuildManta(root) {
   mesh2.castShadow = true;
   mesh2.scale.set(0.88, 0.88, 0.88);
   palManta2Group.add(mesh2);
+  addTips(palManta2Group, mesh.material, 0.88);   // the same 0.88 as its body
   root.add(palManta2Group);
   palMantaA = 0.7;
   palMantaRideT = -1;
@@ -2515,6 +2561,28 @@ function palUpdateManta(game, dt) {
   // the wings beat, slowly, and faster when it means it
   const beat = Math.sin(palTime * (riding ? 1.9 : 0.9)) * (riding ? 0.20 : 0.11);
   palMantaGroup.scale.set(1, 1 + beat * 0.35, 1);
+  // THE TIPS CURL (ROADMAP-WOW Part C): a hinge at the outer third, on the
+  // same slow sine the body breathes on but a quarter behind it, so the tip
+  // trails the stroke; up when the wing comes down. Mirrored by side (the
+  // left tip lives at -X, so its "up" is the other sign of rotation.z), and
+  // the second manta's pair a beat later, as its whole flight already is.
+  if (palMantaTips) {
+    const w = riding ? 1.9 : 0.9;
+    const c1 = 0.08 + Math.sin(palTime * w - 1.2) * (riding ? 0.34 : 0.22);
+    const c2 = 0.08 + Math.sin(palTime * w + 0.1) * (riding ? 0.34 : 0.22);
+    palMantaTips[0].rotation.z = -c1; palMantaTips[1].rotation.z = c1;
+    if (palMantaTips.length > 3) { palMantaTips[2].rotation.z = -c2; palMantaTips[3].rotation.z = c2; }
+  }
+  if (palMantaShade) {
+    const floor = palTerrain(x, z);
+    const clear = y - floor;
+    palMantaShade.position.set(x, floor + 0.05, z);
+    palMantaShade.rotation.z = -yaw;
+    const k = clamp(1 - (clear - 2.0) / 9.0, 0, 1) * (y < palWATER ? 1 : 0);
+    palMantaShade.material.opacity = 0.26 * k;
+    palMantaShade.visible = k > 0.01;
+    palMantaShade.scale.set(1.0 + clear * 0.04, 1.0 + clear * 0.04, 1);
+  }
   // ---- THE SECOND ONE (L5): the same lap, a half-radian back; the same
   // flight, a beat late, and its own breach ---------------------------------
   if (palManta2Group) {
@@ -2747,14 +2815,42 @@ function palBuildBangka(game, root) {
   M.box(-0.30, 1.42, -3.3, 0.26, 0.30, 0.25, PALETTE.palTrunk);
   M.box(-0.30, 1.60, -3.3, 0.46, 0.06, 0.46, PALETTE.palThatch);      // the hat
   M.box(-0.30, 1.42, -3.16, 0.05, 0.05, 0.05, PALETTE.palTrunk);      // and a nose
-  // one arm out on the tiller, which is a stick on the engine and nothing else
-  M.box(-0.02, 1.16, -3.20, 0.55, 0.12, 0.13, PALETTE.palBangkaTrim, 0, 0, -0.22);
-  M.cyl(0.30, 1.02, -3.10, 0.05, 0.9, PALETTE.palBambooDk, 0.5, 0, 0.4, 4);
   M.box(0.42, 0.62, -3.6, 0.34, 0.42, 0.55, PALETTE.palWreckDk);      // the engine
+  // ONE THING NOT MIRRORED (ROADMAP-WOW Part C): the port float wears a band
+  // of the hull's blue at its bow, the way a working boat gets repainted one
+  // plank at a time. The starboard float does not.
+  M.cyl(-3.5, 0.35, 2.6, 0.18, 0.9, PALETTE.palBangkaTrim, Math.PI * 0.5, 0, 0, 6);
   const g = new THREE.Group();
+  g.name = 'palBangka';
   const mesh = new THREE.Mesh(M.build(), palVC());
   mesh.castShadow = true; mesh.receiveShadow = true;
   g.add(mesh);
+  // THE TILLER SWINGS (ROADMAP-WOW Part C): the boatman's arm and the stick
+  // were baked into the hull; they are one small mesh on a pivot at his
+  // shoulder now, and the update rocks it with the hull's own roll and the
+  // course — a man steering, not a man welded to an engine.
+  const TM = palMerger();
+  TM.box(0.28, -0.02, 0.10, 0.55, 0.12, 0.13, PALETTE.palBangkaTrim, 0, 0, -0.22);
+  TM.cyl(0.60, -0.16, 0.20, 0.05, 0.9, PALETTE.palBambooDk, 0.5, 0, 0.4, 4);
+  palBangkaTiller = new THREE.Mesh(TM.build(), palVC());
+  palBangkaTiller.position.set(-0.30, 1.18, -3.30);
+  palBangkaTiller.castShadow = true;
+  g.add(palBangkaTiller);
+  // THE WAKE: a trailing pair of pale quads on the foam colour, the quay
+  // wake's own material (transparent, no depth write, no texture), scaled by
+  // the speed in the update and hidden at the berths.
+  palBangkaWake = new THREE.Group();
+  for (let sd = -1; sd <= 1; sd += 2) {
+    const q = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.0),
+      mat(PALETTE.seaFoam, { transparent: true, opacity: 0.45, depthWrite: false }));
+    q.rotation.x = -Math.PI / 2;
+    q.position.set(sd * 1.1, 0, 0);
+    q.castShadow = false; q.receiveShadow = false;
+    q.userData.noShadow = true;
+    palBangkaWake.add(q);
+  }
+  palBangkaWake.position.set(0, -0.48, -6.2);
+  g.add(palBangkaWake);
   root.add(g);
   palBangkaGroup = g;
 
@@ -2835,6 +2931,19 @@ const total = Math.hypot(palBANGKA_B.x - palBANGKA_A.x, palBANGKA_B.z - palBANGK
     palBangkaGroup.position.set(x, 0.55 + Math.sin(palTime * 1.4) * 0.06, z);
     palBangkaGroup.rotation.y = yaw;
     palBangkaGroup.rotation.z = Math.sin(palTime * 0.9) * 0.035;
+    const sp = Math.hypot(palBangkaBody.velocity.x, palBangkaBody.velocity.z);
+    const st = clamp(sp / palBANGKA_SPEED, 0, 1);
+    if (palBangkaTiller) {
+      // he corrects against the roll, and works the stick harder under way
+      palBangkaTiller.rotation.y = Math.sin(palTime * 0.9) * 0.22 * (0.3 + 0.7 * st) + Math.sin(palTime * 2.7) * 0.06 * st;
+    }
+    if (palBangkaWake) {
+      palBangkaWake.visible = st > 0.05;
+      const len = 2.5 + st * 6.5;
+      palBangkaWake.position.z = -4.6 - len * 0.5;
+      palBangkaWake.scale.set(0.6 + st * 0.6, 1, len);
+      for (let i = 0; i < 2; i++) palBangkaWake.children[i].material.opacity = 0.45 * st;
+    }
   }
   // ---- the ride ----------------------------------------------------------
   // IN THE HULL'S OWN FRAME. The route runs at 2.7 radians to the world axes,
