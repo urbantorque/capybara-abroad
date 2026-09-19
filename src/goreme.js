@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matEmit, emitSet, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, swayMesh, makeMerger, warnOnce } from './shared.js';
+import { PALETTE, mat, matOwn, matEmit, EMIT_OVER, emitSet, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, swayMesh, makeMerger, warnOnce } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 13 — CAPPADOCIA. AND YOU DO NOT GET A STEERING WHEEL.
@@ -181,6 +181,22 @@ let gorBasketPX = 0, gorBasketPY = 0, gorBasketPZ = 0;
 
 let gorBalVX = 0, gorBalVY = 0, gorBalVZ = 0;
 let gorBalBurn = 0;
+// ---- THE CREW TENDS IT (ROADMAP-WOW Part B) --------------------------------
+// The arrival sentence is "the first envelope already up", and the player's
+// bag is the top third of the arrival frame — but its inner glow only ever
+// fired from the player's own hand on E, so at arrival the biggest object
+// in the picture was a dark dome. A bag that is UP is being kept up: the
+// note over gorDECOR_BURN says it — a balloon holds by burning about every
+// twenty seconds — and the one live field crew already tops up on its own
+// clock (gorUpdateFieldBurners). So does this one, while it stands on the
+// field with nobody aboard: the same 6.5-12 s between, the same 1.9 s
+// flame, the same envelope smoothing, the same roar placed at the basket.
+// It drives the FLAME AND THE GLOW ONLY — gorBalBurn stays the control and
+// the lift; a top-up on a tethered bag moves nothing. Cut by
+// game.state.noTend.
+let gorBalTendNext = 3.5;           // s to the next top-up (negative: burning)
+let gorBalTend = 0;                 // 0..1 across the flame, smoothed
+let gorBalTendWas = false;
 // ---- JOINING THE BURN (D4.3) ---------------------------------------------
 // The marquee of this chapter was a stat-check on a clock: be above 55 m in
 // an eleven-second window and it pays, whatever you are doing. The one lever
@@ -2841,13 +2857,69 @@ function gorEnvelopeSplit(r) {
   return { a: mk(A), b: mk(B) };
 }
 
+// ---- THE FLEET'S BURN IS AN EMITTER (ROADMAP-WOW Part B) --------------------
+// The fleet's burn was an instance-colour multiply (toward the burner colour,
+// ×1.95) on a plain Lambert — which at five in the morning, under a sun that
+// has not cleared the ridge, is a slightly different shade of dark. A lantern
+// is LIGHT: the player's bag and the live field crew glow through `emitSet`
+// (EMIT_OVER, so the composite's bright pass takes them), and the fleet could
+// not, because twenty-six instances share one material and one emissive.
+// Measured at arrival (qa/wow-goreme-glow.js): the dome that fills the top
+// third of the arrival frame is fleet instance 24, and nothing in that frame
+// could bloom.
+//
+// So the burn goes down a per-instance attribute (`aBurn`, one float, written
+// where the instance colour already is) and an own material adds
+// `burner × aBurn × gorDECOR_EMIT` to totalEmissiveRadiance — the same
+// colour and the same 0.80 × EMIT_OVER the field crew's envelope uses, so a
+// fleet bag mid-burn is the field bag mid-burn. Chained after the rim hook
+// (leaf()'s pattern in shared.js); its own cache key. The colour multiply
+// stays: it is what you see of the fabric, this is what comes through it.
+// Cut by game.state.noFleetGlow (a uniform, read in gorUpdateDawnLine).
+const gorDECOR_EMIT = 0.40 * EMIT_OVER;
+const gorFleetGlowK = { value: 1 };
+let gorDecorBurnAttr = null;
+function gorDecorEnvMat() {
+  const m = matOwn(0xffffff);
+  const prev = m.onBeforeCompile;
+  const hadHook = typeof prev === 'function' && m.hasOwnProperty('onBeforeCompile');
+  const prevKey = m.customProgramCacheKey;
+  const c = gorBurnerC;
+  m.onBeforeCompile = function (shader) {
+    if (hadHook) prev.call(this, shader);
+    shader.uniforms.uGorFleetK = gorFleetGlowK;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aBurn;\nvarying float vGorBurn;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGorBurn = aBurn;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vGorBurn;\nuniform float uGorFleetK;')
+      .replace('#include <emissivemap_fragment>',
+               '#include <emissivemap_fragment>\n' +
+               'totalEmissiveRadiance += vec3(' + c.r.toFixed(4) + ', ' + c.g.toFixed(4) + ', ' + c.b.toFixed(4) +
+               ') * (vGorBurn * ' + gorDECOR_EMIT.toFixed(4) + ' * uGorFleetK);');
+  };
+  m.customProgramCacheKey = function () {
+    return 'gorFleetBurn' + (prevKey ? '|' + prevKey.call(this) : '');
+  };
+  return m;
+}
+
 function gorBuildDecor(root) {
   const cols = [PALETTE.gorEnvA, PALETTE.gorEnvB, PALETTE.gorEnvC,
                 PALETTE.gorEnvD, PALETTE.gorEnvE, PALETTE.gorEnvF];
   gorDecorData = new Float32Array(gorDECOR_N * 5);   // x, z, y, launchPhase, rate
   const envGeo = gorEnvelopeSplit(1);
-  const em = new THREE.InstancedMesh(envGeo.a, mat(0xffffff), gorDECOR_N);
-  const gm = new THREE.InstancedMesh(envGeo.b, mat(0xffffff), gorDECOR_N);
+  // one burn attribute, shared by the two halves of the bag (same instances)
+  gorDecorBurnAttr = new THREE.InstancedBufferAttribute(new Float32Array(gorDECOR_N), 1);
+  gorDecorBurnAttr.setUsage(THREE.DynamicDrawUsage);
+  envGeo.a.setAttribute('aBurn', gorDecorBurnAttr);
+  envGeo.b.setAttribute('aBurn', gorDecorBurnAttr);
+  const fleetMat = gorDecorEnvMat();
+  const em = new THREE.InstancedMesh(envGeo.a, fleetMat, gorDECOR_N);
+  const gm = new THREE.InstancedMesh(envGeo.b, fleetMat, gorDECOR_N);
+  // named, and the cut knob hung on the mesh, for qa/wow-goreme-glow.js
+  em.name = 'gorFleetEnv'; gm.name = 'gorFleetGore';
+  em.userData.glowK = gorFleetGlowK; gm.userData.glowK = gorFleetGlowK;
   const bm = new THREE.InstancedMesh(gorG.box, mat(PALETTE.gorBasket), gorDECOR_N);
   const tm = new THREE.InstancedMesh(gorG.cone8, mat(PALETTE.gorEnvC), gorDECOR_N);
   for (let i = 0; i < gorDECOR_N; i++) {
@@ -3048,11 +3120,21 @@ function gorUpdateDawnLine(dt) {
     const y = gorTerrain(gorDecorData[o], gorDecorData[o + 1]) + 6 + gorDecorData[o + 2];
     const lit = clamp((y - line) / 25, 0, 1) * clamp(gorSun * 3, 0, 1);
     // ---- the burner ------------------------------------------------------
-    // Only once it is off the ground, and it FADES OUT rather than snapping:
-    // an envelope stays warm for a second or two after the blast valve shuts,
-    // which is also what stops twenty-six of these reading as a strobe.
+    // It FADES OUT rather than snapping: an envelope stays warm for a second
+    // or two after the blast valve shuts, which is also what stops twenty-six
+    // of these reading as a strobe.
+    //
+    // ON THE GROUND TOO (ROADMAP-WOW Part B). This used to wait for the bag to
+    // be 3 m up, and at arrival not one of the eleven fleet bags in the frame
+    // had launched — so the frame whose sentence is "the first envelope
+    // already up" had eleven envelopes up and none of them lit, for forty
+    // seconds (qa/wow-goreme-glow.js). A bag standing inflated on a field is
+    // being KEPT inflated: the crew tops it up, which is the field-crew note's
+    // own picture ("a row of paper lanterns flashing out of step"). Same
+    // clock, same duty; a bag still folded (state 0/1 crews) is a different
+    // mesh and does not come here.
     let burn = 0;
-    if (gorDecorData[o + 2] > 3) {
+    {
       const u = (gorTime * gorDECOR_BURN + i * 0.3701 + (i % 5) * 0.13) % 1;
       if (u < 0.16) burn = gorSmooth(u / 0.035) * gorSmooth((0.16 - u) / 0.10);
       // ...and the whole valley, together, in the last twelve seconds. Staggered
@@ -3094,6 +3176,8 @@ function gorUpdateDawnLine(dt) {
       }
     }
     gorDecorLit[i] = on ? 1 : 0;
+    // ...and the emitter inside the bag — see gorDecorEnvMat.
+    if (gorDecorBurnAttr) gorDecorBurnAttr.array[i] = burn;
     gorCol.setRGB(gorDecorBase[b], gorDecorBase[b + 1], gorDecorBase[b + 2]);
     gorCol.lerp(gorDawnC, lit * 0.42);
     gorCol.multiplyScalar(1 + lit * 0.55);
@@ -3117,6 +3201,8 @@ function gorUpdateDawnLine(dt) {
     }
   }
   gorDecorMeshEnv.instanceColor.needsUpdate = true;
+  if (gorDecorBurnAttr) gorDecorBurnAttr.needsUpdate = true;
+  gorFleetGlowK.value = (gorGame && gorGame.state && gorGame.state.noFleetGlow) ? 0 : 1;
   if (gorDecorMeshGore && gorDecorMeshGore.instanceColor) gorDecorMeshGore.instanceColor.needsUpdate = true;
   // ...and the one burner you hear out of however many lit this frame. The
   // rate limit is here rather than left to the dispatcher's throttle, because
@@ -4733,6 +4819,35 @@ function gorUpdateBalloon(game, dt) {
   gorBasketBody.position.set(bx, by, bz);
   gorSyncBody(gorBasketBody);
 
+  // ---- THE CREW TENDS IT — see gorBalTendNext. ---------------------------
+  // Grounded and empty, the bag tops up on the field crew's clock; the
+  // moment anyone boards, or it lifts, the clock stops and the flame is the
+  // player's again (gorBalBurn). The rising edge roars once, at the basket.
+  {
+    const tending = !gorAboard && gorGroundedT > 0.5 && !(game.state && game.state.noTend);
+    if (tending) {
+      gorBalTendNext -= dt;
+      if (gorBalTendNext <= -gorBURN_LEN) gorBalTendNext = rand(gorBURN_A, gorBURN_B);
+      const u = gorBalTendNext <= 0 ? -gorBalTendNext / gorBURN_LEN : -1;
+      gorBalTend = u >= 0 ? gorSmooth(u / 0.27) * gorSmooth((1 - u) / 0.32) : 0;
+      const lit = gorBalTend > 0.35;
+      if (lit && !gorBalTendWas) {
+        const h = gorHeard(gorBalX, gorBalZ, 10, 130);
+        if (h > 0.03) {
+          gorSfx('burner', gorPlace({ volume: 0.34 * h * rand(0.82, 1.12),
+                                    pitch: (1.05 + h * 0.75) * rand(0.90, 1.10) },
+                                  gorBalX, gorBalY + 3.2, gorBalZ, 130));
+        }
+      }
+      gorBalTendWas = lit;
+    } else {
+      gorBalTend = 0; gorBalTendWas = false;
+      if (gorBalTendNext < 0) gorBalTendNext = rand(gorBURN_A, gorBURN_B);
+    }
+  }
+  // what the flame and the envelope show: the player's hand, or the crew's
+  const gorBalGlow = Math.max(gorBalBurn, gorBalTend);
+
   if (gorBalloon) {
     gorBalloon.position.set(gorBalX, gorBalY, gorBalZ);
     // the envelope trails the basket when the wind changes under it, which is
@@ -4741,14 +4856,14 @@ function gorUpdateBalloon(game, dt) {
     gorBalloon.rotation.x = clamp((gorBalVZ - w.z) * 0.05, -0.14, 0.14);
     const flame = gorBalloon.userData.flame;
     if (flame) {
-      flame.visible = gorBalBurn > 0.03;
+      flame.visible = gorBalGlow > 0.03;
       // A four-metre column of burning propane, and it was a 1.5 m cone that
       // grew to two and a half. It is the only warm light in the valley and
       // the one piece of feedback a four-second control has.
-      const s = 0.7 + gorBalBurn * 2.3 + Math.sin(gorTime * 22) * 0.16 * gorBalBurn;
-      const w = 0.86 + gorBalBurn * 0.34 + Math.sin(gorTime * 31) * 0.06 * gorBalBurn;
+      const s = 0.7 + gorBalGlow * 2.3 + Math.sin(gorTime * 22) * 0.16 * gorBalGlow;
+      const w = 0.86 + gorBalGlow * 0.34 + Math.sin(gorTime * 31) * 0.06 * gorBalGlow;
       flame.scale.set(w, s, w);
-      emitSet(flame.material, 1.0 + gorBalBurn * 2.4);
+      emitSet(flame.material, 1.0 + gorBalGlow * 2.4);
     }
     // ---- AND THE ENVELOPE LIGHTS UP FROM THE INSIDE --------------------
     // THE picture of that valley, and the chapter did not have it. A four-
@@ -4771,7 +4886,7 @@ function gorUpdateBalloon(game, dt) {
       // plain dome. A lantern is a lantern because you can still see what it
       // is made of; it is the FLAME that should be the bright thing, and that
       // is where the extra went (see the scale below).
-      emitSet(envM.material, gorBalBurn * 0.50 * flick);
+      emitSet(envM.material, gorBalGlow * 0.50 * flick);
     }
   }
 

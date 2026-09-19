@@ -963,6 +963,35 @@ frame or it is not a beat.
   caustic is a picture (the net moves 632 px of the same band) — the
   spawn looks along the beach, not down at the bed, and the spawn row is
   frozen.
+- **Goreme — the envelope's inner glow when the burner fires.** The glow
+  existed at every tier the row did not look at (the player's bag via
+  `emitSet` at 0.50 — a measured "0.50, NOT 0.85" against washing the
+  gores; the one live field crew at 0.80; the fleet by instance colour)
+  and NONE of it could fire in the arrival frame: the field crew's bag is
+  just right of the frame edge, the player's bag is a 268-px sliver at
+  the edge and only glows from the player's own hand on E, and the eleven
+  fleet bags standing in the frame were gated `> 3 m up` and had not
+  launched (40 s of polling: nothing lit). Two things shipped, both on the
+  chapter's own clocks: (1) THE FLEET'S BURN IS AN EMITTER — a per-instance
+  `aBurn` attribute written where the instance colour already is, an own
+  material (`gorDecorEnvMat`, chained after the rim hook, leaf()'s
+  pattern) adding burner × aBurn × 0.40·EMIT_OVER to
+  `totalEmissiveRadiance`; and a standing inflated bag tops up like a
+  flying one (the ground gate dropped; its comment reasoned the fade, not
+  the gate; the field-crew note's own picture is "a row of paper lanterns
+  flashing out of step"). (2) THE CREW TENDS THE PLAYER'S BAG — grounded
+  and empty it fires on the field crew's clock (`gorBURN_A..B`,
+  `gorBURN_LEN`), driving the flame and the envelope glow only;
+  `gorBalBurn` stays the control and nothing lifts. Cuts:
+  `game.state.noFleetGlow` (a uniform) and `game.state.noTend`.
+  `qa/wow-goreme-glow.js` (real composite via `game.post.render()`, a
+  per-instance silhouette with the other 25 zeroed, the cut same-instant):
+  0.80·EMIT_OVER read (255, 243, 138) inside — a flat yellow sheet, gores
+  gone, halo 96 % moved by 66 levels — so 0.25 (inside +22) and 0.40
+  shipped: inside 100 % moved, mean +37, max 69; the HALO ring outside the
+  silhouette 74 % moved, mean +11 — the bloom, which a colour change
+  cannot put there; rest of frame 0.03 %. The frame: warm lanterns among
+  dark bags, the gores still readable.
 
 ## Part C — the model sheet: structures, movers, NPCs and the animal, biome by biome (added 19 Sep 2026)
 
