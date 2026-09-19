@@ -228,6 +228,7 @@ const hkRINGS = [
   [50, 64, -140], [72, 42, -105], [40, 30, -78], [0, 40, -60],
 ];
 let hkHeliG = null, hkHeliRotor = null, hkHeliTail = null, hkHeliPadMesh = null;
+let hkHeliTailRotor = null;         // its own mesh, spun about X (ROADMAP-WOW Part C)
 let hkHeliX = hkHELI.x, hkHeliY = hkROOF_Y, hkHeliZ = hkHELI.z, hkHeliYaw = hkHELI.yaw;
 let hkHeliVX = 0, hkHeliVY = 0, hkHeliVZ = 0, hkHeliBank = 0, hkHeliPitch = 0;
 let hkHeliOn = false, hkHeliCool = 0, hkHeliRotorK = 0, hkHeliMover = null, hkHeliAir = 0;
@@ -1519,6 +1520,7 @@ function hkBuildHeli(game, root) {
   root.add(hkHeliPadMesh);
   // the machine: a bubble, a boom, a fin, two skids; the rotor is its own mesh
   const g = new THREE.Group();
+  g.name = 'hkHeli';                 // findable from the harness (qa/wow-movers.js)
   const K = hkMerger();
   const body = PALETTE.hkNeonGold, dark = PALETTE.hkConcreteDk;
   // AN OPEN CABIN, so the pilot is in the picture: a floor, a rear wall, two
@@ -1533,7 +1535,8 @@ function hkBuildHeli(game, root) {
   // no canopy: the camera is above and behind, and a roof is a lid on the pilot
   K.box(0, 1.35, -2.4, 0.5, 0.45, 3.4, body);                      // the boom
   K.box(0, 2.0, -4.0, 0.16, 1.1, 0.7, body);                       // the fin
-  K.cyl(0.35, 1.95, -4.05, 0.55, 0.06, dark, 0, 0, Math.PI / 2, 8); // the tail rotor
+  // (the tail rotor is its own mesh now — see below the merge)
+  K.cyl(0.35, 1.95, -4.05, 0.07, 0.10, dark, 0, 0, Math.PI / 2, 6);  // its hub
   K.box(0, 1.75, -0.7, 0.32, 0.9, 0.32, dark);                      // the mast, off the rear wall
   for (let sd = -1; sd <= 1; sd += 2) {
     K.box(sd * 0.95, 0.12, 0.2, 0.12, 0.12, 3.0, dark);            // a skid
@@ -1550,6 +1553,20 @@ function hkBuildHeli(game, root) {
   hkHeliRotor.position.set(0, 2.22, -0.5);
   hkHeliRotor.castShadow = true;
   g.add(hkHeliRotor);
+  // THE TAIL ROTOR TURNS (ROADMAP-WOW Part C, the movers uplift). It was a
+  // disc baked into the hull; the main rotor spun and the tail sat still,
+  // which is the one thing about a helicopter that nobody's eye forgives. Two
+  // blades on the starboard side of the fin, its own mesh, spun about its own
+  // X in hkUpdateHeli at a rate above the main rotor's — a tail rotor turns
+  // faster than the disc it trims. The hub stays in the merge.
+  const TR = hkMerger();
+  TR.box(0, 0, 0, 0.05, 1.10, 0.12, dark);
+  TR.box(0, 0, 0, 0.05, 0.12, 1.10, dark);
+  TR.box(0, 0.50, 0, 0.06, 0.12, 0.14, PALETTE.hkNeonGold);        // one tip in the body colour
+  hkHeliTailRotor = new THREE.Mesh(TR.build(), hkVC());
+  hkHeliTailRotor.position.set(0.40, 1.95, -4.05);
+  hkHeliTailRotor.castShadow = true;
+  g.add(hkHeliTailRotor);
   // a red light on the boom, so it reads at night
   const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 4), hkGlowMat(0xff4040, 2.2));
   lamp.position.set(0, 2.6, -4.0);
@@ -1631,6 +1648,7 @@ function hkUpdateHeli(game, dt) {
   // ---- the rotor, the sound -----------------------------------------------
   hkHeliRotorK = damp(hkHeliRotorK, hkHeliOn ? 1 : 0, hkHeliOn ? 1.6 : 0.8, dt);
   if (hkHeliRotor) hkHeliRotor.rotation.y += hkHeliRotorK * 34 * dt;
+  if (hkHeliTailRotor) hkHeliTailRotor.rotation.x += hkHeliRotorK * 52 * dt;
   if (hkHeliTail) hkHeliTail.material.emissiveIntensity = 1.2 + Math.sin(hkTime * 9) * 1.0;
   if (!hkHeliMover && game.sfxMover) hkHeliMover = game.sfxMover('prop', { key: 'hk:heli', near: 8, far: 160 });
   if (hkHeliMover) {

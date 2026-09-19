@@ -93,7 +93,7 @@ async page => {
 
   // ---- the rows: which chapters to run is the literal below (trap 14: no
   // argv in run-code) ----
-  const RUN = ['cali']
+  const RUN = ['kowloon']
   const errAt = () => errs.length
 
   for (let ci = 0; ci < RUN.length; ci++) {
@@ -184,6 +184,24 @@ async page => {
       rec.chiva2 = await page.evaluate(() => { const d = window.__capy.cali.chivaDebug(); return { st: d.st, v: d.v, s: d.s } })
       await shot('MOV-cali-3', B, [14, 6, 8, 2.0, 36])
       await shot('MOV-cali-4', B, [-9, -7, 2.2, 1.2, 34])
+    }
+
+    if (name === 'kowloon') {
+      // THE HELICOPTER: take it from the harness, hold Space (climb) so the
+      // rotors spin up and the machine lifts, two frames 250 ms apart from
+      // the starboard quarter where the tail rotor is, then a play-angle shot.
+      rec.take = await page.evaluate(() => window.__capy.kowloon.heliDebug({ take: true }))
+      await page.waitForTimeout(1200)
+      await page.keyboard.down('Space')
+      await page.waitForTimeout(3200)
+      const H = (a) => { const o = window.__capy.scene.getObjectByName('hkHeli'); return o ? window.__art.objShot(o, a[0], a[1], a[2], a[3], a[4]) : '' }
+      await shot('MOV-kowloon-1', H, [7.5, 5.5, 2.4, 1.6, 32])
+      await page.waitForTimeout(250)
+      await shot('MOV-kowloon-2', H, [7.5, 5.5, 2.4, 1.6, 32])
+      rec.heli = await page.evaluate(() => { const h = window.__capy.kowloon.heli(); return { on: h.on, y: +h.y.toFixed(1), air: +h.air.toFixed(1) } })
+      await shot('MOV-kowloon-3', H, [3.0, 4.0, 1.0, 1.9, 30])
+      await shot('MOV-kowloon-4', H, [14, 0, 9, 1.5, 36])
+      await page.keyboard.up('Space')
     }
 
     rec.errs = errs.slice(e0)
