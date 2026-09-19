@@ -171,6 +171,10 @@ const sysSPL_REACH1 = 26.0;  // ...and of the biggest cluster in the game.
                              // worth the instruction.
 const sysSplFound   = [];    // { x, y, z, r, cr, cg, cb } — rebuilt on biome swap
 const sysSPL_GEO_CENTRE = { monaco: 1 };   // instanced emitters clustered at the geometry's centre, not the instance origin (A4)
+const sysSPL_SPLIT_MERGED = { iceland: [4.4, 5.2] }; // a merged emissive mesh clustered by its vertices in this height band — Reykjavik's heads at 4.75 (A4)
+const sysSPL_REACH_BY = { iceland: 7.0 };   // m; a sodium head's pool on the road, not a sign bank's 14 (A4)
+const sysSPL_MAXC_BY = { iceland: 256 };    // clusters kept, where the default 24 cannot hold the town (A4)
+const sysSPL_CLUS_BY = { iceland: 2.5 };    // m; a fitting is its own light, not one cluster with the windows behind it (A4)
 const sysSplSlots   = [];    // { src, k }
 const sysSplWant    = [];
 const sysSplOut     = [];
@@ -12057,6 +12061,41 @@ export function createSystems(game) {
           cand.push({ x: sysSplV.x, y: sysSplV.y, z: sysSplV.z, l: lum,
                       r: m.emissive.r, g: m.emissive.g, b: m.emissive.b, used: false });
         }
+      } else if (sysSPL_SPLIT_MERGED[B && B.current] && o.geometry && o.geometry.attributes &&
+                 o.geometry.attributes.position) {
+        // A MERGED EMITTER IS MANY LIGHTS (ROADMAP-WOW A4 — Iceland's spill).
+        // Reykjavik's 26 sodium heads and every lit window are ONE merged
+        // mesh whose origin is the chapter root, so the scan saw two clusters
+        // in the whole town (a headlamp and the lighthouse) and the lamps lit
+        // nothing on the road. Its vertices, snapped to a metre and deduped,
+        // are a candidate per corner of every pane and head; the cluster
+        // pass below folds each fitting's corners into one light. Gated: it
+        // is a walk over thousands of vertices once per attach, and it moves
+        // the pool in any chapter it is switched on for.
+        //
+        // ...AND A CEILING, because the stars are a merged emitter too: the
+        // first walk filled all 96 slots with a hundred and sixty stars at
+        // y 80-280 (raysAudit), three hundred metres off, and not one lamp
+        // got in. A light that spills is within reach of the ground.
+        //
+        // ...AND ONLY THE LAMPS. With every window in as well (144 clusters,
+        // reach 14 m, the nearest eight all overlapping) the lower half of
+        // the frame moved 99.8 % at a mean of 47 levels: the coldest chapter
+        // in the game re-graded to a sodium street. The row names the band
+        // the heads hang in (sysSPL_SPLIT_MERGED[name] = [y0, y1]); the
+        // windows keep their own painted pools (iceWinPools).
+        const band = sysSPL_SPLIT_MERGED[B && B.current];
+        const pos = o.geometry.attributes.position, seen = new Set();
+        for (let i = 0; i < pos.count; i++) {
+          sysSplV.fromBufferAttribute(pos, i);
+          o.localToWorld(sysSplV);
+          if (sysSplV.y < band[0] || sysSplV.y > band[1]) continue;
+          const key = Math.round(sysSplV.x) + ',' + Math.round(sysSplV.y) + ',' + Math.round(sysSplV.z);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          cand.push({ x: sysSplV.x, y: sysSplV.y, z: sysSplV.z, l: lum,
+                      r: m.emissive.r, g: m.emissive.g, b: m.emissive.b, used: false });
+        }
       } else {
         o.getWorldPosition(sysSplV);
         if (sysSplV.y < sysSPL_MINY) return;
@@ -12069,7 +12108,15 @@ export function createSystems(game) {
     // Brightest first, then absorb everything within sysSPL_CLUS of it. Greedy
     // and O(n^2) on a few hundred candidates, once per chapter attach.
     cand.sort(function (a, b) { return b.l - a.l; });
-    for (let i = 0; i < cand.length && sysSplFound.length < sysSPL_MAXC; i++) {
+    // ...and a town of seventy fittings needs a longer list than 24: the
+    // pool still ranks the nearest eight, this is only how many it may
+    // choose from (A4; sysSPL_MAXC_BY).
+    const maxC = sysSPL_MAXC_BY[B && B.current] || sysSPL_MAXC;
+    // ...and a fitting is its own light where the row says so: at 7 m a
+    // sodium head and the windows behind it were one cluster whose centroid
+    // sat on a dark wall (sysSPL_CLUS_BY).
+    const clus = sysSPL_CLUS_BY[B && B.current] || sysSPL_CLUS;
+    for (let i = 0; i < cand.length && sysSplFound.length < maxC; i++) {
       if (cand[i].used) continue;
       let sx = 0, sy = 0, sz = 0, sr = 0, sg = 0, sb = 0, w = 0, n = 0, spread = 0;
       for (let j = i; j < cand.length; j++) {
@@ -12077,7 +12124,7 @@ export function createSystems(game) {
         if (c.used) continue;
         const dx = c.x - cand[i].x, dy = c.y - cand[i].y, dz = c.z - cand[i].z;
         const d2 = dx * dx + dy * dy + dz * dz;
-        if (d2 > sysSPL_CLUS * sysSPL_CLUS) continue;
+        if (d2 > clus * clus) continue;
         c.used = true; n++;
         if (d2 > spread) spread = d2;
         sx += c.x * c.l; sy += c.y * c.l; sz += c.z * c.l;
@@ -12093,11 +12140,11 @@ export function createSystems(game) {
       if (mx > 0.001) sysSplC.multiplyScalar(1 / mx);
       // Bigger clusters reach further and burn a little harder, but both are
       // capped: this is a sign, not the sun.
-      const big = clamp(Math.sqrt(spread) / sysSPL_CLUS, 0, 1);
+      const big = clamp(Math.sqrt(spread) / clus, 0, 1);
       const k = sysSPL_K * clamp(0.55 + 0.45 * clamp(w / 2.2, 0, 1), 0, 1);
       sysSplFound.push({
         x: sx / w, y: sy / w, z: sz / w,
-        r: lerp(sysSPL_REACH0, sysSPL_REACH1, big),
+        r: sysSPL_REACH_BY[B && B.current] || lerp(sysSPL_REACH0, sysSPL_REACH1, big),
         cr: sysSplC.r * k, cg: sysSplC.g * k, cb: sysSplC.b * k,
       });
     }

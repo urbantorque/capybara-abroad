@@ -21,7 +21,7 @@ async page => {
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
 
-  const CHAPTER = 'monaco'
+  const CHAPTER = 'iceland'
   // Goreme's rays exist at the sun's event, not at arrival: wait for sunUp to
   // pass the ridge (gorSUN_P), polling at most this many seconds.
   const WAIT_EVENT_S = 0   // Goreme: the ridge event is balloon-altitude only (see sysRAYS); test the plaza's predawn arrival
