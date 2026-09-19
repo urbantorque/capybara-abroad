@@ -219,6 +219,26 @@ edges (texel snap exists; acne on the low suns does not).
 - **`game.state.noStill`** (one switch for all four, plus per-term
   reads for attribution).
 
+**The shimmer floor, recorded (19 Sep 2026).** `qa/wow-still.js` built
+and run: two raw renders 120 ms apart through ONE frozen copy of the
+resting camera, the intended motion hidden for both (weather fields at
+renderOrder 6, the 72-vertex roster, sway-hooked instanced foliage, the
+locals, the animal), per-pixel max-channel diff > 8 levels, the LEAST of
+three pairs (a shower's onset is an event, not the floor — the first
+single-pair run read Kyoto at 82 % moved for exactly that reason).
+Moved % of frame / of the lower third:
+
+sydney 0.95/0.18 · pasto 1.89/1.39 · quay 4.99/6.56 · kyoto 0.32/0 ·
+cali 0.79/0 · rio 2.01/2.11 · iceland 1.78/0.30 · sahara 1.69/0.95 ·
+drift 0.35/0 · venice 1.05/0.04 · kowloon 3.00/3.22 · palawan 1.86/0.29
+· goreme 0.22/0.02 · manly 0.95/0 · pantanal 3.00/2.74 · cave 0.21/0.32
+· antarctic 0.45/0.05 · monaco 0.83/0.71 · hanoi 3.19/0.00
+
+The four worst are the Quay (rigging, the harbour's sparkle), Kowloon,
+the Pantanal (tufts, the flood's sparkle) and Hanoi (the cables) — the
+chapters A3 named before it was measured. These are the "before" for the
+−40 % target; anything in A3 is judged against this row, per chapter.
+
 **W1 reality check (19 Sep 2026), before building any of the four —
 LIFT10's lesson applied to this item too: check the code before chasing
 the description.**
