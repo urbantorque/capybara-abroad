@@ -142,6 +142,50 @@ this band; today it softens nothing because nothing is in it.
   chapter's own batch; where it must sway it joins the chapter's
   existing `swayMesh` batch.
 
+**W1 reality check (19 Sep 2026): four of the six landed, two did not, and
+neither miss was a shape problem.**
+
+- **Kyoto, Hanoi, Kowloon and Cali shipped**, each a static
+  `hangThing`/merged-box addition placed once from the live resting
+  camera (position + `getWorldDirection` + two cross products, never
+  the spawn table's yaw) and confirmed by an actual screenshot per
+  chapter (`qa/wow-fore-<name>.png`, gitignored) plus a bounding-box NDC
+  proxy in `qa/wow-fore.js`. The real trap on all four was **the object
+  read far too large at 1.5-3.5 m** — `sysBOARD_HANG`'s own lengths
+  (`len: 1.05`, `2.05`) are sized for a board mounted 5-15 m off, and
+  the first placement at those lengths filled a third of the frame;
+  every landed chapter needed its `len` cut to roughly half, sometimes
+  twice, before it read as a corner accent instead of a curtain.
+- **Manly did not ship: the resting camera itself is not deterministic
+  on a fresh arrival.** Three separate fresh boots (`hud.cross('manly')`
+  from a cold title screen, no state carried over) converged to three
+  DIFFERENT stable camera poses — `(9.09, 6.69, 53.62)`,
+  `(-0.56, 5.85, 50.95)`, `(6.51, 5.86, 50.84)` — each one confirmed
+  settled by a poll (two 1 s-apart reads agreeing within 5 cm), not a
+  mid-transition read. A world-space anchor keyed to any one of those
+  poses is right about a third of the time and off-frame or behind the
+  lens the other two thirds. This is a property of Manly's own rig (the
+  windiest chapter in `wxMOOD`, and the resting-lens memory already
+  notes it "cuts to 0.80 against a dune" where every other chapter
+  reads `clear: 1`) and is out of scope for this item to fix — it needs
+  its own investigation into why the yaw settles differently per boot,
+  not a foreground object.
+- **Sydney did not ship: the arrival frame has no empty corner to give
+  it.** The resting camera at the Sydney spawn sits close enough to
+  `envFIG_SPOTS[10]` (-11.5, 17.5) that that fig's own crown blobs
+  already fill roughly the right two-thirds of the frame, top to
+  bottom — confirmed stable across repeated fresh boots, so it is not a
+  measurement fluke. The outer-left column is under the to-do card at
+  rest, not just during the arrival hold, and the remaining strip of
+  open sky is dead centre, not a corner, so a bough hung there reads as
+  a leaf floating with nothing near it rather than as part of a tree.
+  This is exactly the failure mode the second beauty pass's own line
+  at the top of this section names — "a canopy between lens and
+  animal is a camera problem" — except here the canopy already fills
+  the frame instead of the near 3 m being empty, so this item's fix
+  (add something to an empty corner) does not apply to what Sydney's
+  spawn actually has wrong with it.
+
 ### A3 — STILL PIXELS ("smoother")
 
 The art style is low-poly and MSAA ×4 is what its edges live on. What
