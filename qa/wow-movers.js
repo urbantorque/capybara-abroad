@@ -93,7 +93,7 @@ async page => {
 
   // ---- the rows: which chapters to run is the literal below (trap 14: no
   // argv in run-code) ----
-  const RUN = ['pasto']
+  const RUN = ['cali']
   const errAt = () => errs.length
 
   for (let ci = 0; ci < RUN.length; ci++) {
@@ -144,6 +144,46 @@ async page => {
           if (++n >= 60) { clearInterval(t); res({ found: true, against, withIt, fanRange: +(fmax - fmin).toFixed(3), shoulderRange: +(smax - smin).toFixed(3), rows }) }
         }, 50)
       }))
+    }
+
+    if (name === 'quay') {
+      // THE FERRY: take the helm from the harness, hold W (throttle) and A
+      // (rudder) with real keys for six seconds, then two frames 300 ms
+      // apart from the starboard quarter — pennant, ensign, wheel, wake, and
+      // the lifebuoy on the port side visible from the other quarter.
+      rec.helm = await page.evaluate(() => window.__capy.quay.helmDebug(true))
+      await page.waitForTimeout(600)
+      await page.keyboard.down('KeyW')
+      await page.waitForTimeout(5000)
+      await page.keyboard.down('KeyA')
+      await page.waitForTimeout(1500)
+      const F = () => window.__art.objShot(window.__capy.scene.getObjectByName('quayBoat'), 16, 9, 7, 1.6, 34)
+      await shot('MOV-quay-1', F)
+      await page.waitForTimeout(300)
+      await shot('MOV-quay-2', F)
+      rec.boat = await page.evaluate(() => { const b = window.__capy.quay.boat; return { speed: +b.speed.toFixed(2), rudder: +b.rudder.toFixed(2), throttle: +b.throttle.toFixed(2) } })
+      // the port quarter: the lifebuoy, and the pennant's lean seen from aft
+      await shot('MOV-quay-3', () => window.__art.objShot(window.__capy.scene.getObjectByName('quayBoat'), 13, -8, 5.5, 1.8, 34))
+      // the play angle: high, behind
+      await shot('MOV-quay-4', () => window.__art.objShot(window.__capy.scene.getObjectByName('quayBoat'), 22, 0, 16, 1.5, 36))
+      await page.keyboard.up('KeyA')
+      await page.keyboard.up('KeyW')
+    }
+
+    if (name === 'cali') {
+      // THE PARTY BUS: roll her from the harness (chivaSet: state + v), then
+      // two frames 300 ms apart low on the starboard side where the wheels
+      // and the spare read, and the play angle from behind-above.
+      rec.set = await page.evaluate(() => window.__capy.cali.chivaSet({ state: 'rolling', v: 5.5 }))
+      await page.waitForTimeout(1500)
+      rec.chiva = await page.evaluate(() => { const d = window.__capy.cali.chivaDebug(); return { st: d.st, v: d.v, s: d.s } })
+      const B = (side) => { const o = window.__capy.scene.getObjectByName('caliChiva'); return o ? window.__art.objShot(o, side[0], side[1], side[2], side[3], side[4]) : '' }
+      await shot('MOV-cali-1', B, [1.5, 12.5, 2.6, 1.0, 30])
+      await page.waitForTimeout(200)
+      await shot('MOV-cali-2', B, [1.5, 12.5, 2.6, 1.0, 30])
+      rec.chiva2 = await page.evaluate(() => { const d = window.__capy.cali.chivaDebug(); return { st: d.st, v: d.v, s: d.s } })
+      await shot('MOV-cali-3', B, [14, 6, 8, 2.0, 36])
+      await shot('MOV-cali-4', B, [-9, -7, 2.2, 1.2, 34])
     }
 
     rec.errs = errs.slice(e0)

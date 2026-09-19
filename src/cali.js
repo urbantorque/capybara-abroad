@@ -197,6 +197,8 @@ let caliCaneMesh = null, caliCaneList = null, caliCanePhase = null, caliCaneLast
 let caliFloorMesh = null, caliFloorMat = null;
 let caliLampMesh = null;
 let caliChivaGroup = null;
+let caliChivaWheels = null;          // four separate wheels, spun by the road (ROADMAP-WOW Part C)
+let caliChivaWheelS = 0;             // the route distance the wheels last rolled to
 let caliGatoGroup = null;
 let caliLuladaMesh = null, caliLuladaGone = false, caliLuladaT = 0;
 let caliSpark = null;
@@ -1036,18 +1038,16 @@ function caliBuildStreet(game, root) {
  */
 function caliBuildChiva(game, root) {
   const g = new THREE.Group();
+  g.name = 'caliChiva';               // findable from the harness (qa/wow-movers.js)
   const C = caliMerger();
   const L = 9.5, W = 2.9;
-  // chassis and wheels
+  // chassis; the wheels are their own meshes now — see below the merge
   C.box(0, 0.62, 0, W, 0.5, L, PALETTE.caliGrille);
-  for (let s = -1; s <= 1; s += 2) {
-    for (let k = -1; k <= 1; k += 2) {
-      C.cyl(s * (W * 0.5 - 0.1), 0.55, k * (L * 0.32), 0.55, 0.42, PALETTE.caliGrille,
-            0, 0, Math.PI / 2, 8);
-      C.cyl(s * (W * 0.5 - 0.1), 0.55, k * (L * 0.32), 0.26, 0.46, PALETTE.caliChivaTrim,
-            0, 0, Math.PI / 2, 6);
-    }
-  }
+  // ...AND ONE THING THAT IS NOT MIRRORED: a spare wheel slung on the
+  // starboard flank amidships, between the axles, under the benches, and only there. Everything else
+  // on her is built in s = -1..1 pairs.
+  C.cyl(W * 0.5 + 0.12, 1.02, -L * 0.06, 0.50, 0.24, PALETTE.caliGrille, 0, 0, Math.PI / 2, 8);
+  C.cyl(W * 0.5 + 0.12, 1.02, -L * 0.06, 0.22, 0.28, PALETTE.caliChivaTrim, 0, 0, Math.PI / 2, 6);
   // the body: red, with yellow and blue bands, and the roof on posts
   C.box(0, 1.30, 0, W, 0.9, L, PALETTE.caliChiva);
   C.box(0, 1.78, 0, W + 0.06, 0.2, L, PALETTE.caliChivaTrim);
@@ -1093,6 +1093,31 @@ function caliBuildChiva(game, root) {
   m.castShadow = true;
   m.receiveShadow = true;
   g.add(m);
+  // ---- THE WHEELS TURN (ROADMAP-WOW Part C, the movers uplift) -----------
+  // They were four cylinders baked into the body: a bus that slid down the
+  // painted street as one block, which the rubric calls a prop. Four
+  // separate meshes, one merged geometry shared, spun about their axle by
+  // the body's own speed in caliStepChiva. The tyre is eight-sided and the
+  // hub six, and a trim-coloured lug on the rim breaks the symmetry so the
+  // turn reads at the play distance rather than as a shimmer. The kinematic
+  // compound in caliChivaBody never included the wheels; nothing collides.
+  {
+    const Wm = caliMerger();
+    Wm.cyl(0, 0, 0, 0.55, 0.42, PALETTE.caliGrille, 0, 0, Math.PI / 2, 8);
+    Wm.cyl(0, 0, 0, 0.26, 0.46, PALETTE.caliChivaTrim, 0, 0, Math.PI / 2, 6);
+    Wm.box(0, 0.40, 0, 0.48, 0.12, 0.10, PALETTE.caliChivaTrim);          // the lug
+    const wg = Wm.build();
+    caliChivaWheels = [];
+    for (let s = -1; s <= 1; s += 2) {
+      for (let k = -1; k <= 1; k += 2) {
+        const wm = new THREE.Mesh(wg, caliVC());
+        wm.position.set(s * (W * 0.5 - 0.1), 0.55, k * (L * 0.32));
+        wm.castShadow = true;
+        g.add(wm);
+        caliChivaWheels.push(wm);
+      }
+    }
+  }
   // ---- THE FESTOON (L5): a string of coloured bulbs along both rails and
   // across the front, dark by day and lit as the night comes (see the update)
   {
@@ -2673,6 +2698,18 @@ function caliStepChiva(game, dt) {
   caliQ.setFromEuler(caliEu);
   caliChivaGroup.position.set(caliChivaX, caliChivaY, caliChivaZ);
   caliChivaGroup.quaternion.copy(caliQ);
+  // the wheels roll with the road: the change in route distance over a
+  // 0.55 m radius (v is unsigned on the return leg, and she backs down the
+  // hill). Forward is +Z in her own frame, and a positive turn about +X
+  // carries the tread aft.
+  if (caliChivaWheels) {
+    const dS = caliChivaS - caliChivaWheelS;
+    caliChivaWheelS = caliChivaS;
+    if (Math.abs(dS) < 20) {
+      const dth = dS / 0.55;
+      for (let i = 0; i < 4; i++) caliChivaWheels[i].rotation.x += dth;
+    }
+  }
 
   const b = caliChivaBody;
   b.position.set(caliChivaX, caliChivaY, caliChivaZ);
