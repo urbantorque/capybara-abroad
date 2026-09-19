@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matOwn, TASKS, rand, randInt, clamp, damp, lerp, waterYAt } from './shared.js';
+import { PALETTE, mat, matOwn, matRound, TASKS, rand, randInt, clamp, damp, lerp, waterYAt } from './shared.js';
 
 // ===========================================================================
 // AGENT D — NPC AI.  Sydneysiders: tourists, gardeners, joggers, bin chickens.
@@ -179,10 +179,15 @@ function npcMakeGeo(parts) {
     const p = parts[i];
     let g;
     if (p.k === 'cyl') g = new THREE.CylinderGeometry(p.rt, p.rb, p.h, p.seg || 6);
-    else if (p.k === 'sph') g = new THREE.SphereGeometry(p.r, 6, 4);
+    // a sphere is `r` (uniform) or `sx/sy/sz` (semi-axes — a head that was a
+    // box becomes a sphere of the same silhouette; ROADMAP-WOW G5 item 2).
+    // The scale rides in the part matrix, so applyMatrix4 transforms the
+    // normals with the inverse-transpose and a squashed sphere stays smooth.
+    else if (p.k === 'sph') g = new THREE.SphereGeometry(p.sx !== undefined ? 1 : p.r, 6, 4);
     else if (p.k === 'cone') g = new THREE.ConeGeometry(p.r, p.h, p.seg || 5);
     else g = new THREE.BoxGeometry(p.w, p.h, p.d);
     npcM1.makeRotationFromEuler(npcE1.set(p.rx || 0, p.ry || 0, p.rz || 0));
+    if (p.k === 'sph' && p.sx !== undefined) npcM1.scale(npcV1.set(p.sx, p.sy !== undefined ? p.sy : p.sx, p.sz !== undefined ? p.sz : p.sx));
     npcM1.setPosition(p.x || 0, p.y || 0, p.z || 0);
     g.applyMatrix4(npcM1);
     let ng = g;
@@ -1195,6 +1200,18 @@ export function createNPCs(game) {
 
   // Near-white base colour so per-instance colours multiply true (sun-bleached).
   const instMat = mat(PALETTE.sail, { vertexColors: true });
+  // ---- THE LIVING ARE ROUND (ROADMAP-WOW G5, item 4: the animals) ---------
+  // The same material with flatShading OFF, under matRound's own cache key
+  // so the people's and the props' instMat never share its program. On a
+  // part list the GEOMETRY decides: SphereGeometry and CylinderGeometry carry
+  // smooth normals through toNonIndexed, BoxGeometry carries face normals —
+  // so an ibis body goes round, a gull's box wing stays planar, a dog's box
+  // torso stays a box, on one flag. Only the animals' instances take it (the
+  // `round` argument to mkInst); `game.state.noRound` swaps them all back
+  // for the A/B, polled once a frame in update() and applied on the edge.
+  const instMatRound = matRound(PALETTE.sail, { vertexColors: true });
+  const npcRoundMeshes = [];
+  let npcRoundOn = !(game.state && game.state.noRound);
 
   // ---------------------------------------------------------------- roster
   const roster = [];
@@ -1212,8 +1229,9 @@ export function createNPCs(game) {
   const HUMANS = roster.length;      // 16 + 16
   const IBIS = 6;
 
-  function mkInst(geo, count) {
-    const m = new THREE_.InstancedMesh(geo, instMat, count);
+  function mkInst(geo, count, round) {
+    const m = new THREE_.InstancedMesh(geo, round && npcRoundOn ? instMatRound : instMat, count);
+    if (round) npcRoundMeshes.push(m);
     m.instanceMatrix.setUsage(THREE_.DynamicDrawUsage);
     m.castShadow = true;
     m.receiveShadow = false;
@@ -1245,10 +1263,11 @@ export function createNPCs(game) {
   const iCam   = mkInst(gCam, HUMANS);
   const iTool  = mkInst(gTool, HUMANS);
   const iCone  = mkInst(gCone, HUMANS);
-  const iIbisB = mkInst(gIbisBody, IBIS);
-  const iIbisN = mkInst(gIbisNeck, IBIS);
-  const iIbisLA = mkInst(gIbisLeg, IBIS);
-  const iIbisLB = mkInst(gIbisLeg, IBIS);
+  const iIbisB = mkInst(gIbisBody, IBIS, true);
+  const iIbisN = mkInst(gIbisNeck, IBIS, true);
+  const iIbisLA = mkInst(gIbisLeg, IBIS, true);
+  const iIbisLB = mkInst(gIbisLeg, IBIS, true);
+  iIbisB.name = 'npcIbisBody';   // the sheet reads a bird's pose off it (qa/wow-round-animals.js)
 
   // ------------------------------------------------- Circular Quay geometry
   // Everything below is instanced too, so the whole precinct costs 12 calls.
@@ -1296,7 +1315,10 @@ export function createNPCs(game) {
     { w: 0.30, h: 0.06, d: 0.06, y: 0.10, z: 0.36 },   // collar
   ]);
   const gDogHead = npcMakeGeo([
-    { w: 0.22, h: 0.20, d: 0.22 },
+    // the skull was a 0.22 box; a sphere of the same silhouette (G5 item 2 —
+    // a head that is a box becomes a head that is a sphere). The snout, the
+    // nose and the ears stay boxes on it: a muzzle has corners.
+    { k: 'sph', sx: 0.115, sy: 0.105, sz: 0.115 },
     { w: 0.13, h: 0.11, d: 0.17, y: -0.03, z: 0.17, c: npcSRGB(0.85) },  // snout
     { w: 0.06, h: 0.03, d: 0.05, y: -0.05, z: 0.26 },  // nose
     { w: 0.07, h: 0.13, d: 0.05, x: -0.10, y: 0.12, z: -0.02, rz: 0.3 },
@@ -1314,15 +1336,16 @@ export function createNPCs(game) {
   const iTray   = mkInst(gTray, 1);
   const iBHat   = mkInst(gBuskHat, 1);
   const iCup    = mkInst(gCup, 1);
-  const iGullB  = mkInst(gGullBody, npcGULL_N);
-  const iGullWL = mkInst(gGullWing, npcGULL_N);
-  const iGullWR = mkInst(gGullWing, npcGULL_N);
-  const iGullH  = mkInst(gGullHead, npcGULL_N);
-  const iGullBk = mkInst(gGullBeak, npcGULL_N);
-  const iDogB   = mkInst(gDogBody, 1);
-  const iDogH   = mkInst(gDogHead, 1);
-  const iDogL   = mkInst(gDogLeg, 4);
-  const iDogT   = mkInst(gDogTail, 1);
+  const iGullB  = mkInst(gGullBody, npcGULL_N, true);
+  const iGullWL = mkInst(gGullWing, npcGULL_N, true);    // boxes: planar either way
+  const iGullWR = mkInst(gGullWing, npcGULL_N, true);
+  const iGullH  = mkInst(gGullHead, npcGULL_N, true);
+  const iGullBk = mkInst(gGullBeak, npcGULL_N, true);
+  const iDogB   = mkInst(gDogBody, 1, true);
+  const iDogH   = mkInst(gDogHead, 1, true);
+  const iDogL   = mkInst(gDogLeg, 4, true);
+  const iDogT   = mkInst(gDogTail, 1, true);
+  iGullB.name = 'npcGullBody'; iDogB.name = 'npcQuayDogBody';   // for the sheet
   const leadMesh = new THREE_.Mesh(gLead, mat(PALETTE.cloth1, { vertexColors: true }));
   leadMesh.castShadow = false;
   leadMesh.frustumCulled = false;
@@ -12798,7 +12821,9 @@ export function createNPCs(game) {
     ]);
     const gLlamaNeck = npcMakeGeo([
       { k: 'cyl', rt: 0.15, rb: 0.20, h: 0.84, seg: 6, y: 0.42 },
-      { w: 0.24, h: 0.26, d: 0.30, y: 0.90, z: 0.05 },
+      // the skull, a sphere of the old box's silhouette (G5 item 2); the
+      // face block and the ears stay boxes on it
+      { k: 'sph', sx: 0.125, sy: 0.135, sz: 0.155, y: 0.90, z: 0.05 },
       { w: 0.15, h: 0.13, d: 0.20, y: 0.84, z: 0.22, c: npcSRGB(0.82) },   // the face
       { w: 0.05, h: 0.21, d: 0.05, x: -0.09, y: 1.10, z: -0.02, rz: 0.16 },
       { w: 0.05, h: 0.21, d: 0.05, x: 0.09, y: 1.10, z: -0.02, rz: -0.16 },
@@ -12839,14 +12864,15 @@ export function createNPCs(game) {
     pBrow = mkInst(gBrow, PA_H * 2);
     pTool = mkInst(gTool, PA_H);
     pBroom = mkInst(gBroom, PA_H);
-    pLlamaB = mkInst(gLlamaBody, PA_LL);
-    pLlamaN = mkInst(gLlamaNeck, PA_LL);
-    pLlamaL = mkInst(gLlamaLeg, PA_LL * 4);
-    pDogB = mkInst(gDogBody, PA_DG);
-    pDogH = mkInst(gDogHead, PA_DG);
-    pDogL = mkInst(gDogLeg, PA_DG * 4);
-    pDogT = mkInst(gDogTail, PA_DG);
-    pLlamaT = mkInst(gLlamaTail, PA_LL);
+    pLlamaB = mkInst(gLlamaBody, PA_LL, true);
+    pLlamaN = mkInst(gLlamaNeck, PA_LL, true);
+    pLlamaL = mkInst(gLlamaLeg, PA_LL * 4, true);
+    pDogB = mkInst(gDogBody, PA_DG, true);
+    pDogH = mkInst(gDogHead, PA_DG, true);
+    pDogL = mkInst(gDogLeg, PA_DG * 4, true);
+    pDogT = mkInst(gDogTail, PA_DG, true);
+    pLlamaT = mkInst(gLlamaTail, PA_LL, true);
+    pLlamaB.name = 'npcLlamaBody'; pDogB.name = 'npcDogBody';   // for the sheet
 
     // ---- stall posts (Agent A publishes the real ones; ring the plaza) -----
     // x, z, yaw triples. The yaw is the whole point: a stall's nav footprint is
@@ -14496,6 +14522,11 @@ export function createNPCs(game) {
   function update(dt) {
     if (dt > 0.08) dt = 0.08;
     npcWxRead();
+    // round or flat, live (G5): the animals' instances swap material on the edge
+    if (npcRoundOn === !!game.state.noRound) {
+      npcRoundOn = !game.state.noRound;
+      for (let i = 0; i < npcRoundMeshes.length; i++) npcRoundMeshes[i].material = npcRoundOn ? instMatRound : instMat;
+    }
     // ---- THE PLACE COOLS IN REAL TIME (v33) -------------------------------
     // Above the biome gate on purpose: a square you left in a temper is not
     // waiting for you exactly as you left it three chapters later. And the two
