@@ -43,6 +43,7 @@ import { PALETTE, mat, rand, clamp, damp, calmOn, waterYAt } from './shared.js';
 //   game.weather.bed()       the levels systems.js mixes the ambience at
 //   game.weather.set(n,cfg)  a chapter may override its own row at runtime
 //   game.weather.mistAudit() the ground mist (G3): row, floor, depth, drift
+//   game.weather.skitterAudit() the petals on the ground (Part B): kind, count, flying
 //
 // WHAT IT DOES NOT OWN: any light, any fog value, any post parameter, any
 // audio node, any NPC. It computes numbers. systems.js, capybara.js and
@@ -157,6 +158,32 @@ const wxKIND = {
               cols: [PALETTE.wxSeed, PALETTE.petalYellow], geo: 'quad', glow: 0.2 },
 };
 
+// ---- THE SKITTER (ROADMAP-WOW Part B, Sydney) --------------------------------
+// A second field, and a different kind of thing from the motes: not specks
+// hanging in the air around the lens but PETALS ON THE GROUND, lying flat
+// until a gust picks them up, tumbling a metre or two downwind, and lying
+// down again. The Sydney row's own sentence is "a jacaranda petal drift on
+// the gust across the forecourt", and the chapter has the trees (eight
+// jacarandas, two on the spawn lawn) and the fallen blossom (envBLOSSOM's
+// decals) and NO petal that moves — its mote row is pollen, and stays pollen:
+// this is a new optional key on a row (`skitter`), not a moved one.
+//
+// Data, like wxKIND: the loop knows a petal lies at `size`, hops when the
+// gust is over `gustMin`, at `odds` per second per petal at full gust, with
+// a kick of `lift`, rides the gust at `windK` and falls back at `fall`.
+const wxSKIT = {
+  jacaranda: { n: 96, size: 0.10, windK: 1.35, lift: 2.1, odds: 1.1, gustMin: 0.9, fall: 0.85,
+               cols: [PALETTE.petalPurple, PALETTE.petalPink] },
+};
+const wxSKIT_MAX = 96;
+// ...and its own, tighter box: petals on the ground are looked at from three
+// metres up, so a 13 m half-width leaves half of them beside or behind the
+// lens (measured 24-31 of 72 in the arrival frame); 9 m puts the field where
+// the lens is looking.
+const wxSKIT_R = 9;
+/** A skitter row is `{ kind }`, and the kind's own numbers do the rest. */
+function wxSkitter(kind) { return wxSKIT[kind] ? { kind: kind } : null; }
+
 /** Convenience: a mote row is `[kind, density]`, density scaling wxKIND.n. */
 function wxMotes(kind, density, size) {
   const k = wxKIND[kind];
@@ -176,6 +203,8 @@ const wxMOOD = {
     cloudK: 0.55, pulseK: 0.030,
     gust: { base: 1.5, swing: 1.1, hz: 0.055 }, dir: 1.05,
     motes: wxMotes('pollen', 0.85),
+    // ...and the petals on the ground (Part B). The mote row above is untouched.
+    skitter: wxSkitter('jacaranda'),
     bed: { rain: 0.55, wind: 0.40, chirp: 0.10, drip: 0.18, rustle: 0.42, thunder: 0.20 },
     slipK: 0.16, cold: 0.00,
   },
@@ -771,6 +800,21 @@ export function createWeather(game) {
   const rainMesh = wxBuildField(new THREEx.BoxGeometry(1, 1, 1), wxRAIN_MAX, 0.35, 0.5);
   let moteMesh = moteQuad;          // whichever geometry the live row wants
 
+  // ---- THE SKITTER (Part B). See the block above wxSKIT. -----------------
+  // Its own field, opaque folded quads like the motes; drawn after them.
+  const skitMesh = wxBuildField(wxQuadGeo(), wxSKIT_MAX, 0, 1);
+  skitMesh.renderOrder = 7;
+  const sx = new Float32Array(wxSKIT_MAX), sz = new Float32Array(wxSKIT_MAX),
+        sy = new Float32Array(wxSKIT_MAX), svy = new Float32Array(wxSKIT_MAX),
+        sph = new Float32Array(wxSKIT_MAX), ssz = new Float32Array(wxSKIT_MAX),
+        srot = new Float32Array(wxSKIT_MAX);
+  let skit = null;                  // the live wxSKIT row, or null
+  let skitFlying = 0;               // how many are in the air this frame (audit)
+  for (let i = 0; i < wxSKIT_MAX; i++) {
+    sx[i] = rand(-wxSKIT_R, wxSKIT_R); sz[i] = rand(-wxSKIT_R, wxSKIT_R);
+    sy[i] = 0; svy[i] = 0; sph[i] = rand(0, 6.283); ssz[i] = rand(0.75, 1.3); srot[i] = rand(0, 6.283);
+  }
+
   // ---- THE CONTACT RINGS (D5). See the block above wxRING_MAX. ------------
   // The SAME shape props.js's water-entry foam uses — an open-ended cylinder
   // five centimetres tall, which from any camera in this game reads as a ring
@@ -951,6 +995,24 @@ export function createWeather(game) {
       moteMesh.setColorAt(i, wxCol);
     }
     if (moteMesh.instanceColor) moteMesh.instanceColor.needsUpdate = true;
+    // ...and the skitter, the same way: colours once, count from the kind.
+    skitMesh.count = 0; skit = null;
+    const sk = rw && rw.skitter && wxSKIT[rw.skitter.kind];
+    if (sk) {
+      skit = sk;
+      const sn = Math.min(wxSKIT_MAX, sk.n | 0);
+      skitMesh.count = sn;
+      if (!skitMesh.instanceColor && sn > 0) {
+        skitMesh.instanceColor =
+          new THREEx.InstancedBufferAttribute(new Float32Array(wxSKIT_MAX * 3), 3);
+      }
+      for (let i = 0; i < sn; i++) {
+        wxCol.set(sk.cols[i % sk.cols.length]);
+        skitMesh.setColorAt(i, wxCol);
+        sy[i] = 0; svy[i] = 0;
+      }
+      if (skitMesh.instanceColor) skitMesh.instanceColor.needsUpdate = true;
+    }
     // The rain takes its colour from the hour: against a bright sky a streak
     // is paler than the sky, against a dark one it is what the lamps hit.
     const nightish = rw.lock === 'night' || rw.lock === 'predawn' || rw.lock === 'interior';
@@ -1289,6 +1351,51 @@ export function createWeather(game) {
       moteMesh.instanceMatrix.needsUpdate = true;
     }
 
+    // ---- the skitter (Part B). See the block above wxSKIT. ---------------
+    // Horizontally it is the motes' box — it follows the lens and wraps, so
+    // the petals are always in the frame the lens is looking at. Vertically
+    // it is the GROUND: each petal's y is the biome's floor under it (the
+    // mist's own query — water first, then terrain, else 0) plus its hop.
+    // Lying, a petal is flat and still; a gust over `gustMin` gives each one
+    // `odds` a second of being kicked up `lift`, after which it tumbles
+    // downwind at `windK` and falls at `fall` until it lies down again. A
+    // calm chapter (reduced motion) skips the kicks and lets what is up land.
+    skitFlying = 0;
+    const skitOn = skit && skitMesh.count > 0 && !(game.state && game.state.noSkitter);
+    skitMesh.visible = !!skitOn;
+    if (skitOn) {
+      const n = skitMesh.count;
+      const gm = Math.hypot(gx, gz);
+      const kick = wxCalm() ? 0 : clamp((gm - skit.gustMin) / 1.5, 0, 1) * skit.odds * dt;
+      const wk = skit.windK;
+      for (let i = 0; i < n; i++) {
+        const ph = sph[i];
+        if (sy[i] <= 0) {
+          if (kick > 0 && Math.random() < kick) { svy[i] = skit.lift * rand(0.55, 1.0); sy[i] = 0.001; }
+        } else {
+          sx[i] += (gx * wk + Math.sin(wxT * 3.1 + ph) * 0.35) * dt;
+          sz[i] += (gz * wk + Math.cos(wxT * 2.7 + ph * 1.3) * 0.35) * dt;
+          svy[i] = Math.max(svy[i] - 5.5 * dt, -skit.fall);
+          sy[i] += svy[i] * dt;
+          srot[i] += dt * (2.2 + ph * 0.3);
+          if (sy[i] <= 0) { sy[i] = 0; svy[i] = 0; } else skitFlying++;
+        }
+        if (sx[i] > wxSKIT_R) sx[i] -= wxSKIT_R * 2; else if (sx[i] < -wxSKIT_R) sx[i] += wxSKIT_R * 2;
+        if (sz[i] > wxSKIT_R) sz[i] -= wxSKIT_R * 2; else if (sz[i] < -wxSKIT_R) sz[i] += wxSKIT_R * 2;
+        const wx = anchor.x + sx[i], wz = anchor.z + sz[i];
+        const s = ssz[i] * skit.size;
+        wxV1.set(wx, wxMistGround(wx, wz) + 0.012 + sy[i], wz);
+        // lying: flat, turned about y only; flying: tumbling
+        if (sy[i] > 0) wxE1.set(srot[i], ph, srot[i] * 0.61);
+        else wxE1.set(0, ph + srot[i], 0);
+        wxQ1.setFromEuler(wxE1);
+        wxS1.set(s, s, s);
+        wxM1.compose(wxV1, wxQ1, wxS1);
+        skitMesh.setMatrixAt(i, wxM1);
+      }
+      skitMesh.instanceMatrix.needsUpdate = true;
+    }
+
     // ---- the rain --------------------------------------------------------
     // The count scales with the intensity, so a shower ARRIVES rather than
     // switching on: at 0.1 there are twenty streaks in twenty metres, which is
@@ -1447,6 +1554,13 @@ export function createWeather(game) {
       for (const k in cfg) next[k] = cfg[k];
       wxMIST[n] = next;
       if (n === name) wxMistTo(name);
+    },
+    /** The skitter (Part B): the live kind, how many petals, how many in the
+     *  air, the gust they are riding, and the mesh for a probe's count. */
+    skitterAudit() {
+      return { kind: skit ? (row.skitter && row.skitter.kind) : null, n: skitMesh.count,
+               flying: skitFlying, visible: skitMesh.visible,
+               gust: [+wxGust.x.toFixed(2), +wxGust.z.toFixed(2)], mesh: skitMesh };
     },
     mistAudit() {
       const u = mistMat.uniforms;
