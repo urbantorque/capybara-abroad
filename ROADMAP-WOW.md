@@ -757,6 +757,50 @@ same head and face parts as a drop-in.
 - **Wave:** the first W4 item after the animal — the sheet (W0) will
   name any chapter beyond those two that has also drifted.
 
+**ONE PERSON reality check (19 Sep 2026): both chapters landed, and the
+standard itself had two faults nobody could have seen.**
+
+- **`npcPERSON` shipped** (npc.js, before `createNPCs`): the roster's
+  twelve part lists exported once — skull, hair, torso bands, eyes, brow,
+  mouth, limbs — with `HEAD_Y`, `SHOULDER`, `HIP`, the child ratio and the
+  jitter pinned, plus `standing()` (the body at rest pose as one merged
+  list, with `legs:false` / `hands:false` for what a garment covers) and
+  `face()` / `hair()` in head space. The roster reads the same lists: the
+  twelve literals are byte-identical to what `npcMakeGeo` was given before
+  (checked against `80c0163~1` with comments and whitespace stripped), so
+  its buffers are unchanged by construction. `qa/wow-person.mjs` is in
+  `npm test`: exported once, numbers pinned, every `BuildPeople`/
+  `AddPerson` file imports and builds from it, no sphere on a body.
+- **Marrakech and Rio** keep their own pools, strides and behaviour; each
+  gained two instanced draws (`…PeopleHair` = hair + both brows in the
+  hair colour, `…PeopleFaces` = eyes + mouth in white) that ride the head
+  matrix already composed per frame — two `setMatrixAt` copies, no new
+  arithmetic. The djellaba is `sahDJELLABA`, a garment list over
+  `standing({legs:false, hands:false})`; Rio's shorts are the old leg grey
+  as a hips/legs multiplier. The pursuers got the same torso, skirt and a
+  baked face so they stay the men whose stalls you robbed.
+- **The standard's own two faults, found because the square's people
+  now have faces:** the roster's `mouthN` never had a z (it sat at
+  (0, 0.150, 0), inside the head, since L3-9) and `mouthY` 0.150 is inside
+  the nose box (0.11..0.17). Nobody tuned a mouth they could not see. It is
+  on the face plane at y 0.085 now, in Sydney too.
+- **The trap, paid once:** the first Marrakech cut put the hood cone in
+  body space at the head's rest height, and a sitter's body is scaled to
+  0.62 while the head is not — so on every cross-legged figure the cone
+  landed exactly where the skull is and swallowed it. Found by hiding the
+  head pool (`qa/WOW2-probe-nohead.png`), fixed as a cowl behind the
+  shoulders. The same probe showed the pre-existing head offset
+  (`z + rx*1.3`) was a world-axis shove: a leaning sitter's head sat 27 cm
+  back inside his chest. It goes through the body's own quaternion now.
+- **Read by eye:** `qa/WOW2-sahara-roster.png`, `-group.png`,
+  `WOW2-rio-roster.png`, `-group.png` (gitignored) beside
+  `WOW-sydney-roster.png`. The square is a crowd of the Sydney figure in
+  robes; the halqa rings keep their heads.
+- **Not measured yet:** `qa/wow-people.js` (the nineteen-chapter ratio /
+  eyes / two-colour sweep) was written and stalled twice on a concurrent
+  `shared.js` edit that threw in `grain()` at boot; its numbers are owed
+  in the next commit, with the rv-geom hash diff of the roster.
+
 
 ### What is on the sheet, per chapter (the subjects; the findings come from W0)
 
