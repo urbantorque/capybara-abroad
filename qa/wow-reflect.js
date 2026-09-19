@@ -59,7 +59,7 @@ async page => {
     cali: { at: [-22, 0.5, 12], yaw: 0, dist: 11, pitch: 0.30, raise: 1.6 },   // the south bank, the Gato (-34, -14) and the cat walk across the river
     kowloon: { at: [0, 0.4, 30], yaw: 0, dist: 9, pitch: 0.20, raise: 1.4 },   // the carriageway, lens low and south, looking north under the signs (no sea: the road is the 'water')
     antarctic: { at: [0, 0.9, 20], yaw: 0, dist: 11, pitch: 0.30, raise: 1.6 },   // the jetty's seaward end, lens south, the boat and the pack across the lead
-    cave: { at: [-2, -6.3, -12], yaw: 0.1, dist: 10, pitch: 0.30, raise: 1.6 },   // the east bank in the passage, lens south, looking north along the river to where the doline's light falls on it
+    cave: { at: [-2, -6.3, -12], yaw: 0.3, dist: 11, pitch: 0.28, raise: 1.8 },   // the east bank in the passage, lens SSE, looking NNW over the river to the sky-lit cones and the glade under the doline
   }
   const out = { errs, rows: {} }
   for (const name of CH) {

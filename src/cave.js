@@ -3809,11 +3809,23 @@ function cavBuildRiver(root) {
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 4));
   g.computeVertexNormals();
+  // ...AND THE RIVER IS A MIRROR (ROADMAP-WOW A1). The depth audit exempted
+  // this chapter's far field and asked for a lit far layer instead: this is
+  // it. The river runs under the doline, so from the passage the water
+  // carries the shaft's light — the hole and the sky in it, the lit column
+  // — doubled and in the frame before the hole itself is. The sheet's
+  // vertex alpha still fades it to nothing at the shore (grain() scales the
+  // alpha push by it). pow 0.7, not 1: a still river in the dark is mirror-
+  // black at the play angle, and what it mirrors is dark rock — at pow 1 the
+  // in-mask diff read 7.5 levels, the cones doubled but faint. sysREFLECT.cave
+  // carries the plane at cavWATER.
+  // Never clone this material after this call: the clone drops the hook.
   cavRiverMesh = new THREE.Mesh(g, grain(mat(0xffffff, {
     vertexColors: true, transparent: true, opacity: 1, depthWrite: false,
   }), { scale: 0.5, amount: 0.09, warp: 0,
         sparkle: 0.6, sparkleScale: 1.5, sparkleSpeed: 0.7, fresnel: 0.65,
-        sparkleCut: 0.66, sparkleBand: 0.09, sparkleColor: PALETTE.cavEcho }));
+        sparkleCut: 0.66, sparkleBand: 0.09, sparkleColor: PALETTE.cavEcho,
+        reflect: { k: 1.0, pow: 0.7, wobble: 1.0, blur: 0 } }));
   cavRiverMesh.frustumCulled = false;
   cavRiverMesh.renderOrder = 3;
   root.add(cavRiverMesh);
