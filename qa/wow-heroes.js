@@ -5,7 +5,7 @@ async page => {
   // root's merged triangle / mesh / instanced-mesh counts, and the raw
   // own-camera arrival frame. Edit KEY/NAME/TAG between runs; the pinned pose
   // is one run's own live camera, kept so before/after compare.
-  const KEY = 'Semicolon', NAME = 'pantanal', TAG = 'hero-arrive'
+  const KEY = 'Digit6', NAME = 'rio', TAG = 'hero-arrive'
   const errs = []
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
@@ -20,6 +20,7 @@ async page => {
     monaco: { p: [0.06, 6.5, -85.96], d: [0.851, -0.124, 0.51] },
     hanoi: { p: [-69.15, 5.15, -70.81], d: [0.78, -0.127, -0.613] },
     pantanal: { p: [10.26, 5.8, 67.87], d: [-0.86, -0.133, -0.492] },
+    rio: { p: [11.16, 4.07, 3.49], d: [-0.945, -0.14, -0.296] },
   }[NAME]
   const row = await page.evaluate((POSE) => {
     const g = window.__capy, T = g.THREE

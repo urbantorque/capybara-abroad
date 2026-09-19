@@ -1007,6 +1007,30 @@ function rioBuildBeach(game, root) {
   M.cyl(kx, ky + 1.3, kz, 2.4, 2.6, PALETTE.rioWall1, 0, 0, 0, 8);
   M.cone(kx, ky + 3.1, kz, 3.4, 1.0, PALETTE.rioRoof, 0, 0, 0, 8);
   M.box(kx, ky + 2.05, kz - 2.2, 3.0, 0.12, 0.7, PALETTE.rioWall4);
+  // ROADMAP-WOW Part C (Heroes): THE KIOSK FROM THE OTHER SIDE. Everything
+  // below — counter, chalk board, cooler, coconuts, stools — is on the -z
+  // face, and the arrival lens (x +11, looking west) sees the +x face: a
+  // cream drum under a red cone (qa/WOW-H-rio-before.png). Four forms that
+  // read from EVERY side: a blue valance hanging under the eave with a white
+  // hem (the second colour), a dark base course at the foot, a finial on the
+  // cone, and on the +x face a green serving hatch with its shelf — the side
+  // the crates climb to, which is where a hatch would be.
+  M.cyl(kx, ky + 2.46, kz, 3.42, 0.34, PALETTE.rioTileBlue, 0, 0, 0, 8);
+  M.cyl(kx, ky + 2.27, kz, 3.46, 0.06, PALETTE.rioTileWhite, 0, 0, 0, 8);
+  M.cyl(kx, ky + 0.16, kz, 2.52, 0.32, PALETTE.rioPaveDark, 0, 0, 0, 8);
+  M.cyl(kx, ky + 3.72, kz, 0.06, 0.5, PALETTE.rioTileWhite, 0, 0, 0, 4);
+  M.sph(kx, ky + 4.02, kz, 0.22, 0.22, 0.22, PALETTE.rioFeather2, 6);
+  // (On the facet centred at 67.5 deg — the 8-gon has a CORNER at +x, and a
+  // flat box there floats off the wall — so the hatch is yawed to lie flush.)
+  {
+    const hA = 67.5 * Math.PI / 180, hd = 2.4 * Math.cos(Math.PI / 8);
+    const hx = kx + Math.sin(hA) * (hd + 0.06), hz = kz + Math.cos(hA) * (hd + 0.06), hy = hA - Math.PI / 2;
+    M.box(hx, ky + 1.75, hz, 0.10, 1.05, 1.7, PALETTE.rioTileGreen, 0, hy, 0);
+    M.box(hx, ky + 1.75, hz, 0.12, 0.06, 1.7, PALETTE.rioTileWhite, 0, hy, 0);
+    M.box(hx, ky + 1.75, hz, 0.12, 1.05, 0.06, PALETTE.rioTileWhite, 0, hy, 0);
+    const sx = kx + Math.sin(hA) * (hd + 0.32), sz = kz + Math.cos(hA) * (hd + 0.32);
+    M.box(sx, ky + 1.18, sz, 0.6, 0.08, 1.9, PALETTE.rioWall4, 0, hy, 0);
+  }
   // THE DRUM'S COLLIDER BURIED THE COUNTER IT SERVES.
   // It was 2.6 high and 4.6 deep, spanning z -8.3..-3.7; the counter sits at
   // z -8.2 with a half-depth of 0.35, so all but a 0.25 m sliver of the shelf
@@ -1678,6 +1702,22 @@ function rioBuildSugarloaf(game, root) {
 
   // a mast on the summit, because there is one
   M.cyl(rioSUGAR.x + 7, gY + 6, rioSUGAR.z - 5, 0.2, 12, PALETTE.metal);
+  // ROADMAP-WOW Part C (Heroes): THE SUMMIT STATION IS A SILHOUETTE. From the
+  // beach the top of the loaf was a slab and a mast; the real station is a
+  // flat canopy on posts over the platform and a rail round the terrace,
+  // which is the shape everybody knows the summit by. Four posts, a roof
+  // slab in rioRoof (the second colour against the whitewash), a rail on the
+  // seaward edge. Behind the arrival lens (it looks west, the loaf is east)
+  // but in every frame from the cable and the bay.
+  for (let a = -1; a <= 1; a += 2) for (let b = -1; b <= 1; b += 2) {
+    M.cyl(rioSUGAR.x + a * 3.2, gY + DECK + 1.9, rioSUGAR.z + b * 2.2, 0.14, 3.4, PALETTE.rioArch, 0, 0, 0, 6);
+  }
+  M.box(rioSUGAR.x, gY + DECK + 3.7, rioSUGAR.z, 8.0, 0.30, 5.6, PALETTE.rioRoof);
+  M.box(rioSUGAR.x, gY + DECK + 3.95, rioSUGAR.z, 5.0, 0.20, 3.4, PALETTE.rioArch);
+  for (let k = 0; k < 6; k++) {
+    M.box(rioSUGAR.x - 4.2 + k * 1.68, gY + DECK + 0.7, rioSUGAR.z - 3.4, 0.08, 0.9, 0.08, PALETTE.metal);
+  }
+  M.box(rioSUGAR.x, gY + DECK + 1.15, rioSUGAR.z - 3.4, 8.6, 0.06, 0.06, PALETTE.metal);
 
   // --- the cable. Two spans: station -> Urca -> summit.
   rioCableSpan(M, rioSTATION.x, stY + rioCABLE_CLEAR, rioSTATION.z,
