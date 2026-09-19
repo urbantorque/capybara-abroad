@@ -505,7 +505,13 @@ Iceland 12.5 / 76 %, Goreme 3.3 / 42 %, Pantanal 8.5 / 89 %, Drift 19.6 /
 floor of 0.03–1.3 (motes and water moving between two ticks). Forced
 shower on Iceland: `rainT` 0.505 peak, alpha 0.34 → 0.434, h 0.80 → 0.92.
 Zero console errors. Every arrival frame read by eye: a low band, never
-on the animal's face.
+on the animal's face. The UPPER-third control (same on/off pair, rows
+0–h/3, where a band under 0.8 m has no business) reads floor in all six —
+Iceland 0.26 / 1.9 %, Goreme 0.34 / 1.9 %, Pantanal 0.72 / 6.8 %, Drift
+0.25 / 1.6 %, Monaco 0.24 / 1.9 %, Venice 0.62 / 8.9 % — the two larger
+ones being chapters whose parked floor already moves that much (cloud
+cards, gulls, water). One chapter per invocation from 19 Sep: a six-boot
+sweep is one tool call over ten minutes under load and the harness kills it.
 
 Two things the build taught. (1) **A chapter's fog colour is invisible
 as its mist** — the first round tinted every row with its own haze and
