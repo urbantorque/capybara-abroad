@@ -31,6 +31,7 @@ async page => {
   // — see ROADMAP-WOW.md's A2 section for which of the six are done.
   const FORE_CHAPTERS = [
     { name: 'kyoto', anchor: [-23.27, 4.70, 57.10] },
+    { name: 'hanoi', anchor: [-64.01, 5.60, -74.22] },
   ];
 
   const out = { errs, chapters: {} };

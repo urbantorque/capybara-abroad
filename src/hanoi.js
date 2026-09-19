@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh, makeMerger } from './shared.js';
+import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh, makeMerger, hangThing } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 19 — HANOI
@@ -4556,6 +4556,31 @@ function hanBuildScatter(root) {
   put(weed, bladeGeo, PALETTE.hanShutter, false);
 }
 
+// ---- ROADMAP-WOW A2, THE FOREGROUND (W1) -----------------------------------
+// Same argument as Kyoto's kyoBuildForeground: the arrival frame's near 0-4 m
+// is empty, and the fix is one static hung thing placed once from the LIVE
+// resting camera (never the spawn table's yaw). `strand` is already this
+// chapter's own "row of small things on a line" (its board hangs one too —
+// sysBOARD_HANG.hanoi), so a second, shorter one in the corner reads as more
+// of the same street rather than a new object family. Colours match
+// sysBOARD_DRESS.hanoi (ochre body, tarp-red trim). Static, no sway, gated on
+// noFore, built once (hanBuild runs exactly once, hanBuilt guards it).
+function hanBuildForeground(game, root) {
+  if (game.state && game.state.noFore) return;
+  const g = hangThing('strand', {
+    a: PALETTE.hanTarpRed, b: PALETTE.hanOchre, c: PALETTE.hanShopDk, len: 0.45,
+  });
+  // Measured 19 Sep 2026 from the live resting camera at the Hanoi arrival
+  // (cam ~ (-67.82, 5.05, -74.56), fwd/right/up read off camera.matrixWorld,
+  // fov 52 (vertical), aspect 1.684): world position = cam + fwd*3.0 +
+  // right*2.09 + up*1.24 — top-right corner, clear of the to-do card
+  // (top-left) and the traffic queue the animal arrives beside. First cut at
+  // len 0.60 / ndcY 0.72 read as hanging a bit low (down to about half the
+  // frame); pulled higher and shortened.
+  g.position.set(-64.01, 5.60, -74.22);
+  root.add(g);
+}
+
 function hanBuild(game) {
   if (hanBuilt) return;
   hanBuilt = true;
@@ -4587,6 +4612,7 @@ function hanBuild(game) {
   hanBuildWindows(hanRoot);
   hanBuildSigns(hanRoot);
   hanBuildLocals(game);
+  hanBuildForeground(game, hanRoot);
 
   if (typeof game.registerShadowTarget === 'function' && hanTrainG) {
     game.registerShadowTarget(hanTrainG);
