@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matOwn, matEmit, EMIT_OVER, emitSet, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, swayMesh, makeMerger, warnOnce } from './shared.js';
+import { PALETTE, mat, matOwn, matEmit, EMIT_OVER, emitSet, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, swayMesh, makeMerger, warnOnce, skyDomeLit } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 13 — CAPPADOCIA. AND YOU DO NOT GET A STEERING WHEEL.
@@ -3258,6 +3258,10 @@ function gorBuildSky(root) {
   const m = mat(0xffffff, { vertexColors: true, side: THREE.BackSide }).clone();
   m.fog = false;
   m.depthWrite = false;
+  // ROADMAP-WOW A5: this dome is Goreme's own (sysSKY_OWN), so the shared
+  // dome's cloud band never reached it. skyDomeLit gives it the same hook the
+  // shared dome has; the sysSKY2.goreme row says what the band is here.
+  skyDomeLit(m);
   // THE ONE EXEMPTION FROM THE FLAT-SHADING LAW IN THIRTEEN CHAPTERS, and it is
   // not a shape. Flat shading is what makes every OBJECT in this game read as
   // folded paper; on a nine-hundred-metre dome it turns a dawn gradient into

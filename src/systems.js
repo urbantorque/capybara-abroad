@@ -8,7 +8,7 @@ import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount,
          rimTick, cloudTick, skyTick, fresnelTick, paleTick, triTick, mirrorTick, shadeTick, bounceSlots, bounceTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo, keyDomeTick, keyDomeInfo, skyDomeLit, sky2CloudTick, sky2SunTick, sky2Info,
-         exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt, lensFadeUniform, lensCapTick, reflectSet } from './shared.js';
+         exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt, lensFadeUniform, lensCapTick, reflectSet, dappleSet } from './shared.js';
 // THE CHARACTER KEY (L7, E4)
 import { capyKeyTick } from './capybara.js';
 
@@ -2753,6 +2753,10 @@ const sysSKY2 = {
   pantanal: { lo: 0.56, hi: 0.72, band: [0.11, 0.55], scale: 1.3, tint: PALETTE.panSkyLow, base: PALETTE.panHaze, gain: 1.0 },
   palawan:  { lo: 0.53, hi: 0.72, band: [0.10, 0.60], scale: 1.2, tint: PALETTE.palSkyLow, base: PALETTE.palFog, gain: 1.0, sun: { k: 1.0, p: 300, r: 1.6 } },
   cali:     { lo: 0.55, hi: 0.73, band: [0.10, 0.58], scale: 1.3, tint: PALETTE.caliHaze, base: PALETTE.caliSky, gain: 1.0, sun: { k: 1.0, p: 300, r: 1.6 } },
+  // Goreme's own dome (gorBuildSky, now through skyDomeLit): a thin, high
+  // predawn band in its own rim-and-zenith pair, no disc — the sun is below
+  // the ridge at arrival and the balloon event owns its rise (A4).
+  goreme:   { lo: 0.62, hi: 0.78, band: [0.18, 0.60], scale: 1.4, tint: PALETTE.gorSkyLow, base: PALETTE.gorSkyHigh, gain: 0.9 },
 };
 const sysSKY2_LAMBDA = 2.0;    // the band walks in at the zenith's own rate
 const sysSKY2_DRIFT  = 0.004;  // cells per second per m/s of gust: weather, not a flicker
@@ -38564,6 +38568,8 @@ export function createSystems(game) {
         sysCloudX += sysCloudDX * sysCLOUD_SPEED * dt;
         sysCloudZ += sysCloudDZ * sysCLOUD_SPEED * dt;
       }
+      // ROADMAP-WOW G2's cut, wired (W5): the dapple's shared gain, 0 or 1.
+      dappleSet(game.state.noDapple ? 0 : 1);
       cloudTick(game.state.noCloud ? 0 : sysCloudK, sysCloudX, sysCloudZ,
                 sysCLOUD_WAVE, sysCLOUD_LO, sysCLOUD_HI);
     }
