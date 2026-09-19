@@ -1266,6 +1266,43 @@ a seawall and the pub closes the street; the cave mouth has a toothed lip
 and a floor of blocks under it. 0 console errors in every run; `npm test`
 green each commit; no grade, sun, fog, mote or spawn row touched.
 
+### Findings — Iceland, Goreme, Venice (19 Sep 2026)
+
+Same probe, copied to `qa/partd-probe-b.js` (adds an instanced-mesh count
+under the root) with `qa/partd-look.js` for pinned looks at named places and
+`qa/partd-flood.js` for Venice's tide. Three more things about the instrument:
+
+- **A local in the lens.** Two pinned runs (Iceland's before, Iceland's first
+  after) read near 0.69 against 0.48 for every other run at the same pose: an
+  NPC had wandered to within a metre of the pinned camera
+  (`qa/WOW-D-iceland-after-pinned.png`, a red slab over a third of the
+  frame). The crowd is a scene child with no name, so it cannot be filtered;
+  a pinned reading with near 0.2 above its neighbours is re-run, not recorded.
+- **Draw calls are not comparable across minutes** while other agents hold
+  uncommitted `main.js`/`systems.js` edits (Goreme's live count read 280, 294
+  and 286 across three runs with one instanced mesh added). The honest
+  budget number is meshes + instanced meshes under the chapter root.
+- **The brief's far plane is not always in the arrival frame.** Both W0 and
+  every arrival here look NORTH in Iceland (the harbour is south) and WNW in
+  Venice (San Giorgio is south-east). What is built where the brief said
+  stands where the player goes next; what is built where the lens looks is
+  the geography that is actually there (Venice's Dogana, Göreme's west rim).
+
+| chapter | built (in the chapter's own mergers, no new material) | Δ merged tris | Δ meshes | mid+far before → after (pinned) | skipped, and why |
+|---|---|---|---|---|---|
+| Iceland (`3ff45bb`) | corrugated ribs on all four faces of every house (standing quads, 2 tris, wall colour × 0.80); frame quad + sill on every street-facing pane; a door with frame and step; the downpipe's shoe; gully grates every 12.5 m in the gutter; rig on the three boats (crosstree, radar, boom, forestay); a 22 m quay crane between the pier and shed five (`qa/WOW-D-iceland-quay.png`) | +5 106 | 0 (60) | 0.222 → 0.411 on paper; honestly unchanged — the live reading at the same pose before any edit was 0.410, the 0.222 was a local in the lens | the brief's middle plane cannot reach the arrival frame: the harbour is behind every northward arrival lens; the frame's far field is the lava NE of the back row |
+| Goreme (`e183de2`) | the 26-envelope fleet split BY FACE into its two fabrics (`gorEnvelopeSplit`: odd gores + crown take the instance colour, even gores are gorEnvC — the pair every balloon here uses); one more InstancedMesh, same matrices, dawn line and burner; a west ridge at x −98 with 22 capped spires (`qa/WOW-D-goreme-westridge.png`); a gravel apron and tether stakes round the field | +3 924 | +1 instanced (151) | far 0.085 → 0.103 in both after runs (the ridge); mid+far 0.282 → 0.308 / 0.274 — the 20 m line is where the crowd walks, ±7 rays between identical runs | caps on the valley chimneys (they have them; a sphere is a blob at 80 m); a burner frame on the fleet's baskets (a second instanced mesh, over budget) |
+| Venice (see commit) | base moulding, necking and abacus in venStoneDark on every arcade pier, a keystone 6 cm proud on every arch; `shoreTint 0.45 / venCanalPale / shoreDeep 0.9` added to the paving's grain call (tide-gated by construction, `qa/WOW-D-venice-flood.png`); San Giorgio given Palladio's portico, entablature, door, belfry openings and finial; the Dogana on the point at x −74..−52, z 25.5 with tower, Atlases and the globe (solid to the bed); the Giardini Reali — six trees and a railing on the Molo's west end | +2 340 | 0 (29) | 0.393 → 0.376: far 0.085 → 0.051 and mid 0.308 → 0.325 — the gardens at 45 m now stand in front of water at 70 m, which is a middle plane doing what one does; sky unchanged | nothing; San Giorgio is behind the arrival lens, so the in-frame silhouette is the Dogana, which is what the Molo actually looks across at |
+
+Frames read against W0: `qa/WOW-D-iceland-hero-arrive.png` (ribs, white
+frames and sills round every pane, a door and step per house — the boxes with
+cut-outs are houses now), `qa/WOW-D-goreme-hero-arrive.png` (green/cream,
+orange/cream, purple/cream gores on every envelope in frame),
+`qa/WOW-D-venice-hero-arrive.png` (dark keystones and capital lines down the
+whole arcade, the gardens mid-left, the Dogana's globe across the water). 0
+console errors in every run; `npm test` 25/25 each commit; no grade, sun,
+fog, mote or spawn row touched.
+
 ## Order and ownership
 
 Six waves. W0 is a review (Part C's sheet) and builds nothing; A1 is the biggest and the riskiest, so it does not go first.

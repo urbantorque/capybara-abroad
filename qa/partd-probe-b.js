@@ -3,7 +3,7 @@ async page => {
   // corrected depth bins (l10-depth-sweep's method), renderer.info.render, the
   // live resting camera, and the raw own-camera arrival frame (wow-sheet's
   // method). Edit KEY/NAME/TAG between runs.
-  const KEY = 'BracketLeft', NAME = 'goreme', TAG = 'after2'
+  const KEY = 'Digit0', NAME = 'venice', TAG = 'after'
   const errs = []
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
@@ -17,7 +17,7 @@ async page => {
   // two yaws 0.3 rad apart), so a PINNED pose — one run's own live camera,
   // rebuilt with the live fov — is measured as well, and that is the
   // before/after differential.
-  const POSE = { iceland: { p: [-5.87, 4.05, 109.15], d: [0.496, -0.134, -0.858] }, goreme: { p: [10.06, 10.92, 39.9], d: [-0.856, -0.125, -0.502] }, venice: null,
+  const POSE = { iceland: { p: [-5.87, 4.05, 109.15], d: [0.496, -0.134, -0.858] }, goreme: { p: [10.06, 10.92, 39.9], d: [-0.856, -0.125, -0.502] }, venice: { p: [6.12, 4.88, 19.16], d: [-0.844, -0.119, -0.522] },
                  manly: { p: [11.62, 6.68, 48.37], d: [-0.971, -0.135, -0.198] },
                  cave: { p: [8.35, 6.59, 69.99], d: [-0.716, -0.127, -0.686] }, sahara: { p: [6.42, 3.9, -1.7], d: [-0.548, -0.123, 0.828] } }[NAME]
   const row = await page.evaluate((POSE) => {

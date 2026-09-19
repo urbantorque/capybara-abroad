@@ -493,7 +493,15 @@ function venVCG() {
                   // about four seconds of tide — and a narrow band there is a
                   // hard edge sweeping across the stone. Half a metre of band
                   // on the ground turns that edge into a wash arriving.
-                  venSHORE, { shoreBand: 0.50, shoreScale: 1.4 }));
+                  venSHORE, { shoreBand: 0.50, shoreScale: 1.4 },
+                  // THE ALGAE (ROADMAP-WOW Part D). Stone that spends part of
+                  // every day under the lagoon grows a film on it, and at the
+                  // top of the tide the flooded trachyte was the dry trachyte
+                  // seen through green glass. grain()'s own depth term, which
+                  // MULTIPLIES the albedo toward the canal's pale green over
+                  // the first 0.9 m below the line — so the mark arrives with
+                  // the water and goes with it. Tide-gated by construction.
+                  { shoreTint: 0.45, shoreTintColor: PALETTE.venCanalPale, shoreDeep: 0.9 }));
   return venGroundMat;
 }
 function venPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
@@ -1105,6 +1113,16 @@ function venBuildSquares(game, root) {
       bx(u, gy + 0.1, 0.5, PIER + 0.34, 1.2, 1.16, PALETTE.venStone);       // plinth
       bx(u, gy + 2.05, 0.5, PIER, 2.5, 0.96, PALETTE.venStone);             // shaft
       bx(u, gy + 3.42, 0.5, PIER + 0.3, 0.34, 1.12, PALETTE.venStone);      // capital
+      // ---- A CAPITAL AND A BASE THAT READ (ROADMAP-WOW Part D) -----------
+      // Plinth, shaft and capital were three boxes of the one Istrian white,
+      // so from the Molo the pier was a post: nothing on it changed value
+      // where the shaft became the capital. A base moulding on the plinth and
+      // a necking under the capital in the darker stone, and an abacus over
+      // it a shade wider — the three lines that make a pier a column at
+      // thirty metres, in the arcade's own merger.
+      bx(u, gy + 0.78, 0.5, PIER + 0.20, 0.16, 1.04, PALETTE.venStoneDark);   // base moulding
+      bx(u, gy + 3.20, 0.5, PIER + 0.10, 0.10, 1.00, PALETTE.venStoneDark);   // the necking
+      bx(u, gy + 3.66, 0.5, PIER + 0.44, 0.14, 1.18, PALETTE.venStoneDark);   // the abacus
       venArcPiers.push(PX(u, 0.5), PZ(u, 0.5),
                        (along ? PIER + 0.34 : 1.16) * 0.5, (along ? 1.16 : PIER + 0.34) * 0.5);
     }
@@ -1141,6 +1159,10 @@ function venBuildSquares(game, root) {
         bx(uc + Math.cos(a) * rr / len, spring + Math.sin(a) * rr, 0.5, tw, 0.52, 1.02,
            PALETTE.venStone, along ? 0 : Math.PI * 0.5 - a, 0, along ? a - Math.PI * 0.5 : 0);
       }
+      // the keystone (Part D): taller than the ring, a shade darker, standing
+      // 6 cm proud of the voussoirs at the crown — the one stone in an arch
+      // that is allowed to be different, and the one the eye finds first
+      bx(uc, spring + rr + 0.04, 0.47, tw * 0.9, 0.78, 1.08, PALETTE.venStoneDark);
       // ---- AND THE BACK OF THE LOGGIA IS A SHOPFRONT ----------------------
       // The colonnade was cut open on 21 Aug 2026 and became somewhere to be;
       // what it became a place of is fifty metres of blank plaster three
@@ -4041,6 +4063,85 @@ function venBuildFar(game, root) {
   // metres inside a base it should have stopped 15 m out from. Down to -4.
   venStaticBox(game, -86, 1, 46, 30, 10, 30);
   venStaticBox(game, -86, 11, 46, 22, 12, 22);
+
+  // ---- SAN GIORGIO READS AS SAN GIORGIO (ROADMAP-WOW Part D) ---------------
+  // The block at (40, 108) is the right thing in the right place — the church
+  // out in the Bacino, the campanile beside it — and it read as a brick box
+  // with a chimney. What everybody knows about San Giorgio Maggiore is
+  // Palladio's WHITE front: a temple portico of four columns under a
+  // pediment, stood against the brick, and the campanile's belfry with its
+  // four dark openings under the spire. The white slab and its pyramid were
+  // already there (above); the columns, entablature and door stand in front
+  // of them. In the far merger, a silhouette across the water from the Molo —
+  // the way out of the chapter.
+  {
+    const fx = gx - 14.9, fz = gz;                 // the west front, facing the Molo
+    for (let k = 0; k < 4; k++) {
+      M.cyl(fx - 1.2, 7.5, fz - 4.5 + k * 3.0, 0.55, 11.0, PALETTE.venStone, 0, 0, 0, 6);
+      M.box(fx - 1.2, 13.2, fz - 4.5 + k * 3.0, 1.3, 0.5, 1.3, PALETTE.venStone);   // capital
+    }
+    M.box(fx - 1.2, 13.8, fz, 1.6, 0.8, 11.6, PALETTE.venStone);                  // the entablature
+    M.box(fx - 0.35, 5.2, fz, 0.6, 5.0, 2.4, PALETTE.venStoneDark);                // the door
+    // the belfry: four openings and a cornice, on the shaft that was there
+    for (let s = -1; s <= 1; s += 2) {
+      M.box(gx + 12 + s * 2.85, 41, gz + 6, 0.2, 2.2, 1.4, PALETTE.venStoneDark);
+      M.box(gx + 12, 41, gz + 6 + s * 2.85, 1.4, 2.2, 0.2, PALETTE.venStoneDark);
+    }
+    M.box(gx + 12, 42.7, gz + 6, 6.2, 0.4, 6.2, PALETTE.venStone);
+    M.sph(gx + 12, 48.2, gz + 6, 0.5, 0.5, 0.5, PALETTE.venGold);                 // the finial
+  }
+
+  // ---- THE DOGANA, ON THE POINT (Part D) -----------------------------------
+  // The arrival lens looks west along the Molo, and at its left edge the
+  // frame was water to the fog: the Salute's base stops at x -71 and nothing
+  // stood at the canal's mouth. In Venice the customs house does — the Punta
+  // della Dogana, a long low warehouse ending in a square tower with the
+  // golden globe on it, on the tip of Dorsoduro exactly opposite the Molo.
+  // Here on the same point, x -74..-52 along z 22..29, 65-80 m from the
+  // lens, with the Salute's dome rising behind it, which is the view from
+  // the Molo everybody has photographed. Solid to the bed (the animal swims).
+  {
+    const DX0 = -74, DX1 = -52, DZ = 25.5, DW = 7.0, gy2 = -1.3;
+    const cx = (DX0 + DX1) * 0.5, L = DX1 - DX0;
+    M.box(cx, gy2 + 0.5, DZ, L + 1.0, 1.4, DW + 1.2, PALETTE.venStoneWet);           // the fondamenta
+    M.box(cx, gy2 + 3.9, DZ, L, 5.6, DW, PALETTE.venPlaster3);                        // the warehouse
+    M.box(cx, gy2 + 7.0, DZ, L + 0.4, 0.5, DW + 0.4, PALETTE.venStone);               // the cornice
+    M.box(cx, gy2 + 7.9, DZ, L + 0.2, 1.4, DW + 0.6, PALETTE.venRoof, 0, 0, 0);       // the roof
+    for (let k = 0; k < 6; k++) {                                                    // arched bays
+      M.box(DX0 + 2.5 + k * 3.4, gy2 + 3.2, DZ - DW * 0.5 - 0.05, 1.6, 3.4, 0.2, PALETTE.venStoneDark);
+    }
+    // the tower at the point, and the two Atlases with the globe
+    M.box(DX1 - 1.5, gy2 + 5.5, DZ, 6.0, 9.0, 6.0, PALETTE.venStone);
+    M.box(DX1 - 1.5, gy2 + 10.2, DZ, 6.6, 0.5, 6.6, PALETTE.venStone);
+    M.box(DX1 - 1.5, gy2 + 11.0, DZ, 1.6, 1.4, 1.6, PALETTE.venBronze);
+    M.sph(DX1 - 1.5, gy2 + 12.6, DZ, 1.4, 1.4, 1.4, PALETTE.venGold);
+    M.box(DX1 - 1.5, gy2 + 14.2, DZ, 0.3, 1.6, 0.3, PALETTE.venBronze);              // Fortuna
+    venStaticBox(game, cx, gy2 - 0.6, DZ, L + 1.0, 7.0, DW + 1.2);
+    venStaticBox(game, DX1 - 1.5, gy2 + 5.5, DZ, 6.0, 9.0, 6.0);
+  }
+
+  // ---- THE GIARDINI REALI (Part D) ----------------------------------------
+  // West of the Zecca the Molo has the one green thing on this waterfront:
+  // the royal gardens, a row of trees behind a railing, forty-five metres
+  // from the arrival lens and the only thing on the quay between the
+  // Library's end and the water. Six trees in the shutters' own tired green
+  // (this palette has no foliage; a Venetian garden in October is that
+  // colour), two spheres and a trunk each, and the railing they stand behind.
+  {
+    const GZ = 13.4, GY = venMOLO_Y;
+    for (let k = 0; k < 6; k++) {
+      const tx = -39.4 + k * 1.75 + ((k * 7) % 3) * 0.25, tz = GZ - 1.2 + ((k * 5) % 3) * 0.6;
+      const th = 3.6 + ((k * 3) % 4) * 0.35;
+      M.cyl(tx, GY + th * 0.5, tz, 0.16, th, PALETTE.venBriccola, 0, 0, 0, 4);
+      M.add(venG.sph6, venXform(tx, GY + th + 0.9, tz, 0, k, 0, 3.0, 2.6, 3.0), PALETTE.venShutter);
+      M.add(venG.sph6, venXform(tx + 0.7, GY + th + 1.9, tz - 0.4, 0, k * 1.7, 0, 2.2, 1.9, 2.2), PALETTE.venShutter2);
+    }
+    M.box(-35.0, GY + 0.55, GZ + 1.6, 10.6, 0.08, 0.08, PALETTE.venBronze);     // the rail
+    M.box(-35.0, GY + 0.2, GZ + 1.6, 10.6, 0.4, 0.5, PALETTE.venStone);         // its kerb
+    for (let x = -40.0; x <= -30; x += 1.7) M.box(x, GY + 0.35, GZ + 1.6, 0.06, 0.6, 0.06, PALETTE.venBronze);
+    venStaticBox(game, -35.0, GY + 1.0, GZ - 0.6, 10.8, 2.0, 3.6);
+  }
+
   const mesh = new THREE.Mesh(M.build(), venVC());
   mesh.castShadow = true;
   root.add(mesh);
