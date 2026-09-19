@@ -23,7 +23,7 @@ async page => {
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
 
   // EDIT THIS to the chapter under test. One per run.
-  const CHAPTER = 'drift'
+  const CHAPTER = 'iceland'
   const out = { errs, chapter: CHAPTER }
 
   await page.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('capy3.prefs.v1', JSON.stringify({ v: 1, pf: 1 })) } catch (e) {} })

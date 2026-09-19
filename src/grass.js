@@ -64,7 +64,7 @@ const grsSLICES  = 4;       // frames a full re-placement is spread over
 
 // One row per chapter that grows anything. h is [min, max] fan height in
 // metres; n the fan count at rung 0; gate the green margin (linear, on
-// g - max(r, b)) or the named tone test for the two dry chapters; minY a floor
+// g - max(r, b)); minY a floor
 // under which nothing grows (Manly: the tide line); sway metres of tip travel
 // at a full gust.
 const grsROW = {
@@ -75,10 +75,14 @@ const grsROW = {
   // = 0.055 linear, driGrassDark 0.021); its VIOLET is the rock and the cloud
   // deck below, which a violet gate grew grass on (measured, first frame).
   drift:    { n: 4500, h: [0.25, 0.45], gate: 0.015, sway: 0.10 },
-  iceland:  { n: 4500, h: [0.25, 0.42], gate: 'tussock', sway: 0.12 },
+  // Iceland's only green is the moss (iceMoss 0x93a878, d = 0.10; the lava,
+  // moraine and sinter all fail); Goreme's is the scrub and the vines
+  // (gorScrub d = 0.05, gorVine 0.11; tuff, soil and road fail). The same
+  // gate serves both — no named tone test was needed.
+  iceland:  { n: 4500, h: [0.25, 0.42], gate: 0.04, sway: 0.12 },
   manly:    { n: 4000, h: [0.30, 0.55], gate: 0.04, sway: 0.12, minY: 1.2 },
   cali:     { n: 4500, h: [0.25, 0.45], gate: 0.04, sway: 0.09 },
-  goreme:   { n: 2500, h: [0.15, 0.28], gate: 'dry', sway: 0.05 },
+  goreme:   { n: 2500, h: [0.15, 0.28], gate: 0.03, sway: 0.05 },
 };
 
 // A deterministic per-fan hash so the field is the same on every boot and in
@@ -89,7 +93,7 @@ function grsHash(i, k) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-/** The per-row growth gate on a LINEAR colour. Returns 0..1, a density. */
+/** The growth gate on a LINEAR colour: 0..1, a density. */
 function grsGate(gate, r, g, b) {
   if (typeof gate === 'number') {
     // grain()'s speck gate on the green dominance, with the row's own floor
@@ -100,17 +104,6 @@ function grsGate(gate, r, g, b) {
     if (d <= gate) return 0;
     const t = clamp((d - gate) / 0.03, 0, 1);
     return t * t * (3 - 2 * t);
-  }
-  if (gate === 'tussock' || gate === 'dry') {
-    // Olive / ochre: warm and green-leaning against blue, and not grey.
-    // Rock, snow, sand and paving are neutral (r ≈ g ≈ b) or blue-leaning;
-    // a tussock has g ≥ 0.9 r and b well under both.
-    const warm = Math.min(r, g) - b;
-    if (warm < 0.06) return 0;
-    if (g < r * 0.88) return 0;               // a red-brown roof, not a plant
-    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    if (lum > 0.75 || lum < 0.06) return 0;   // snow, black
-    return clamp((warm - 0.06) / 0.08, 0, 1);
   }
   return 0;
 }
