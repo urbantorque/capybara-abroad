@@ -240,6 +240,7 @@ let gorRimMat = null;
 let gorBulbMat = null;
 let gorSkyMesh = null, gorCirrus = null;
 let gorDecorMeshEnv = null, gorDecorMeshBask = null, gorDecorMeshThroat = null;
+let gorDecorMeshGore = null;         // the fleet's cream panels (Part D) — see gorBuildDecor
 let gorDecorData = null;
 
 let gorChimDone = false, gorDoveDone = false, gorTetherDone = false;
@@ -2137,6 +2138,43 @@ function gorBuildCliff(game, root) {
                  24.8, C.top + 22, CSTEP + 0.4);
   }
 
+  // ---- THE WEST RIDGE — THE FAR CHIMNEYS AS A SKYLINE (ROADMAP-WOW Part D) --
+  // The arrival lens looks west-south-west across the plaza (cam 10, 11, 40;
+  // dir -0.86, -0.13, -0.50) and past the town's roofs the western sky was
+  // open: the cliff stops at z -18 and north of it, at x < -78, there was
+  // nothing but ground to the horizon (far bin 0.06). Göreme is a valley
+  // RINGED in tuff, and what stands on its western rim is the same thing that
+  // stands in Love Valley, further off and in silhouette: a low massif with a
+  // run of spires on it, each with its cap. A hundred and five metres from the
+  // lens, in the cliff's own merger, in the near-ridge's own value
+  // (gorTuffShadow, the tuff before the sun gets to it) — the east ridge's
+  // rule, "distance is colour". Beyond gorRIM_HARD, so the balloon never
+  // reaches it and it needs no body. Not in the flight's way, not in the sun's:
+  // the sun clears the EAST ridge.
+  {
+    const RX = -98;
+    const rcrest = (z) => 15 + Math.sin(z * 0.071 + 0.9) * 3.5 + Math.sin(z * 0.023 - 0.4) * 2.5;
+    for (let z = -22; z < 62; z += 6) {
+      const g = gorTerrain(RX, z), h = rcrest(z) + rnd() * 2;
+      M.taper(RX - rnd() * 6, g + h * 0.5, z + rnd() * 3, 9 + rnd() * 4, 3.5 + rnd() * 2, h,
+              rnd() < 0.35 ? PALETTE.gorTuffDk : PALETTE.gorTuffShadow, rnd() * 3);
+    }
+    // the spires: twenty-two fairy chimneys on the crest, four to nine metres
+    // over it, each capped — the mushroom silhouette, which is what a fairy
+    // chimney is at any distance
+    for (let i = 0; i < 22; i++) {
+      const z = -20 + i * 3.7 + rnd() * 2.4;
+      const x = RX - 2 + rnd() * 7;
+      const g = gorTerrain(RX, z) + rcrest(z) * (0.55 + rnd() * 0.3);
+      const h = 4 + rnd() * 5, rb = 1.3 + rnd() * 0.9, rt = rb * 0.42;
+      M.taper(x, g + h * 0.5, z, rb, rt, h,
+              rnd() < 0.5 ? PALETTE.gorTuffShadow : PALETTE.gorTuffDk, rnd() * 3);
+      const cr = rt * (1.6 + rnd() * 0.4);
+      M.sph(x + (rnd() - 0.5) * rt * 0.5, g + h + cr * 0.3, z, cr, cr * 0.7, cr * 0.9,
+            rnd() < 0.4 ? PALETTE.gorBasaltDk : PALETTE.gorBasalt, 8);
+    }
+  }
+
   const mesh = new THREE.Mesh(M.build(), gorVC());
   mesh.castShadow = true; mesh.receiveShadow = true;
   mesh.name = 'gorCliff';
@@ -2759,12 +2797,57 @@ function gorUpdateShadows() {
 }
 
 /** The other twenty-six. Three instanced meshes, and they never touch physics. */
+/**
+ * THE FLEET IS SEWN TOO (ROADMAP-WOW Part D).
+ *
+ * qa/WOW-goreme-hero-arrive.png: the twenty-six decor envelopes read as
+ * single-colour spheres — the player's and the field's get their gores per
+ * vertex out of gorEnvelopeGeo, and an InstancedMesh with one colour per
+ * instance cannot carry a second fabric in the same geometry. So the envelope
+ * is split by FACE into the two fabrics: the odd gores and the crown band in
+ * one geometry that takes the instance colour, the even ones in a second that
+ * is gorEnvC — the "other fabric" every balloon in this chapter pairs with,
+ * exactly as gorBuildBalloon and gorBuildField pair theirs. Same matrices,
+ * same dawn line and burner (gorUpdateDawnLine writes both), one more
+ * instanced draw call, which is the chapter's whole Part D allowance.
+ */
+function gorEnvelopeSplit(r) {
+  const g = gorEnvelopeGeo(r, 0xffffff, 0xffffff);
+  const p = g.attributes.position.array, n = g.attributes.normal.array, ix = g.index.array;
+  const A = { pos: [], nor: [] }, B = { pos: [], nor: [] };
+  for (let f = 0; f < ix.length; f += 3) {
+    let cx = 0, cy = 0, cz = 0;
+    for (let k = 0; k < 3; k++) { const v = ix[f + k] * 3; cx += p[v]; cy += p[v + 1]; cz += p[v + 2]; }
+    cx /= 3; cy /= 3; cz /= 3;
+    // gorEnvelopeGeo's own rule, on the face's centroid: eight gores by
+    // longitude, and the band round the crown in the other fabric
+    const t = clamp(((cy - r * 0.1) / 1.14 + r) / (2 * r), 0, 1);
+    const lon = Math.atan2(cz, cx);
+    let gore = Math.floor((lon + Math.PI) / (Math.PI * 2) * 8) % 2;
+    if (t > 0.72) gore = 1 - gore;
+    const dst = gore ? A : B;
+    for (let k = 0; k < 3; k++) {
+      const v = ix[f + k] * 3;
+      dst.pos.push(p[v], p[v + 1], p[v + 2]); dst.nor.push(n[v], n[v + 1], n[v + 2]);
+    }
+  }
+  g.dispose();
+  const mk = (d) => {
+    const o = new THREE.BufferGeometry();
+    o.setAttribute('position', new THREE.Float32BufferAttribute(d.pos, 3));
+    o.setAttribute('normal', new THREE.Float32BufferAttribute(d.nor, 3));
+    return o;
+  };
+  return { a: mk(A), b: mk(B) };
+}
+
 function gorBuildDecor(root) {
   const cols = [PALETTE.gorEnvA, PALETTE.gorEnvB, PALETTE.gorEnvC,
                 PALETTE.gorEnvD, PALETTE.gorEnvE, PALETTE.gorEnvF];
   gorDecorData = new Float32Array(gorDECOR_N * 5);   // x, z, y, launchPhase, rate
-  const envGeo = gorEnvelopeGeo(1, 0xffffff, 0xffffff);
-  const em = new THREE.InstancedMesh(envGeo, mat(0xffffff), gorDECOR_N);
+  const envGeo = gorEnvelopeSplit(1);
+  const em = new THREE.InstancedMesh(envGeo.a, mat(0xffffff), gorDECOR_N);
+  const gm = new THREE.InstancedMesh(envGeo.b, mat(0xffffff), gorDECOR_N);
   const bm = new THREE.InstancedMesh(gorG.box, mat(PALETTE.gorBasket), gorDECOR_N);
   const tm = new THREE.InstancedMesh(gorG.cone8, mat(PALETTE.gorEnvC), gorDECOR_N);
   for (let i = 0; i < gorDECOR_N; i++) {
@@ -2776,15 +2859,17 @@ function gorBuildDecor(root) {
     gorDecorData[o + 4] = rand(0.85, 1.5);
     gorCol.set(cols[i % cols.length]);
     em.setColorAt(i, gorCol);
+    gm.setColorAt(i, gorEnvCC);
     // RECORDED, because the dawn line rewrites this attribute every frame and
     // there is no other copy of what colour the fabric started out.
     gorDecorBase.push(gorCol.r, gorCol.g, gorCol.b);
   }
   if (em.instanceColor) em.instanceColor.needsUpdate = true;
-  em.frustumCulled = false; bm.frustumCulled = false; tm.frustumCulled = false;
-  em.castShadow = true;
-  root.add(em); root.add(bm); root.add(tm);
-  gorDecorMeshEnv = em; gorDecorMeshBask = bm; gorDecorMeshThroat = tm;
+  if (gm.instanceColor) gm.instanceColor.needsUpdate = true;
+  em.frustumCulled = false; gm.frustumCulled = false; bm.frustumCulled = false; tm.frustumCulled = false;
+  em.castShadow = true; gm.castShadow = true;
+  root.add(em); root.add(gm); root.add(bm); root.add(tm);
+  gorDecorMeshEnv = em; gorDecorMeshGore = gm; gorDecorMeshBask = bm; gorDecorMeshThroat = tm;
 }
 
 function gorUpdateDecor(dt) {
@@ -2836,12 +2921,14 @@ function gorUpdateDecor(dt) {
     const sway = Math.sin(gorTime * 0.4 + i) * 0.03;
     gorDecorMeshEnv.setMatrixAt(i, gorXform(gorDecorData[o], y + r * 1.2, gorDecorData[o + 1],
                                             sway, i, 0, r, r, r));
+    if (gorDecorMeshGore) gorDecorMeshGore.setMatrixAt(i, gorM);
     gorDecorMeshBask.setMatrixAt(i, gorXform(gorDecorData[o], y - r * 0.55, gorDecorData[o + 1],
                                              0, i, 0, 1.7, 1.3, 1.7));
     gorDecorMeshThroat.setMatrixAt(i, gorXform(gorDecorData[o], y + r * 0.05, gorDecorData[o + 1],
                                                Math.PI, i, 0, 2.2, 2.0, 2.2));
   }
   gorDecorMeshEnv.instanceMatrix.needsUpdate = true;
+  if (gorDecorMeshGore) gorDecorMeshGore.instanceMatrix.needsUpdate = true;
   gorDecorMeshBask.instanceMatrix.needsUpdate = true;
   gorDecorMeshThroat.instanceMatrix.needsUpdate = true;
   gorUpdateDawnLine(dt);
@@ -2869,6 +2956,7 @@ function gorUpdateDecor(dt) {
  */
 const gorDecorBase = [];
 const gorDawnC = new THREE.Color(PALETTE.gorSkyLow);
+const gorEnvCC = new THREE.Color(PALETTE.gorEnvC);    // the fleet's other fabric (Part D)
 // AND ALL TWENTY-SIX OF THEM ARE BURNING.
 //
 // The player's own envelope lights up from the inside when the burner is on —
@@ -3016,8 +3104,20 @@ function gorUpdateDawnLine(dt) {
       gorCol.multiplyScalar(1 + burn * 0.95);
     }
     gorDecorMeshEnv.setColorAt(i, gorCol);
+    // ...and the cream panels take the same dawn and the same burner
+    if (gorDecorMeshGore) {
+      gorCol.copy(gorEnvCC);
+      gorCol.lerp(gorDawnC, lit * 0.42);
+      gorCol.multiplyScalar(1 + lit * 0.55);
+      if (burn > 0.002) {
+        gorCol.lerp(gorBurnerC, burn * 0.55);
+        gorCol.multiplyScalar(1 + burn * 0.95);
+      }
+      gorDecorMeshGore.setColorAt(i, gorCol);
+    }
   }
   gorDecorMeshEnv.instanceColor.needsUpdate = true;
+  if (gorDecorMeshGore && gorDecorMeshGore.instanceColor) gorDecorMeshGore.instanceColor.needsUpdate = true;
   // ...and the one burner you hear out of however many lit this frame. The
   // rate limit is here rather than left to the dispatcher's throttle, because
   // the throttle can only drop the sound and this can choose it: nearest wins,
@@ -3671,6 +3771,51 @@ function gorBuildField(game, root) {
     const mg = gorTerrain(mx, mz);
     M.cyl(mx, mg + 1.9, mz, 0.07, 3.8, PALETTE.gorSteel, 0, 0, 0, 4);
     lamps.push(mx, mg + 3.9, mz, 1.0);
+  }
+
+  // ---- THE APRON AND THE STAKES (ROADMAP-WOW Part D) ----------------------
+  // The field was a flattened patch of the same tuff as everything round it,
+  // with no edge: from the plaza it read as two planes, the ground and the
+  // balloons on it. A launch field that five crews drive onto every morning
+  // has a gravel margin worn round it where the trucks turn, and tether
+  // stakes along that margin — the iron pins the crown lines are pegged to
+  // while the fan runs. The apron is flat quads (two triangles each, the
+  // merger's own M.quad), a metre and a half wide, in the track's own gravel;
+  // the stakes are four-sided pins leaning outward, a metre high, every six
+  // metres, with a coil of line at the foot of one in three.
+  {
+    const hw = F.w * 0.5 + 1.2, hd = F.d * 0.5 + 1.2, AW = 1.6;
+    const seg = (x0, z0, x1, z1) => {
+      const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 3);
+      for (let i = 0; i < n; i++) {
+        const t0 = i / n, t1 = (i + 1) / n;
+        const x = lerp(x0, x1, (t0 + t1) * 0.5), z = lerp(z0, z1, (t0 + t1) * 0.5);
+        const along = Math.hypot(x1 - x0, z1 - z0) / n + 0.15;
+        const ry = Math.atan2(x1 - x0, z1 - z0);
+        M.quad(x + (rnd() - 0.5) * 0.3, gorTerrain(x, z) + 0.10, z + (rnd() - 0.5) * 0.3,
+               AW + rnd() * 0.5, along, rnd() < 0.3 ? PALETTE.gorSoil : PALETTE.gorRoad, ry);
+      }
+    };
+    seg(F.x - hw, F.z - hd, F.x + hw, F.z - hd);
+    seg(F.x + hw, F.z - hd, F.x + hw, F.z + hd);
+    seg(F.x + hw, F.z + hd, F.x - hw, F.z + hd);
+    seg(F.x - hw, F.z + hd, F.x - hw, F.z - hd);
+    const per = 2 * (hw + hd) * 2;
+    for (let d = 1.5; d < per; d += 6) {
+      // walk the perimeter: south edge east, east edge north, north edge west, west edge south
+      let x, z, ox, oz, u = d;
+      if (u < 2 * hw) { x = F.x - hw + u; z = F.z - hd; ox = 0; oz = -1; }
+      else if ((u -= 2 * hw) < 2 * hd) { x = F.x + hw; z = F.z - hd + u; ox = 1; oz = 0; }
+      else if ((u -= 2 * hd) < 2 * hw) { x = F.x + hw - u; z = F.z + hd; ox = 0; oz = 1; }
+      else { u -= 2 * hw; x = F.x - hw; z = F.z + hd - u; ox = -1; oz = 0; }
+      x += ox * 0.9; z += oz * 0.9;
+      const g = gorTerrain(x, z);
+      M.cyl(x, g + 0.5, z, 0.05, 1.05, PALETTE.gorSteel, oz * 0.22, 0, -ox * 0.22, 4);
+      M.box(x, g + 1.0, z, 0.16, 0.06, 0.16, PALETTE.gorBasaltDk);
+      if (Math.floor(d / 6) % 3 === 0) {
+        M.cyl(x - ox * 0.6, g + 0.06, z - oz * 0.6, 0.42, 0.12, PALETTE.gorBasket, 0, 0, 0, 8);
+      }
+    }
   }
 
   // the track across the field, which everybody drives on and nobody made
