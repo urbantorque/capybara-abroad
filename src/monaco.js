@@ -1183,8 +1183,17 @@ function monBuildSea(root) {
     col[i] = c.r; col[i + 1] = c.g; col[i + 2] = c.b;
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  // THE BASIN MIRRORED (ROADMAP-WOW A1) — the open beauty item since the
+  // first pass: the terrace's lit windows and the yacht's own doubled in
+  // the still water inside the moles. One planar pass at monWATER; the
+  // open sea's swell rides half a metre over that plane and its crests are
+  // never drawn in the mirror (FrontSide, seen from below), so out there
+  // the reflection is the sky, which is what a swell shows anyway. The
+  // per-facet wobble reads the swell's own slope, so the basin (3.5 cm)
+  // is nearly still and the sea outside moves.
   const m = new THREE.Mesh(g, grain(mat(0xffffff, { vertexColors: true }),
-                                    { scale: 0.05, amount: 0.045, warp: 1.2 }));
+                                    { scale: 0.05, amount: 0.045, warp: 1.2,
+                                      reflect: { k: 1.0, pow: 1.0, wobble: 1.0, blur: 0 } }));
   m.frustumCulled = false;
   m.receiveShadow = true;
   m.castShadow = false;

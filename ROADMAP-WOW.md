@@ -110,13 +110,13 @@ was wrong.**
   Per chapter, from `qa/wow-reflect.js` (one chapter per run, pretty
   pinned through the prefs file, the frame held by `game.frameShot`),
   in-mask mean diff cut-vs-live: **Kyoto 33-38, Hanoi 28-29, the Pantanal
-  33-46, Monaco (its own row below)** — all over the 12-level target,
+  33-46, Monaco 34.7** — all over the 12-level target,
   88-99 % of water pixels over 12 each, outside the mask under 0.6, zero
   console errors, the swim cut proven in Hanoi and the Pantanal (`why:
   'eye under'` for the whole dive, `'drawn'` on surfacing). Read by eye:
   the pavilion, the torii run and the heron in the pond; Thap Rua and
   the red bridge in Hoan Kiem; the gallery trees trunk-and-canopy in the
-  baía.
+  baía; the far shore's lit windows and the yacht's in the basin.
 - **The design point that was wrong: "half res, so a quarter of the
   pixels."** The pass is not pixel-bound. On the Kyoto frame it costs the
   same at a quarter, a third, a half and full resolution
