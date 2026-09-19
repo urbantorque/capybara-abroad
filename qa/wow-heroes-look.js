@@ -1,9 +1,9 @@
 async page => {
   // Part D: pinned own-camera looks at named places after a real title-card
   // arrival. Edit KEY/LOOKS between runs.
-  const KEY = 'Digit2'
-  const LOOKS = [{ n: 'pasto-spout', p: [9, 3.2, 22.5], t: [0, 1.2, 20] },
-                 { n: 'pasto-galeras', p: [0, 14, 20], t: [-40, 56, -70] }]
+  const KEY = 'Period'
+  const LOOKS = [{ n: 'monaco-quay', p: [-30, 7, -66], t: [-20, 0.5, -12.5] },
+                 { n: 'monaco-casino', p: [118, 31, 52], t: [118, 44, 107] }]
   await page.setViewportSize({ width: 1280, height: 760 })
   await page.evaluate(() => { try { localStorage.clear() } catch (e) {} })
   await page.reload()

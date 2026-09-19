@@ -1277,6 +1277,30 @@ function monBuildHarbour(game, root) {
     const e = edges[i];
     K.box(e[0], monQUAY_Y + 0.10, e[1], e[2], 0.34, e[3], PALETTE.monQuayDk);
     K.box(e[0], monQUAY_Y - 1.6, e[1], e[2] * 0.86, 3.2, e[3] * 0.86, PALETTE.monQuay);
+    // ROADMAP-WOW Part C (Heroes): the quay is the built thing the arrival
+    // lens looks across at (qa/WOW-H-monaco-before.png, the far wall at
+    // ~40 m), and a coping on a slab is two forms. Three more, on the
+    // basin face only: a string course at mid-height, a tide band where the
+    // wall goes into the water (monStoneSh — wet stone, never one hex with
+    // the wall), and fender timbers every twelve metres, which is what a
+    // quay a yacht lies against actually has on it. Same merge, no new
+    // material; the fenders stand 30 cm proud, under the coping's overhang,
+    // and nothing here is a collider — the coping's rim already is.
+    const alongX = e[2] > e[3];
+    const inward = i === 0 ? 1 : i === 1 ? -1 : i === 2 ? 1 : -1;   // toward the basin
+    const faceOff = (alongX ? e[3] : e[2]) * 0.86 * 0.5;
+    const fx = alongX ? e[0] : e[0] + inward * (faceOff + 0.05);
+    const fz = alongX ? e[1] + inward * (faceOff + 0.05) : e[1];
+    const run = (alongX ? e[2] : e[3]) * 0.86;
+    K.box(fx, monQUAY_Y - 1.35, fz, alongX ? run : 0.10, 0.22, alongX ? 0.10 : run, PALETTE.monQuayDk);
+    K.box(fx, monWATER + 0.42, fz, alongX ? run : 0.12, 0.84, alongX ? 0.12 : run, PALETTE.monStoneSh);
+    const nF = Math.floor(run / 12);
+    for (let f = 0; f < nF; f++) {
+      const t = (f + 0.5) / nF - 0.5;
+      const px = alongX ? e[0] + t * run : fx + inward * 0.12;
+      const pz = alongX ? fz + inward * 0.12 : e[1] + t * run;
+      K.box(px, monQUAY_Y - 1.7, pz, 0.30, 3.0, 0.30, PALETTE.monTeakDk);
+    }
   }
 
   // ---- bollards, and there are a great many of them ---------------------
@@ -1714,6 +1738,16 @@ function monBuildTerrace(game, root) {
     K.cyl(tx, ty + 33.4, cz - d * 0.5 + 5, 0.34, 2.6, PALETTE.monGold, 0, 0, 0, 6);
     K.sph(tx, ty + 34.9, cz - d * 0.5 + 5, 0.5, 0.5, 0.5, PALETTE.monGold, 6);
     monPoolBox(body, tx, ty + 12, cz - d * 0.5 + 5, 12, 26, 12);
+    // ROADMAP-WOW Part C (Heroes): the ONE ASYMMETRY. Two identical towers
+    // are a drawing; the east one flies the principality's flag off a pole on
+    // its gold band — red over white, a mast in monMast, nothing on the west
+    // tower. Reads from the harbour as a fleck the far cupola does not have.
+    if (s > 0) {
+      const px = tx + 5.2, pz = cz - d * 0.5 + 5 - 5.2;
+      K.cyl(px, ty + 28.6, pz, 0.12, 7.0, PALETTE.monMast, 0, 0, 0, 6);
+      K.box(px + 1.3, ty + 31.5, pz, 2.4, 0.8, 0.08, PALETTE.monEnsign);
+      K.box(px + 1.3, ty + 30.7, pz, 2.4, 0.8, 0.08, PALETTE.monMarble);
+    }
   }
   // the entrance front: eight columns, a pediment, and the doors
   const fz = cz - d * 0.5;
@@ -1810,6 +1844,25 @@ function monBuildTerrace(game, root) {
     monWindowAt(cx - 18 + i * 4, ty + 9.5, fz - 0.9, Math.PI, 1.6, 3.2, 1.0);
     monWindowAt(cx - 18 + i * 4, ty + 9.5, cz + d * 0.5 + 0.14, 0, 1.6, 3.2, 1.0);
   }
+  // ROADMAP-WOW Part C (Heroes): WINDOW BANDS on the two towers and an upper
+  // band on the front. From the harbour the Casino is 210 m off and 28 m up
+  // (qa/WOW-H-monaco-before.png: two copper cupolas in the top-right corner
+  // over blind stone) — at that range the only secondary form that reads at
+  // night is a lit band, and the towers had none on any face. Four rows of
+  // three on each tower's south, east and west faces, and a second row
+  // across the front above the colonnade. All into the one instanced pane
+  // pool: no new draw call.
+  for (let s = -1; s <= 1; s += 2) {
+    const tx = cx + s * (w * 0.5 - 6), tz = cz - d * 0.5 + 5;
+    for (let r = 0; r < 4; r++) {
+      const wy = ty + 4.2 + r * 5.0;
+      for (let c = -1; c <= 1; c++) {
+        monWindowAt(tx + c * 3.4, wy, tz - 6.14, Math.PI, 1.3, 2.4, 1.0);
+        monWindowAt(tx + s * 6.14, wy, tz + c * 3.4, s > 0 ? Math.PI / 2 : -Math.PI / 2, 1.3, 2.4, 1.0);
+      }
+    }
+  }
+  for (let i = 0; i < 10; i++) monWindowAt(cx - 18 + i * 4, ty + 15.4, fz - 0.9, Math.PI, 1.4, 2.0, 1.0);
 }
 
 // ============================================================ THE INSIDE =====
