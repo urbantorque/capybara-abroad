@@ -2750,7 +2750,7 @@ const sysSKY_OWN = { sydney: 1, drift: 1, goreme: 1, cave: 1 };
 //            blob at 1280 wide), so the halo is 0.35 and the power doubled.
 const sysSKY2 = {
   sahara:   { lo: 0.60, hi: 0.74, band: [0.12, 0.62], scale: 1.1, tint: PALETTE.sahSkyHot, base: PALETTE.sahHaze, gain: 1.35, baseGain: 0.92, sun: { k: 1.0, p: 60, r: 1.6 } },
-  pantanal: { lo: 0.50, hi: 0.70, band: [0.08, 0.55], scale: 1.3, tint: PALETTE.panSkyLow, base: PALETTE.panHaze, gain: 1.0 },
+  pantanal: { lo: 0.56, hi: 0.72, band: [0.11, 0.55], scale: 1.3, tint: PALETTE.panSkyLow, base: PALETTE.panHaze, gain: 1.0 },
   palawan:  { lo: 0.53, hi: 0.72, band: [0.10, 0.60], scale: 1.2, tint: PALETTE.palSkyLow, base: PALETTE.palFog, gain: 1.0, sun: { k: 1.0, p: 300, r: 1.6 } },
   cali:     { lo: 0.55, hi: 0.73, band: [0.10, 0.58], scale: 1.3, tint: PALETTE.caliHaze, base: PALETTE.caliSky, gain: 1.0, sun: { k: 1.0, p: 300, r: 1.6 } },
 };
