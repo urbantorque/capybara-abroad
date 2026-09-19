@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, clamp, spillSlots, spillUniforms, calmOn } from './shared.js';
+import { PALETTE, clamp, spillSlots, spillUniforms, calmOn, reflectRender, reflectInfo } from './shared.js';
 import { createEnvironment } from './environment.js';
 import { createPhysicsWorld, createProps } from './props.js';
 import { createCapybara } from './capybara.js';
@@ -1994,6 +1994,12 @@ function mainBoot() {
     addCrowdBodies() { return null; },
   };
   window.__capy = game;
+  // For qa/wow-reflect.js: what the planar reflection pass did last frame,
+  // and the pass itself on demand, so an A/B can draw both arms in one task.
+  game.reflectInfo = reflectInfo;
+  game.reflectDraw = function () {
+    return reflectRender(game.renderer, game.scene, game.camera, !!game.state.noReflect, game.state.perfRung | 0, game.state.reflectScale);
+  };
 
   // Built before anything else: a module's constructor is allowed to ask for a
   // beat, and the very first frame has to have a scale on it.
@@ -2497,6 +2503,14 @@ function mainBoot() {
     if (render !== false && !held) {
       const tDraw = performance.now();
       try {
+        // ---- THE PLANAR REFLECTION (ROADMAP-WOW A1) ------------------------
+        // Before the scene draw, inside the same net, on the post path only
+        // (pretty tier: the no-post fallback never asked for a mirror). It
+        // reads the shadow maps the pass above just wrote and re-runs none of
+        // it; parked from the governor's first rung. See reflectRender.
+        if (game.post.enabled) {
+          reflectRender(renderer, game.scene, game.camera, !!game.state.noReflect, game.state.perfRung | 0, game.state.reflectScale);
+        }
         game.post.render();
         game.state.frames = (game.state.frames | 0) + 1;
         mainMsAdd('draw', performance.now() - tDraw);

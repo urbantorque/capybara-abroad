@@ -8,7 +8,7 @@ import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount,
          rimTick, cloudTick, skyTick, fresnelTick, paleTick, triTick, mirrorTick, shadeTick, bounceSlots, bounceTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo, keyDomeTick, keyDomeInfo, skyDomeLit,
-         exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt, lensFadeUniform, lensCapTick } from './shared.js';
+         exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt, lensFadeUniform, lensCapTick, reflectSet } from './shared.js';
 // THE CHARACTER KEY (L7, E4)
 import { capyKeyTick } from './capybara.js';
 
@@ -3069,6 +3069,16 @@ const sysGRADES = {
 // which is roughly what an afternoon does and well under what anyone reads
 // as a filter.
 // ===========================================================================
+// THE PLANAR REFLECTION (ROADMAP-WOW A1) — one row per chapter whose still
+// water is the subject. `y` is the water plane (a number, or a function of
+// game for a tide); `k` the strength handed to reflectRender (the material's
+// own `reflect.k` scales it again); `lift` raises the clip plane over the
+// ripple crests (default 0.06 m). A chapter with no row draws no pass and
+// pays nothing. Cut by game.state.noReflect; swept by game.state.reflectK.
+// The material side is the water's `grain(..., { reflect: {...} })`.
+const sysREFLECT = {
+  kyoto:    { y: -0.45, k: 1.0, lift: 0.07 },   // the mirror pond (kyoWATER_Y; ripple amp 0.055)
+};
 const sysLENS = {
   //             wide  splitW splitC
   sydney:    [0.35, 0.020, 0.026],
@@ -38401,6 +38411,24 @@ export function createSystems(game) {
         // there — the same hand-over leafTick makes for the foliage
         sysCloudSunV.value.copy(sysAxDir).transformDirection(camera.matrixWorldInverse);
       }
+    }
+    // ---- THE PLANAR REFLECTION (ROADMAP-WOW A1). See sysREFLECT. ---------
+    // Here, after the dome has been placed and before main.js draws, because
+    // reflectRender carries the dome to the virtual eye and puts it back. The
+    // plane is the row's height (or its function, for a tide); the cut is
+    // the lens under water OR the animal diving — the eye's fact, not the
+    // animal's, is what a mirror cares about, and the dive is the one state
+    // where the lens follows it under.
+    {
+      const rr = sysREFLECT[name];
+      let ry = null, rk = 0;
+      if (rr && !game.state.noReflect) {
+        ry = typeof rr.y === 'function' ? rr.y(game) : rr.y;
+        rk = typeof game.state.reflectK === 'number' ? game.state.reflectK : rr.k;
+      }
+      const under = (subT > 0.002) || !!(game.capy && game.capy.diving);
+      reflectSet(ry, rk, under, sysSkyMesh && sysSkyMesh.visible ? sysSkyMesh : null,
+                 game.locals || null, rr ? rr.lift : undefined);
     }
 
     // ---- the grade --------------------------------------------------------

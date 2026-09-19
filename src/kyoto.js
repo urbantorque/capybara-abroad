@@ -500,7 +500,7 @@ function kyoBuildGroundBody(game) {
  * the grass — four hard right angles in the middle of a garden that has not
  * contained a right angle since 1397.
  */
-function kyoBuildWater(cx, cz, hx, hz, y, near, far, round) {
+function kyoBuildWater(cx, cz, hx, hz, y, near, far, round, reflect) {
   let g;
   if (round) {
     // Concentric rings, not a triangle fan: a fan has one interior vertex and
@@ -549,10 +549,17 @@ function kyoBuildWater(cx, cz, hx, hz, y, near, far, round) {
   // water from there is a sparse field of moving points far brighter than the
   // surface. It costs four hash calls and it is the difference between a sea
   // and a sheet of coloured card. See grain() in shared.js.
+  // ...AND THE MIRROR (ROADMAP-WOW A1). The pond asks; the river does not —
+  // two hundred metres of fast shallow water over gravel reflects nothing but
+  // sky, and the fresnel already draws that. k 1 with pow 1 puts a third of
+  // the picture on the water at the boom's 41 degrees and all of it at
+  // grazing; wobble 1 is the pond's own 0.055 m ripple bending it by about
+  // half a percent of the frame. See grain()'s reflect block in shared.js.
   const m = new THREE.Mesh(g, grain(mat(0xffffff, { vertexColors: true, transparent: true, opacity: 0.92 }),
     { scale: 0.6, amount: 0.05, warp: 0,
       sparkle: 0.34, sparkleScale: 1.7, sparkleSpeed: 0.22, sparkleCut: 0.665, fresnel: 0.65,
-      sparkleColor: PALETTE.kyotoHaze }));
+      sparkleColor: PALETTE.kyotoHaze,
+      reflect: reflect ? { k: 1.0, pow: 1.0, wobble: 1.0, blur: 0 } : undefined }));
   m.receiveShadow = true;
   m.frustumCulled = false;
   return m;
@@ -4972,7 +4979,7 @@ function kyoBuild(game) {
   // sheet has nowhere left to go brighter. A deep green-blue, and the gold has
   // somewhere to land.
   const pond = kyoBuildWater(kyoPOND.x, kyoPOND.z, kyoPOND.rx, kyoPOND.rz,
-                             kyoWATER_Y, PALETTE.pondWater, PALETTE.pondDeep, true);
+                             kyoWATER_Y, PALETTE.pondWater, PALETTE.pondDeep, true, true);
   kyoPondAttr = pond.geometry.attributes.position;
   // ---- THE POND TAKES THE COLOUR OF WHAT IS STANDING IN IT --------------
   //

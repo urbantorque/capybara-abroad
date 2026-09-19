@@ -5400,6 +5400,254 @@ export function swayMesh(mesh, opts) {
   return mesh;
 }
 
+// ---------------------------------------------------------------------------
+// THE PLANAR REFLECTION (ROADMAP-WOW A1 — the flagship).
+//
+// Nothing in the game reflected anything: the pond is CALLED the mirror pond,
+// the Pantanal's palette comment says its flood "is a MIRROR", and both drew
+// a colour (the horizon, through `fresnel`) and, since L7, a smeared column
+// under each lamp (`mirror`). This is the thing itself: the scene drawn once
+// more from the eye mirrored through the water plane, into a half-resolution
+// half-float target, and sampled back by the water's own fragment.
+//
+// THE MIRRORED CAMERA IS A ROTATION, NOT A REFLECTION. A reflection matrix
+// has determinant -1 and flips every triangle's winding, which three cannot
+// be told about. So the virtual eye, its target and its up are each mirrored
+// through the plane and lookAt() builds a proper camera from them — the
+// same construction as three's Reflector. The one consequence is that the
+// image comes out mirrored left-to-right relative to the main frame, so the
+// water samples it at (1 - u, v). Proof: for any point P on the plane,
+// P - E' = R(P - E) with R the mirror; the virtual right axis is
+// Rf x Ru = det(R) R(f x u) = -Rr, so x' = -x, y' = y, z' = z.
+//
+// THE OBLIQUE CLIP. Everything under the water — the pond floor, the bank's
+// underside, the animal's legs when it wades — would otherwise draw in the
+// mirror image where the sky should be. The virtual camera's near plane is
+// replaced by the water plane (Lengyel's oblique-frustum substitution on
+// the projection matrix's third row), so the GPU clips it for free.
+//
+// WHAT IT DRAWS: the merged world, the sky dome (moved to the virtual eye
+// for the duration — it rides the lens, and a dome left at the real eye
+// puts its horizon band a metre under the water), the emitters, the animal.
+// NOT the motes (the top-level renderOrder-6 instanced fields), NOT locals
+// past 40 m, NOT the contact term (uCtcOn 0 for the pass). The shadow pass
+// is NOT re-run: autoUpdate and needsUpdate are both held false, which the
+// wrapped sysShadowPass honours, so the mirror reads the same maps.
+//
+// CUT while the eye is under the surface (systems.js passes subT and the
+// dive), when the eye is geometrically below the plane, by
+// game.state.noReflect, and at any governor rung but 0 — PARKED: the target
+// stays allocated, the pass is skipped and `k` damps to zero, never freed.
+//
+// COST: one extra scene walk and draw at a quarter of the pixels, no MSAA
+// (samples 0 — the sample goes through a wobble and a half-res bilinear
+// fetch, and an edge that was jagged reads as a ripple). Measured per
+// chapter by qa/wow-reflect.js's interleaved A/B, not assumed.
+// ---------------------------------------------------------------------------
+let _reflRT = null;
+let _reflCam = null;
+const _reflTex = { value: null };                       // the target's texture
+const _reflRes = { value: new THREE.Vector2(1, 1) };    // the MAIN frame's size (gl_FragCoord's)
+const _reflK = { value: 0 };                            // damped 0..1; 0 parks
+const _reflOn = { value: 0 };                           // 1 while the target holds a picture
+const _reflSt = { y: null, k: 0, under: false, sky: null, locals: null, lift: 0.06,
+                  tAt: 0, ms: 0, drawn: false, why: 'never', size: [0, 0], hidden: 0, cutWas: false };
+const _reflE = new THREE.Vector3(), _reflF = new THREE.Vector3(), _reflU = new THREE.Vector3();
+const _reflQ = new THREE.Quaternion();
+const _reflQ4 = new THREE.Vector4(), _reflC4 = new THREE.Vector4();
+const _reflPlane = new THREE.Plane(), _reflUp = new THREE.Vector3(0, 1, 0), _reflPt = new THREE.Vector3();
+const _reflSz = new THREE.Vector2();
+const _reflHid = [];
+// THE GROUND COVER STAYS OUT OF THE MIRROR. Measured on the Kyoto frame
+// (qa/wow-reflect-perf2.js): the pass costs the same at a quarter, a third,
+// a half and full resolution — it is object-bound, not pixel-bound — and
+// the instanced meshes are ~40 % of it. The ones that matter to a
+// reflection are the trees; the ones that cost are the fields of hundreds
+// of sub-30 cm pieces (petals, litter, tufts, pebbles), each a draw call
+// with a sway or a leaf vertex program, none of which a half-res picture
+// seen through a wobble can resolve. Swept once a second, not per frame:
+// the sweep walks every object and a chapter builds lazily.
+const _reflCover = [];
+let _reflSweepAt = -1e9;
+const _reflCOVER_N = 150;     // instances — fewer is a hand-placed set, kept
+const _reflCOVER_R = 0.35;    // m — per-instance geometry radius under this is cover
+function _reflSweep(scene, now) {
+  _reflSweepAt = now;
+  _reflCover.length = 0;
+  scene.traverse(function (o) {
+    if (!o.isInstancedMesh || o.renderOrder === 6 || o.count < _reflCOVER_N) return;
+    const g = o.geometry;
+    if (!g) return;
+    if (!g.boundingSphere) g.computeBoundingSphere();
+    if (g.boundingSphere && g.boundingSphere.radius < _reflCOVER_R) _reflCover.push(o);
+  });
+}
+/**
+ * Once a frame from systems.js: where the live chapter's still water is
+ * (a height, or null for none), how strong its row asks for the mirror,
+ * whether the eye is under (subT or the dive), the dome to carry along, and
+ * the locals list for the 40 m cull. `lift` raises the clip plane over the
+ * ripple crests so the surface itself never draws in its own mirror.
+ */
+export function reflectSet(y, k, under, sky, locals, lift) {
+  _reflSt.y = (typeof y === 'number' && isFinite(y)) ? y : null;
+  _reflSt.k = k > 0 ? (k < 2 ? k : 2) : 0;
+  _reflSt.under = !!under;
+  _reflSt.sky = sky || null;
+  _reflSt.locals = locals || null;
+  _reflSt.lift = typeof lift === 'number' ? lift : 0.06;
+}
+/** For the probes: what the pass did on the last frame. */
+export function reflectInfo() {
+  return { y: _reflSt.y, want: _reflSt.k, k: _reflK.value, on: _reflOn.value, under: _reflSt.under,
+           drawn: _reflSt.drawn, why: _reflSt.why, ms: _reflSt.ms, size: _reflSt.size.slice(),
+           hidden: _reflSt.hidden, cover: _reflCover.length, allocated: !!_reflRT };
+}
+/**
+ * The pass. main.js calls it immediately before the scene draw, every frame
+ * the scene draws. `cut` is game.state.noReflect; `rung` the governor's.
+ * Returns true when the target holds this frame's picture.
+ */
+export function reflectRender(renderer, scene, camera, cut, rung, scale) {
+  const now = performance.now();
+  const dt = _reflSt.tAt ? Math.min(0.1, (now - _reflSt.tAt) / 1000) : 0.016;
+  _reflSt.tAt = now;
+  const y = _reflSt.y;
+  let why = '';
+  if (y === null) why = 'no water';
+  else if (_reflSt.k <= 0) why = 'k 0';
+  else if (cut) why = 'noReflect';
+  else if (rung > 0) why = 'parked rung ' + rung;
+  else if (_reflSt.under) why = 'eye under';
+  else if (camera.position.y <= y + _reflSt.lift + 0.02) why = 'eye below plane';
+  const live = why === '';
+  // Damped, not switched: the strength is a term in nineteen water shaders
+  // and a cut that snaps reads as a flicker on the pond. ~80 ms to settle.
+  const want = live ? _reflSt.k : 0;
+  // ...except the probe's own switch, which CUTS rather than fades, both
+  // ways — the same rule as every lens switch — so an A/B can toggle it
+  // between two synchronous draws and read the whole term.
+  if (cut || _reflSt.cutWas) _reflK.value = want;
+  else _reflK.value += (want - _reflK.value) * (1 - Math.exp(-dt * 30));
+  _reflSt.cutWas = !!cut;
+  if (_reflK.value < 0.002) _reflK.value = 0;
+  _reflSt.drawn = false;
+  _reflSt.why = live ? 'drawn' : why;
+  if (!live) {
+    // Parked or cut: the last picture stays bound while k damps out, and is
+    // dropped once it has. The target itself is never freed.
+    if (_reflK.value <= 0) _reflOn.value = 0;
+    _reflSt.ms = 0;
+    return false;
+  }
+  const t0 = performance.now();
+  renderer.getDrawingBufferSize(_reflSz);
+  // Half by contract; `scale` is the probe's sweep knob (game.state.reflectScale).
+  const sc = (typeof scale === 'number' && scale > 0.05 && scale <= 1) ? scale : 0.5;
+  const w = Math.max(2, Math.floor(_reflSz.x * sc)), h = Math.max(2, Math.floor(_reflSz.y * sc));
+  if (!_reflRT) {
+    _reflRT = new THREE.WebGLRenderTarget(w, h, {
+      type: THREE.HalfFloatType, format: THREE.RGBAFormat,
+      minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+      depthBuffer: true, stencilBuffer: false, samples: 0,
+    });
+    _reflRT.texture.name = 'reflect';
+    _reflCam = new THREE.PerspectiveCamera();
+    _reflCam.matrixAutoUpdate = true;
+  } else if (_reflRT.width !== w || _reflRT.height !== h) {
+    _reflRT.setSize(w, h);
+  }
+  _reflSt.size[0] = w; _reflSt.size[1] = h;
+  _reflRes.value.set(_reflSz.x, _reflSz.y);
+
+  // ---- the virtual eye ----------------------------------------------------
+  camera.updateMatrixWorld();
+  camera.getWorldPosition(_reflE);
+  camera.getWorldQuaternion(_reflQ);
+  const py = y + _reflSt.lift;
+  _reflF.set(0, 0, -1).applyQuaternion(_reflQ).add(_reflE);     // a point ahead
+  _reflU.set(0, 1, 0).applyQuaternion(_reflQ);                  // the up
+  _reflCam.position.set(_reflE.x, 2 * py - _reflE.y, _reflE.z);
+  _reflCam.up.set(_reflU.x, -_reflU.y, _reflU.z);
+  _reflF.y = 2 * py - _reflF.y;
+  _reflCam.lookAt(_reflF);
+  _reflCam.near = camera.near; _reflCam.far = camera.far;
+  _reflCam.fov = camera.fov; _reflCam.aspect = camera.aspect; _reflCam.zoom = camera.zoom;
+  _reflCam.updateMatrixWorld(true);
+  _reflCam.matrixWorldInverse.copy(_reflCam.matrixWorld).invert();
+  _reflCam.projectionMatrix.copy(camera.projectionMatrix);
+  // ---- the oblique near plane (Lengyel) -----------------------------------
+  _reflPt.set(_reflE.x, py, _reflE.z);
+  _reflPlane.setFromNormalAndCoplanarPoint(_reflUp, _reflPt).applyMatrix4(_reflCam.matrixWorldInverse);
+  _reflC4.set(_reflPlane.normal.x, _reflPlane.normal.y, _reflPlane.normal.z, _reflPlane.constant);
+  const P = _reflCam.projectionMatrix.elements;
+  _reflQ4.x = (Math.sign(_reflC4.x) + P[8]) / P[0];
+  _reflQ4.y = (Math.sign(_reflC4.y) + P[9]) / P[5];
+  _reflQ4.z = -1.0;
+  _reflQ4.w = (1.0 + P[10]) / P[14];
+  _reflC4.multiplyScalar(2.0 / _reflC4.dot(_reflQ4));
+  P[2] = _reflC4.x; P[6] = _reflC4.y; P[10] = _reflC4.z + 1.0; P[14] = _reflC4.w;
+  _reflCam.projectionMatrixInverse.copy(_reflCam.projectionMatrix).invert();
+
+  // ---- what stays out of the mirror ----------------------------------------
+  _reflHid.length = 0;
+  const ch = scene.children;
+  for (let i = 0; i < ch.length; i++) {
+    const c = ch[i];
+    if (c.isInstancedMesh && c.renderOrder === 6 && c.visible) { c.visible = false; _reflHid.push(c); }
+  }
+  if (now - _reflSweepAt > 1000) _reflSweep(scene, now);
+  for (let i = 0; i < _reflCover.length; i++) {
+    const c = _reflCover[i];
+    if (c.visible && c.parent) { c.visible = false; _reflHid.push(c); }
+  }
+  const loc = _reflSt.locals;
+  if (loc) {
+    for (let i = 0; i < loc.length; i++) {
+      const L = loc[i];
+      const g = L && L.fig && L.fig.group;
+      if (!g || !g.visible) continue;
+      const dx = L.x - _reflE.x, dz = L.z - _reflE.z;
+      if (dx * dx + dz * dz > 1600) { g.visible = false; _reflHid.push(g); }
+    }
+  }
+  _reflSt.hidden = _reflHid.length;
+  const ctc = _contactOn.value; _contactOn.value = 0;
+  const sky = _reflSt.sky;
+  const skyWas = sky && sky.visible;
+  if (skyWas) sky.position.copy(_reflCam.position);
+  // The water must never sample the target it is being drawn into.
+  _reflTex.value = null;
+  const sm = renderer.shadowMap;
+  const smAuto = sm.autoUpdate, smNeed = sm.needsUpdate;
+  sm.autoUpdate = false; sm.needsUpdate = false;
+  const prevRT = renderer.getRenderTarget();
+  // The scene's matrix walk is the main draw's, a moment later: the mirror
+  // reads the matrices the last frame left, one frame late on whatever
+  // moved, and the dome — the one thing this pass moves — is walked by hand.
+  const mwa = scene.matrixWorldAutoUpdate;
+  scene.matrixWorldAutoUpdate = false;
+  if (skyWas) sky.updateMatrixWorld(true);
+  try {
+    renderer.setRenderTarget(_reflRT);
+    renderer.clear();
+    renderer.render(scene, _reflCam);
+  } finally {
+    scene.matrixWorldAutoUpdate = mwa;
+    renderer.setRenderTarget(prevRT);
+    sm.autoUpdate = smAuto; sm.needsUpdate = smNeed;
+    _contactOn.value = ctc;
+    if (skyWas) { sky.position.copy(_reflE); sky.updateMatrixWorld(true); }
+    for (let i = 0; i < _reflHid.length; i++) _reflHid[i].visible = true;
+    _reflHid.length = 0;
+  }
+  _reflTex.value = _reflRT.texture;
+  _reflOn.value = 1;
+  _reflSt.drawn = true;
+  _reflSt.ms = performance.now() - t0;
+  return true;
+}
+
 const _grainCache = new Map();
 export function grain(m, opts) {
   const o = opts || {};
@@ -5634,6 +5882,34 @@ export function grain(m, opts) {
   // fragment. On by default on every sea (`sparkle > 0`); `mirror: 0` opts
   // out. A strength, so a chapter can tune what its lamps do to its water.
   const mirror = (o.wetOnly === true || !(o.sparkle > 0)) ? 0 : (o.mirror === undefined ? 1 : o.mirror);
+  // ---------------------------------------------------------------------
+  // THE PLANAR REFLECTION (ROADMAP-WOW A1) — see the block above _reflRT.
+  // Opt-in per water material: `reflect: { k, blur, wobble, pow }`. Off
+  // unless a call site asks, and never on the wet-only build.
+  //
+  //   k       strength at grazing, 0..1. What the mirror replaces of the
+  //           water's own lit colour where the view is flat to the surface.
+  //   pow     the grazing curve: weight = k * (1 - V.y)^pow. 1 (the default)
+  //           gives a third of k at the play angle (41 degrees up) and
+  //           nothing looking straight down; 3 is a physical Fresnel and
+  //           reads as nothing at all from the boom.
+  //   wobble  how far the ripple bends the sample, in about half a percent
+  //           of the frame per unit. The bend is the mesh's OWN geometric
+  //           normal (dFdx/dFdy of the world position — kyoRipple moves the
+  //           vertices and never recomputes the normals, so a varying would
+  //           read flat) plus a slow drifting noise for the sheets that are
+  //           genuinely flat.
+  //   blur    in half-res texels; 0 is one tap, more is a five-tap cross.
+  //           Kowloon's wet street wants it high; a pond wants none.
+  //
+  // It is applied to outgoingLight, NOT to diffuseColor: a reflection is
+  // light arriving from somewhere else, and put on the albedo it would be
+  // lit a second time by the sun and shaded by the water's own shadow.
+  const refl = (o.wetOnly === true || !o.reflect || typeof o.reflect !== 'object') ? null : o.reflect;
+  const reflK = refl ? (refl.k === undefined ? 1 : refl.k) : 0;
+  const reflPow = refl ? (refl.pow === undefined ? 1.0 : refl.pow) : 1;
+  const reflWob = refl ? (refl.wobble === undefined ? 1.0 : refl.wobble) : 0;
+  const reflBlur = refl ? (refl.blur === undefined ? 0 : refl.blur) : 0;
   // cloud shadows: a multiplier on the shared uniform, 1 by default (see _cloudK)
   const cloud = o.wetOnly === true ? 0 : (o.cloud === undefined ? 1 : o.cloud);
   // How the per-channel gain splits. Red rises fastest and blue slowest, so
@@ -5729,7 +6005,8 @@ export function grain(m, opts) {
               '|' + fres + '|' + fresPow + '|' + nearPale +
               '|' + speck + '|' + speckScale + '|' + speckCut + '|' + speckCol + '|' + cloud +
               '|' + mid + '|' + midM + '|' + midColor + '|' + midBase + '|' + midHue +
-              '|' + tri + '|' + course + '|' + rock + '|' + mirror;
+              '|' + tri + '|' + course + '|' + rock + '|' + mirror +
+              '|' + reflK + '|' + reflPow + '|' + reflWob + '|' + reflBlur;
   const hit = _grainCache.get(key);
   if (hit) return hit;
 
@@ -5766,7 +6043,16 @@ export function grain(m, opts) {
   // and it already has the sparkle doing the same job better.
   const wet = spark <= 0;
   g.onBeforeCompile = function (shader) {
-    if (spark > 0 || shore > 0 || cloud > 0) shader.uniforms.uGrainT = _grainTime;
+    if (spark > 0 || shore > 0 || cloud > 0 || reflK > 0) shader.uniforms.uGrainT = _grainTime;
+    // THE PLANAR REFLECTION (A1): the target, the frame size gl_FragCoord is
+    // in, the damped strength and the "holds a picture" flag. Shared objects,
+    // so reflectRender's writes reach every water in the game at once.
+    if (reflK > 0) {
+      shader.uniforms.uReflT = _reflTex;
+      shader.uniforms.uReflRes = _reflRes;
+      shader.uniforms.uReflK = _reflK;
+      shader.uniforms.uReflOn = _reflOn;
+    }
     if (cloud > 0) shader.uniforms.uCloudK = _cloudK;
     if (shore > 0) shader.uniforms.uShoreY = _shoreY;
     if (wet) {
@@ -5827,7 +6113,11 @@ export function grain(m, opts) {
         wet ? 'varying vec3 vGrainN;' : '',
         wet ? 'uniform float uGrainWet;' : '',
         wet ? 'uniform vec3 uGrainWetC;' : '',
-        (spark > 0 || shore > 0 || cloud > 0) ? 'uniform float uGrainT;' : '',
+        (spark > 0 || shore > 0 || cloud > 0 || reflK > 0) ? 'uniform float uGrainT;' : '',
+        reflK > 0 ? 'uniform sampler2D uReflT;' : '',
+        reflK > 0 ? 'uniform vec2 uReflRes;' : '',
+        reflK > 0 ? 'uniform float uReflK;' : '',
+        reflK > 0 ? 'uniform float uReflOn;' : '',
         cloud > 0 ? 'uniform float uCloudK;' : '',
         shore > 0 ? 'uniform float uShoreY;' : '',
         cont > 0 ? 'uniform vec4 uCtcP[' + _CONTACT_N + '];' : '',
@@ -6313,6 +6603,41 @@ export function grain(m, opts) {
         !rimHere ? '  if (uGrCloudP.w > 0.0005) diffuseColor.rgb *= 1.0 - rmCloud(vGrainW, uGrCloudP, uGrCloudS) * 0.7;' : '',
         '}',
       ].join('\n'));
+    // ---- THE PLANAR REFLECTION (A1) — on the LIT colour, just before it is
+    // written. See the option block above `refl`. The anchor text is kept at
+    // the tail so _rimInject (never on water, but the rule stands) still
+    // finds it.
+    if (reflK > 0) {
+      shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', [
+        'if (uReflOn > 0.5) {',
+        '  vec3 rV = normalize(cameraPosition - vGrainW);',
+        '  float rW = pow(1.0 - clamp(rV.y, 0.0, 1.0), ' + reflPow.toFixed(3) + ') * ' +
+             reflK.toFixed(4) + ' * uReflK;',
+        '  if (rW > 0.001) {',
+        // (1 - u, v): the virtual camera is a rotation, so its picture is
+        // mirrored left-to-right. See the block above _reflRT.
+        '    vec2 rUv = vec2(1.0 - gl_FragCoord.x / uReflRes.x, gl_FragCoord.y / uReflRes.y);',
+        // The ripple the chapter already has: the geometric normal of the
+        // rippled mesh, per facet, which moves because the vertices do.
+        '    vec3 rGN = cross(dFdx(vGrainW), dFdy(vGrainW));',
+        '    rGN *= sign(rGN.y + 1e-6);',
+        '    vec2 rN = rGN.xz / max(abs(rGN.y), 1e-4);',
+        '    vec2 rDr = vec2(grNoise(vGrainW.xz * 0.9 + uGrainT * 0.17) - 0.5,',
+        '                    grNoise(vGrainW.zx * 0.9 - uGrainT * 0.13 + 3.7) - 0.5);',
+        '    rUv += (clamp(rN, -0.06, 0.06) * 40.0 + rDr * 0.8) * ' + (reflWob * 0.01).toFixed(5) + ';',
+        '    rUv = clamp(rUv, vec2(0.002), vec2(0.998));',
+        reflBlur > 0 ? '    vec2 rTx = vec2(' + reflBlur.toFixed(2) + ') / (uReflRes * 0.5);' : '',
+        reflBlur > 0
+          ? '    vec3 rC = (texture2D(uReflT, rUv).rgb * 2.0 + texture2D(uReflT, rUv + rTx).rgb + texture2D(uReflT, rUv - rTx).rgb' +
+            ' + texture2D(uReflT, rUv + vec2(rTx.x, -rTx.y)).rgb + texture2D(uReflT, rUv + vec2(-rTx.x, rTx.y)).rgb) / 6.0;'
+          : '    vec3 rC = texture2D(uReflT, rUv).rgb;',
+        '    outgoingLight = mix(outgoingLight, rC, rW);',
+        m.transparent ? '    diffuseColor.a = mix(diffuseColor.a, 1.0, rW);' : '',
+        '  }',
+        '}',
+        '#include <opaque_fragment>',
+      ].join('\n'));
+    }
     // LAST, and it has to BE last: _rimInject anchors on '#include <common>'
     // and on '#include <opaque_fragment>', and grain's own replacements above
     // keep the '#include <common>' text at the head of what they substitute —
@@ -6331,6 +6656,7 @@ export function grain(m, opts) {
   // "this chapter is wired" from "this chapter looks about right".
   if (!g.userData) g.userData = {};
   g.userData.grainShore = shore;
+  g.userData.grainReflect = reflK;   // qa/wow-reflect.js finds the water by this
   g.needsUpdate = true;
   _grainCache.set(key, g);
   return g;
