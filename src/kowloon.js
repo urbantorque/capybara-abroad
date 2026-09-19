@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matEmit, emitSet, EMIT_OVER, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, makeMerger, makeMover, warnOnce } from './shared.js';
+import { PALETTE, mat, matEmit, emitSet, EMIT_OVER, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, makeMerger, makeMover, warnOnce, hangThing } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 11 — HONG KONG. UP IS A DIRECTION HERE.
@@ -6083,7 +6083,30 @@ function hkBuild(game) {
     }
   }
 
+  hkBuildForeground(game, hkRoot);
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(hkRoot);
+}
+
+// ---- ROADMAP-WOW A2, THE FOREGROUND (W1) -----------------------------------
+// Same fix as Kyoto and Hanoi: the arrival frame's near 0-4 m is empty. A shop
+// sign's underside is "the one thing this chapter is made of" (the roadmap's
+// own words), so `hangThing('sign', ...)` in the corner reads as more of the
+// same street. Colours from sysBOARD_DRESS.kowloon (neon gold trim, neon cyan
+// lamp face, concrete-dark cord) so it belongs to the same object family as
+// the chapter's own board-hung sign. Static, no sway, gated on noFore, built
+// once (hkBuild runs exactly once, hkBuilt guards it).
+function hkBuildForeground(game, root) {
+  if (game.state && game.state.noFore) return;
+  const g = hangThing('sign', {
+    a: PALETTE.hkNeonGold, b: PALETTE.hkNeonCyan, c: PALETTE.hkConcreteDk, len: 0.5,
+  });
+  // Measured 19 Sep 2026 from the live resting camera at the Kowloon arrival
+  // (cam ~ (9.68, 4.10, 40.78), fwd/right/up read off camera.matrixWorld, fov
+  // 52 (vertical), aspect 1.684): world position = cam + fwd*3.0 +
+  // right*2.09 + up*1.14 — top-right corner, against the dark sky rather than
+  // the street's own dense row of neon (green/pink/cyan) already in frame.
+  g.position.set(8.32, 4.82, 37.27);
+  root.add(g);
 }
 
 // ================================================================ THE DRIP ==

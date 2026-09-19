@@ -19,12 +19,6 @@ async page => {
   const errs = []
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
-  await page.addInitScript(() => { try { localStorage.clear() } catch (e) {} })
-  await page.setViewportSize({ width: 1280, height: 760 })
-  await page.goto('http://localhost:5188/')
-  await page.waitForTimeout(5200)
-  await page.evaluate(() => document.querySelector('.capyui-go').click())
-  await page.waitForTimeout(1500)
 
   // Each row's `anchor` is the object's own world position (its pivot),
   // exactly as landed in the chapter's own source file. Landed chapters only
@@ -32,11 +26,25 @@ async page => {
   const FORE_CHAPTERS = [
     { name: 'kyoto', anchor: [-23.27, 4.70, 57.10] },
     { name: 'hanoi', anchor: [-64.01, 5.60, -74.22] },
+    { name: 'kowloon', anchor: [8.32, 4.82, 37.27] },
   ];
 
   const out = { errs, chapters: {} };
 
+  // headless-qa-harness trap 31: THE ARRIVAL LENS DEPENDS ON THE CHAPTER YOU
+  // CAME FROM (camDist is not reset on travel). Crossing chapter-to-chapter
+  // in one page would measure each chapter's frame as arrived-from-the-
+  // previous-chapter-in-this-list, not as a player actually arrives from the
+  // title/Sydney start — a different, uncontrolled camera distance each row.
+  // Reload and re-Begin fresh for every chapter so each one is measured from
+  // the same, comparable arrival vector this object was placed against.
   for (const row of FORE_CHAPTERS) {
+    await page.addInitScript(() => { try { localStorage.clear() } catch (e) {} });
+    await page.setViewportSize({ width: 1280, height: 760 });
+    await page.goto('http://localhost:5188/');
+    await page.waitForTimeout(5200);
+    await page.evaluate(() => document.querySelector('.capyui-go').click());
+    await page.waitForTimeout(1500);
     await page.evaluate((n) => window.__capy.hud.cross(n), row.name);
     await page.waitForTimeout(9500);
     const res = await page.evaluate((anchorArr) => {
