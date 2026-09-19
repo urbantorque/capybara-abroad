@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matSelf, matEmit, TASKS, rand, randInt, clamp, damp, lerp, waterYAt, reachRim } from './shared.js';
+import { PALETTE, mat, matSelf, matRound, matEmit, TASKS, rand, randInt, clamp, damp, lerp, waterYAt, reachRim } from './shared.js';
 
 // ===========================================================================
 // AGENT B — THE CAPYBARA
@@ -530,6 +530,15 @@ const capyRAIN_WET = 0.85;
 // --- shared geometry (built once) -----------------------------------------
 const capyGeoBlob = new THREE.SphereGeometry(1, 8, 6);
 const capyGeoBead = new THREE.SphereGeometry(1, 6, 4);
+// THE LIVING ARE ROUND (ROADMAP-WOW G5). The sphere the animal's own soft parts
+// are cut from — belly, tail, cheeks, ears, eyes — one segment step up from
+// the blob, 12x8 against the law's 8x6, with the same written exemption the sky
+// dome has: this animal is the subject of every frame in the game. The blob
+// stays 8x6 for the wardrobe (a parka hood is built, not alive). Under
+// `flatShading: false` the sphere's own vertex normals decide, so this is
+// where the round read comes from; the segment step is for the SILHOUETTE,
+// which no normal can change. ~90 triangles a part, seven parts, once.
+const capyGeoLive = new THREE.SphereGeometry(1, 12, 8);
 // How far up the shin the ankle band reaches. It is a GEOMETRY number as well
 // as a shading one: the shin carries a vertex ring at exactly this height so
 // the band has an edge to end on, and the coat reads the same constant back.
@@ -537,7 +546,7 @@ const capyANKLE_H = 0.06;
 // The shin, hand-authored (R4) rather than a CylinderGeometry: same 6 sides,
 // same taper, same 0.32, plus the one extra ring 6 cm off the sole that the
 // ankle band needs somewhere to live. See capyLegGeo.
-const capyGeoLeg = capyLegGeo(0.100, 0.068, 0.29, 6, capyANKLE_H);
+const capyGeoLeg = capyLegGeo(0.100, 0.068, 0.29, 6, capyANKLE_H, true);
 const capyGeoRing = new THREE.CylinderGeometry(1, 1, 0.05, 8, 1, true);
 // The wardrobe's three. A unit disc (hat brims, bands, lenses), a unit dome
 // (crowns, hoods, helmets) and a unit box are between them every costume in the
@@ -680,8 +689,12 @@ function capyHullFit(zFrom, zTo) {
  * `dw` / `dTop` / `dBot` inflate the section: outward, upward, and up-from-
  * underneath — a jacket rides ABOVE the belly, so its bottom is raised rather
  * than dropped.
+ *
+ * `smooth` (G5) is for the animal's own hull and not for a costume shell: the
+ * strip gets a second, smoothed normal set alongside the face one, and which
+ * of the two the mesh carries is the round/flat A/B. See capySmoothNormals.
  */
-function capyHullGeo(rows, dw, dTop, dBot) {
+function capyHullGeo(rows, dw, dTop, dBot, smooth) {
   const R = rows.length, N = capyHULL_N;
   const px = capyHULL_PIVOT[0], py = capyHULL_PIVOT[1], pz = capyHULL_PIVOT[2];
   const ring = [], mid = [];
@@ -726,7 +739,67 @@ function capyHullGeo(rows, dw, dTop, dBot) {
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.computeVertexNormals();
   g.computeBoundingSphere();
+  if (smooth) capySmoothNormals(g, (R - 1) * N * 2);
   return g;
+}
+
+/**
+ * SMOOTH NORMALS FOR A LIVING PART (ROADMAP-WOW G5) — THE HULL AND THE SHIN.
+ *
+ * The rule G5 wrote is "turn `flatShading` off and the geometry decides", and
+ * for a SphereGeometry it does. The animal's body and legs are not spheres:
+ * they are hand-authored, non-indexed, and `computeVertexNormals` on a
+ * non-indexed buffer gives every triangle its own face normal — which the two
+ * comments above chose on purpose, for the rim's sake. Under `flatShading:
+ * false` those baked face normals render exactly as flat as before, so the
+ * flag alone would round the belly and the ears and leave the body faceted
+ * between them: a soft animal in a hard barrel.
+ *
+ * So the strip gets a second normal set, averaged across every strip face
+ * that shares a vertex position (area-weighted; the caps — the chest fan
+ * inside the skull, the rump, the sole — keep their face normals, so the
+ * blunt rump stays blunt). BOTH sets are kept on the geometry, because the
+ * rim reads the attribute whether or not the material is flat-shaded
+ * (`_RIM_VS_BEGIN` takes `objectNormal`), and an A/B that flipped the flag
+ * and left the smooth attribute in place would be comparing two different
+ * rims. `capyRoundApply` swaps the attribute with the flag.
+ *
+ * The rim's own objection — an interpolated normal sees a face as edge-on
+ * before it is — is real and is now the animal's, not the scenery's: the
+ * self rim (`selfRimTick`) is tuned on the animal alone, and the sheet
+ * (qa/wow-round.js) is what says whether it still reads.
+ */
+function capySmoothNormals(g, stripTris) {
+  const pos = g.attributes.position.array;
+  const flat = g.attributes.normal;
+  const out = new Float32Array(pos.length);
+  const acc = new Map();
+  const keyOf = (v) => pos[v * 3] + ',' + pos[v * 3 + 1] + ',' + pos[v * 3 + 2];
+  for (let t = 0; t < stripTris; t++) {
+    const a = t * 3, b = a + 1, c = a + 2;
+    const ax = pos[a * 3], ay = pos[a * 3 + 1], az = pos[a * 3 + 2];
+    const ux = pos[b * 3] - ax, uy = pos[b * 3 + 1] - ay, uz = pos[b * 3 + 2] - az;
+    const vx = pos[c * 3] - ax, vy = pos[c * 3 + 1] - ay, vz = pos[c * 3 + 2] - az;
+    // unnormalised cross product: twice the area, so a sliver weighs less
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    for (const v of [a, b, c]) {
+      const k = keyOf(v);
+      let s = acc.get(k);
+      if (!s) { s = [0, 0, 0]; acc.set(k, s); }
+      s[0] += nx; s[1] += ny; s[2] += nz;
+    }
+  }
+  const n = pos.length / 3;
+  for (let v = 0; v < n; v++) {
+    const o = v * 3;
+    const s = v < stripTris * 3 ? acc.get(keyOf(v)) : null;
+    const L = s ? Math.sqrt(s[0] * s[0] + s[1] * s[1] + s[2] * s[2]) : 0;
+    if (L > 1e-9) { out[o] = s[0] / L; out[o + 1] = s[1] / L; out[o + 2] = s[2] / L; }
+    else { out[o] = flat.array[o]; out[o + 1] = flat.array[o + 1]; out[o + 2] = flat.array[o + 2]; }
+  }
+  if (!g.userData) g.userData = {};
+  g.userData.nFlat = flat;
+  g.userData.nRound = new THREE.BufferAttribute(out, 3);
 }
 
 /**
@@ -953,7 +1026,7 @@ function capyFootGeo(w, h, d, toes, notch, cham) {
  * same reason: it now stops 2 cm inside the top of the foot instead of ending
  * flush with the sole, where it was coplanar with it.
  */
-function capyLegGeo(rTop, rBot, h, seg, split) {
+function capyLegGeo(rTop, rBot, h, seg, split, smooth) {
   const ys = [-h * 0.5, -h * 0.5 + split, h * 0.5];
   const ring = ys.map(y => {
     const t = (y + h * 0.5) / h, r = rBot + (rTop - rBot) * t, a = [];
@@ -985,6 +1058,9 @@ function capyLegGeo(rTop, rBot, h, seg, split) {
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.computeVertexNormals();
   g.computeBoundingSphere();
+  // G5: a six-sided tube with smoothed strip normals reads as a round leg;
+  // the sole keeps its face normal. See capySmoothNormals.
+  if (smooth) capySmoothNormals(g, (ring.length - 1) * seg * 2);
   return g;
 }
 
@@ -1020,7 +1096,7 @@ function capyLegGeo(rTop, rBot, h, seg, split) {
 //     reason it is written this way, and R2 collected on it: seven blobs
 //     became one hand-authored hull and the hull got the same coat by calling
 //     the same function, with no number in this block re-authored.
-//  2. THE GEOMETRY HAS TO BE CLONED FIRST. `capyGeoBlob` is shared by the
+//  2. THE GEOMETRY HAS TO BE CLONED FIRST. `capyGeoLive` is shared by the
 //     the belly, the tail, the ears and both cheeks — a colour attribute
 //     written on the shared buffer would paint the ears with the belly's
 //     gradient. Cloned per part, once, at create. Same for the shin and the
@@ -1262,7 +1338,7 @@ function capyCoatAnkle(out, y, band) {
 // Shared buffers: anything in here has to be cloned before it can carry a coat.
 // The two feet are here for the same reason the shin is — two legs each — even
 // though nothing outside the animal uses them.
-const capyGeoShared = new Set([capyGeoBlob, capyGeoBead, capyGeoLeg,
+const capyGeoShared = new Set([capyGeoBlob, capyGeoLive, capyGeoBead, capyGeoLeg,
                                capyGeoRing, capyGeoDisc, capyGeoDome,
                                capyGeoBox, capyGeoFootF, capyGeoFootR]);
 const _coatM4 = new THREE.Matrix4();
@@ -3172,14 +3248,33 @@ export function createCapybara(game) {
   // pairing is the invariant, not the individual flag. `_rimWants` is true for
   // this option set, so the animal keeps its own rim; and these are built, not
   // cloned, because a clone loses the rim hook.
-  const mFur = matSelf(PALETTE.capy, { vertexColors: true });
-  const mFurWet = matSelf(PALETTE.capyDark, { vertexColors: true });
-  const mBelly = matSelf(PALETTE.capyLight, { vertexColors: true });
-  const mBellyWet = matSelf(PALETTE.capy, { vertexColors: true });
-  const mDark = matSelf(PALETTE.capyDark, { vertexColors: true });
-  const mDarkWet = matSelf(PALETTE.capyNose, { vertexColors: true });
+  //
+  // ...AND THE SIX ARE ROUND (ROADMAP-WOW G5): the built world is flat-shaded
+  // and anything that breathes takes its geometry's own normals. `flatShading:
+  // false` in the opts is the whole change at the material — matSelf merges
+  // it over its default, the rim hook binds exactly as before (the option set
+  // still passes `_rimWants`), and the character key wraps it exactly as
+  // before. A sphere-built part (belly, ears, cheeks, tail, eyes) goes round on
+  // the flag; the hull and the shin carry an authored smooth normal set (see
+  // capySmoothNormals); the skull, the muzzle, the jaw, the brow, the nose pad
+  // and the toed feet keep face normals and stay hard — the muzzle's chamfer
+  // is a light EDGE, and a toe is a corner. The wardrobe stays on `mat()`: a
+  // body is alive, a garment is built. `game.state.noRound` puts it all back,
+  // live — see capyRoundApply.
+  let capyRoundOn = !(game.state && game.state.noRound);
+  const capyRoundOpts = () => ({ vertexColors: true, flatShading: !capyRoundOn });
+  const mFur = matSelf(PALETTE.capy, capyRoundOpts());
+  const mFurWet = matSelf(PALETTE.capyDark, capyRoundOpts());
+  const mBelly = matSelf(PALETTE.capyLight, capyRoundOpts());
+  const mBellyWet = matSelf(PALETTE.capy, capyRoundOpts());
+  const mDark = matSelf(PALETTE.capyDark, capyRoundOpts());
+  const mDarkWet = matSelf(PALETTE.capyNose, capyRoundOpts());
   const mNose = mat(PALETTE.capyNose);
-  const mEye = mat(PALETTE.capyEye);
+  // The eye is the one shared accent that is alive: a cached round variant
+  // under its own key (matRound), with the flat one kept for the A/B.
+  const mEyeFlat = mat(PALETTE.capyEye);
+  const mEyeRound = matRound(PALETTE.capyEye);
+  const mEye = capyRoundOn ? mEyeRound : mEyeFlat;
   // ...AND A SEVENTH, FOR THE NOSE PAD ALONE (R3). The note above says the two
   // accents stay on `mat()` because they are never on the outline, and for the
   // eyes that is still true. It was wrong about the pad, and measurably so: the
@@ -3226,7 +3321,7 @@ export function createCapybara(game) {
   // Positioned at the table's pivot rather than the origin, because the idle
   // breath scales this node and a chest expands upward from the belly line, not
   // symmetrically about the middle of the animal and down into the floor.
-  const hull = new THREE.Mesh(capyHullGeo(capyHULL, 0, 0, 0), mFur);
+  const hull = new THREE.Mesh(capyHullGeo(capyHULL, 0, 0, 0, true), mFur);
   hull.name = 'capyHull';   // named for the probes; nothing in src reads it
   hull.position.set(capyHULL_PIVOT[0], capyHULL_PIVOT[1], capyHULL_PIVOT[2]);
   hull.castShadow = true;
@@ -3234,7 +3329,7 @@ export function createCapybara(game) {
   wetParts.push({ m: hull, dry: mFur, wet: mFurWet });
   // the ONLY capyLight on the animal: the belly underside. Narrow enough that
   // it emerges as a low band along the underside instead of a mottled patch.
-  const belly = capyAddPart(capySquash, capyGeoBlob, mBelly, 0, 0.245, -0.04, 0.245, 0.105, 0.30);
+  const belly = capyAddPart(capySquash, capyGeoLive, mBelly, 0, 0.245, -0.04, 0.245, 0.105, 0.30);
   wetParts.push({ m: belly, dry: mBelly, wet: mBellyWet });
   // THE TAIL HAS A PIVOT NOW (R5), and it needs one before it can have a
   // writer: this nub is a 5 cm sphere that was centred on itself, and rotating
@@ -3250,7 +3345,7 @@ export function createCapybara(game) {
   const tailPivot = new THREE.Group();
   tailPivot.position.set(0, 0.520, -0.500);
   capySquash.add(tailPivot);
-  const tail = capyAddPart(tailPivot, capyGeoBlob, mDark, 0, -0.020, -0.115, 0.050, 0.055, 0.045);
+  const tail = capyAddPart(tailPivot, capyGeoLive, mDark, 0, -0.020, -0.115, 0.050, 0.055, 0.045);
 
   // --- head: no neck, squared-off snout, eyes+ears high and far back --
   const head = new THREE.Group();
@@ -3313,8 +3408,8 @@ export function createCapybara(game) {
   // surface with the eyes and the ears in the same plane above them, which is
   // why an animal that is swimming shows those three things and nothing else.
   // It is also the read the game actually gets — the resting lens looks DOWN.
-  capyAddPart(head, capyGeoBead, mEye, 0.036, 0.062, 0.445, 0.018, 0.010, 0.014);
-  capyAddPart(head, capyGeoBead, mEye, -0.036, 0.062, 0.445, 0.018, 0.010, 0.014);
+  const nostrilL = capyAddPart(head, capyGeoBead, mEye, 0.036, 0.062, 0.445, 0.018, 0.010, 0.014);
+  const nostrilR = capyAddPart(head, capyGeoBead, mEye, -0.036, 0.062, 0.445, 0.018, 0.010, 0.014);
 
   // EYES — dark beads set into the outer-front corners of the brow, angled
   // outward-and-forward so BOTH catch the light from a three-quarter front
@@ -3324,12 +3419,13 @@ export function createCapybara(game) {
   eyeSockL.position.set(0.128, 0.128, 0.265);
   eyeSockL.rotation.y = 0.62;
   head.add(eyeSockL);
-  // 8x6, not the 6x4 bead (R3). At the contract's cap and no further, and the
+  // 8x6, not the 6x4 bead (R3), and 12x8 since G5 (capyGeoLive, the animal's
+  // written exemption from the cap). The
   // reason is the catchlight below rather than the eye itself: a 6x4 sphere's
   // top band is FOUR facets, so a highlight put on the upper front of it lands
   // on one facet and switches between two as the head turns. It is also the one
   // part of this animal the lens is on at every arrival.
-  const eyeL = capyAddPart(eyeSockL, capyGeoBlob, mEye, 0, 0, 0.056, 0.046, 0.050, 0.042);
+  const eyeL = capyAddPart(eyeSockL, capyGeoLive, mEye, 0, 0, 0.056, 0.046, 0.050, 0.042);
   // A catchlight is not fur. It borrows mBelly for the value and must not
   // borrow the coat with it, or the palest thing on the animal picks up the
   // throat's lift and stops reading as a highlight.
@@ -3357,7 +3453,7 @@ export function createCapybara(game) {
   eyeSockR.position.set(-0.128, 0.128, 0.265);
   eyeSockR.rotation.y = -0.62;
   head.add(eyeSockR);
-  const eyeR = capyAddPart(eyeSockR, capyGeoBlob, mEye, 0, 0, 0.056, 0.046, 0.050, 0.042);
+  const eyeR = capyAddPart(eyeSockR, capyGeoLive, mEye, 0, 0, 0.056, 0.046, 0.050, 0.042);
   capyAddPart(eyeR, capyGeoBead, mCatch, -0.135, 0.452, 0.597, 0.30, 0.30, 0.30)
     .userData.coat = { flat: true };
 
@@ -3366,8 +3462,8 @@ export function createCapybara(game) {
   // a bead on a flat plane is a dot, a bead on a ledge is an eye — and in
   // profile it breaks what was a dead straight line from the ear to the end of
   // the muzzle into a skull and a snout, which is the shape of a head.
-  const cheekL = capyAddPart(head, capyGeoBlob, mFur, 0.150, 0.045, 0.235, 0.048, 0.050, 0.090);
-  const cheekR = capyAddPart(head, capyGeoBlob, mFur, -0.150, 0.045, 0.235, 0.048, 0.050, 0.090);
+  const cheekL = capyAddPart(head, capyGeoLive, mFur, 0.150, 0.045, 0.235, 0.048, 0.050, 0.090);
+  const cheekR = capyAddPart(head, capyGeoLive, mFur, -0.150, 0.045, 0.235, 0.048, 0.050, 0.090);
   wetParts.push({ m: cheekL, dry: mFur, wet: mFurWet });
   wetParts.push({ m: cheekR, dry: mFur, wet: mFurWet });
 
@@ -3481,7 +3577,7 @@ export function createCapybara(game) {
   // is the one channel over three pixels, and it is what the look-back, the
   // crouch, the inhale and the nap are all read off. Taller, and raised by
   // half the difference so the root stays in the skull.
-  const earMeshL = capyAddPart(earL, capyGeoBlob, mDark, 0.02, 0.03 + 0.078 * (capyEAR_LONG - 1) * 0.5, 0,
+  const earMeshL = capyAddPart(earL, capyGeoLive, mDark, 0.02, 0.03 + 0.078 * (capyEAR_LONG - 1) * 0.5, 0,
                                0.072, 0.078 * capyEAR_LONG, 0.036);
   // The cup. -z is the face the playing camera actually sees from behind and
   // above, and it is the one that never sees the sky either way.
@@ -3490,7 +3586,7 @@ export function createCapybara(game) {
   const earR = new THREE.Group();
   earR.position.set(-0.135, 0.17, -0.05);
   head.add(earR);
-  const earMeshR = capyAddPart(earR, capyGeoBlob, mDark, -0.02, 0.03 + 0.078 * (capyEAR_LONG - 1) * 0.5, 0,
+  const earMeshR = capyAddPart(earR, capyGeoLive, mDark, -0.02, 0.03 + 0.078 * (capyEAR_LONG - 1) * 0.5, 0,
                                0.072, 0.078 * capyEAR_LONG, 0.036);
   earMeshR.userData.coat = { nook: [0, 0, -1], to: capyCOAT_EAR };
   wetParts.push({ m: earMeshR, dry: mDark, wet: mDarkWet });
@@ -3564,6 +3660,32 @@ export function createCapybara(game) {
   // once, at create, over the whole animal in its rest pose — the wardrobe is
   // built below and wears `mat()` materials, so it is correctly skipped.
   const capyCoated = capyPaintCoat(capyModel, capyFurMats);
+
+  // ---- ROUND OR FLAT, LIVE (G5) --------------------------------------------
+  // `game.state.noRound` is polled once a frame (capyUpdate) and applied on
+  // the edge. Three things move together, and an A/B that moved one of them
+  // alone would be measuring something else: the six fur materials' flag
+  // (three recompiles; `flatShading` is in its program key), the eyes' and
+  // nostrils' material (the cached flat/round pair), and the normal attribute
+  // on every geometry that carries an authored smooth set (the hull, the four
+  // shins — the rim reads the attribute regardless of the flag).
+  const capyRoundMats = [mFur, mFurWet, mBelly, mBellyWet, mDark, mDarkWet];
+  const capyRoundSwap = [eyeL, eyeR, nostrilL, nostrilR];
+  function capyRoundApply(on) {
+    for (const m of capyRoundMats) {
+      if (m.flatShading === !on) continue;
+      m.flatShading = !on;
+      m.needsUpdate = true;
+    }
+    for (const o of capyRoundSwap) o.material = on ? mEyeRound : mEyeFlat;
+    capyModel.traverse(function (o) {
+      if (!o.isMesh || !o.geometry || !o.geometry.userData || !o.geometry.userData.nRound) return;
+      const want = on ? o.geometry.userData.nRound : o.geometry.userData.nFlat;
+      if (o.geometry.attributes.normal !== want) o.geometry.setAttribute('normal', want);
+    });
+    capyRoundOn = on;
+  }
+  capyRoundApply(capyRoundOn);
 
   // ===================================================================
   // THE WARDROBE — ten costumes, one per chapter that earns one.
@@ -4394,6 +4516,16 @@ export function createCapybara(game) {
     group: capyRoot,
     body,
     mouthAnchor,
+    // G5's probe: which way the animal is shaded right now, and what bound.
+    roundInfo() {
+      let smoothGeo = 0, flatMats = 0;
+      capyModel.traverse(function (o) {
+        if (o.isMesh && o.geometry && o.geometry.userData && o.geometry.userData.nRound &&
+            o.geometry.attributes.normal === o.geometry.userData.nRound) smoothGeo++;
+      });
+      for (const m of capyRoundMats) if (m.flatShading) flatMats++;
+      return { on: capyRoundOn, smoothGeo, flatMats, eye: eyeL.material === mEyeRound ? 'round' : 'flat' };
+    },
     position: capyPosition,          // AUTHORITATIVE simulated position (gameplay)
     velocity: capyVelocity,
     renderPosition: capyRenderPos,   // additive: smoothed display transform (camera-friendly)
@@ -5361,6 +5493,8 @@ export function createCapybara(game) {
   // -------------------------------------------------------------------
   function capyUpdate(dt) {
     if (dt <= 0) dt = 1 / 60;
+    // G5's A/B, on the edge and before the helm's early return
+    if (capyRoundOn === !!game.state.noRound) capyRoundApply(!game.state.noRound);
     const input = game.input;
     const env = capyWater(game);
     const t = game.state.time;

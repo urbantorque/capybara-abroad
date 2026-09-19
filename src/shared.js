@@ -2598,6 +2598,34 @@ export function matOwn(color, opts) {
 }
 
 // ---------------------------------------------------------------------------
+// matRound — THE LIVING ARE ROUND (ROADMAP-WOW G5).
+//
+// The built world is flat-shaded; anything that breathes takes its geometry's
+// own vertex normals, so a sphere-built part goes round and a box-built part
+// on the same figure stays hard. This is `mat()` with `flatShading: false`,
+// under its OWN cache entry: mat() keys by colour, and the animal's brown is
+// not unique to the animal (matSelf's comment), so without the `:round` suffix
+// the lawn's fig and the animal would trade materials across the line. Same
+// rim hook, same program key contribution; `flatShading` is part of three's
+// own program key, so the round variants share one compiled program among
+// themselves and none with the flat ones. The capybara's OWN fur goes through
+// matSelf (uncached, so it simply passes `flatShading: false`); this is for
+// the shared accents (its eyes) and for every other living thing.
+// ---------------------------------------------------------------------------
+export function matRound(color, opts) {
+  const key = color + '|' + (opts ? JSON.stringify(opts) : '') + ':round';
+  let m = _matCache.get(key);
+  if (m) return m;
+  m = new THREE.MeshLambertMaterial(Object.assign({ color, flatShading: false }, opts || {}));
+  if (_rimWants(opts)) {
+    m.onBeforeCompile = _rimInject;
+    m.customProgramCacheKey = _rimKey;
+  }
+  _matCache.set(key, m);
+  return m;
+}
+
+// ---------------------------------------------------------------------------
 // OVER-WHITE — A THING THAT MAKES LIGHT SHOULD BE BRIGHTER THAN A THING THAT
 // DOES NOT, AND FOR EIGHT CHAPTERS IT WAS NOT (D5).
 //

@@ -7339,6 +7339,7 @@ is what finishes this composition. See `ROADMAP-TITLE.md`.
   `LatheGeometry`, `ExtrudeGeometry`, or hand-authored `BufferGeometry`. **No textures. No image files.**
 - Materials: `MeshLambertMaterial` with `flatShading: true` ONLY (use `mat()` from shared.js).
   No PBR, no metalness/roughness, no env maps, no normal maps.
+- **Flat-shaded for the built world; smooth normals for anything that breathes** (G5): the capybara, every human, every animal go through `matRound()` / `flatShading: false` — a box-built part on a living thing still stays hard, and the animal's 12×8 sphere is its written exemption from the cap above.
 - Colours come from `PALETTE` in `shared.js`. Never hardcode a hex outside shared.js.
   Palette is flat + pastel + sun-bleached Australian: soft yellows, sage greens, chalk whites,
   dusty terracotta, pale harbour blue. No saturated primaries, no black outlines, no neon.

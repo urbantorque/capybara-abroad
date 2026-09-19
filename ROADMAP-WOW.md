@@ -512,6 +512,41 @@ faceted was the taste call the first draft of this item hedged on. It
 stays behind `game.state.smoothCrowns`, OFF, judged by eye at the
 closeout — the only thing in this pass that still is.
 
+**G5 reality check, the animal (19 Sep 2026) — the description above
+was written against a capybara that no longer exists.** "capyGeoBlob
+scaled into body, head, muzzle and limbs — it rounds in one flag" was
+true before R2–R4. Today the body is a hand-authored hull
+(`capyHullGeo`, seven stations, twelve sides), the head a 0.36 m box,
+the muzzle a chamfered brick (`capyMuzzleGeo`), the shin a three-ring
+tube (`capyLegGeo`) and the feet toed slabs (`capyFootGeo`) — all
+non-indexed, all `computeVertexNormals()` on a non-indexed buffer, which
+is a FACE normal per vertex, chosen on purpose by each of those
+comments for the rim's sake. `flatShading: false` on a face-normal
+buffer renders exactly as flat as before. So the flag alone rounded the
+belly, the tail, the cheeks, the ears and the eyes and left the body
+faceted between them — a soft animal in a hard barrel.
+
+What shipped: the flag on the six fur materials (`matSelf` with
+`flatShading: false`, same rim hook, same character key; `matRound()`
+in shared.js for the cached eye accent, `+':round'` key), a 12×8
+`capyGeoLive` for the seven sphere-built parts (the blob stays 8×6 for
+the wardrobe's hood), and an AUTHORED smooth normal set on the hull and
+the shin (`capySmoothNormals`: area-weighted across the strip, the caps
+— chest, rump, sole — keep their face normals, so the rump stays blunt).
+Both normal sets stay on the geometry and `game.state.noRound` swaps
+the attribute WITH the flag, because the rim reads the attribute either
+way (`_RIM_VS_BEGIN` takes `objectNormal`) and an A/B that flipped only
+the flag would be comparing two rims. Live toggle, polled once a frame
+in `capyUpdate`, applied on the edge. The skull, muzzle, jaw, brow, nose
+pad and toed feet stay hard by the rule's own words (a box-built part on
+a living thing stays a box) — the brick skull IS the species tell. On
+the sheet (`qa/wow-round.js`, eight azimuths × two states, own camera)
+the round hull reads as one soft mass with no seam, `canopyAudit().rim.self`
+is 0.086 in both states, and the one thing left for an eye at the
+closeout is whether a round body under a brick head wants the skull's
+top edges softened too — not done, not decided. `qa/rv-geom.js`'s
+baseline is invalidated by the segment step and NOT re-baselined here.
+
 
 ### What the reference has that this game should NOT chase
 
