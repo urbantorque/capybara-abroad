@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger, makeMover } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger, makeMover, hangThing } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 4 — KYOTO & UJI
@@ -4909,6 +4909,46 @@ export function createKyoto(game) {
   return api;
 }
 
+// ---- ROADMAP-WOW A2, THE FOREGROUND (W1) ----------------------------------
+//
+// The arrival frame at Uji street has nothing in its own near 0-4 m: lens,
+// then forty metres of empty flagstones before the first shopfront. One
+// static chōchin, hung as if from the Uji street's own eave, placed once from
+// the LIVE resting camera's position/forward/right/up (never hand-computed
+// from the spawn yaw — a rig that has swung off the bearing would place this
+// wrong and nobody would notice until the screenshot). Colours echo
+// `sysBOARD_HANG.kyoto` (`{kind:'lantern', wind:0.7}`) and its own
+// `sysBOARD_DRESS.kyoto` dressing (temple wood, gold trim) so it reads as the
+// same object family as the board's own hung lantern, not a new one.
+//
+// Placed top-right of the RESTING frame (outer 20% column, top 25% band),
+// 2.5 m from the lens along its own forward axis — nowhere near the
+// capybara's screen-line, which sits centre-low in every arrival shot this
+// chapter has ever been measured in (capy3-the-resting-lens). Static: no
+// sway in this pass (deferred, per the roadmap's own rule for this item).
+// Gated on game.state.noFore, checked once at build time — this chapter's
+// build runs exactly once (`kyoBuilt`), so a build-time conditional is the
+// same cost as every other one-off decoration in this file.
+function kyoBuildForeground(game, root) {
+  if (game.state && game.state.noFore) return;
+  // A full-size board lantern (len 1.05, its normal viewing distance is
+  // 5-15 m) reads far too large this close to the lens — the first placement
+  // at len 1.05 / 2.5 m filled half the frame's height. Shrunk to 0.65 and
+  // pushed to 3.0 m (still inside the 1.5-3.5 m band) so its screen footprint
+  // actually sits inside the top band instead of spilling down the frame.
+  const g = hangThing('lantern', {
+    a: PALETTE.gold, b: PALETTE.templeWood, c: PALETTE.templeWoodDk, len: 0.65,
+  });
+  // Measured 19 Sep 2026 from the live resting camera at Uji street
+  // (cam ~ (-26.86, 4.05, 56.62), fwd/right/up read off camera.matrixWorld,
+  // fov 48 (vertical), aspect 1.684): world position = cam + fwd*3.0 +
+  // right*1.84 + up*1.07, landing it against the shop wall at screen-right,
+  // clear of the animal (centre-low in this frame) and clear of the to-do
+  // card (top-left).
+  g.position.set(-23.27, 4.70, 57.10);
+  root.add(g);
+}
+
 function kyoBuild(game) {
   if (kyoBuilt) return;
   kyoBuilt = true;
@@ -4995,6 +5035,7 @@ function kyoBuild(game) {
   kyoBuildPondEdge(kyoRoot);
   kyoBuildKoi(kyoRoot);
   kyoBuildPetals(kyoRoot);
+  kyoBuildForeground(game, kyoRoot);
   // ...and the pond takes a picture of what is standing in it. Reflectors are
   // registered by hand because a reflection is anchored to a THING, not to a
   // mesh: the pavilion is three storeys of one merged geometry and its smear is
