@@ -3084,6 +3084,7 @@ const sysREFLECT = {
   monaco:   { y: -0.6, k: 1.0, lift: 0.06, box: [-270, -330, 270, 220] },  // the basin and the sea (monWATER; basin ripple 0.035)
   quay:     { y: -0.5, k: 1.0, lift: 0.10, box: [-420, -760, 460, 120] },  // the harbour (quayWATER_Y; ripple amp 0.29 — the sheet is FrontSide, never in its own mirror)
   cali:     { y: -1.5, k: 1.0, lift: 0.08, box: [-210, -9, 210, 9] },      // the Río Cali (caliRIVER_Y; ripple amp 0.10)
+  kowloon:  { y: 0.01, k: 1.0, lift: 0.05, box: [-6.5, -44, 6.5, 62] },    // NOT a sea: the wet carriageway (hkBuildStreet's road plane; the material's own k is 0.55, blur 4)
 };
 const sysLENS = {
   //             wide  splitW splitC
@@ -3118,6 +3119,107 @@ for (const k in sysLENS) {
   sysGRADES[k].wide = sysLENS[k][0];
   sysGRADES[k].splitW = sysLENS[k][1];
   sysGRADES[k].splitC = sysLENS[k][2];
+}
+// ---- THE LENS TABLE'S `rays` ROW (ROADMAP-WOW A4) --------------------------
+// Five chapters have a light as their subject at arrival and draw it as a
+// bright shape; this is the radial blur of the existing bloom toward that
+// light (MAIN_POST_RAYS, main.js). Kept beside sysLENS rather than as a
+// fourth column of it because the sysLENS triples are written into sysGRADES
+// and cross-faded, and this row — like sysDEPTH — is geometry, not a look: a
+// source position is projected EVERY FRAME and the term is zero unless the
+// projection lands inside the frame (with sysRAYS_MARGIN of ndc to spare) and
+// in front of the lens. The sky is 0 % of most frames; nothing here may paint
+// rays from a sun that is behind the camera.
+//
+//   k     strength on the composite (the bloom buffer is HDR; 0.3–0.9)
+//   len   the reach, in frame heights
+//   r     the seed radius round the light, in frame heights — what radiates
+//   src   'sun'                     the chapter's star, at sysAxDir (skySunMesh)
+//         function(game) -> {x,y,z} a named emitter the chapter publishes
+//         { spill: {x, z} }         the sysSpillScan cluster nearest that xz
+//         { spill: 'near' }         the nearest in-frame sysSpillScan cluster
+//         [a, b, ...]               candidates in order; the first one whose
+//                                   projection is inside the frame wins
+//
+// Cut by game.state.noRays; parked (zero) from rung 1 up, the way the far
+// cascade is. No grade, sun, fog or mote row moves for it.
+const sysRAYS_MARGIN = 0.18;   // ndc beyond the edge a source may sit and still cast
+const sysRAYS = {
+  // First the sun disc gorUpdateSky moves — (760, lerp(-120, 300,
+  // smooth(sunUp)), -70) — which is the ridge event seen from the balloon:
+  // MEASURED from the plaza and the field the disc's whole travel tops out at
+  // 21 degrees of elevation behind a crest that stands at 33, and the
+  // arrival lens faces west with the sun at its back (camera-space z +620).
+  // So on the ground the row falls through to the nearest lit lamp in frame
+  // (the plaza's two sodium bulbs are in the arrival frame), and aloft, when
+  // the disc clears the rock, it is the disc.
+  goreme:  { k: 0.40, len: 0.55, r: 0.16, src: [function (g) {
+    if (!g.goreme || typeof g.goreme.sunUp !== 'function') return null;
+    const u = clamp(g.goreme.sunUp(), 0, 1), s = u * u * (3 - 2 * u);
+    sysRaysV.set(760, lerp(-120, 300, s), -70);
+    return sysRaysV;
+  }, { spill: 'near' }] },
+  // noon, 61 degrees up: off the frame at the walking lens by construction,
+  // present the moment the lens is pitched at the sky (a helm, the postcard)
+  sahara:  { k: 0.45, len: 0.50, r: 0.14, src: 'sun' },
+  kowloon: { k: 0.42, len: 0.42, r: 0.12, src: function (g) { return g.kowloon && g.kowloon.sign || null; } },
+  iceland: { k: 0.50, len: 0.36, r: 0.10, src: { spill: 'near' } },
+  monaco:  { k: 0.48, len: 0.40, r: 0.12, src: function (g) {
+    return g.monaco && g.monaco.casino ? { spill: { x: g.monaco.casino.x, z: g.monaco.casino.z } } : null;
+  } },
+};
+const sysRaysV = new THREE.Vector3();
+const sysRaysP = new THREE.Vector3();
+const sysRaysQ = new THREE.Vector3();
+const sysRaysOut = { x: 0, y: 0, z: 0 };
+const sysRaysOne = [null];     // a one-slot list for a row with a single src
+const sysRaysAt = { x: 0, y: 0, z: 0 };   // the source chosen this frame, for the probes
+/**
+ * Where the row's light is this frame, in world space, or null. Reads what
+ * the world already publishes — the sun's axis, a chapter's landmark, the
+ * spill scan's clusters — and never a hard-coded emitter of its own.
+ */
+function sysRaysSource(src, game, camera) {
+  if (!src) return null;
+  if (typeof src === 'function') {
+    const r = src(game);
+    if (!r) return null;
+    if (r.spill) return sysRaysSource(r, game, camera);
+    return r;
+  }
+  if (src === 'sun') {
+    // exactly where skyRigFrame puts skySunMesh — the disc the bloom sees
+    const d = (camera.far || 400) * 0.92;
+    sysRaysOut.x = camera.position.x + sysAxDir.x * d;
+    sysRaysOut.y = camera.position.y + sysAxDir.y * d;
+    sysRaysOut.z = camera.position.z + sysAxDir.z * d;
+    return sysRaysOut;
+  }
+  if (src.spill) {
+    let best = null, bd = Infinity;
+    if (src.spill === 'near') {
+      // the nearest cluster whose projection is inside the frame's margin
+      const m = 1 + sysRAYS_MARGIN;
+      for (let i = 0; i < sysSplFound.length; i++) {
+        const f = sysSplFound[i];
+        sysRaysQ.set(f.x, f.y, f.z).project(camera);
+        if (sysRaysQ.z >= 1 || sysRaysQ.z <= -1 || Math.abs(sysRaysQ.x) > m || Math.abs(sysRaysQ.y) > m) continue;
+        const dx = f.x - camera.position.x, dy = f.y - camera.position.y, dz = f.z - camera.position.z;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 < bd) { bd = d2; best = f; }
+      }
+    } else {
+      const ax = src.spill.x, az = src.spill.z;
+      for (let i = 0; i < sysSplFound.length; i++) {
+        const f = sysSplFound[i];
+        const dx = f.x - ax, dz = f.z - az;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < bd) { bd = d2; best = f; }
+      }
+    }
+    return best;
+  }
+  return null;
 }
 // The shoulder and the vignette's colour are NOT per-chapter. They are
 // properties of the lens rather than of the place: every chapter in the game
@@ -38679,6 +38781,50 @@ export function createSystems(game) {
                 : Math.max(0, (sysAIRLIT[name] === undefined ? sysAIRLIT_DEF : sysAIRLIT[name])
                               + (sysGradeDelta && sysGradeDelta.airlit
                                  ? sysGradeDelta.airlit * sysActK : 0));
+    // ---- THE RAYS (ROADMAP-WOW A4). See sysRAYS. -------------------------
+    // Not cross-faded, cut by its switch, parked from rung 1 (the far
+    // cascade's rule: allocated-but-skipped — main.js draws into buffers the
+    // bloom already owns). The source is resolved and PROJECTED here every
+    // frame; the term is zero unless the projection is in front of the lens
+    // and inside the frame by sysRAYS_MARGIN, fading over that margin so a
+    // sun sliding off the top edge takes its rays with it rather than
+    // dropping them.
+    {
+      const rr = sysRAYS[name];
+      let rk = 0, rx = 0.5, ry = 0.5;
+      if (rr && !game.state.noRays && sysPerfRung < 1 && pp.bloom > 0.0005) {
+        const list = Array.isArray(rr.src) ? rr.src : sysRaysOne;
+        if (list === sysRaysOne) sysRaysOne[0] = rr.src;
+        for (let ci = 0; ci < list.length && rk === 0; ci++) {
+          const s = sysRaysSource(list[ci], game, camera);
+          if (!s) continue;
+          // IN FRONT OF THE LENS is a camera-space test, not an ndc one. A
+          // point behind the lens projects with its x/y MIRRORED and z just
+          // past 1 — Goreme's disc from the plaza read ndc (-1.0, -0.45,
+          // 1.002), which an ndc gate would have let through as "nearly on
+          // the left edge", with camera-space z +620: behind. Depth first,
+          // then the projection for x/y only.
+          sysRaysP.set(s.x, s.y, s.z).applyMatrix4(camera.matrixWorldInverse);
+          if (sysRaysP.z < -0.5) {
+            sysRaysP.set(s.x, s.y, s.z).project(camera);
+            const m = sysRAYS_MARGIN;
+            const ax = Math.abs(sysRaysP.x), ay = Math.abs(sysRaysP.y);
+            const ex = 1 - clamp((ax - 1) / m, 0, 1), ey = 1 - clamp((ay - 1) / m, 0, 1);
+            const e = ex * ey;
+            if (e > 0.001) {
+              // swept by game.state.raysK (a probe's lever, like bounceK)
+              rk = (typeof game.state.raysK === 'number' ? game.state.raysK : rr.k) * (e * e * (3 - 2 * e));
+              sysRaysAt.x = s.x; sysRaysAt.y = s.y; sysRaysAt.z = s.z;
+              rx = sysRaysP.x * 0.5 + 0.5; ry = sysRaysP.y * 0.5 + 0.5;
+            }
+          }
+        }
+      }
+      pp.rays = rk; pp.raysX = rx; pp.raysY = ry;
+      pp.raysLen = rr ? rr.len : 0.4; pp.raysR = rr ? rr.r : 0.12;
+      game.state.raysLive = rk;      // for the probes: 0 is "no source in frame"
+      game.state.raysAt = rk > 0 ? sysRaysAt : null;
+    }
     // ---- AND THE DEPTH ---------------------------------------------------
     // Three more switches on the same terms: cut, never faded.
     //

@@ -25,6 +25,7 @@ import { createAntarctic } from './antarctic.js';
 import { createMonaco } from './monaco.js';
 import { createHanoi } from './hanoi.js';
 import { createWeather } from './weather.js';
+import { createGrass } from './grass.js';
 import { createCondor } from './condor.js';
 
 // ---------------------------------------------------------------------------
@@ -908,6 +909,65 @@ const MAIN_POST_BLUR = MAIN_POST_HEAD + '\n' + [
 ].join('\n');
 
 // ---------------------------------------------------------------------------
+// THE RAYS (ROADMAP-WOW A4). A radial blur of the EXISTING quarter-res bloom
+// toward the projected light, composited additively — no new scene render.
+//
+// Two passes of eight taps, the second at eight times the first's step, is
+// sixty-four effective taps for sixteen reads: the first pass runs quarter-res
+// bloomA into bloomB (free once the bloom's own ping-pong has finished), the
+// second runs bloomB into eighth-res wideB (free once the wide octave has
+// finished in wideA). Nothing is allocated for this, which is what lets the
+// governor park it at rung 1 as allocated-but-skipped.
+//
+// THE SEED IS MASKED TO THE LIGHT. Without uMaskR every bright thing in the
+// frame smears toward the light — Mong Kok's other signs streaking at the big
+// one reads as a zoom blur, not as rays through wet air. The first pass only
+// admits bloom inside uMaskR (frame heights) of the light, so what radiates is
+// the light and nothing else; the second pass carries it out to the reach.
+//
+// Direction and distance are in FRAME-HEIGHT units (x scaled by aspect), so a
+// ray is the same piece of the picture at every window size — the lesson the
+// bloom's radius learned in v40 (MAIN_POST_REF_H). A tap that leaves the frame
+// contributes nothing: a clamped edge texel would streak the frame's border.
+// Travel is capped at the distance to the light so a pixel past it does not
+// sample through it and out the other side.
+// ---------------------------------------------------------------------------
+const MAIN_POST_RAYS = MAIN_POST_HEAD + '\n' + [
+  'uniform sampler2D tDiffuse;',
+  'uniform vec2  uLight;',     // uv of the light
+  'uniform float uAspect;',    // vw / vh
+  'uniform float uStep;',      // one tap, in frame heights
+  'uniform float uDecay;',     // weight per tap outward
+  'uniform float uMaskR;',     // seed radius in frame heights; 0 = unmasked (pass 2)
+  'void main() {',
+  '  vec2 p = vec2(vUv.x * uAspect, vUv.y);',
+  '  vec2 l = vec2(uLight.x * uAspect, uLight.y);',
+  '  vec2 d = l - p;',
+  '  float dist = length(d);',
+  '  vec2 dir = dist > 1e-4 ? d / dist : vec2(0.0);',
+  '  vec3 acc = vec3(0.0);',
+  '  float w = 1.0;',
+  '  for (int i = 0; i < 8; i++) {',
+  '    float t = min(float(i) * uStep, dist);',
+  '    vec2 q = p + dir * t;',
+  '    vec2 quv = vec2(q.x / uAspect, q.y);',
+  '    vec3 c = texture(tDiffuse, quv).rgb;',
+  '    if (quv.x < 0.0 || quv.x > 1.0 || quv.y < 0.0 || quv.y > 1.0) c = vec3(0.0);',
+  '    if (uMaskR > 0.0) c *= 1.0 - smoothstep(uMaskR * 0.45, uMaskR, length(q - l));',
+  '    acc += c * w; w *= uDecay;',
+  '  }',
+  // A SUM WITH A FIXED GAIN, NOT A WEIGHTED MEAN. Divided by the weights this
+  // read under one sRGB level (measured: a 6-px bulb seed averaged over 8 and
+  // then 8 taps is ~0.01 linear, and the A/B was 0.00 %) — a ray is the light
+  // integrated along the line. An eighth is the mean when every tap hits, so
+  // a pixel on the source reads the seed and one three taps reach reads three
+  // eighths of it; at a quarter the festoon on Goreme's plaza washed 48 % of
+  // the frame at a mean of 21 levels, which is fog and not a glow.
+  '  fragColor = vec4(acc * 0.125, 1.0);',
+  '}',
+].join('\n');
+
+// ---------------------------------------------------------------------------
 // THE DEPTH TERMS (v45). See THE DEPTH PASS in CONTRACT.md.
 //
 // Until now there was NOTHING in the buffer but colour, and three of the four
@@ -1046,6 +1106,9 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   // THE WATER'S TINT (L7, E3): rgb the sysSUB row's colour, a the lens's own
   // "how far under" scalar. One uniform, one line, see below.
   'uniform vec4  uSub;',
+  // THE RAYS (ROADMAP-WOW A4): the radial-blurred bloom, see MAIN_POST_RAYS.
+  'uniform sampler2D tRays;',
+  'uniform float uRaysK;',
   'const vec3 MAIN_LUMA = vec3(0.2126, 0.7152, 0.0722);',
   MAIN_POST_DEPTH_FN,
   // FOUR OPPOSED PAIRS. Index 2i and 2i+1 are the same axis in opposite
@@ -1291,6 +1354,11 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   // THE SECOND OCTAVE. See the header: the tight one is the glow ON a light,
   // this is the air AROUND it, and a lamp without it is a white sticker.
   '  lin += texture(tWide, vUv).rgb * uWide;',
+  // THE RAYS (ROADMAP-WOW A4). Additive like the two octaves and after them:
+  // light that has travelled through the air from the one source the row
+  // names. uRaysK is zero — and tRays the 1x1 black — in every chapter with
+  // no row, when the source is off the frame, and from rung 1 up.
+  '  lin += texture(tRays, vUv).rgb * uRaysK;',
   // ---- EXPOSURE (v47) ----------------------------------------------------
   // AFTER the bloom and BEFORE the shoulder, which is the only place it can
   // go without invalidating work. After the bloom, because exposure is the
@@ -1478,6 +1546,10 @@ function mainMakePost(game) {
       // (L7, E3) the water's tint over the whole frame when the lens is
       // under: the sysSUB row's colour and the lens's own scalar. 0 is off.
       sub: 0.0, subR: 0, subG: 0, subB: 0,
+      // (ROADMAP-WOW A4) the rays: strength, the light's uv, the reach and the
+      // seed radius in frame heights. systems.js's sysRAYS row writes them
+      // every frame, already gated to zero when the source is off the frame.
+      rays: 0.0, raysX: 0.5, raysY: 0.5, raysLen: 0.4, raysR: 0.12,
       crease: 0.0,
       creaseWide: 1,     // the wide octave's on/off; the governor's rung 3 writes 0
     },
@@ -1489,7 +1561,7 @@ function mainMakePost(game) {
   let sceneRT = null, bloomA = null, bloomB = null, wideA = null, wideB = null;
   let dofA = null, dofB = null, sceneDepth = null;
   let quadScene = null, quadCam = null, quad = null;
-  let matBright = null, matBlur = null, matComp = null, matCoC = null;
+  let matBright = null, matBlur = null, matComp = null, matCoC = null, matRays = null;
   let vw = 0, vh = 0, bw = 0, bh = 0, ww = 0, wh = 0;
 
   try {
@@ -1564,6 +1636,10 @@ function mainMakePost(game) {
     matBlur = raw(MAIN_POST_BLUR, {
       tDiffuse: { value: null }, uStep: { value: new THREE.Vector2() },
     });
+    matRays = raw(MAIN_POST_RAYS, {
+      tDiffuse: { value: null }, uLight: { value: new THREE.Vector2(0.5, 0.5) },
+      uAspect: { value: 1 }, uStep: { value: 0.01 }, uDecay: { value: 0.92 }, uMaskR: { value: 0 },
+    });
     matCoC = raw(MAIN_POST_COC, {
       tDiffuse: { value: null }, tDepth: { value: null },
       uTexel: { value: new THREE.Vector2() },
@@ -1594,6 +1670,7 @@ function mainMakePost(game) {
       uCreaseK: { value: 0 },
       uAirLitK: { value: 0 }, uAirLitFar: { value: MAIN_AIRLIT_FAR },
       uSub: { value: new THREE.Vector4(0, 0, 0, 0) },     // (L7, E3)
+      tRays: { value: mainPostBlack }, uRaysK: { value: 0 },  // (ROADMAP-WOW A4)
       uCamPos: { value: new THREE.Vector3() },
       uRayBL: { value: new THREE.Vector3() },
       uRayDX: { value: new THREE.Vector3() },
@@ -1830,11 +1907,36 @@ function mainMakePost(game) {
         matComp.uniforms.tWide.value = mainPostBlack;
         matComp.uniforms.uWide.value = 0;
       }
+
+      // ---- THE RAYS (ROADMAP-WOW A4). See MAIN_POST_RAYS. -----------------
+      // AFTER the wide octave, because the second pass writes wideB and the
+      // wide chain's result lives in wideA; after the bloom, because the
+      // first pass writes bloomB. p.rays arrives already zero when systems.js
+      // found the source off the frame, behind the lens, cut (noRays) or
+      // parked (rung 1 up) — this block has no opinion of its own.
+      if (p.rays > 0.0005) {
+        const ru = matRays.uniforms;
+        // 64 taps across raysLen frame heights: 8 at s, then 8 of those at 8s.
+        const s = Math.max(p.raysLen, 0.02) / 64;
+        ru.uLight.value.set(p.raysX, p.raysY);
+        ru.uAspect.value = vw / vh;
+        ru.tDiffuse.value = bloomA.texture; ru.uStep.value = s;     ru.uDecay.value = 0.94; ru.uMaskR.value = p.raysR;
+        mainPostDraw(matRays, bloomB);
+        ru.tDiffuse.value = bloomB.texture; ru.uStep.value = s * 8; ru.uDecay.value = 0.80; ru.uMaskR.value = 0;
+        mainPostDraw(matRays, wideB);
+        matComp.uniforms.tRays.value = wideB.texture;
+        matComp.uniforms.uRaysK.value = p.rays;
+      } else {
+        matComp.uniforms.tRays.value = mainPostBlack;
+        matComp.uniforms.uRaysK.value = 0;
+      }
     } else {
       matComp.uniforms.tBloom.value = mainPostBlack;
       matComp.uniforms.uBloom.value = 0;
       matComp.uniforms.tWide.value = mainPostBlack;
       matComp.uniforms.uWide.value = 0;
+      matComp.uniforms.tRays.value = mainPostBlack;
+      matComp.uniforms.uRaysK.value = 0;
     }
 
     const c = matComp.uniforms;
@@ -2082,6 +2184,9 @@ function mainBoot() {
   // hemisphere change rather than being detached with the place that was live
   // when they happened to be allocated.
   const weather = mainSafe('weather',     () => createWeather(game));
+  // ...and the grass (ROADMAP-WOW G1), for the same reason: one instanced field
+  // every grass chapter borrows, so it is not captured into a biome either.
+  const grass   = mainSafe('grass',       () => createGrass(game));
   const systems = mainSafe('systems',     () => createSystems(game));
 
   // The locals service, now that npc.js exists. Biomes call game.addLocal()
@@ -2216,11 +2321,11 @@ function mainBoot() {
   // the gust and the light deltas it computes are read the same frame by the
   // controller's grip, the locals' umbrellas and the atmosphere pass.
   const all = [env, pasto, quay, kyoto, cali, rio, iceland, sahara, drift, venice, kowloon,
-               palawan, goreme, manly, pantanal, cave, antarctic, monaco, hanoi, weather,
+               palawan, goreme, manly, pantanal, cave, antarctic, monaco, hanoi, weather, grass,
                props, capy, condor, npcs, systems];
   const updaterNames = ['environment', 'pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland', 'sahara',
                         'drift', 'venice', 'kowloon', 'palawan', 'goreme',
-                        'manly', 'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi', 'weather',
+                        'manly', 'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi', 'weather', 'grass',
                         'props', 'capybara', 'condor', 'npc', 'systems'];
   all.forEach((m, i) => { if (m) m.__name = updaterNames[i]; });
   const updaters = all.filter(m => m && typeof m.update === 'function');
