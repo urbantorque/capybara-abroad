@@ -633,10 +633,17 @@ function caliBuildRiver() {
   // water from there is a sparse field of moving points far brighter than the
   // surface. It costs four hash calls and it is the difference between a sea
   // and a sheet of coloured card. See grain() in shared.js.
+  // ...AND THE RIVER IS A MIRROR (ROADMAP-WOW A1): the painted cats on the
+  // north walk, the Gato, La Ermita's spire and the Ortiz's arches doubled in
+  // the channel they stand over. The river runs, so its 10 cm ripple bends
+  // the sample per facet and the picture is never still — which is what a
+  // river's reflection is. sysREFLECT.cali carries the plane at caliRIVER_Y.
+  // Never clone this material after this call: the clone drops the hook.
   const m = new THREE.Mesh(g, grain(mat(0xffffff, { vertexColors: true, transparent: true, opacity: 0.9 }),
     { scale: 0.6, amount: 0.05, warp: 0,
       sparkle: 0.40, sparkleScale: 1.7, sparkleSpeed: 0.52, sparkleCut: 0.655, fresnel: 0.65,
-      sparkleColor: PALETTE.caliHaze }));
+      sparkleColor: PALETTE.caliHaze,
+      reflect: { k: 1.0, pow: 1.0, wobble: 1.0, blur: 0 } }));
   m.receiveShadow = true;
   m.frustumCulled = false;
   caliRiverAttr = g.attributes.position;
