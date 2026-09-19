@@ -2699,17 +2699,62 @@ function monBuildCar(colours) {
     // reason it reads as a car rather than as a wedge
     K.box(s * 0.88, 1.12, 0.30, 0.16, 0.09, 0.09, d);
   }
-  // four wheels
+  // ---- THE REAR WING, THE SECOND COLOUR (ROADMAP-WOW Part C) -------------
+  // The rubric wants a vehicle in two colours and a moving part that is not
+  // the whole; the tourer had its dark sill and its stripes, but from the
+  // play camera — behind and above — the tail was one block of paint. A wing
+  // on two struts over the tonneau in the stripe colour (marble on the red
+  // car, gold on the blue, the silver's own stripe), so the back of the car
+  // has a line across it that is not the body.
+  K.box(0, 1.28, -1.88, 1.70, 0.05, 0.34, colours.stripe, -0.10, 0, 0);
+  K.box(0, 1.34, -1.72, 1.70, 0.04, 0.06, colours.stripe);           // the flap
   for (let s = -1; s <= 1; s += 2) {
-    for (let f = -1; f <= 1; f += 2) {
-      K.cyl(s * 0.84, 0.36, f * 1.32, 0.36, 0.26, PALETTE.monTyre, 0, 0, Math.PI / 2, 12);
-      K.cyl(s * 0.90, 0.36, f * 1.32, 0.21, 0.06, PALETTE.monWheelHub, 0, 0, Math.PI / 2, 8);
-    }
+    K.box(s * 0.62, 1.10, -1.88, 0.06, 0.32, 0.20, d);               // the struts
+    K.box(s * 0.86, 1.30, -1.88, 0.05, 0.16, 0.34, d);               // the end plates
   }
+  // ---- AND A HELMET (ROADMAP-WOW Part C, "the face"). The pack's drivers
+  // sit in the left seat: a helmet in the stripe colour with a dark visor
+  // band, proud of the cockpit rim by the top of a head, and shoulders in the
+  // sill's dark under it. The red car the animal takes carries the same
+  // helmet on the PASSENGER seat, out of the well the capybara stands in
+  // (see monBuildGrid) — the driver of that one is the animal.
+  const hx = colours.helmetSide || -0.36;
+  K.box(hx, 1.02, -0.72, 0.46, 0.14, 0.30, d);                       // the shoulders
+  K.sph(hx, 1.19, -0.72, 0.17, 0.18, 0.17, colours.stripe, 8);
+  K.box(hx, 1.20, -0.58, 0.24, 0.08, 0.06, PALETTE.monCarDk);        // the visor
   const g = new THREE.Group();
   const m = new THREE.Mesh(K.build(), monVCF());
   m.castShadow = true; m.receiveShadow = true;
   g.add(m);
+  // ---- THE WHEELS TURN (ROADMAP-WOW Part C, the movers uplift) -----------
+  // Four cylinders baked into the body: a car that went round Monaco at
+  // twenty-six metres a second as one block, which the rubric calls a prop.
+  // One mesh PER AXLE (the two wheels on an axle spin together, so a mesh
+  // on the axle line does both — two draw calls a car, not four), spun about
+  // X by the ROUTE-DISTANCE delta over the 0.36 m radius in monUpdateCars /
+  // monMePlace. A hub-coloured lug on each rim breaks the wheel's symmetry so
+  // the turn reads at the play distance rather than as a shimmer. The
+  // wheels hang off the GROUP, not the body mesh: the body leans into the
+  // hairpin (rule 4) and a wheel that leaned with it would lift off the
+  // road. The kinematic compound never included the wheels; nothing collides.
+  {
+    const W = monMerger();
+    for (let s = -1; s <= 1; s += 2) {
+      W.cyl(s * 0.84, 0, 0, 0.36, 0.26, PALETTE.monTyre, 0, 0, Math.PI / 2, 12);
+      W.cyl(s * 0.90, 0, 0, 0.21, 0.06, PALETTE.monWheelHub, 0, 0, Math.PI / 2, 8);
+      W.box(s * 0.84, 0.26, 0, 0.28, 0.10, 0.10, PALETTE.monWheelHub);   // the lug
+    }
+    const wg = W.build();
+    g.userData.wheels = [];
+    for (let f = -1; f <= 1; f += 2) {
+      const wm = new THREE.Mesh(wg, monVCF());
+      wm.position.set(0, 0.36, f * 1.32);
+      wm.castShadow = true;
+      g.add(wm);
+      g.userData.wheels.push(wm);
+    }
+    g.userData.wheelS = 0;
+  }
   // ---- AND THE LAMPS EMIT (L6, E6 / art #7) -----------------------------
   // The headlamp discs and tail lamps above are Lambert in the body's own
   // merge, lit by a dusk sky: at twenty past eight they rendered as pale
@@ -2774,7 +2819,10 @@ const monCAR_TOW_K = 1.08;
  */
 function monBuildGrid(game, root) {
   monInitTrack();
-  monMeG = monBuildCar(monCAR_COL[1]);
+  // ...with the helmet on the passenger seat: the well the animal stands in
+  // is the left one (see monUpdateRace's cb.position), and the driver is you
+  monMeG = monBuildCar(Object.assign({}, monCAR_COL[1], { helmetSide: 0.46 }));
+  monMeG.name = 'monMeCar';   // the probes find it by name (qa/wow-movers2.js)
   root.add(monMeG);
   const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC,
                               material: (game.mats && game.mats.prop) || undefined });
@@ -2833,6 +2881,7 @@ function monMePlace(dt) {
     b.quaternion.setFromEuler(0, yaw, 0);
   }
   monMeTX = tx; monMeTY = ty; monMeTZ = tz; monMeYaw = yaw;
+  if (dt > 0) monCarSpin(monMeG, monMeS);
 }
 function monBuildCars(game, root) {
   monInitTrack();
@@ -2872,6 +2921,20 @@ function monBuildCars(game, root) {
     b.quaternion.setFromEuler(0, monTrackTmp.yaw, 0);
     monSyncBody(b);
   }
+}
+
+/** Spin a car's two axles by how far along the lap it has come since the
+ *  last call (the party bus's pattern, cali.js). +Z is forward in the car's
+ *  own frame and a positive turn about +X carries the tread aft. */
+function monCarSpin(g, u) {
+  const w = g.userData.wheels;
+  if (!w) return;
+  let dS = u - g.userData.wheelS;
+  g.userData.wheelS = u;
+  if (dS < -monTrackTotal * 0.5) dS += monTrackTotal;      // the lap seam
+  if (Math.abs(dS) > 20) return;                           // a re-place, not a roll
+  const dth = dS / 0.36;
+  w[0].rotation.x += dth; w[1].rotation.x += dth;
 }
 
 /**
@@ -2999,6 +3062,10 @@ function monUpdateCars(game, dt) {
     g.children[0].rotation.z = damp(g.children[0].rotation.z, -lean, 6, dt);
     g.children[0].rotation.x = damp(g.children[0].rotation.x,
       clamp((want - monCarV[i]) * 0.006, -0.05, 0.05), 6, dt);
+    // the wheels roll with the road (ROADMAP-WOW Part C): the change in lap
+    // distance over the 0.36 m radius — u only ever grows, so a delta that
+    // is large and negative is the lap seam, not a reverse
+    monCarSpin(g, monCarU[i]);
     // the beam only exists where it can be seen doing something
     const bm = g.userData.beam;
     if (bm) {

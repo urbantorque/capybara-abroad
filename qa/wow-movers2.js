@@ -102,7 +102,7 @@ async page => {
   }
 
   // ---- the rows ----
-  const RUN = ['rio']
+  const RUN = ['hanoi']
   const errAt = () => errs.length
 
   for (let ci = 0; ci < RUN.length; ci++) {
@@ -154,6 +154,65 @@ async page => {
       await shot('MOV2-rio-6', C)
       await shot('MOV2-rio-7', () => window.__art.objShot(window.__capy.condor.group, 3.0, 0.0, 6.0, 0.0, 36))
       rec.condor = await page.evaluate(() => { const c = window.__capy.condor; return { st: c.state, pos: c.group.position.toArray().map(v => +v.toFixed(1)) } })
+    }
+
+    if (name === 'monaco') {
+      // THE RED CAR: take it from the harness (raceDebug), let the lights go
+      // out, hold W with a real key, then two frames 300 ms apart low on the
+      // starboard side where the wheels and the lug read; the rear quarter
+      // for the wing and the helmet; and a pack car for its driver.
+      rec.take = await page.evaluate(() => window.__capy.monaco.raceDebug({ take: true }))
+      await page.waitForTimeout(3600)
+      await page.keyboard.down('KeyW')
+      await page.waitForTimeout(3000)
+      const R = (a) => { const o = window.__capy.scene.getObjectByName('monMeCar'); return o ? window.__art.objShot(o, a[0], a[1], a[2], a[3], a[4]) : '' }
+      const W = () => { const o = window.__capy.scene.getObjectByName('monMeCar'); return o ? { f: +o.userData.wheels[0].rotation.x.toFixed(3), r: +o.userData.wheels[1].rotation.x.toFixed(3), s: +o.userData.wheelS.toFixed(1) } : null }
+      const w0 = await page.evaluate(W)
+      await shot('MOV2-monaco-1', R, [1.0, 7.5, 1.4, 0.7, 32])
+      await page.waitForTimeout(300)
+      await shot('MOV2-monaco-2', R, [1.0, 7.5, 1.4, 0.7, 32])
+      const w1 = await page.evaluate(W)
+      rec.wheels = { w0, w1, race: await page.evaluate(() => window.__capy.monaco.race()) }
+      await shot('MOV2-monaco-3', R, [8.0, 4.0, 3.2, 0.9, 34])      // the rear quarter: wing, helmet, wheels
+      await shot('MOV2-monaco-4', R, [-7.0, 3.0, 2.2, 0.9, 34])     // from ahead: the helmet's visor, the lamps
+      await page.keyboard.up('KeyW')
+      // a pack car (the silver one, index 0), low on its side while it laps
+      const P = (a) => { const o = window.__capy.scene.getObjectByName('monCar'); return o ? window.__art.objShot(o, a[0], a[1], a[2], a[3], a[4]) : '' }
+      const p0 = await page.evaluate(() => { const o = window.__capy.scene.getObjectByName('monCar'); return o ? +o.userData.wheels[0].rotation.x.toFixed(3) : null })
+      await shot('MOV2-monaco-5', P, [2.0, -7.0, 1.6, 0.8, 32])
+      await page.waitForTimeout(300)
+      await shot('MOV2-monaco-6', P, [2.0, -7.0, 1.6, 0.8, 32])
+      const p1 = await page.evaluate(() => { const o = window.__capy.scene.getObjectByName('monCar'); return o ? +o.userData.wheels[0].rotation.x.toFixed(3) : null })
+      rec.pack = { p0, p1 }
+      await shot('MOV2-monaco-7', P, [7.0, 3.5, 3.0, 0.9, 34])
+    }
+
+    if (name === 'hanoi') {
+      // THE PHO SCOOTER: take the Cub from the harness (cubDebug), hold W with
+      // a real key, then two frames 300 ms apart low on the starboard side
+      // where the wheels' lugs read; then the bars over with A held for the
+      // front wheel's steer, from ahead-above; and the traffic beside it,
+      // untouched, for the record. The Cub is hanCubG — find it as the
+      // parent of the wheel meshes' shared geometry: name it from here.
+      rec.take = await page.evaluate(() => window.__capy.hanoi.cubDebug({ take: true }))
+      await page.waitForTimeout(800)
+      await page.keyboard.down('KeyW')
+      await page.waitForTimeout(2200)
+      const C = (a) => { const o = window.__capy.scene.getObjectByName('hanCub'); return o ? window.__art.objShot(o, a[0], a[1], a[2], a[3], a[4]) : '' }
+      const Wh = () => { const o = window.__capy.scene.getObjectByName('hanCub'); if (!o) return null; const w = o.children.filter(c => c.rotation.order === 'YXZ'); return { n: w.length, f: +w[0].rotation.x.toFixed(3), r: +w[1].rotation.x.toFixed(3), fy: +w[0].rotation.y.toFixed(3) } }
+      const w0 = await page.evaluate(Wh)
+      await shot('MOV2-hanoi-1', C, [0.6, 4.2, 0.9, 0.5, 30])
+      await page.waitForTimeout(300)
+      await shot('MOV2-hanoi-2', C, [0.6, 4.2, 0.9, 0.5, 30])
+      const w1 = await page.evaluate(Wh)
+      rec.wheels = { w0, w1, cub: await page.evaluate(() => { const c = window.__capy.hanoi.cub(); return { on: c.on, v: +c.v.toFixed(2) } }) }
+      await page.keyboard.down('KeyA')
+      await page.waitForTimeout(700)
+      await shot('MOV2-hanoi-3', C, [-4.5, 1.5, 2.6, 0.5, 32])     // from ahead: the front wheel turned with the bars
+      rec.steer = await page.evaluate(Wh)
+      await page.keyboard.up('KeyA')
+      await shot('MOV2-hanoi-4', C, [5.0, 2.5, 2.4, 0.7, 34])      // the play angle, behind-above
+      await page.keyboard.up('KeyW')
     }
 
     rec.errs = errs.slice(e0)
