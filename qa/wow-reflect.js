@@ -48,17 +48,23 @@ async page => {
   // lens is (the bearing from the animal), looking across the water at the
   // thing the chapter says the water mirrors.
   const FRAME = {
-    kyoto: { at: [26, 0.3, 19.5], yaw: Math.PI / 2 },   // the pond's south shore, lens south (camYaw is atan2(dz, dx)), the pavilion across it
+    // yaw is frameShot's: the bearing from the animal to the lens, atan2(x, z), so 0 is a lens due south
+    kyoto: { at: [26, 0.3, 19.5], yaw: 0, dist: 11, pitch: 0.34, raise: 1.4 },   // the pond's south shore, the pavilion across it
   }
   const out = { errs, rows: {} }
   for (const name of CH) {
     await page.evaluate((n) => window.__capy.hud.cross(n), name)
     await page.waitForTimeout(4000)
     await settle()
+    // what the pass did on the arrival frame itself (a pond off frame is 'water off frame', and free)
+    const arrival = await page.evaluate(() => { const g = window.__capy; const i = g.reflectInfo(); return { why: i.why, ms: +i.ms.toFixed(2), cam: g.camera.position.toArray().map(v => +v.toFixed(1)) } })
     if (FRAME[name]) {
-      await put(...FRAME[name].at); await page.waitForTimeout(1200)
-      await face(FRAME[name].yaw); await page.waitForTimeout(1500)
-      await settle()
+      const F = FRAME[name]
+      await put(...F.at); await page.waitForTimeout(1500)
+      // a frameShot, not the hand-turned rig: the resting lens drifts back
+      // behind the animal, and a shot holds its bearing for the A/B
+      await page.evaluate((F) => window.__capy.frameShot({ yaw: F.yaw, dist: F.dist, pitch: F.pitch, raise: F.raise, hold: 30 }), F)
+      await page.waitForTimeout(2600)
     }
     const r = await page.evaluate(async (name) => {
       const g = window.__capy, T = g.THREE
@@ -133,6 +139,7 @@ async page => {
       await fetch('/shot?name=wow-reflect-' + name + '-off', { method: 'POST', body: offUrl })
       return res
     }, name)
+    r.arrival = arrival
     out.rows[name] = r
     // ---- the swim cut: the animal into the water, E held for the dive --------
     if (name === 'kyoto') {

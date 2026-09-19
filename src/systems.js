@@ -3077,7 +3077,8 @@ const sysGRADES = {
 // pays nothing. Cut by game.state.noReflect; swept by game.state.reflectK.
 // The material side is the water's `grain(..., { reflect: {...} })`.
 const sysREFLECT = {
-  kyoto:    { y: -0.45, k: 1.0, lift: 0.07 },   // the mirror pond (kyoWATER_Y; ripple amp 0.055)
+  // box: the water's world-xz footprint; the pass is skipped when none of it is in frame
+  kyoto:    { y: -0.45, k: 1.0, lift: 0.07, box: [-8, -28, 60, 16] },   // the mirror pond (kyoWATER_Y; ripple amp 0.055)
 };
 const sysLENS = {
   //             wide  splitW splitC
@@ -38428,7 +38429,7 @@ export function createSystems(game) {
       }
       const under = (subT > 0.002) || !!(game.capy && game.capy.diving);
       reflectSet(ry, rk, under, sysSkyMesh && sysSkyMesh.visible ? sysSkyMesh : null,
-                 game.locals || null, rr ? rr.lift : undefined);
+                 game.locals || null, rr ? rr.lift : undefined, rr ? rr.box : null);
     }
 
     // ---- the grade --------------------------------------------------------

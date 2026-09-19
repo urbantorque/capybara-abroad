@@ -5457,6 +5457,7 @@ const _reflQ = new THREE.Quaternion();
 const _reflQ4 = new THREE.Vector4(), _reflC4 = new THREE.Vector4();
 const _reflPlane = new THREE.Plane(), _reflUp = new THREE.Vector3(0, 1, 0), _reflPt = new THREE.Vector3();
 const _reflSz = new THREE.Vector2();
+const _reflBox = new THREE.Box3(), _reflFr = new THREE.Frustum(), _reflVP = new THREE.Matrix4();
 const _reflHid = [];
 // THE GROUND COVER STAYS OUT OF THE MIRROR. Measured on the Kyoto frame
 // (qa/wow-reflect-perf2.js): the pass costs the same at a quarter, a third,
@@ -5467,19 +5468,56 @@ const _reflHid = [];
 // with a sway or a leaf vertex program, none of which a half-res picture
 // seen through a wobble can resolve. Swept once a second, not per frame:
 // the sweep walks every object and a chapter builds lazily.
+//
+// ...AND SO DOES THE SMALL AND FAR (qa/wow-reflect-perf3.js): 88 instanced
+// meshes of under 300 instances and 545 plain meshes were the cost, and
+// neither the instance counts nor the triangles moved it — it is the draw
+// call itself, ~20 us each in the browser. The sweep also lists every mesh
+// whose world bounding sphere is under _reflSMALL_R; per frame those are
+// tested by distance from the virtual eye alone, and one that would
+// subtend under ~5 half-res pixels stays out. An InstancedMesh is judged
+// on its whole field (computeBoundingSphere), so a forest is never small.
 const _reflCover = [];
+const _reflSmall = [];        // { o, r, c } — the mesh, its world radius, its world centre
 let _reflSweepAt = -1e9;
 const _reflCOVER_N = 150;     // instances — fewer is a hand-placed set, kept
 const _reflCOVER_R = 0.35;    // m — per-instance geometry radius under this is cover
+const _reflSMALL_R = 0.8;     // m — world radius under this is a candidate for the cull
+const _reflSMALL_A = 0.012;   // rad — radius over distance under this is not drawn
+const _reflSwV = new THREE.Vector3();
 function _reflSweep(scene, now) {
   _reflSweepAt = now;
   _reflCover.length = 0;
+  _reflSmall.length = 0;
   scene.traverse(function (o) {
-    if (!o.isInstancedMesh || o.renderOrder === 6 || o.count < _reflCOVER_N) return;
+    if (!o.isMesh || o.renderOrder === 6) return;
     const g = o.geometry;
     if (!g) return;
+    if (o.isInstancedMesh) {
+      if (o.count >= _reflCOVER_N) {
+        if (!g.boundingSphere) g.computeBoundingSphere();
+        if (g.boundingSphere && g.boundingSphere.radius < _reflCOVER_R) { _reflCover.push(o); return; }
+      }
+      // Into a copy, and the mesh's own field put back as found: three's
+      // frustum test reads `o.boundingSphere` when it is set, and a field
+      // built with it null is culled on its geometry's sphere at its origin
+      // (which is why the chapters set frustumCulled false on the ones that
+      // matter). This sweep is not the place to change what the main pass draws.
+      let bs = null;
+      const had = o.boundingSphere;
+      try { o.computeBoundingSphere(); bs = o.boundingSphere; } catch (e) { bs = null; }
+      o.boundingSphere = had;
+      if (!bs) return;
+      _reflSwV.setFromMatrixScale(o.matrixWorld);
+      const r = bs.radius * Math.max(_reflSwV.x, _reflSwV.y, _reflSwV.z);
+      if (r < _reflSMALL_R) _reflSmall.push({ o: o, r: r, c: bs.center.clone().applyMatrix4(o.matrixWorld) });
+      return;
+    }
     if (!g.boundingSphere) g.computeBoundingSphere();
-    if (g.boundingSphere && g.boundingSphere.radius < _reflCOVER_R) _reflCover.push(o);
+    if (!g.boundingSphere) return;
+    _reflSwV.setFromMatrixScale(o.matrixWorld);
+    const r = g.boundingSphere.radius * Math.max(_reflSwV.x, _reflSwV.y, _reflSwV.z);
+    if (r < _reflSMALL_R) _reflSmall.push({ o: o, r: r, c: g.boundingSphere.center.clone().applyMatrix4(o.matrixWorld) });
   });
 }
 /**
@@ -5489,19 +5527,23 @@ function _reflSweep(scene, now) {
  * the locals list for the 40 m cull. `lift` raises the clip plane over the
  * ripple crests so the surface itself never draws in its own mirror.
  */
-export function reflectSet(y, k, under, sky, locals, lift) {
+export function reflectSet(y, k, under, sky, locals, lift, box) {
   _reflSt.y = (typeof y === 'number' && isFinite(y)) ? y : null;
   _reflSt.k = k > 0 ? (k < 2 ? k : 2) : 0;
   _reflSt.under = !!under;
   _reflSt.sky = sky || null;
   _reflSt.locals = locals || null;
   _reflSt.lift = typeof lift === 'number' ? lift : 0.06;
+  // The water's footprint in world xz ([x0, z0, x1, z1]); with one, the pass
+  // is skipped whenever no part of it is in the main camera's frustum. A
+  // pond is one corner of a chapter and the lane never sees it.
+  _reflSt.box = (box && box.length === 4) ? box : null;
 }
 /** For the probes: what the pass did on the last frame. */
 export function reflectInfo() {
   return { y: _reflSt.y, want: _reflSt.k, k: _reflK.value, on: _reflOn.value, under: _reflSt.under,
            drawn: _reflSt.drawn, why: _reflSt.why, ms: _reflSt.ms, size: _reflSt.size.slice(),
-           hidden: _reflSt.hidden, cover: _reflCover.length, allocated: !!_reflRT };
+           hidden: _reflSt.hidden, cover: _reflCover.length, small: _reflSmall.length, allocated: !!_reflRT };
 }
 /**
  * The pass. main.js calls it immediately before the scene draw, every frame
@@ -5520,6 +5562,15 @@ export function reflectRender(renderer, scene, camera, cut, rung, scale) {
   else if (rung > 0) why = 'parked rung ' + rung;
   else if (_reflSt.under) why = 'eye under';
   else if (camera.position.y <= y + _reflSt.lift + 0.02) why = 'eye below plane';
+  else if (_reflSt.box) {
+    const b = _reflSt.box;
+    camera.updateMatrixWorld();
+    _reflVP.copy(camera.matrixWorld).invert();
+    _reflVP.premultiply(camera.projectionMatrix);
+    _reflFr.setFromProjectionMatrix(_reflVP);
+    _reflBox.min.set(b[0], y - 0.5, b[1]); _reflBox.max.set(b[2], y + 0.5, b[3]);
+    if (!_reflFr.intersectsBox(_reflBox)) why = 'water off frame';
+  }
   const live = why === '';
   // Damped, not switched: the strength is a term in nineteen water shaders
   // and a cut that snaps reads as a flicker on the pond. ~80 ms to settle.
@@ -5600,6 +5651,13 @@ export function reflectRender(renderer, scene, camera, cut, rung, scale) {
   for (let i = 0; i < _reflCover.length; i++) {
     const c = _reflCover[i];
     if (c.visible && c.parent) { c.visible = false; _reflHid.push(c); }
+  }
+  const ex = _reflCam.position.x, ey = _reflCam.position.y, ez = _reflCam.position.z;
+  for (let i = 0; i < _reflSmall.length; i++) {
+    const si = _reflSmall[i], o = si.o;
+    if (!o.visible || !o.parent) continue;
+    const dx = si.c.x - ex, dy = si.c.y - ey, dz = si.c.z - ez;
+    if (si.r * si.r < _reflSMALL_A * _reflSMALL_A * (dx * dx + dy * dy + dz * dz)) { o.visible = false; _reflHid.push(o); }
   }
   const loc = _reflSt.locals;
   if (loc) {
