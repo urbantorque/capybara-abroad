@@ -3085,6 +3085,7 @@ const sysREFLECT = {
   quay:     { y: -0.5, k: 1.0, lift: 0.10, box: [-420, -760, 460, 120] },  // the harbour (quayWATER_Y; ripple amp 0.29 — the sheet is FrontSide, never in its own mirror)
   cali:     { y: -1.5, k: 1.0, lift: 0.08, box: [-210, -9, 210, 9] },      // the Río Cali (caliRIVER_Y; ripple amp 0.10)
   kowloon:  { y: 0.01, k: 1.0, lift: 0.05, box: [-6.5, -44, 6.5, 62] },    // NOT a sea: the wet carriageway (hkBuildStreet's road plane; the material's own k is 0.55, blur 4)
+  antarctic: { y: -0.6, k: 1.0, lift: 0.08, box: [-212, -512, 212, 122] }, // the sea between the floes (antWATER, a constant; swell amp 0.23, FrontSide)
 };
 const sysLENS = {
   //             wide  splitW splitC

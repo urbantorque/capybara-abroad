@@ -1183,8 +1183,17 @@ function antBuildSea(root) {
   // sparkle (opaque, by design, so the pack can sit on it) and until the
   // beauty pass it was the one flat sheet in the chapter; now the far channel
   // goes to the colour of the sky the way the near water does not.
+  // ...AND THE SEA BETWEEN THE FLOES IS A MIRROR (ROADMAP-WOW A1): the pack,
+  // the glacier face, the jetty and the boat doubled in the black water,
+  // which is what a polar sea in still air does better than any other water
+  // in the game — cold, dark, and flat between the swells. The sheet's own
+  // swell (antSwellAt, 0.23 m) bends the sample per facet; out in the lead it
+  // is nearly still. sysREFLECT.antarctic carries the plane at antWATER (a
+  // constant: this chapter has no tide). Never clone this material after
+  // this call: the clone drops the hook.
   const m = new THREE.Mesh(g, grain(mat(0xffffff, { vertexColors: true }),
-                                    { scale: 0.06, amount: 0.05, warp: 1.1, fresnel: 0.55 }));
+                                    { scale: 0.06, amount: 0.05, warp: 1.1, fresnel: 0.55,
+                                      reflect: { k: 1.0, pow: 1.0, wobble: 1.0, blur: 0 } }));
   m.frustumCulled = false;
   m.receiveShadow = true;
   antSeaMesh = m;

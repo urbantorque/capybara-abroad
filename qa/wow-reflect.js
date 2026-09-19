@@ -9,7 +9,7 @@ async page => {
   // post.render x 30 with a readPixels drain at each end, ten interleaved
   // reps, median per arm. Then the swim cut.
   // ONE chapter per run (a run must finish in under four minutes on a loaded machine)
-  const CH = ['kowloon']
+  const CH = ['cave']
   const errs = []
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
@@ -58,6 +58,8 @@ async page => {
     quay: { at: [14, 0.6, 17.5], yaw: 0.25, dist: 12, pitch: 0.30, raise: 1.8 },   // the apron's edge by the ferry's berth (6.6, 6), the bridge at z -58 across the harbour
     cali: { at: [-22, 0.5, 12], yaw: 0, dist: 11, pitch: 0.30, raise: 1.6 },   // the south bank, the Gato (-34, -14) and the cat walk across the river
     kowloon: { at: [0, 0.4, 30], yaw: 0, dist: 9, pitch: 0.20, raise: 1.4 },   // the carriageway, lens low and south, looking north under the signs (no sea: the road is the 'water')
+    antarctic: { at: [0, 0.9, 20], yaw: 0, dist: 11, pitch: 0.30, raise: 1.6 },   // the jetty's seaward end, lens south, the boat and the pack across the lead
+    cave: { at: [-2, -6.3, -12], yaw: 0.1, dist: 10, pitch: 0.30, raise: 1.6 },   // the east bank in the passage, lens south, looking north along the river to where the doline's light falls on it
   }
   const out = { errs, rows: {} }
   for (const name of CH) {
@@ -151,7 +153,7 @@ async page => {
     out.rows[name] = r
     // ---- the swim cut: the animal into the water, E held for the dive --------
     const SWIM = { kyoto: [26, -0.2, -2], hanoi: [0, -0.3, -58], pantanal: [-34, 0.3, -68], monaco: [-10, -0.4, -40],
-                   quay: [16, -0.4, -12], cali: [-20, -1.8, 0] }
+                   quay: [16, -0.4, -12], cali: [-20, -1.8, 0], antarctic: [10, -0.9, 8], cave: [-20, -7.6, -30] }
     if (SWIM[name]) {
       await page.evaluate((p) => { const b = window.__capy.capy.body; b.position.set(p[0], p[1], p[2]); b.velocity.set(0, 0, 0); if (b.interpolatedPosition) b.interpolatedPosition.set(p[0], p[1], p[2]) }, SWIM[name])
       await page.waitForTimeout(2500)
