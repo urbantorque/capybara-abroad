@@ -1293,6 +1293,58 @@ function iceGlowMesh(pos, col) {
  * does the rest — which happens to be exactly what a window looks like from
  * across a street.
  */
+/**
+ * WHAT A LAUGAVEGUR HOUSE IS MADE OF (ROADMAP-WOW Part D).
+ *
+ * qa/WOW-iceland-hero-arrive.png: a row of one-hex boxes with square yellow
+ * windows cut in them. A Reykjavik house is corrugated iron on a timber frame,
+ * and what you see from the pavement is the RIBS — a vertical line every
+ * hand's width, in the wall's own colour a shade down — white window frames
+ * with a sill under each, a door with a step, and the downpipe's shoe kicking
+ * out onto the flags. All of it in the town's own merger, so no new material
+ * and no new draw call; the ribs and the frames are standing QUADS (iceG.quad
+ * pitched up, two triangles each — the tussock's argument) because a rib is
+ * only ever seen from the front, and a thousand boxes for a thing a
+ * centimetre deep would spend the chapter's whole budget on faces the camera
+ * cannot reach. The darker tone is the wall's PALETTE colour at 0.80 — this
+ * file has six house colours and no dark pair for them.
+ */
+const iceDetailC = new THREE.Color();
+function iceHouseDetail(M, x, gy, z, w, h, d, c, face, i) {
+  const dk = iceDetailC.set(c).multiplyScalar(0.80);
+  const FRAME = c === PALETTE.iceHouse5 ? PALETTE.iceRoofGrey : PALETTE.iceHouse5;
+  const rh = h - 0.12, ry = gy + h * 0.5;
+  // the ribs, all four faces, a hand's width over
+  for (let s = -1; s <= 1; s += 2) {
+    const zz = z + s * (d * 0.5 + 0.03);
+    for (let rx = x - w * 0.5 + 0.36; rx < x + w * 0.5 - 0.2; rx += 0.72) {
+      M.add(iceG.quad, iceXform(rx, ry, zz, s * Math.PI / 2, 0, 0, 0.10, 1, rh), dk);
+    }
+    const xx = x + s * (w * 0.5 + 0.03);
+    for (let rz = z - d * 0.5 + 0.36; rz < z + d * 0.5 - 0.2; rz += 0.72) {
+      M.add(iceG.quad, iceXform(xx, ry, rz, Math.PI / 2, s * Math.PI / 2, 0, 0.10, 1, rh), dk);
+    }
+  }
+  // the door, on the street face at the corner the downpipe is not on, and
+  // its step; every doorstep in this town is a slab of the pavement's stone
+  const dx = x - w * 0.36;
+  M.add(iceG.quad, iceXform(dx, gy + 1.08, z + face * (d * 0.5 + 0.05), face * Math.PI / 2, 0, 0, 1.0, 1, 2.16), FRAME);
+  M.add(iceG.quad, iceXform(dx, gy + 1.05, z + face * (d * 0.5 + 0.06), face * Math.PI / 2, 0, 0, 0.84, 1, 2.0),
+        i % 2 ? PALETTE.iceBasaltDk : PALETTE.iceRoofRed);
+  M.box(dx, gy + 0.08, z + face * (d * 0.5 + 0.30), 1.36, 0.16, 0.56, PALETTE.iceMoraine);
+  // the downpipe's shoe (the pipe itself is drawn above), which is the one
+  // place a wall meets the ground with a shape
+  M.box(x + w * 0.44, gy + 0.10, z + face * (d * 0.5 + 0.30), 0.14, 0.14, 0.34, PALETTE.iceRoofGrey);
+}
+/** A frame round the pane and a sill under it — the window's own quad is in
+ *  the lit batch and stands 0.13 proud, so the frame sits behind its face and
+ *  shows as a border. Street faces only: those are the ones in the picture. */
+function iceWindowFrame(M, wx, wy, z, d, face, c) {
+  const FRAME = c === PALETTE.iceHouse5 ? PALETTE.iceRoofGrey : PALETTE.iceHouse5;
+  M.add(iceG.quad, iceXform(wx, wy, z + face * (d * 0.5 + 0.045), face * Math.PI / 2, 0, 0, 1.52, 1, 1.74), FRAME);
+  M.box(wx, wy - 0.86, z + face * (d * 0.5 + 0.11), 1.62, 0.08, 0.22, FRAME);
+}
+
 function iceBuildCity(game, root) {
   const M = iceMerger();
   const SG = iceStaticGroup(game);
@@ -1356,6 +1408,7 @@ function iceBuildCity(game, root) {
       // so the lit face is +z for the far row and -z for the near one
       const face = z < iceLANES[0] ? 1 : -1;
       W.box(wx, wy, z + face * (d * 0.5 + 0.07), 1.25, 1.45, 0.12, PALETTE.iceWindow);
+      iceWindowFrame(M, wx, wy, z, d, face, c);
       // ...AND IT LIGHTS THE GROUND UNDER IT (L6, E6 / art #7). Forty lit
       // windows and the pavement under every one of them was the same value
       // as the road (qa/l6r-art-iceland-walk.png): a window that touches
@@ -1388,6 +1441,7 @@ function iceBuildCity(game, root) {
           w + 0.5, 0.14, 0.16, PALETTE.iceRoofGrey);
     M.cyl(x + w * 0.44, gy + h * 0.5, z + (z < iceLANES[0] ? 1 : -1) * (d * 0.5 + 0.16),
           0.07, h, PALETTE.iceRoofGrey);
+    iceHouseDetail(M, x, gy, z, w, h, d, c, z < iceLANES[0] ? 1 : -1, i);
     // AND THE HOUSE IS SOLID. Every house in Reykjavik was drawn and none of
     // them was: the church, the hot dog stand and the harbour all got their
     // colliders and the town — which is the thing the chapter opens standing
@@ -1601,6 +1655,16 @@ function iceBuildKerbs(game, root) {
     }
     for (let x = X0 + 1.8; x < X1 - 0.5; x += 1.8) {
       K.box(x, iceTerrain(x, pz) + 0.07, pz, 0.05, 0.04, pw - 0.1, JOINT);
+    }
+  }
+  // THE DRAIN LINE (Part D): a gully grate in the gutter every twelve and a
+  // half metres, each side, staggered — the dark rectangles that say the
+  // gutter goes somewhere, and the one repeating mark along a kerb that is
+  // otherwise one line from end to end
+  for (let s = -1; s <= 1; s += 2) {
+    for (let x = X0 + 6 + (s > 0 ? 6.25 : 0); x < X1 - 2; x += 12.5) {
+      K.box(x, top - 0.003, z + s * (HZ - 0.30), 0.62, 0.03, 0.30, IRON);
+      K.box(x, top - 0.001, z + s * (HZ - 0.30), 0.50, 0.03, 0.06, KERB);
     }
   }
   // a manhole every twenty-five metres, off the dashes and clear of the stand
@@ -1937,6 +2001,14 @@ function iceBuildHarbour(game, root) {
     W.box(bx + 1.52, iceSEA_Y + 2.5, bz - 1.6, 0.10, 0.7, 1.9, PALETTE.iceWindow);
     W.box(bx - 1.52, iceSEA_Y + 2.5, bz - 1.6, 0.10, 0.7, 1.9, PALETTE.iceWindow);
     W.box(bx, iceSEA_Y + 5.6, bz - 1.6, 0.24, 0.24, 0.24, PALETTE.iceWindow);   // masthead
+    // THE RIG (Part D). A mast was a stick: a fishing boat's is a crosstree
+    // with the aerials on it, a boom swung aft over the hold, a forestay to
+    // the stem and a radar drum — the four lines that make a silhouette over
+    // the sheds from the town end of the quay
+    M.box(bx, iceSEA_Y + 4.6, bz - 1.6, 2.2, 0.12, 0.14, PALETTE.iceMoraineDk);
+    M.box(bx, iceSEA_Y + 4.95, bz - 1.9, 0.9, 0.34, 0.6, PALETTE.iceHouse5);
+    M.cyl(bx + 0.3, iceSEA_Y + 3.9, bz + 1.4, 0.06, 6.2, PALETTE.iceMoraineDk, 1.22, 0, 0, 4);
+    M.cyl(bx, iceSEA_Y + 3.95, bz - 3.5, 0.03, 5.0, PALETTE.iceRope, -0.85, 0, 0, 4);
     M.box(bx, iceSEA_Y + 1.55, bz, 4.5, 0.30, 11.1, PALETTE.iceHull);
     for (let k = -1; k <= 1; k++) {
       M.cyl(bx, iceSEA_Y + 0.9, bz + k * 3.4, 0.22, 4.7, PALETTE.iceMoraineDk, 0, 0, Math.PI / 2, 6);
@@ -1999,6 +2071,31 @@ function iceBuildHarbour(game, root) {
       M.cyl(x - 4.4 + k * 0.9, gy + 0.44, 131.4, 0.32, 0.88, PALETTE.iceHullBlue, 0, 0, 0, 8);
     }
     SG.add(x, gy + 2.2, 127, 10, 4.4, 7);
+  }
+  // ---- THE QUAY CRANE (Part D) ---------------------------------------------
+  // A working harbour has one, and it is the only thing on this waterfront
+  // taller than a shed roof: from the town end of the street the sheds are a
+  // wall and the boats' masts are behind it, so the crane's jib is the one
+  // line that says "harbour" over the roofs before the player gets there. On
+  // the quay between the pier's east edge (28.7) and the fifth shed (35), jib
+  // out over the water, hook down. Collider on the pedestal only.
+  {
+    const cx = 31.8, cz = 122.5, gy = iceTerrain(cx, cz);
+    const Y = PALETTE.iceHouse3, DK = PALETTE.iceMoraineDk;
+    M.box(cx, gy + 0.55, cz, 2.6, 1.1, 2.6, DK);                              // the pedestal
+    M.cyl(cx, gy + 1.1 + 6.5, cz, 0.42, 13.0, Y, 0, 0, 0, 6);                 // the mast
+    M.box(cx, gy + 14.4, cz, 2.4, 1.6, 2.2, Y);                               // the slew ring and cab
+    M.box(cx + 0.9, gy + 14.5, cz - 0.4, 1.0, 1.1, 1.3, DK);                  // the cab's window side
+    // the jib, 15 m at 28 degrees over the water (+z), and the counter-jib
+    M.box(cx, gy + 14.9 + 3.5, cz + 6.6, 0.55, 0.55, 15.0, Y, -0.49, 0, 0);
+    M.box(cx, gy + 15.0 - 0.6, cz - 3.0, 0.5, 0.5, 5.2, Y, 0.22, 0, 0);
+    M.box(cx, gy + 14.2, cz - 5.2, 1.4, 1.2, 1.2, DK);                        // the counterweight
+    // the tie from the mast head to the jib nose, the fall, and the hook
+    M.box(cx, gy + 16.6, cz, 0.36, 2.8, 0.36, Y);                             // the A-frame
+    M.cyl(cx, gy + 19.7, cz + 6.6, 0.04, 13.9, DK, 1.25, 0, 0, 4);
+    M.cyl(cx, gy + 14.6, cz + 13.2, 0.04, 14.6, DK, 0, 0, 0, 4);
+    M.box(cx, gy + 7.0, cz + 13.2, 0.5, 0.7, 0.3, DK);
+    SG.add(cx, gy + 0.55, cz, 2.6, 1.1, 2.6);
   }
   SG.done();
 
