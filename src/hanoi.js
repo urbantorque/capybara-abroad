@@ -1232,9 +1232,37 @@ function hanTerraceOk(x, z) {
   return true;
 }
 
+// ROADMAP-WOW Part C (Heroes): THE END HOUSE HAS A FLANK. Every run of
+// terrace stops at a keep-out — a junction, the market, the spawn — and the
+// house at the end of it shows its whole side to the gap: 11 m by up to 19 m
+// of one hex (qa/WOW-H-hanoi-before.png, the jade wall filling the left third
+// of the arrival frame, 21 m off). A tube house's exposed flank in Hanoi has
+// a string course where each floor is and a pair of small windows per floor
+// (the back rooms' light), and that is what it gets here: hanTrim courses
+// into the quarter's merge, panes into the pane pool. `side` is the house's
+// local +x/-x; local +x is world (cos yaw, -sin yaw), a pane faces local +z
+// at yaw, so the flank's pane yaw is yaw +/- PI/2.
+function hanFlank(K, H, side) {
+  const cs = Math.sin(H.yaw), cc = Math.cos(H.yaw);
+  const fx = H.x + side * (hanHOUSE_W * 0.5 + 0.06) * cc;
+  const fz = H.z - side * (hanHOUSE_W * 0.5 + 0.06) * cs;
+  const floors = Math.max(1, Math.floor((H.h - 4.2) / 3.1));
+  for (let f = 0; f < floors; f++) {
+    const fy = hanGROUND + 4.4 + f * 3.1;
+    K.box(fx, fy - 0.06, fz, 0.12, 0.22, H.d * 0.92, PALETTE.hanTrim, 0, H.yaw, 0);
+    for (let k = -1; k <= 1; k += 2) {
+      // along the flank is local z: world (sin yaw, cos yaw)
+      const oz = k * H.d * 0.22;
+      hanWindowAt(fx + oz * cs + side * 0.02 * cc, fy + 1.5, fz + oz * cc - side * 0.02 * cs,
+                  H.yaw + side * Math.PI / 2, 0.9, 1.3);
+    }
+  }
+}
+
 function hanTerrace(K, L, s0, s1, off, set, body, game) {
   hanInitLanes();
   const step = hanHOUSE_W + 0.12;
+  let last = null;      // the house placed on the previous slot, or null after a gap
   for (let s = s0; s < s1; s += step) {
     hanLaneAtS(L, s, hanTmp);
     const nx = Math.cos(hanTmp.yaw), nz = -Math.sin(hanTmp.yaw);
@@ -1242,16 +1270,25 @@ function hanTerrace(K, L, s0, s1, off, set, body, game) {
     const h = rand(9, 19);
     const bx = hanTmp.x + nx * (set + d * 0.5) * off;
     const bz = hanTmp.z + nz * (set + d * 0.5) * off;
-    if (hanTerrain(bx, bz) < hanWATER + 0.3) continue;
-    // THREE POINTS, not one: the shopfront, the middle and the back wall. A
-    // twelve-metre-deep house whose centre is clear can still have its back
-    // half standing in the next street.
-    if (!hanTerraceOk(bx, bz)) continue;
-    if (!hanTerraceOk(hanTmp.x + nx * set * off, hanTmp.z + nz * set * off)) continue;
-    if (!hanTerraceOk(hanTmp.x + nx * (set + d) * off, hanTmp.z + nz * (set + d) * off)) continue;
+    // a slot that is skipped is a gap: the previous house, if any, closes a
+    // run and its leading flank is exposed
+    const skip = hanTerrain(bx, bz) < hanWATER + 0.3
+      // THREE POINTS, not one: the shopfront, the middle and the back wall. A
+      // twelve-metre-deep house whose centre is clear can still have its back
+      // half standing in the next street.
+      || !hanTerraceOk(bx, bz)
+      || !hanTerraceOk(hanTmp.x + nx * set * off, hanTmp.z + nz * set * off)
+      || !hanTerraceOk(hanTmp.x + nx * (set + d) * off, hanTmp.z + nz * (set + d) * off);
+    if (skip) { if (last) hanFlank(K, last, last.lead); last = null; continue; }
     // the house faces the road, so its -z looks at the centreline
     const yaw = hanTmp.yaw + (off > 0 ? Math.PI / 2 : -Math.PI / 2);
     hanHouse(K, bx, bz, yaw, h, randInt(0, 4), d);
+    // which local side of the house the run continues on: local +x is
+    // (cos yaw, -sin yaw), which for yaw = lane + PI/2 (off > 0) is MINUS the
+    // lane's tangent — so the run goes on at local -x there, and +x for off < 0
+    const H = { x: bx, z: bz, yaw: yaw, h: h, d: d, lead: off > 0 ? -1 : 1 };
+    if (!last) hanFlank(K, H, -H.lead);     // opens a run: trailing flank exposed
+    last = H;
     hanPoolBox(body, bx, hanGROUND + h * 0.5 + 1, bz, hanHOUSE_W, h + 2, d, yaw);
     // ...AND A HOUSE IS AN OBSTACLE (integrity 9). Every terrace in the chapter
     // was bodied and none of them was ever registered with hanNavBlocked, so
@@ -1261,6 +1298,7 @@ function hanTerrace(K, L, s0, s1, off, set, body, game) {
     // was one instanced block per house, standing inside it.
     hanBlock(bx, bz, Math.max(hanHOUSE_W, d) * 0.45);
   }
+  if (last) hanFlank(K, last, last.lead);   // the run's last house closes it
 }
 
 function hanBuildQuarter(game, root) {
@@ -3350,6 +3388,17 @@ function hanBuildLakeSet(game, root) {
   K.box(tx, hanGROUND + 9.4, tz, 2.6, 2.2, 2.2, PALETTE.hanTowerSt);
   K.cone(tx, hanGROUND + 11.4, tz, 2.2, 1.8, PALETTE.hanTowerDk, 0, 0.78, 0, 4);
   K.cyl(tx, hanGROUND + 12.6, tz, 0.16, 0.9, PALETTE.hanTowerDk, 0, 0, 0, 6);
+  // ROADMAP-WOW Part C (Heroes): EAVES, not ledges. The two dark slabs
+  // between the tiers stood 30 cm proud, which at the lake's 45-90 m is a line
+  // the eye loses; a thin lip a metre wider on each makes the three tiers
+  // read as three roofs, which is the silhouette Thap Rua actually has. And
+  // the ONE ASYMMETRY: the islet's own tree, on the east side only — the real
+  // one has exactly that.
+  K.box(tx, hanGROUND + 4.98, tz, 6.6, 0.14, 5.6, PALETTE.hanTowerDk);
+  K.box(tx, hanGROUND + 7.98, tz, 5.4, 0.14, 4.6, PALETTE.hanTowerDk);
+  K.cyl(tx + 3.6, hanGROUND + 1.9, tz + 1.4, 0.26, 2.6, PALETTE.hanTrunk, 0, 0, 0, 6);
+  K.sph(tx + 3.7, hanGROUND + 3.9, tz + 1.5, 1.9, 1.5, 1.9, PALETTE.hanLeaf, 6);
+  K.sph(tx + 4.4, hanGROUND + 4.6, tz + 0.9, 1.2, 0.9, 1.2, PALETTE.hanLeafDk, 6);
   for (let f = 0; f < 3; f++) {
     const fy = hanGROUND + 2.6 + f * 3.0;
     for (let s = -1; s <= 1; s += 2) {
