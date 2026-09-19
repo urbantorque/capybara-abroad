@@ -3,7 +3,7 @@ async page => {
   // corrected depth bins (l10-depth-sweep's method), renderer.info.render, the
   // live resting camera, and the raw own-camera arrival frame (wow-sheet's
   // method). Edit KEY/NAME/TAG between runs.
-  const KEY = 'BracketRight', NAME = 'manly', TAG = 'after'
+  const KEY = 'Quote', NAME = 'cave', TAG = 'after'
   const errs = []
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
@@ -18,7 +18,7 @@ async page => {
   // rebuilt with the live fov — is measured as well, and that is the
   // before/after differential.
   const POSE = { manly: { p: [11.62, 6.68, 48.37], d: [-0.971, -0.135, -0.198] },
-                 cave: null, sahara: { p: [6.42, 3.9, -1.7], d: [-0.548, -0.123, 0.828] } }[NAME]
+                 cave: { p: [8.35, 6.59, 69.99], d: [-0.716, -0.127, -0.686] }, sahara: { p: [6.42, 3.9, -1.7], d: [-0.548, -0.123, 0.828] } }[NAME]
   const row = await page.evaluate((POSE) => {
     const g = window.__capy, T = g.THREE
     const cam = g.camera
@@ -48,7 +48,9 @@ async page => {
       c.updateMatrixWorld()
       pinned = binsOf(c)
       g.renderer.setRenderTarget(null)
+      g.renderer.info.reset()
       g.renderer.render(g.scene, c)
+      pinned.calls = g.renderer.info.render.calls; pinned.triangles = g.renderer.info.render.triangles
       pngPinned = g.renderer.domElement.toDataURL('image/png')
     }
     const p = cam.getWorldPosition(new T.Vector3())

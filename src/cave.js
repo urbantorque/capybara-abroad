@@ -1213,6 +1213,48 @@ function cavBuildOutside(game, root) {
     cavPoolBox(bC, x, h + r * 0.26, z, r * 0.8, r * 0.30, r * 0.8);
     if (++nC >= 16) { cavPoolDone(game, bC); bC = cavPoolBody(game); nC = 0; }
   }
+  // ---- THE ROCKFALL UNDER THE ARCH, AND THE CURTAIN OVER IT (ROADMAP-WOW
+  // Part D) ----------------------------------------------------------------
+  // The W0 arrival frame (qa/WOW-cave-hero-arrive.png) from the resting lens
+  // at (8.4, 6.6, 70) looking (-0.72, -0.13, -0.69): the near half is lawn
+  // and canopy, the far half is the river going in, and between them the
+  // entrance slope (z 36–49, 25–45 m out) is bare. The scatter above stops at
+  // the mouth. What lies on the floor of every big entrance in Quang Binh is
+  // the roof that used to be over it — a rockfall of house-sized blocks on
+  // both banks — and what hangs off the lip is a curtain, not eight teeth.
+  //
+  // The rock term itself (cavVC's `rock: 0.08`) is L7's and is not re-based
+  // here; `course` at a 0.55 m period on a 60 m cliff would shimmer at
+  // distance (A3). This chapter has 0 % sky rays, so mid+far cannot rise by
+  // construction — the added forms sit in the mid bin the slope already
+  // occupies. This is a picture change, measured by eye against W0.
+  for (let i = 0; i < 34; i++) {
+    const bank = i % 3 === 0 ? -1 : 1;                    // two on the near bank to one on the far
+    const x = bank > 0 ? rand(-2, 30) : rand(-52, -38);
+    const z = rand(36, 49);
+    if (Math.abs(x - cavRIVER_X) < cavRIVER_W + 1.5) continue;
+    const h = cavTerrain(x, z);
+    if (!Number.isFinite(h)) continue;
+    const r = rand(1.4, 4.2);
+    // a fallen block is a BLOCK: boxes, tipped, with a boulder on some
+    M.box(x, h + r * 0.42, z, r * 1.6, r * 0.9, r * 1.2,
+          i % 4 === 0 ? PALETTE.cavRockLt : (i % 2 ? PALETTE.cavRock : PALETTE.cavRockDk),
+          rand(-0.18, 0.18), rand(0, 3.1), rand(-0.22, 0.22));
+    if (i % 3 === 1) M.sph(x + rand(-0.6, 0.6), h + r * 0.95, z + rand(-0.6, 0.6), r * 0.55, r * 0.4, r * 0.55, PALETTE.cavRock, 6);
+    if (z > 44 && i % 2 === 0) M.sph(x, h + r * 0.9, z, r * 0.7, r * 0.18, r * 0.7, PALETTE.cavJungleDk, 6);   // moss, where the light still reaches
+    // a short box: a block you cannot hop is a wall, and the slope is the way in
+    cavPoolBox(bC, x, h + r * 0.28, z, r * 0.8, r * 0.30, r * 0.6);
+    if (++nC >= 16) { cavPoolDone(game, bC); bC = cavPoolBody(game); nC = 0; }
+  }
+  for (let i = 0; i < 30; i++) {
+    const x = rand(-24, 24);
+    const a = Math.acos(clamp(x / 21, -1, 1));
+    const lip = 15.4 - Math.pow(Math.cos(a), 2) * 7.6 + 0.6;      // the intrados
+    const z = cavMOUTH_Z - 1.0 - (i % 3) * 3.0;
+    const len = rand(2.5, 8.5) * (0.5 + Math.sin(a) * 0.8);
+    M.cone(x, lip - len * 0.45, z, rand(0.35, 1.1), len,
+           i % 3 ? PALETTE.cavRockDk : PALETTE.cavRock, Math.PI, rand(0, 3), rand(-0.05, 0.05), 6);
+  }
   // ---- the lianas off the arch --------------------------------------------
   // The lip of a cave mouth in Quang Binh is hung with them, and they are the
   // one thing that says the hole is a HOLE rather than a painted black patch:

@@ -99,6 +99,55 @@ grazing angles and vanishes looking straight down.
   live inside the mask; frame time both arms.
 - **`game.state.noReflect`.**
 
+**W2 reality check (19 Sep 2026): the pass and all four flagships
+landed; the cost budget is not confirmed, and one design point above
+was wrong.**
+
+- **Shipped** (`1093169`, `6571e70`, `8eaf39e`, and the Pantanal/Monaco
+  commits after them): `reflectRender`/`reflectSet` in shared.js above
+  `_grainCache`, `grain(..., { reflect: { k, pow, wobble, blur } })`,
+  `sysREFLECT` in systems.js, the call in main.js before the scene draw.
+  Per chapter, from `qa/wow-reflect.js` (one chapter per run, pretty
+  pinned through the prefs file, the frame held by `game.frameShot`),
+  in-mask mean diff cut-vs-live: **Kyoto 33-38, Hanoi 28-29, the Pantanal
+  33-46, Monaco (its own row below)** — all over the 12-level target,
+  88-99 % of water pixels over 12 each, outside the mask under 0.6, zero
+  console errors, the swim cut proven in Hanoi and the Pantanal (`why:
+  'eye under'` for the whole dive, `'drawn'` on surfacing). Read by eye:
+  the pavilion, the torii run and the heron in the pond; Thap Rua and
+  the red bridge in Hoan Kiem; the gallery trees trunk-and-canopy in the
+  baía.
+- **The design point that was wrong: "half res, so a quarter of the
+  pixels."** The pass is not pixel-bound. On the Kyoto frame it costs the
+  same at a quarter, a third, a half and full resolution
+  (`qa/wow-reflect-perf2.js`); it is the second `renderer.render` — the
+  scene walk and ~120 draw calls at ~20 us each in the browser
+  (`qa/wow-reflect-perf3.js`). What helped: leaving out every mesh that
+  subtends under ~5 half-res pixels from the virtual eye (432 of 632
+  candidates on the pond frame; swept once a second), skipping the scene
+  matrix walk, and a per-row `box` that skips the pass when none of the
+  water is in the main frustum. What did not: the target's size, the
+  instanced ground-cover rule (no field in Kyoto has more than 720
+  instances), wider cull thresholds (0.1 ms).
+- **The cost is NOT a quiet-machine number.** Every measurement in W2
+  was taken with four to six agents' browsers live; the OFF arm of the
+  in-frame A/B read 12-46 ms for a draw that is 10 on a quiet machine.
+  Drained pass alone on Kyoto: 2.5-2.8 ms; interleaved in-frame delta
+  1.5-4.6 ms across runs; the Pantanal (the whole map is water, so the
+  pass always runs, over the biggest scene in the game) read 17 ms of
+  delta on a 29 ms OFF arm, which is contamination, not a cost — but it
+  is also the chapter most likely to break the budget on the reference
+  machine. **W5 must re-measure all four quiet**, and if the Pantanal is
+  over 2.5 ms the honest lever is a per-instance cull three cannot do
+  (the sugi/gallery forests are one draw each and cheap; it is the 500
+  small meshes), or the pass at every other frame in that chapter alone.
+- **Kyoto's arrival lens does not see the pond** — it is inside the
+  frustum behind a machiya wall 13 m out, so the `box` skip does not
+  fire there and the frame pays for a mirror it cannot show. An
+  occlusion query (`ANY_SAMPLES_PASSED` on the water's own draw) is the
+  right tool and is held; the frustum test still covers every bearing
+  that faces away from the water.
+
 ### A2 — THE FOREGROUND (the near 3 m, empty in nineteen frames)
 
 *"The near 3 m of every frame being empty — foreground framing is the
@@ -433,6 +482,44 @@ rain rows raise it while a shower runs.
 - **Instrument:** the diff over the lower third of the frame; the
   weather probe forced on (`odds: 1`, `hold: 14` — trap 35).
 - **`game.state.noMist`.**
+
+**SHIPPED (19 Sep 2026), all six.** `wxMIST` in weather.js (the mood
+table's own file — a row per chapter, `{ h, alpha, drift, tint, tide? }`,
+no per-biome code): three sheets in one geometry under one
+`ShaderMaterial`, one draw call, six triangles; value-noise alpha over
+world x/z advected by `wxGust`, a radial fade from the animal, a near-lens
+fade, `pow(1-h, 1.4)` to nothing at `h` (0.6–0.8 m), and a Beer-Lambert
+slab term (`od / cosθ`) so the band thickens toward the far side of the
+frame and thins under the lens rather than lying on the ground like a
+decal. Rain lifts alpha (+55 %) and h (+30 %) on `rainT`; Venice's row
+scales with `waterLevel` between its two tide marks. Tint is a PALETTE
+entry per row; no grade, sun, fog or mote row moved. Parks at governor
+rung ≥ 1 (allocated, `visible = false`); `state.noMist` cuts it.
+
+Verified live (`qa/wow-mist.js`; pretty pinned via `capy3.prefs.v1
+{v:1,pf:1}` because a headless machine under six boots sits at rung 3 on
+auto and the band correctly parks): per chapter the lower-third diff,
+on vs off, as mean level over the whole band / share of pixels changed —
+Iceland 12.5 / 76 %, Goreme 3.3 / 42 %, Pantanal 8.5 / 89 %, Drift 19.6 /
+89 %, Monaco 6.1 / 88 %, Venice (low tide) 3.2 / 32 % — against a parked
+floor of 0.03–1.3 (motes and water moving between two ticks). Forced
+shower on Iceland: `rainT` 0.505 peak, alpha 0.34 → 0.434, h 0.80 → 0.92.
+Zero console errors. Every arrival frame read by eye: a low band, never
+on the animal's face.
+
+Two things the build taught. (1) **A chapter's fog colour is invisible
+as its mist** — the first round tinted every row with its own haze and
+measured as nothing in all six; a mist reads against what it hides, so a
+pale chapter takes a tint darker than its paving (Venice `venPigeon`,
+Goreme `gorShadowFog`) and a dark one a tint lighter than its road
+(Iceland `wxHazeWet`, the Drift `driCloud`). (2) **The sheets were wound
+face-down** — `(-r,-r)→(r,-r)→(r,r)` over x/z is clockwise from +y, so a
+`FrontSide` sheet drew nothing in any chapter, and the "haze" read in an
+early Iceland frame was that boot's own variation. A red-tint diagnostic
+with `depthTest` off (`qa/wow-mist-diag.js`) is what said so; the
+instrument's floor-level numbers had said it first and were not believed.
+Goreme's hillside and the Drift's islands both read fine with a level
+sheet: mist pools in the low ground, which is what a level sheet does.
 
 ### G4 — THE ANIMAL'S RIM, WHEN BACKLIT
 
@@ -1047,6 +1134,37 @@ here re-bases a dial):
 - One agent per chapter file, disjoint from the wave running beside it;
   lands in **W4** alongside Part C's uplifts, closes in W5 with the
   rest.
+
+### Findings — Sahara, Manly, the cave (19 Sep 2026)
+
+Three chapters, three commits, one probe (`qa/partd-probe.js`: title-card
+arrival, `l10-depth-sweep`'s bins, the own-camera raw frame, and the
+chapter's merged triangle count; baselines by `git stash push -- <file>`
+with close/open between). Two things about the instrument first:
+
+- **The resting lens is not deterministic.** Manly settled at two yaws
+  0.3 rad apart on consecutive arrivals (dir z −0.20 and −0.51); the cave
+  the same. So the probe also measures a PINNED pose — one run's own live
+  camera, rebuilt with the live fov — and that is the before/after. Draw
+  calls counted on the live lens vary with the settled yaw (Manly 149–153
+  before, 132 after; cave 126–147) and are only comparable pinned.
+- **The crowd and the jungle are `rand()`-placed per build**, so the bins
+  carry a noise floor of a few rays out of 117 (Sahara's two baseline
+  runs read mid+far 0.265 and 0.179; the cave's 0.196–0.247).
+
+| chapter | built (all in the chapter's own merger, no new material) | Δ merged tris | Δ draw calls | mid+far before → after | skipped, and why |
+|---|---|---|---|---|---|
+| Sahara (`6b3abfa`) | a rug and a crate stack at every stall; a 4 m paving grid on the square; a second row of six stalls at z 30; six camels couched at a post at ~39 m (`sahCamelGeo`, `addPainted`); seven riads along z 48 with parapets, terrace stair heads, windows under cedar lintels, a door, a step | +4 696 | 0 (197) | 0.265/0.179 → 0.299 (mid 0.137 → 0.239, sky 0.316 → 0.265) | nothing; the riads were added after the first cut (stalls + camels only) moved the bins the wrong way — at an eye height of 3.9 m nothing under 3 m takes a ray off the sky at 40 m |
+| Manly (`e6d2833`) | the seawall's coping course (collider grown to match), a pilaster per 8 m bay, sand drifts at its foot; three step flights through it at 22/44/66 m; the corner pub (three storeys, two verandahs on posts, pediment); five Norfolks climbing the western headland and a scrub band | +2 232 | 0 pinned (meshes 22 → 22) | pinned 0.256 → 0.307; live 0.282 → 0.342 | the rail: the wall top is the route to the sand, a rail blocks it or is walk-through; the strand line: the wrack line exists and was tuned down twice on purpose |
+| the cave (see commit) | a rockfall of 34 tipped blocks on both banks of the entrance slope (z 36–49), mossed where the light reaches, short colliders; a curtain of 30 stalactites under the arch in three rows | +2 100 | 0 pinned (147) | pinned 0.205 → 0.188 (−2 rays, inside the noise) | the rock term: `cavVC` already asks `rock: 0.08` (L7) and it is not re-based; `course` at a 0.55 m period on a 60 m cliff would shimmer (A3). **With 0 % sky the cave's mid+far cannot rise by construction** — a near hit is never pushed farther by adding geometry — so the cave is measured by eye only, as its table row already says |
+
+Frames read against W0: `qa/WOW-D-sahara-hero-arrive.png`,
+`qa/WOW-D-manly-hero-arrive.png`, `qa/WOW-D-cave-hero-arrive.png` (the
+last two from the pinned pose). Sahara's stall ring now carries six
+sub-shapes and the riad parapets break the skyline; Manly's wall reads as
+a seawall and the pub closes the street; the cave mouth has a toothed lip
+and a floor of blocks under it. 0 console errors in every run; `npm test`
+green each commit; no grade, sun, fog, mote or spawn row touched.
 
 ## Order and ownership
 
