@@ -170,6 +170,7 @@ const sysSPL_REACH1 = 26.0;  // ...and of the biggest cluster in the game.
                              // levels of 255, which is not visible and was not
                              // worth the instruction.
 const sysSplFound   = [];    // { x, y, z, r, cr, cg, cb } — rebuilt on biome swap
+const sysSPL_GEO_CENTRE = { monaco: 1 };   // instanced emitters clustered at the geometry's centre, not the instance origin (A4)
 const sysSplSlots   = [];    // { src, k }
 const sysSplWant    = [];
 const sysSplOut     = [];
@@ -3092,6 +3093,7 @@ const sysREFLECT = {
   // (venTideLevel; the plateau is 1). y is the live venWaterY; NaN parks it.
   venice:   { y: function (g) { const v = g.venice; return (v && v.tide() > 0.6) ? v.tideY() : NaN; },
               k: 1.0, lift: 0.07, box: [-210, -105, 80, 25] },   // the acqua alta (venWaterY; swell 0.05)
+  iceland:  { y: -1.0, k: 1.0, lift: 0.07, box: [-260, -78, 260, 317] },   // ONE plane, two sheets: the old harbour's sea (iceSEA_Y) and the lagoon (iceLAG_Y), both -1.0
 };
 const sysLENS = {
   //             wide  splitW splitC
@@ -3178,9 +3180,13 @@ const sysRAYS = {
   // has one.
   kowloon: { k: 0.30, len: 0.42, r: 0.12, src: [function (g) { return g.kowloon && g.kowloon.sign || null; }, { spill: 'near' }] },
   iceland: { k: 0.50, len: 0.36, r: 0.10, src: { spill: 'near' } },
-  monaco:  { k: 0.48, len: 0.40, r: 0.12, src: function (g) {
-    return g.monaco && g.monaco.casino ? { spill: { x: g.monaco.casino.x, z: g.monaco.casino.z } } : null;
-  } },
+  // The terrace never makes the pool: sysSpillScan keeps the 24 brightest
+  // clusters and Monaco's are all quay lamps and basin yachts (raysAudit,
+  // 19 Sep — nothing within 120 m of the casino), and the yacht's own
+  // windows are unlit Basic panes the scan cannot see. So the light the
+  // frame is about — at the stern arrival a quay lamp, now clustered at its
+  // globe and not its foot (sysSPL_GEO_CENTRE).
+  monaco:  { k: 0.50, len: 0.40, r: 0.12, src: { spill: 'near' } },
 };
 const sysRaysV = new THREE.Vector3();
 const sysRaysP = new THREE.Vector3();
@@ -12026,9 +12032,25 @@ export function createSystems(game) {
       const lum = (0.2126 * m.emissive.r + 0.7152 * m.emissive.g + 0.0722 * m.emissive.b) * ei;
       if (lum < sysSPL_LUM) return;
       if (o.isInstancedMesh) {
+        // THE INSTANCE ORIGIN IS NOT THE LIGHT (ROADMAP-WOW A4, 19 Sep).
+        // Monaco's 121 lamp globes are one InstancedMesh placed at the
+        // POST'S FOOT, with the globe at +5.0 in the geometry — so every
+        // lamp cluster sat on the quay at y 2.6 (raysAudit), five metres
+        // under the thing that is lit, and the rays' seed mask found grey
+        // fog there. The geometry's bounding-sphere centre, carried through
+        // the instance matrix, is where the light is. Gated to the chapters
+        // that asked (sysSPL_GEO_CENTRE): moving a spill source five metres
+        // changes the footprint on the ground under it, and no other
+        // chapter's picture moves for this pass without its own A/B.
+        let cx = 0, cy = 0, cz = 0;
+        if (sysSPL_GEO_CENTRE[B && B.current] && o.geometry) {
+          if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+          const c = o.geometry.boundingSphere && o.geometry.boundingSphere.center;
+          if (c) { cx = c.x; cy = c.y; cz = c.z; }
+        }
         for (let i = 0; i < o.count; i++) {
           o.getMatrixAt(i, sysSplM4);
-          sysSplV.setFromMatrixPosition(sysSplM4);
+          sysSplV.set(cx, cy, cz).applyMatrix4(sysSplM4);
           o.localToWorld(sysSplV);
           if (sysSplV.y < sysSPL_MINY) continue;
           cand.push({ x: sysSplV.x, y: sysSplV.y, z: sysSplV.z, l: lum,
