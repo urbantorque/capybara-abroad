@@ -78,12 +78,13 @@ async page => {
         for (const hd of heads) {
           const hrows = inst(hd)
           const sibs = all.filter(o => o !== hd && o.parent === hd.parent && o.count === hd.count)
+          // the roster's torso pool FIRST (0.715..1.31, its instance at the feet):
+          // the roster also has a 1.30 m rake pool at the same count, and the
+          // first sweep took that for the body
           let body = null, bodyH = 0
-          for (const o of sibs) { const b = box(o); const h = b.max.y - b.min.y; if (h > 1.0 && h > bodyH) { body = o; bodyH = h } }
-          if (!body) {
-            // the roster: the torso pool is 0.60 tall and its instance sits at the feet
-            for (const o of sibs) { const b = box(o); if (b.min.y > 0.6 && b.max.y > 1.25 && b.max.y < 1.4) body = o }
-          }
+          for (const o of sibs) { const b = box(o); if (b.min.y > 0.6 && b.min.y < 0.8 && b.max.y > 1.25 && b.max.y < 1.4) body = o }
+          if (!body) for (const o of sibs) { const b = box(o); const h = b.max.y - b.min.y; if (h > 1.0 && b.min.y < 0.1 && h > bodyH) { body = o; bodyH = h } }
+          if (!body) continue   // a head-shaped pool with no body beside it is not a person pool
           const hv = hd.geometry.attributes.position.count
           const face = sibs.find(o => { const n = o.geometry.attributes.position.count; return (n === 144 || n === 180) && (box(o).max.y - box(o).min.y) < 0.2 })
           const eyesMerged = hv >= 108 + 144
@@ -98,10 +99,11 @@ async page => {
             const d = Math.hypot(h.x - cp.x, h.z - cp.z)
             if (d > 120) continue
             near = true
-            // standing: the body's y scale is its x scale (a sitter is squashed), and
-            // the head's scale is the body's (a child's is 1.22 of it)
-            if (Math.abs(b.sy - b.sx) > 0.05 * b.sx) continue
-            if (Math.abs(h.sy - b.sx) > 0.05 * b.sx) continue
+            // standing: the head's y scale is the body's. A sitter's body is
+            // squashed in y and its head is not; a child's head is 1.22 of its
+            // body (the tell, by design). The body's x is NOT compared — the
+            // roster's heavy and thin builds are a girth on x alone.
+            if (Math.abs(h.sy - b.sy) > 0.05 * b.sy) continue
             const top = h.y + skull * h.sy      // skull top, world
             const feet = b.y
             const fig = top - feet

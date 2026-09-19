@@ -806,10 +806,30 @@ standard itself had two faults nobody could have seen.**
   `WOW2-rio-roster.png`, `-group.png` (gitignored) beside
   `WOW-sydney-roster.png`. The square is a crowd of the Sydney figure in
   robes; the halqa rings keep their heads.
-- **Not measured yet:** `qa/wow-people.js` (the nineteen-chapter ratio /
-  eyes / two-colour sweep) was written and stalled twice on a concurrent
-  `shared.js` edit that threw in `grain()` at boot; its numbers are owed
-  in the next commit, with the rv-geom hash diff of the roster.
+- **Measured (`qa/wow-people.js`, nineteen `hud.cross` arrivals, zero
+  console errors):** every live instanced person pool has a median skull /
+  figure ratio of **0.193** — Sydney's roster (31 standing of 32), Pasto's
+  (13), Rio (284 of 308), Marrakech (106 standing of 174; the rest are the
+  halqa sitters, excluded by design) and the six pursuers — with the eyes
+  pool at the head pool's count in each and 4–7 colours in every torso
+  buffer. Note the number: the head box over feet-to-skull-top is 0.193 for
+  the roster too, not the 0.20 this section quoted; the 0.20 was a
+  rounder read of the same rig, and the 0.17 the square measured against
+  it is now 0.193 by the same rule. The other fifteen chapters report no
+  instanced person pool within 120 m of the arrival point — their people
+  are hand-built `g.locals`, which this instrument does not measure.
+- **The instrument's own trap, paid twice:** its first sweep took the
+  roster's 1.30 m rake pool for the body (same instance count, taller
+  bbox) and read Sydney at 0.316 with one colour; and it required a
+  standing body's x scale to equal its y, which the roster's heavy and
+  thin builds (a girth on x alone) fail. Body is the torso pool first, a
+  ground-based >1 m pool second; standing is head y-scale == body y-scale.
+- **The roster's buffers are what they were:** `qa/rv-geom.js` before and
+  after, 654 unnamed `Scene/Mesh` rows each side, one row moved — and that
+  one (396 → 420 verts) is another agent's concurrent edit in this tree,
+  not a roster geometry. `sahPeople` 272 → 504 verts, `rioPeople` 144 →
+  540, both heads → the roster's 108-vertex skull (same hash `e24711ef`),
+  two new 144/180-vertex pools each.
 
 
 ### What is on the sheet, per chapter (the subjects; the findings come from W0)
