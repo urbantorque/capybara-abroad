@@ -7,7 +7,7 @@ import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY, cloudSet,
          rimTick, cloudTick, skyTick, fresnelTick, paleTick, triTick, mirrorTick, shadeTick, bounceSlots, bounceTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
-         shadeEnable, skyOccTick, shadeInfo, keyDomeTick, keyDomeInfo, skyDomeLit,
+         shadeEnable, skyOccTick, shadeInfo, keyDomeTick, keyDomeInfo, skyDomeLit, sky2CloudTick, sky2SunTick, sky2Info,
          exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt, lensFadeUniform, lensCapTick, reflectSet } from './shared.js';
 // THE CHARACTER KEY (L7, E4)
 import { capyKeyTick } from './capybara.js';
@@ -2721,6 +2721,43 @@ const sysBIO_SH_NB_BY = { iceland: 0.085, antarctic: 0.09, pantanal: 0.075 };
 // no sky at all. It has a ROOF, two hundred metres up, and cave.js draws it —
 // a gradient dome over the top of that would be a hole in the mountain.
 const sysSKY_OWN = { sydney: 1, drift: 1, goreme: 1, cave: 1 };
+// ---------------------------------------------------------------------------
+// CLOUDS FOR THE SIX THAT SHOW SKY, AND THE SUN DISC (ROADMAP-WOW A5).
+// See the block above sky2CloudTick in shared.js for the two terms. One row
+// per chapter whose arrival frame has sky in its top fifth; a chapter with no
+// row gets k 0 and no disc, which is bit for bit the shader it had. Two of
+// the six that show sky have NO row here because they own their sky
+// (sysSKY_OWN): the Drift has no dome at all — stars, a moon and opaque
+// cumulus banks in drift.js — and Goreme's dome, disc and glow shells are
+// goreme.js's own sunrise (a `skyDomeLit(m)` on gorBuildSky's material would
+// make its row live; that is the chapter's line, not this file's).
+//   lo, hi   coverage ramp on a 0..1 noise: higher lo, fewer clouds
+//   band     [sin lo, sin hi] — the elevation the deck lives in
+//   scale    noise cells per unit of the flat layer: bigger, smaller clouds
+//   tint     the lit top; base the underside — PALETTE tones the chapter owns
+//   gain     a level on the tint (baseGain on the base; defaults to gain): a
+//            palette tone is an albedo and the dome is lit, so white-ish
+//            tones need ~1.35 to stand as a lit top against a lit sky
+//   sun      { k, p, r } disc strength, halo power, disc radius in degrees.
+//            Absent = no disc: the Pantanal is an hour before sundown and its
+//            own chapter crosses into the dusk; the disc is for the three
+//            daylight ones. p 300 is a glow of ~3 degrees; Sahara's 60 is
+//            the dust's aureole, ~7 degrees round a 61-degree sun the
+//            walking lens never frames (A4: 'Sahara cannot be framed'). A
+//            first cut at p 5 was a flat lift of the whole sky — a grade,
+//            not a halo; p 30 with the halo at 0.55 of the disc's colour
+//            saturated a sun-facing frame out to ten degrees (a 280-px white
+//            blob at 1280 wide), so the halo is 0.35 and the power doubled.
+const sysSKY2 = {
+  sahara:   { lo: 0.60, hi: 0.74, band: [0.12, 0.62], scale: 1.1, tint: PALETTE.sahSkyHot, base: PALETTE.sahHaze, gain: 1.35, baseGain: 0.92, sun: { k: 1.0, p: 60, r: 1.6 } },
+  pantanal: { lo: 0.50, hi: 0.70, band: [0.08, 0.55], scale: 1.3, tint: PALETTE.panSkyLow, base: PALETTE.panHaze, gain: 1.0 },
+  palawan:  { lo: 0.53, hi: 0.72, band: [0.10, 0.60], scale: 1.2, tint: PALETTE.palSkyLow, base: PALETTE.palFog, gain: 1.0, sun: { k: 1.0, p: 300, r: 1.6 } },
+  cali:     { lo: 0.55, hi: 0.73, band: [0.10, 0.58], scale: 1.3, tint: PALETTE.caliHaze, base: PALETTE.caliSky, gain: 1.0, sun: { k: 1.0, p: 300, r: 1.6 } },
+};
+const sysSKY2_LAMBDA = 2.0;    // the band walks in at the zenith's own rate
+const sysSKY2_DRIFT  = 0.004;  // cells per second per m/s of gust: weather, not a flicker
+let   sysSky2K = 0, sysSky2SunK = 0, sysSky2OffX = 0, sysSky2OffZ = 0;
+const sysSky2Tint = new THREE.Color(), sysSky2Base = new THREE.Color(), sysSky2SunC = new THREE.Color();
 const sysSKY_TOP = {
   pasto:   PALETTE.andesSkyTop,
   quay:    PALETTE.skyTop,        // it IS Sydney, an hour later and a mile out
@@ -11993,6 +12030,26 @@ export function createSystems(game) {
                   score: front ? +((f.cr + f.cg + f.cb) / (0.15 + nd2)).toFixed(3) : 0 });
     }
     return { biome: game.biome && game.biome.current, live: game.state.raysLive, at: game.state.raysAt, clusters: rows };
+  };
+  /** The band and the disc (ROADMAP-WOW A5), for a probe: every uniform the
+   *  dome reads, and where the disc projects — the same axis and distance
+   *  sysRaysSource('sun') uses, so a rays probe and a sky probe agree. */
+  game.sky2Audit = function () {
+    const d = (camera.far || 400) * 0.92;
+    sysRaysQ.set(camera.position.x + sysAxDir.x * d, camera.position.y + sysAxDir.y * d, camera.position.z + sysAxDir.z * d);
+    sysRaysP.copy(sysRaysQ).applyMatrix4(camera.matrixWorldInverse);
+    const front = sysRaysP.z < -0.5;
+    sysRaysQ.project(camera);
+    const info = sky2Info();
+    info.biome = game.biome && game.biome.current;
+    info.row = !!sysSKY2[info.biome];
+    info.domeVisible = !!(sysSkyMesh && sysSkyMesh.visible);
+    info.cut = !!game.state.noSky2;
+    info.rung = sysPerfRung;
+    info.sun.elev = +(Math.asin(clamp(sysAxDir.y, -1, 1)) * 180 / Math.PI).toFixed(1);
+    info.sun.ndc = front ? [+sysRaysQ.x.toFixed(2), +sysRaysQ.y.toFixed(2)] : null;
+    info.sun.inFrame = front && Math.abs(sysRaysQ.x) <= 1 && Math.abs(sysRaysQ.y) <= 1;
+    return info;
   };
   /** What the bounce found and what it is doing, for a probe. */
   game.bounceAudit = function () {
@@ -38634,6 +38691,70 @@ export function createSystems(game) {
         // and the sun, into VIEW space, because the puff's normal is read
         // there — the same hand-over leafTick makes for the foliage
         sysCloudSunV.value.copy(sysAxDir).transformDirection(camera.matrixWorldInverse);
+      }
+    }
+    // ---- THE BAND AND THE DISC (ROADMAP-WOW A5). See sysSKY2. -------------
+    // OUTSIDE the visible-dome branch on purpose: the uniforms are shared by
+    // every dome that goes through skyDomeLit, Sydney's included, so a chapter
+    // with no row must drive them to zero rather than leave the last
+    // chapter's clouds on the next chapter's sky. Cut by noSky2; parked at
+    // rung 1 (zero, never freed). The live states that already move the sky
+    // move this with it: Sahara's storm flattens the sky and takes the deck
+    // with it, its dusk darkens the tint and sets the disc; the Pantanal's
+    // dusk warms the deck the way sysPAN_DUSK_C warms the zenith; Cali's
+    // night dims both.
+    {
+      const row = sysSKY2[name];
+      // THE CUT IS A MULTIPLIER ON THE OUTPUT, NOT A TARGET FOR THE DAMP. The
+      // first cut drove the damped value to zero and let it walk back at
+      // 1 - exp(-lambda * dt), which at a probe's dt = 0 is never: every
+      // on-arm after the first off-arm measured a shader with k = 0 (the
+      // sun-facing profile of a third shot equalled the off shot exactly).
+      // The damp is for the ARRIVAL — a row walking in under the white hold —
+      // and the cut is a switch; a switch is instant both ways.
+      const cut = !!game.state.noSky2 || sysPerfRung >= 1;
+      let wantK = 0, wantSun = 0;
+      if (row) {
+        wantK = typeof game.state.sky2K === 'number' ? game.state.sky2K : 1;
+        wantSun = row.sun ? row.sun.k : 0;
+        sysSky2Tint.set(row.tint).multiplyScalar(row.gain);
+        sysSky2Base.set(row.base).multiplyScalar(row.baseGain === undefined ? row.gain : row.baseGain);
+        if (name === 'sahara') {
+          wantK *= 1 - stormT * 0.9;
+          wantSun *= 1 - duskT;
+          sysSky2Tint.lerp(sysSAH_NIGHT_C, duskT * 0.85);
+          sysSky2Base.lerp(sysSAH_NIGHT_C, duskT * 0.92);
+        } else if (name === 'pantanal' && game.pantanal && game.pantanal.dusk) {
+          const dk = clamp(game.pantanal.dusk(), 0, 1);
+          sysSky2Tint.lerp(sysPAN_DUSK_C, dk * 0.55);
+          sysSky2Base.lerp(sysPAN_DUSK_C, dk * 0.35);
+        } else if (name === 'cali' && game.cali && game.cali.night) {
+          const nk = clamp(game.cali.night(), 0, 1);
+          wantK *= 1 - nk * 0.75;
+          wantSun *= 1 - nk;
+          sysSky2Tint.lerp(sysCALI_N_BG_C, nk * 0.9);
+          sysSky2Base.lerp(sysCALI_N_BG_C, nk * 0.95);
+        }
+        if (subT > 0.002) { wantK *= 1 - subT; wantSun *= 1 - subT; }
+      }
+      const kk2 = 1 - Math.exp(-sysSKY2_LAMBDA * dt);
+      sysSky2K += (wantK - sysSky2K) * kk2;
+      sysSky2SunK += (wantSun - sysSky2SunK) * kk2;
+      const liveK = cut ? 0 : sysSky2K, liveSun = cut ? 0 : sysSky2SunK;
+      if (row && liveK > 0.0005) {
+        // the drift: the weather's own gust, in cells — the flags and the deck move together
+        const gg = game.weather ? game.weather.gust() : null;
+        if (gg && !sysCalmOn()) { sysSky2OffX += gg.x * sysSKY2_DRIFT * dt; sysSky2OffZ += gg.z * sysSKY2_DRIFT * dt; }
+        sky2CloudTick(liveK, row.lo, row.hi, row.band[0], row.band[1], sysSky2Tint, sysSky2Base, sysSky2OffX, sysSky2OffZ, row.scale);
+      } else {
+        sky2CloudTick(0, 0.5, 0.7, 0.1, 0.6, null, null, sysSky2OffX, sysSky2OffZ, 1);
+      }
+      if (row && row.sun && liveSun > 0.0005) {
+        // the sun's own colour for the hour, lifted over 1.0 the way skySunMesh's is, so the bright pass takes it
+        sysSky2SunC.copy(sun.color).multiplyScalar(2.3);
+        sky2SunTick(sysAxDir, liveSun, sysSky2SunC, row.sun.p, row.sun.r);
+      } else {
+        sky2SunTick(sysAxDir, 0, null, 300, 1.6);
       }
     }
     // ---- THE PLANAR REFLECTION (ROADMAP-WOW A1). See sysREFLECT. ---------

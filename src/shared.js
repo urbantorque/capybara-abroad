@@ -2034,10 +2034,124 @@ const _keyDome = { value: new THREE.Vector3(1, 1, 1) };   // x sun, y fill, z he
 /** systems.js publishes the key's three ratios here once a frame (pre / post). */
 export function keyDomeTick(sunK, fillK, indK) { _keyDome.value.set(sunK, fillK, indK); }
 export function keyDomeInfo() { const v = _keyDome.value; return [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)]; }
+
+// ---------------------------------------------------------------------------
+// CLOUDS FOR THE SIX THAT SHOW SKY, AND THE SUN DISC (ROADMAP-WOW A5).
+//
+// The dome is three terms of vertex arithmetic — a ramp, a band, a lobe — and
+// the puffs (sysCloudSkyMesh) are eleven-degree spheres; in the four frames
+// whose top fifth IS sky (Sahara 36 %, the Pantanal 24 %, Palawan 23 %, Cali
+// 21 %) that fifth is one flat gradient with a few balls in it. Two more terms
+// in the dome's FRAGMENT, so they cost the dome's fill and nothing else:
+//
+//   THE BAND. Two octaves of value noise on the view direction, projected onto
+//   a flat layer at unit height (sd.xz / sd.y) — so perspective compresses the
+//   cells toward the horizon for free, the way a real deck of cloud does — a
+//   coverage ramp `lo..hi`, and an elevation band `bandLo..bandHi` (sin of
+//   elevation) the clouds live in. Base colour at the bottom of the band and
+//   in the belly of a thick cloud, tint at the top: darker on the underside.
+//   The drift is an OFFSET in cells, accumulated in systems.js off the
+//   weather's own gust, so the clouds and the flags move the same way.
+//
+//   THE DISC. A smooth disc and a `pow` halo round the sun's axis, the sun's
+//   own colour over 1.0 so the bright pass takes it, zero below the horizon.
+//   It sits under skySunMesh (the three-degree card) where that is in frame;
+//   the halo is what the card never had. sysRaysSource('sun') projects the
+//   SAME axis, so the rays row and this disc can never disagree about where
+//   the light is.
+//
+// The hash is the dome's own, not grain()'s: the two shaders must be free to
+// change independently. A chapter with no sysSKY2 row drives k to 0 and the
+// disc to 0 — one uniform branch, coherent across the dome, and the shader is
+// the one it replaces (skipped, never freed: the recompile rule). Every dome
+// that goes through skyDomeLit gets the hook, so Goreme's could adopt it with
+// one line; until it does, its row would drive uniforms nothing reads.
+// ---------------------------------------------------------------------------
+const _sky2K    = { value: 0 };                                       // band strength; 0 = inert
+const _sky2Ramp = { value: new THREE.Vector4(0.55, 0.72, 0.12, 0.60) }; // lo, hi, bandLo, bandHi
+const _sky2Tint = { value: new THREE.Color(1, 1, 1) };                // the top of a cloud
+const _sky2Base = { value: new THREE.Color(0.7, 0.7, 0.7) };          // its underside
+const _sky2Off  = { value: new THREE.Vector3(0, 0, 1.2) };            // drift x, z (cells); z = cells per unit
+const _sky2Sun  = { value: new THREE.Vector4(0, 1, 0, 0) };           // world axis; w = disc strength
+const _sky2SunC = { value: new THREE.Color(2.4, 2.2, 1.8) };          // over 1.0 on purpose
+const _sky2SunP = { value: new THREE.Vector2(1200, 0.9996) };         // halo power; cos(disc radius)
+/** The band, once a frame: strength, coverage ramp, elevation band, colours, drift and cell scale. */
+export function sky2CloudTick(k, lo, hi, bandLo, bandHi, tint, base, offX, offZ, scale) {
+  _sky2K.value = k;
+  _sky2Ramp.value.set(lo, hi, bandLo, bandHi);
+  if (tint) _sky2Tint.value.copy(tint);
+  if (base) _sky2Base.value.copy(base);
+  _sky2Off.value.set(offX, offZ, scale);
+}
+/** The disc, once a frame: the sun's world axis, strength (0 = none), colour, halo power, radius in degrees. */
+export function sky2SunTick(dir, k, color, haloP, radiusDeg) {
+  if (dir) _sky2Sun.value.set(dir.x, dir.y, dir.z, k); else _sky2Sun.value.w = k;
+  if (color) _sky2SunC.value.copy(color);
+  _sky2SunP.value.set(haloP, Math.cos(radiusDeg * Math.PI / 180));
+}
+/** For a probe: every live value the shader reads. */
+export function sky2Info() {
+  const r = _sky2Ramp.value, o = _sky2Off.value, s = _sky2Sun.value, t = _sky2Tint.value, b = _sky2Base.value, c = _sky2SunC.value;
+  return { k: +_sky2K.value.toFixed(3), lo: r.x, hi: r.y, band: [r.z, r.w], off: [+o.x.toFixed(3), +o.y.toFixed(3)], scale: o.z,
+           tint: [+t.r.toFixed(3), +t.g.toFixed(3), +t.b.toFixed(3)], base: [+b.r.toFixed(3), +b.g.toFixed(3), +b.b.toFixed(3)],
+           sun: { dir: [+s.x.toFixed(3), +s.y.toFixed(3), +s.z.toFixed(3)], k: +s.w.toFixed(3),
+                  c: [+c.r.toFixed(2), +c.g.toFixed(2), +c.b.toFixed(2)], haloP: _sky2SunP.value.x, cosR: +_sky2SunP.value.y.toFixed(5) } };
+}
+const _SKY2_PARS = `
+uniform float uSky2K;
+uniform vec4 uSky2Ramp;
+uniform vec3 uSky2Tint;
+uniform vec3 uSky2Base;
+uniform vec3 uSky2Off;
+uniform vec4 uSky2Sun;
+uniform vec3 uSky2SunC;
+uniform vec2 uSky2SunP;
+varying vec3 vSky2W;
+float sky2Hash(vec2 p) { p = fract(p * vec2(0.1031, 0.1030)); p += dot(p, p.yx + 33.33); return fract((p.x + p.y) * p.x); }
+float sky2Noise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(sky2Hash(i), sky2Hash(i + vec2(1.0, 0.0)), f.x),
+             mix(sky2Hash(i + vec2(0.0, 1.0)), sky2Hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}`;
+const _SKY2_OUT = `if (uSky2K > 0.0005 || uSky2Sun.w > 0.0005) {
+  vec3 sd = normalize(vSky2W - cameraPosition);
+  // the sun first, so a cloud can stand in front of it
+  if (uSky2Sun.w > 0.0005) {
+    float cs = dot(sd, uSky2Sun.xyz);
+    float disc = smoothstep(uSky2SunP.y - 0.0005, uSky2SunP.y + 0.00005, cs);
+    float halo = pow(clamp(cs, 0.0, 1.0), uSky2SunP.x);
+    // nothing below the horizon: neither a sun that has set nor a disc painted on the floor
+    float up = smoothstep(-0.02, 0.06, uSky2Sun.y) * smoothstep(-0.03, 0.02, sd.y);
+    outgoingLight += uSky2SunC * (disc + 0.35 * halo) * uSky2Sun.w * up;
+  }
+  if (uSky2K > 0.0005 && sd.y > uSky2Ramp.z) {
+    vec2 uv = sd.xz / max(sd.y, 0.08) * uSky2Off.z + uSky2Off.xy;
+    float n = 0.62 * sky2Noise(uv) + 0.38 * sky2Noise(uv * 2.17 + vec2(3.7, 9.1));
+    float c = smoothstep(uSky2Ramp.x, uSky2Ramp.y, n);
+    float bw = smoothstep(uSky2Ramp.z, uSky2Ramp.z + 0.06, sd.y) * (1.0 - smoothstep(uSky2Ramp.w - 0.25, uSky2Ramp.w, sd.y));
+    float vg = smoothstep(uSky2Ramp.z, uSky2Ramp.w, sd.y);
+    vec3 cc = mix(uSky2Base, uSky2Tint, vg * (1.0 - 0.45 * c));
+    outgoingLight = mix(outgoingLight, cc, c * bw * uSky2K);
+  }
+}
+#include <opaque_fragment>`;
 function _skyDomeInject(shader) {
   shader.uniforms.uKeyDome = _keyDome;
+  shader.uniforms.uSky2K = _sky2K;
+  shader.uniforms.uSky2Ramp = _sky2Ramp;
+  shader.uniforms.uSky2Tint = _sky2Tint;
+  shader.uniforms.uSky2Base = _sky2Base;
+  shader.uniforms.uSky2Off = _sky2Off;
+  shader.uniforms.uSky2Sun = _sky2Sun;
+  shader.uniforms.uSky2SunC = _sky2SunC;
+  shader.uniforms.uSky2SunP = _sky2SunP;
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vSky2W;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\n\tvSky2W = (modelMatrix * vec4(transformed, 1.0)).xyz;');
   shader.fragmentShader = shader.fragmentShader
-    .replace('#include <lights_pars_begin>', '#include <lights_pars_begin>\nuniform vec3 uKeyDome;')
+    .replace('#include <opaque_fragment>', _SKY2_OUT)
+    .replace('#include <lights_pars_begin>', '#include <lights_pars_begin>\nuniform vec3 uKeyDome;' + _SKY2_PARS)
     .replace('#include <lights_fragment_begin>', THREE.ShaderChunk.lights_fragment_begin
       .replace('directionalLight = directionalLights[ i ];',
                'directionalLight = directionalLights[ i ];\n\t\tdirectionalLight.color *= ( UNROLLED_LOOP_INDEX == 0 ) ? uKeyDome.x : uKeyDome.y;')
