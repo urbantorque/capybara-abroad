@@ -23,7 +23,7 @@ async page => {
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
 
   // EDIT THIS to the chapter under test. One per run.
-  const CHAPTER = 'pantanal'
+  const CHAPTER = 'kyoto'
   const out = { errs, chapter: CHAPTER }
 
   await page.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('capy3.prefs.v1', JSON.stringify({ v: 1, pf: 1 })) } catch (e) {} })
@@ -70,6 +70,49 @@ async page => {
       return { noGround: true, dappledMeshes: any, biome: g.biome.current }
     }
     const cells = ground.material.userData.grainDapple
+    // ...AND THE CELL HAS TO BE ON OPEN GROUND. Kyoto's first sando maple
+    // stands inside the southern machiya row, and a lens put beside it is
+    // inside a house (a flat brown frame, 0 % moved). Walk the cells nearest
+    // first and take the first whose target AND lens both see this ground
+    // mesh as the first thing under them.
+    // "Open" means: this ground mesh is under the point, and nothing else is
+    // hit between knee height and the lens (0.4 .. 3.2 m over it). A crown
+    // overhead (the first thing a ray from 60 m meets under any tree) and a
+    // gravel slab on the ground both pass; a house does not.
+    const rcAll = new T.Raycaster()
+    function onGround(x, z) {
+      rcAll.set(new T.Vector3(x, 60, z), new T.Vector3(0, -1, 0))
+      const hs = rcAll.intersectObjects(g.scene.children, true).filter(h => shown(h.object))
+      const gh = hs.find(h => h.object.material === ground.material)
+      if (!gh) return false
+      const gY = gh.point.y
+      return !hs.some(h => h.object.material !== ground.material && h.point.y > gY + 0.4 && h.point.y < gY + 3.2)
+    }
+    // ...and the LINE OF SIGHT: from where the lens will stand to the target
+    // on the ground, the first thing the ray meets must be this ground. The
+    // vertical test alone passed a lens standing inside a machiya under its
+    // roof (walls do not show up on a ray straight down).
+    function seesGround(px, py, pz, qx, qy, qz) {
+      const o = new T.Vector3(px, py, pz), d = new T.Vector3(qx, qy, qz).sub(o)
+      const L = d.length(); d.normalize()
+      rcAll.set(o, d); rcAll.far = L + 0.5
+      const hs = rcAll.intersectObjects(g.scene.children, true).filter(h => shown(h.object))
+      rcAll.far = Infinity
+      return hs.length > 0 && hs[0].object.material === ground.material
+    }
+    const ordered = cells.slice().sort((p, q) => Math.hypot(p.x - cp.x, p.z - cp.z) - Math.hypot(q.x - cp.x, q.z - cp.z))
+    const skipped = []
+    for (const c of ordered) {
+      const aa = Math.atan2(cp.x - c.x, cp.z - c.z)
+      const ti = c.r > 6 ? c.r * 0.45 : 1.2   // off the trunk's own base, which the ray would meet first
+      const ttx = c.x + Math.sin(aa) * ti, ttz = c.z + Math.cos(aa) * ti
+      rcAll.set(new T.Vector3(ttx, 60, ttz), new T.Vector3(0, -1, 0))
+      const gh = rcAll.intersectObject(ground, false)[0]
+      const ty = gh ? gh.point.y : cp.y
+      const lx = ttx + Math.sin(aa) * 5.2, lz = ttz + Math.cos(aa) * 5.2
+      if (onGround(ttx, ttz) && onGround(lx, lz) && seesGround(lx, ty + 3.0, lz, ttx, ty, ttz)) { cell = c; break }
+      skipped.push([+c.x.toFixed(1), +c.z.toFixed(1)])
+    }
     // ---- the lens: six metres off, thirty degrees up, looking at the foot --
     // (under the crown's underside, so the line of sight to the ground does
     // not pass through the canopy). Bearing: from the animal's side. A fig is
@@ -78,7 +121,7 @@ async page => {
     // the target is a point inside the circle on the near side and the lens
     // stays just outside the trunks.
     const a = Math.atan2(cp.x - cell.x, cp.z - cell.z)
-    const tIn = cell.r > 6 ? cell.r * 0.45 : 0
+    const tIn = cell.r > 6 ? cell.r * 0.45 : 1.2
     const tx = cell.x + Math.sin(a) * tIn, tz = cell.z + Math.cos(a) * tIn
     // ground height under the target: a ray straight down
     const rc = new T.Raycaster(new T.Vector3(tx, 60, tz), new T.Vector3(0, -1, 0), 0, 120)
@@ -134,7 +177,7 @@ async page => {
     }
     const cam0 = g.camera.position
     return {
-      biome: g.biome.current, rung: g.state.perfRung, cells: cells.length, cell, gy: +gy.toFixed(2),
+      biome: g.biome.current, rung: g.state.perfRung, cells: cells.length, cell, skipped, gy: +gy.toFixed(2),
       capy: [+cp.x.toFixed(1), +cp.y.toFixed(1), +cp.z.toFixed(1)],
       playCam: [+cam0.x.toFixed(1), +cam0.y.toFixed(1), +cam0.z.toFixed(1)],
       groundVerts: ground.geometry.attributes.position.count,

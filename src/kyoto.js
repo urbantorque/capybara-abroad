@@ -259,7 +259,12 @@ function kyoVC() {
  *  so it wants no vertical shear in the sample at all. */
 function kyoVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.62, amount: 0.17, warp: 0, near: 0.72, speck: 0.55, nearScale: 7, contact: 1, broad: 0.09, broadM: 14 });
+               { scale: 0.62, amount: 0.17, warp: 0, near: 0.72, speck: 0.55, nearScale: 7, contact: 1, broad: 0.09, broadM: 14,
+                 // THE DAPPLE (ROADMAP-WOW G2): the four sando maples, which are
+                 // the only canopies the arrival corridor has (see kyoSANDO_MAPLES).
+                 // This material is also the sando's own gravel, so the shade
+                 // falls on the path as well as the grass beside it.
+                 dapple: { cells: kyoSANDO_MAPLES, k: 0.35, scale: 3.2 } });
 }
 function kyoPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function kyoInstance(root, geo, color, list, cast, recv) {
@@ -2720,11 +2725,38 @@ function kyoUpdateMirror(game) {
 // Routed to miss the bell tower at (-15, 24) — it leaves the lane at the
 // arrival point and bends east to the head of the pond.
 const kyoSANDO = [-16, 46, -14, 37, -9, 29, -2, 23, 5, 19];   // x, z pairs
+// THE SANDO'S MAPLES, AS A LIST (ROADMAP-WOW G2). kyoBuildSando plants one
+// every fourth bay, alternating sides, 4.4 m off the path; the same arithmetic
+// as the build loop, run once here so the ground's dapple (kyoVCG) and the
+// trees are read from ONE table — the build takes its positions from this.
+// r 3.6: the crown is three cyl6 lumps of diameter up to h (6 m) offset 0.8.
+// These are the only canopies near the lane: kyoBuildMaples refuses to plant
+// within sixteen metres of it, and the cedar wood is rand()-placed.
+const kyoSANDO_MAPLES = (function () {
+  const out = [];
+  const N = kyoSANDO.length / 2;
+  for (let i = 0; i < N - 1; i++) {
+    const x0 = kyoSANDO[i * 2], z0 = kyoSANDO[i * 2 + 1];
+    const x1 = kyoSANDO[i * 2 + 2], z1 = kyoSANDO[i * 2 + 3];
+    const dx = x1 - x0, dz = z1 - z0;
+    const len = Math.hypot(dx, dz) || 1;
+    const nx = dz / len, nz = -dx / len;
+    const STEPS = Math.max(2, Math.round(len / 2.2));
+    for (let k = 0; k < STEPS; k++) {
+      if (k % 4 !== 1) continue;
+      const t0 = k / STEPS, t1 = (k + 1) / STEPS;
+      const mx = x0 + dx * (t0 + t1) * 0.5, mz = z0 + dz * (t0 + t1) * 0.5;
+      const s = (i + k) % 2 ? 1 : -1;
+      out.push({ x: mx + nx * s * 4.4, z: mz + nz * s * 4.4, r: 3.6 });
+    }
+  }
+  return out;
+})();
 function kyoBuildSando(game, root) {
   const S = kyoMerger();
   const trunks = [], canopy = [];
   const N = kyoSANDO.length / 2;
-  let run = 0;
+  let run = 0, mi = 0;
   for (let i = 0; i < N - 1; i++) {
     const x0 = kyoSANDO[i * 2], z0 = kyoSANDO[i * 2 + 1];
     const x1 = kyoSANDO[i * 2 + 2], z1 = kyoSANDO[i * 2 + 3];
@@ -2759,8 +2791,9 @@ function kyoBuildSando(game, root) {
       run += len / STEPS;
       // ---- a maple every eight metres or so, alternating sides ----------
       if (k % 4 === 1) {
-        const s = (i + k) % 2 ? 1 : -1;
-        const tx = mx + nx * s * 4.4, tz = mz + nz * s * 4.4;
+        // from the table above, so the dapple on the ground is under the tree
+        const mp = kyoSANDO_MAPLES[mi++];
+        const tx = mp.x, tz = mp.z;
         const ty = kyoTerrain(tx, tz);
         const h = rand(4.2, 6.0);
         kyoPush9(trunks, tx, ty + h * 0.5, tz, 0, rand(0, 6.28), 0, 0.34, h, 0.34);
