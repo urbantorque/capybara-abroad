@@ -16,7 +16,11 @@ async page => {
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
 
-  const MIST_CHAPTERS = ['iceland', 'goreme', 'pantanal', 'drift', 'monaco', 'venice']
+  // ONE CHAPTER PER RUN (harness rule, 19 Sep): a six-boot sweep is a single
+  // tool call over ten minutes under load and the harness kills it. Edit the
+  // list to the chapter under test; SHOWER runs the forced-rain half.
+  const MIST_CHAPTERS = ['iceland']
+  const SHOWER = false
   const out = { errs, chapters: {}, shower: null }
 
   async function boot(name) {
@@ -53,12 +57,15 @@ async page => {
         t.getContext('2d').drawImage(c, 0, 0)
         return { d: t.getContext('2d').getImageData(0, 0, t.width, t.height).data, w: t.width, h: t.height }
       }
+      // A band of rows [y0, y1). Lower third is the instrument; the UPPER
+      // third is the control — a mist under 0.8 m has no business there, so
+      // a non-floor number in it is a height-fade bug, not weather.
       // Lower third only: rows from 2h/3 to h. Mean over CHANGED pixels of
       // the per-channel mean abs delta, and the share of the band changed.
-      function diffLower(A, B) {
-        const w = A.w, h = A.h, y0 = Math.floor(h * 2 / 3)
+      function diffBand(A, B, f0, f1) {
+        const w = A.w, h = A.h, y0 = Math.floor(h * f0), y1 = Math.floor(h * f1)
         let n = 0, s = 0, tot = 0, sAll = 0
-        for (let y = y0; y < h; y++) for (let x = 0; x < w; x++) {
+        for (let y = y0; y < y1; y++) for (let x = 0; x < w; x++) {
           const i = (y * w + x) * 4
           const d = (Math.abs(A.d[i] - B.d[i]) + Math.abs(A.d[i + 1] - B.d[i + 1]) +
                      Math.abs(A.d[i + 2] - B.d[i + 2])) / 3
@@ -90,7 +97,7 @@ async page => {
       const cp = g.capy.position, cam = g.camera.position
       return { biome: g.biome.current, started: g.state.started,
                rung: g.state.perfRung, on: onA, off: offA,
-               lower: diffLower(A, B), whole: diffAll(A, B),
+               lower: diffBand(A, B, 2 / 3, 1), upper: diffBand(A, B, 0, 1 / 3), whole: diffAll(A, B),
                capy: [+cp.x.toFixed(2), +cp.y.toFixed(2), +cp.z.toFixed(2)],
                cam: [+cam.x.toFixed(2), +cam.y.toFixed(2), +cam.z.toFixed(2)],
                calls: g.state.perf && g.state.perf.calls }
@@ -98,6 +105,7 @@ async page => {
   }
 
   // ---- the shower, on Iceland (a rain row with the biggest band) -----------
+  if (SHOWER) {
   await boot('iceland')
   await page.evaluate(() => {
     const g = window.__capy
@@ -127,6 +135,7 @@ async page => {
     return { samples: r.length, base: r[0], peakRainT: pk('rainT'), peakAlpha: pk('alpha'), peakH: pk('h'),
              trace: r.filter((x, i) => i % 4 === 0) }
   })
+  }
 
   await page.evaluate(async (o) => {
     await fetch('/shot?name=wow-mist.json', { method: 'POST',

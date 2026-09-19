@@ -42,6 +42,7 @@ import { PALETTE, mat, rand, clamp, damp, calmOn, waterYAt } from './shared.js';
 //   game.weather.light()     the deltas systems.js layers on the atmosphere
 //   game.weather.bed()       the levels systems.js mixes the ambience at
 //   game.weather.set(n,cfg)  a chapter may override its own row at runtime
+//   game.weather.mistAudit() the ground mist (G3): row, floor, depth, drift
 //
 // WHAT IT DOES NOT OWN: any light, any fog value, any post parameter, any
 // audio node, any NPC. It computes numbers. systems.js, capybara.js and
@@ -564,22 +565,23 @@ const wxDECK_UP    = 0.40;
 //   drift  how much of the gust the pattern moves on; 1 is the gust itself
 //   tint   the chapter's haze. PALETTE only.
 //   tide   optional [lo, hi] of the live biome's `waterLevel`: the band is
-//          at 0.4 of itself at low water and whole at high — Venice's tide.
+//          at 0.6 of itself at low water and whole at high — Venice's tide.
 const wxMIST = {
-  // VERIFIED BY EYE (qa/wow-mist.js, qa/wow-mist-tune.js): the road behind
-  // the animal carries a low pale band under the parked cars at 2.0, and a
-  // haar is the colour the fog goes when the air has water in it.
-  iceland:  { h: 0.80, alpha: 2.0, drift: 1.0, tint: PALETTE.wxHazeWet },
-  // PROVISIONAL — the five rows below are placed, not yet read by eye
-  // (the tuning run that would have settled them hit another module's
-  // boot error); each is a tint lighter than its own ground, because the
-  // first round proved a chapter's fog colour vanishes into the ground it
-  // lies on. alpha is an OPTICAL DEPTH (see the shader), not a coverage.
-  goreme:   { h: 0.70, alpha: 2.4, drift: 0.7, tint: PALETTE.wxMote },
-  pantanal: { h: 0.80, alpha: 2.4, drift: 0.9, tint: PALETTE.panHaze },
-  drift:    { h: 0.80, alpha: 2.4, drift: 0.8, tint: PALETTE.driCloud },
-  monaco:   { h: 0.60, alpha: 2.0, drift: 0.7, tint: PALETTE.wxHazeWet },
-  venice:   { h: 0.70, alpha: 3.2, drift: 0.8, tint: PALETTE.venPigeon, tide: [-1.30, 0.95] },
+  // EVERY ROW READ BY EYE (qa/wow-mist-tune.js, two depths a chapter, then
+  // qa/wow-mist.js's on/off pair). The first round used each chapter's own
+  // fog colour and measured as nothing everywhere: a fog colour vanishes
+  // into the ground it lies on. A mist reads against what it HIDES — the
+  // dark things at ground level — so a pale chapter (Venice, Goreme) takes
+  // a tint darker than its paving and a dark one (Iceland, the Drift) a
+  // tint lighter than its road. alpha is an OPTICAL DEPTH (see the shader):
+  // 0.2 is a haze you notice at the crowd's ankles, 0.4 is a band the trees
+  // stand in, 0.6 was a wash over the whole road and is the ceiling.
+  iceland:  { h: 0.80, alpha: 0.34, drift: 1.0, tint: PALETTE.wxHazeWet },
+  goreme:   { h: 0.70, alpha: 0.35, drift: 0.7, tint: PALETTE.gorShadowFog },
+  pantanal: { h: 0.80, alpha: 0.40, drift: 0.9, tint: PALETTE.panHaze },
+  drift:    { h: 0.80, alpha: 0.34, drift: 0.8, tint: PALETTE.driCloud },
+  monaco:   { h: 0.60, alpha: 0.22, drift: 0.7, tint: PALETTE.wxHazeWet },
+  venice:   { h: 0.70, alpha: 0.36, drift: 0.8, tint: PALETTE.venPigeon, tide: [-1.30, 0.95] },
 };
 const wxMIST_R       = 36;     // m, half-width of a sheet AND the radial fade's edge
 const wxMIST_LAYERS  = [0.12, 0.42, 0.72];   // fractions of h, bottom to top
@@ -629,11 +631,11 @@ const wxMIST_FRAG = [
   '  vec2 p = vW.xz - uDrift + vL * 41.7;',
   '  float n = wxNoise(p * 0.075) * 0.55 + wxNoise(p * 0.19 + uT * 0.04) * 0.30',
   '          + wxNoise(p * 0.45 - uT * 0.06) * 0.15;',
-  '  n = smoothstep(0.32, 0.78, n);',
+  '  n = smoothstep(0.42, 0.82, n);',
   '  float d = length(vW.xz - uCentre.xz) / uR;',
   '  float rad = 1.0 - smoothstep(0.30, 1.0, d);',
   '  vec3 toEye = vW - cameraPosition;',
-  '  float near = smoothstep(1.2, 3.6, length(toEye));',
+  '  float near = smoothstep(2.0, 6.0, length(toEye));',
   '  float hgt = pow(1.0 - vL, 1.4);',
   // A SLAB, NOT A SHEET. A layer of air seen at a grazing angle is a longer
   // path through the same stuff, so the band thickens toward the far side
@@ -807,9 +809,14 @@ export function createWeather(game) {
   const mistGeo = new THREEx.BufferGeometry();
   {
     const r = wxMIST_R, v = [];
+    // WOUND TO FACE UP. Seen from +y with x to the right, +z runs DOWN the
+    // screen, so (-r,-r) -> (r,-r) -> (r,r) is clockwise and a FrontSide
+    // sheet wound that way faces the floor: the first build drew nothing in
+    // any chapter and a red-tint diagnostic with depthTest off was what
+    // said so (qa/wow-mist-diag.js). Counter-clockwise from above:
     for (let i = 0; i < wxMIST_LAYERS.length; i++) {
       const y = wxMIST_LAYERS[i];
-      v.push(-r, y, -r,  r, y, -r,  r, y, r,   -r, y, -r,  r, y, r,  -r, y, r);
+      v.push(-r, y, -r,  r, y, r,  r, y, -r,   -r, y, -r,  -r, y, r,  r, y, r);
     }
     mistGeo.setAttribute('position', new THREEx.BufferAttribute(new Float32Array(v), 3));
     mistGeo.computeBoundingSphere();
@@ -894,7 +901,7 @@ export function createWeather(game) {
     if (mistRow.tide) {
       const api = wxApiOf(game);
       const wl = api && typeof api.waterLevel === 'number' ? api.waterLevel : mistRow.tide[0];
-      a *= 0.4 + 0.6 * clamp((wl - mistRow.tide[0]) / (mistRow.tide[1] - mistRow.tide[0]), 0, 1);
+      a *= 0.6 + 0.4 * clamp((wl - mistRow.tide[0]) / (mistRow.tide[1] - mistRow.tide[0]), 0, 1);
     }
     u.uAlpha.value = clamp(a, 0, 4);   // an optical depth, not a coverage
     u.uH.value = mistRow.h * (1 + rainT * wxMIST_RAIN_H);

@@ -8,26 +8,12 @@ async page => {
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
 
   const PLAN = {
-    venice: [
-      { tag: 'd', alpha: 4.0, tint: 0xdcd8cf, h: 0.7 },
-      { tag: 'e', alpha: 4.0, tint: 0x9aa0a6, h: 0.7 },
-    ],
-    goreme: [
-      { tag: 'a', alpha: 2.4, tint: 0xe8dfc9, h: 0.7 },
-      { tag: 'b', alpha: 2.4, tint: 0x8a7f8a, h: 0.7 },
-    ],
-    pantanal: [
-      { tag: 'a', alpha: 2.4, tint: 0xcfd6bc, h: 0.8 },
-      { tag: 'b', alpha: 3.2, tint: 0xcfd9d6, h: 0.8 },
-    ],
-    drift: [
-      { tag: 'a', alpha: 2.4, tint: 0xbdb2d6, h: 0.8 },
-      { tag: 'b', alpha: 3.2, tint: 0x8d82ad, h: 0.8 },
-    ],
-    monaco: [
-      { tag: 'a', alpha: 2.0, tint: 0xb9c6cc, h: 0.6 },
-      { tag: 'b', alpha: 2.8, tint: 0x6a7ea0, h: 0.6 },
-    ],
+    iceland:  [ { tag: 'a', alpha: 0.22, tint: 0xb9c6cc, h: 0.8 }, { tag: 'b', alpha: 0.38, tint: 0xb9c6cc, h: 0.8 } ],
+    venice:   [ { tag: 'a', alpha: 0.25, tint: 0x9aa0a6, h: 0.7 }, { tag: 'b', alpha: 0.40, tint: 0x9aa0a6, h: 0.7 } ],
+    goreme:   [ { tag: 'a', alpha: 0.25, tint: 0xe8dfc9, h: 0.7 }, { tag: 'b', alpha: 0.40, tint: 0x8a7f8a, h: 0.7 } ],
+    pantanal: [ { tag: 'a', alpha: 0.25, tint: 0xcfd6bc, h: 0.8 }, { tag: 'b', alpha: 0.40, tint: 0xcfd6bc, h: 0.8 } ],
+    drift:    [ { tag: 'a', alpha: 0.25, tint: 0xbdb2d6, h: 0.8 }, { tag: 'b', alpha: 0.40, tint: 0xbdb2d6, h: 0.8 } ],
+    monaco:   [ { tag: 'a', alpha: 0.20, tint: 0xb9c6cc, h: 0.6 }, { tag: 'b', alpha: 0.35, tint: 0x6a7ea0, h: 0.6 } ],
   }
   const out = { errs, rows: [] }
 
