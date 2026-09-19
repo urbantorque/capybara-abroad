@@ -541,6 +541,87 @@ top fifth is made of.
 
 - **`game.state.noSky2`.**
 
+**Built (20 Sep 2026; `b1689e9`, `8668c6f`, `f8d7308`, `0acbbdd`).** Two
+terms in the shared dome's FRAGMENT, injected by `skyDomeLit`'s hook
+(shared.js, above `sky2CloudTick`), so every dome that goes through the hook
+carries them and they cost the dome's fill and nothing else:
+
+- **The band.** Two octaves of value noise (the dome's own hash, not
+  grain's) on the view direction projected onto a flat layer at unit height
+  (`sd.xz / sd.y`) — perspective compresses the deck toward the horizon for
+  free — a coverage ramp `lo..hi`, an elevation band `bandLo..bandHi` (sin
+  of elevation), base colour at the bottom of the band and in a thick
+  cloud's belly, tint at the top. The drift is an offset in cells
+  accumulated off `game.weather.gust()` at 0.004 cells/s per m/s, so the
+  deck and the flags move together; 0.2-0.4 cells over 20 s of world.
+- **The disc.** A smooth 1.6° disc and a `pow` halo round `sysAxDir` — the
+  SAME axis and 0.92·far point `sysRaysSource('sun')` projects, so the rays
+  row and the disc cannot disagree — in `sun.color` × 2.3 (over 1.0 so the
+  bright pass takes it), zero below the horizon. It sits under
+  `skySunMesh`'s three-degree card; the halo is what the card never had.
+- **`sysSKY2`** in systems.js beside `sysSKY_OWN`: `{ lo, hi, band, scale,
+  tint, base, gain, sun: { k, p, r } }` for sahara, pantanal, palawan, cali.
+  A chapter with no row drives k and the disc to 0 in one uniform branch
+  (skipped, never freed). Cut by `noSky2`, parked from rung 1, swept by
+  `state.sky2K`, read by `game.sky2Audit()` (every uniform, the disc's
+  NDC). Sahara's storm flattens the deck and its dusk sets the disc; the
+  Pantanal's dusk warms the tint with `sysPAN_DUSK_C`; Cali's night dims
+  both; under water both go.
+
+Verification `qa/wow-sky.js`, one chapter a run, pretty pinned, dt = 0 arms
+grabbed synchronously (the on/on floor ≤ 0.02 % everywhere), the diff in
+three masks — the top fifth, the 20-40 % band, the bottom 60 % (the
+control) — and a second frame faced at the sun by rotation alone:
+
+| chapter | top fifth on/off | 20-40 % | bottom 60 % (floor) | faced at the sun (frame / centre 0.12 h) |
+|---|---|---|---|---|
+| Sahara | 34.1 % @ 15.6 | 0.00 % | 0.00 % (0.01) | 32 % @ 26 / 96 % @ 78 — the disc through the dust, a ~15° aureole (p 60) |
+| Palawan | 22.9 % @ 13.5 | 5.6 % @ 8.7 (sky to 37 % of frame) | 0.02 % (0.02) | 24.6 % @ 21.9 / 97 % @ 51.5 — a 5° halo (p 300), the deck's top edge under it |
+| Cali | 36.3 % @ 22.4 | 0.11 % @ 3.6 | 0.00 % (0.00) | 13.7 % @ 25.7 / 96.5 % @ 68.6 — the disc behind the ceiba canopy |
+| the Pantanal | 55.3 % @ 21.6 | 0.61 % @ 3.3 | 0.00 % (0.01) | — (no disc: the chapter crosses into its own dusk) |
+| Kyoto (control) | 0.00 % at 8 yaws | 0.00 % | 0.01 % (0.01) | — |
+| Cali at `pf: 2` (rung 3) | 0.04 % (floor 0.14) | 0.00 % | 0.00 % | k 0, disc 0: parked |
+| Goreme | 0.00 % at 8 yaws | 0.00 % | 0.00 % | shared dome hidden (`sysSKY_OWN`), no row |
+
+Read by eye: soft cloud shapes with soft edges, lit tops and darker bellies,
+no lattice, nothing on the ground, the riads, the sand or the church; the
+puffs (M1) still theirs; the far water in the Pantanal mirrors the deck
+(A1's reflection carries the dome — that is the term, not a leak). 0 errors
+in every run. Frame time not measured (five agents' browsers on the
+machine; the OFF arm never sat at 16.7).
+
+**What was learned, and what is owed.**
+- **Two of the six own their sky.** The Drift and Goreme are in
+  `sysSKY_OWN`: the shared dome is hidden there. The Drift has NO dome at
+  all — stars, a moon and opaque cumulus banks in drift.js — so there is no
+  fragment to add a term to, and it already has the most opaque clouds in
+  the game. Goreme's dome, disc and four glow shells are `gorBuildSky`'s
+  (goreme.js, a chapter file). Every dome through `skyDomeLit` gets the
+  hook, so Goreme is one line in its own file — `skyDomeLit(m)` on the
+  dome's material — plus a `sysSKY2.goreme` row in the dawn's tones.
+  **Owed to the chapter.**
+- **The cut is a switch, not a target.** The first cut drove the damped k
+  to zero and let it walk back at `1 − exp(−λ·dt)`, which at a probe's
+  dt = 0 is never: the third sun-facing shot equalled the off shot exactly
+  and the "on/off" 36 % it reported was the composite's own state moving
+  across the tick between the arms. The cut is a multiplier on the output;
+  the damp is for the arrival.
+- **The halo saturates before it reads.** 0.55 of a 2.3 disc colour at
+  p 30 whited out ten degrees of a sun-facing frame (a 280-px blob at 1280
+  wide); p 5 was a flat lift of the whole sky — a grade, not a halo. 0.35
+  and p 60 (Sahara's dust), p 300 elsewhere.
+- **The walking lens never frames the disc.** 41-61° suns against a +7°
+  top edge: in the resting frame the disc is a thing you see when the
+  camera pitches — the jetpack, a marquee shot, the balloon. Sahara's
+  `sysRAYS` row seeds off the same axis and still gates on in-frame, so A4's
+  "Sahara cannot be framed" stands; a lower sun is not this pass's to move.
+- **The arrival lens is not deterministic.** Sahara arrived at yaw 2.54 (the
+  plaza, 36 % sky) on one run and 1.49 (a riad wall, 0 %) on the next; the
+  probe sweeps 45° steps until the top fifth holds sky.
+- **A flat deck streaks at the horizon.** The projection is right and reads
+  wrong under ~6°: the Pantanal's first row at lo .50 from 4.6° was
+  near-overcast with horizontal streaks (75 % @ 29); lo .56 from 6.3°.
+
 ## Part A′ — what the reference asks for that the law allows (added 19 Sep 2026)
 
 Two reference frames were put beside the game (a smooth-shaded stylised

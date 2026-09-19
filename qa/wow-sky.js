@@ -22,10 +22,11 @@ async page => {
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
 
-  const CHAPTER = 'pantanal'
+  const CHAPTER = 'sahara'
+  const PF = 1   // 1 = pretty pinned (rung 0, the term live); 2 = fast pinned (rung 3): the term must park at 0
   const out = { errs, chapter: CHAPTER }
 
-  await page.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('capy3.prefs.v1', JSON.stringify({ v: 1, pf: 1 })) } catch (e) {} })
+  await page.addInitScript((o) => { try { localStorage.clear(); localStorage.setItem('capy3.prefs.v1', JSON.stringify({ v: 1, pf: o })) } catch (e) {} }, PF)
   await page.setViewportSize({ width: 1280, height: 760 })
   await page.goto('http://localhost:5188/')
   await page.waitForTimeout(5200)
