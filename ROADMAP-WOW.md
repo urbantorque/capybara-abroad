@@ -1,4 +1,4 @@
-# ROADMAP-WOW — the third beauty pass: reflections, the foreground, grass, still pixels, the model sheet, the living made round, and nineteen beats (19 Sep 2026)
+# ROADMAP-WOW — the third beauty pass: reflections, the foreground, grass, still pixels, the model sheet, the living made round, nineteen beats, and a detail pass on the six weakest (19 Sep 2026)
 
 The brief: every chapter noticeably more beautiful — "like 40 % better,
 smoother-looking graphics and more wow factor." LIFT10's audit
@@ -965,6 +965,68 @@ shared roster elsewhere.
   uplift is its own item in W4 (capybara.js, one agent, first).
 - **`qa/rv-geom.js`'s baseline is invalidated by any geometry change**
   — re-baseline after W4, not before, and say so in the commit.
+
+## Part D — the detail, aesthetics and depth pass on the weaker chapters (added 19 Sep 2026)
+
+*Player: "add another detail, aesthetics and depth pass on some of the
+weaker biomes visually — to execute and complete as part of this
+refinement roadmap."*
+
+Which chapters are the weaker ones is decided by the sheet, not by
+taste: the nineteen raw arrival frames in W0 (`qa/WOW-*-hero-arrive.png`),
+the corrected depth bins (`qa/l10-depth-sweep.json.png`) and the roster
+shots. Six read thinnest, each for a nameable reason, and none of the
+reasons is a grade, a sun or a fog row (LIFT10's audit stands — nothing
+here re-bases a dial):
+
+| # | chapter | what the sheet showed | what is thin |
+|---|---|---|---|
+| 8 | Sahara | a flat orange plane, six stalls, cone-headed pillars; the Koutoubia not in the arrival frame | detail: the square has no floor pattern, no rugs, no awnings' shadow; depth: nothing between the stalls and the horizon; the hero is behind the lens |
+| 7 | Iceland | a row of one-hex boxes with square yellow windows on a dark street; the church behind the lens | detail: no window frames, sills, corrugated-iron ribs, doorsteps, drainpipes — the things Laugavegur's houses are made of; depth: the street ends in dark |
+| 13 | Goreme | round envelope blobs, a rail across the bottom of frame, one lit stall | detail: the fairy chimneys read as blobs, the envelopes as spheres with no gores; depth: the field is two planes |
+| 10 | Venice | a flat grey colonnade under a flat grey sky, statues on the parapet the one good detail | detail: the columns have no capitals or bases, the arcade no keystones, the flood-line no algae mark; depth: the Basilica is a box at 83 m |
+| 16 | the cave | dark, green blobs, a beach of cones | detail: the wall is one value (measured in L7: 91 % of blocks sd < 2); depth: exempt on far by the audit, must show a lit far layer instead — the A1 river reflection carries that |
+| 14 | Manly | a good frame, thin near the animal: the crossing, a bin, a wall | detail: the promenade wall is one slab; the pines are the chapter's best thing and are far; depth: the near plane is a crossing |
+
+### What "a detail pass" builds, per chapter — the same three moves everywhere
+
+1. **Secondary forms on the built things in the arrival frame** (Part
+   C's own rubric, "a hero needs at least THREE sub-shapes that read at
+   distance"): window frames and sills, a cornice or eave, a base
+   course, a roofline break, a door with a step — merged into the
+   chapter's own building merger (no new materials, no new draw calls:
+   `jitter` and the bay-and-course treatment the Quay's apron already
+   has), PALETTE colours already in that chapter's file.
+2. **The ground given something to be** — a rug row and a paving
+   pattern in the square (Sahara), a drain line and kerb (Iceland), a
+   gravel apron round the launch field (Goreme), the algae mark at the
+   flood line (Venice, via `grain()`'s `shore` — already written,
+   Venice may already ask), a strand line of kelp and shells (Manly),
+   the cave's wall given its rock term (`grain(..., { rock })` — L7
+   wrote it for exactly this wall).
+3. **A middle plane** where the depth bins say there is none: a second
+   row of stalls and a caravan silhouette at 40 m (Sahara — the caravan
+   accessor `g.sahara.caravan()` exists), a harbour crane and masts
+   past the street's end (Iceland), the far chimneys as a ridge line
+   (Goreme), the campanile of San Giorgio across the Bacino (Venice —
+   one silhouette, 140 m, the chapter's own comment names it), the
+   shaft's lit column visible from the passage (the cave — A1's row),
+   the point's headland with the Norfolk row on it (Manly).
+
+### Rules, and how it is measured
+
+- Additive only: no chapter loses a thing it has; no grade, sun, fog,
+  mote or spawn row moves (LIFT10). Budget: ≤ +6 k triangles and ≤ +1
+  draw call per chapter, stated in the commit.
+- Measured three ways, before and after, per chapter: the corrected
+  depth bins (`qa/l10-depth-sweep.js` — mid+far share must RISE),
+  the arrival frame re-shot (`qa/wow-sheet.js`'s hero-arrive frame)
+  and read by eye against the W0 original, and `npm test` green.
+  The rubric's silhouette and secondary-forms reads on the hero
+  structure go from fail to pass or the chapter is not done.
+- One agent per chapter file, disjoint from the wave running beside it;
+  lands in **W4** alongside Part C's uplifts, closes in W5 with the
+  rest.
 
 ## Order and ownership
 
