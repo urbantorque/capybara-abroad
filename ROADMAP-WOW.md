@@ -1060,6 +1060,25 @@ frame or it is not a beat.
   in frame — a ground field looked at from 3 m up wastes half a 26 m box
   beside and behind the lens. The frame: lilac flecks skittering low across
   the lawn round the animal, the crown as foreground, the decals under them.
+- **Kyoto — lantern light pooled on wet stone under the eaves: NOT SHIPPED,
+  a finding.** kyoto.js has no emissive material anywhere: the forty Gion
+  globes are unlit paper (`mat(PALETTE.paperLantern)`), the chapter is
+  "Sakura Sunshower" — overcast DAY — and the spill pool (`sysSpillScan`)
+  is fed by emissive materials over 0.10 luminance, so there is nothing for
+  it to pool. Measured rather than assumed (`qa/wow-kyoto-lanterns.js`, an
+  own emissive of 0.30 on the globes for one run, then reverted): the scan
+  found 20 two-lantern clusters, 15 in the arrival frame, each with the
+  sign-bank reach of 22 m (`sysSPL_REACH0/1` 14–26 by cluster weight); the
+  `noSpill` cut against a two-frame motion control moved 82 % of the frame
+  by a mean of 47 levels and 96 % of the lower half by 54 — the whole lane
+  re-graded warm, the Iceland failure the spill's own note records ("the
+  lower half of the frame moved 99.8 % at a mean of 47 levels"), not pools
+  under the eaves. What it needs is not in this agent's files: a
+  `sysSPL_REACH_BY.kyoto` of about 4 m (a chochin's pool on a lane, as
+  Iceland's 7 is a sodium head's on a road) in systems.js, and a decision
+  about lighting paper lanterns in a daylight chapter at all — Gion's are
+  lit at dusk, and Kyoto has no dusk. Left for the systems.js owner; the
+  probe is the instrument.
 
 ## Part C — the model sheet: structures, movers, NPCs and the animal, biome by biome (added 19 Sep 2026)
 
