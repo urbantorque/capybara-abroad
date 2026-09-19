@@ -576,9 +576,9 @@ cave, not Antarctica.
 - **Instrument:** `qa/wow-grass.js` — instances in frustum at arrival,
   the rAF A/B, and the still-diff (grass sway is INTENDED motion — mask
   it in `wow-still` the way motes are).
-- **.**
+- **`game.state.noGrass`.**
 
-**SHIPPED (19-20 Sep 2026), eight chapters, .** One
+**SHIPPED (19-20 Sep 2026), eight chapters, `src/grass.js`.** One
 InstancedMesh of four-blade fans (one triangle per blade, no alpha),
 6000 allocated, in a 24 m box around an anchor 2 m ahead of the animal
 along the lens, relaid only when it has moved 3 m (the mote field's
@@ -592,21 +592,22 @@ face that fails the hue gate must be kept as a BLOCKER, not dropped
 under them, at the same height — the first frame grew a lawn through
 the flagstones); and plain-material opaque meshes are blockers too. A
 blade whose ground hit has a blocker within −0.05/+0.5 m does not grow.
-The gate is grain()'s  with a per-row floor and a short
+The gate is grain()'s `g - max(r, b)` with a per-row floor and a short
 ramp (full at floor + 0.03: the Pantanal's olive at d = 0.066 read 38 %
 on a ramp to 0.10). **The Drift's grass is not violet-grey** — that is
 its rock and the cloud deck, and a violet gate stood 974 fans on the
 cloud 30 m down; driGrass 0x4e7a68 is a night blue-green (d = 0.055),
 on the green gate at 0.015. Iceland's moss (d = 0.10) and Goreme's vine
 and scrub (0.11, 0.05) pass the same gate; no tussock/dry tone test was
-needed. Sway from , trample from a 16-point
+needed. Sway from `game.weather.gust()`, trample from a 16-point
 uniform ring of foot positions with the velocity they were laid with,
 fade by shrinking the blade, all in the vertex shader; mat() with
 vertexColors on a clone, the rim/shade hook chained first, the fragment
 normal forced back to up because DoubleSide flipped it and half the
-blades read grey. customProgramCacheKey begins  so masks it as intended motion. Rung 1 halves, rung 2 parks, noGrass cuts.
+blades read grey. customProgramCacheKey begins `swayD` so `wow-still`
+masks it as intended motion. Rung 1 halves, rung 2 parks, noGrass cuts.
 
-Per chapter (, one per run; standing / in frustum at
+Per chapter (`qa/wow-grass.js`, one per run; standing / in frustum at
 arrival, lower-half on/off diff): Sydney 4148/2681, 7.5 % · Pasto 0 at
 the plaza (correct), 2777/2106 from the pasture, 8.0 % · Pantanal
 2633 (the road), 3423/2852 from the verge, 2.5 % · Drift 2662/2577,
