@@ -1633,11 +1633,24 @@ function driBuildLampflies(root) {
   // renders BLACK, which is how forty-six lampflies became forty-six holes in
   // the orchard. Merge one octahedron so it has a white colour attribute, and
   // the per-instance tint has something to multiply.
-  const flyGeo = (() => { const F = driMerger(); F.oct(0, 0, 0, 1, 0xffffff, 0, 0, 0); return F.build(); })();
+  // ---- AND IT IS TWO TONES (ROADMAP-WOW Part C, the movers uplift). One
+  // hex from end to end is the rubric's bollard, and a lampfly was one
+  // octahedron of light. A firefly is a DARK insect with a lit abdomen: a
+  // half-size head in the rock's dark on the body's +z, so every fly has an
+  // end that does not glow. instanceColor multiplies BOTH — the head goes
+  // dark gold on a woken fly and dark violet on a sleeping one, which is
+  // the right read: the light changes, the animal does not.
+  const flyGeo = (() => {
+    const F = driMerger();
+    F.oct(0, 0, 0, 1, 0xffffff, 0, 0, 0);
+    F.oct(0, 0.04, 0.58, 0.48, PALETTE.driRockDark, 0, 0, 0);
+    return F.build();
+  })();
   driFlyMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95 });
   const im = new THREE.InstancedMesh(flyGeo, driFlyMat, driFLY_N);
   im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(driFLY_N * 3), 3);
   im.frustumCulled = false;
+  im.name = 'driLampflies';   // the probes read a fly's pose off it (qa/wow-movers2.js)
   driFlyMesh = im;
   root.add(im);
 
@@ -4868,6 +4881,15 @@ function driUpdateLampflies(game, dt) {
     const since = t - driFlyData[o + 10];
     const flare = since >= 0 && since < 0.9 ? (1 - since / 0.9) * (1 - since / 0.9) : 0;
     const breathe = state === 0 ? 0.55 + Math.sin(t * 1.15 + ph) * 0.45 : 1;
+    // ...AND A WOKEN ONE BLINKS (ROADMAP-WOW Part C). Awake, every fly held
+    // one brightness for ever, so twelve following you read as twelve
+    // lamps on strings. Each has its own blink: a 2.4-3.4 s cycle off its
+    // own rate, lit for the top fifth of it (a flash, not a fade), so a
+    // constellation overhead twinkles out of step. A sleeping one keeps
+    // its breath — that IS its blink, slower. One sine on a loop that
+    // already runs per fly; nothing new is iterated.
+    const bl = state === 0 ? 0 : Math.sin(t * (1.6 + rate * 0.9) + ph * 3);
+    const blink = bl > 0.55 ? (bl - 0.55) / 0.45 : 0;
     // A SLEEPING ONE BREATHES IN SIZE, and it has to be big enough to see: the
     // old 0.30 + breathe * 0.06 is a six-centimetre swing on a thirty-three
     // centimetre object, which at fifteen metres is a pixel and a half. 0.26 to
@@ -4875,25 +4897,27 @@ function driUpdateLampflies(game, dt) {
     const s = (state === 1 ? 0.46 + Math.sin(t * 5 + ph) * 0.06
              : state === 2 ? 0.42 + Math.sin(t * 3.4 + ph) * 0.06
              : 0.26 + breathe * 0.24) * (1 + flare * 1.3);
+    // the body turns about its own up (the head sweeps) and only nods on
+    // the old x tumble, so the dark end stays an end and not a flicker
     driFlyMesh.setMatrixAt(i, driXform(driFlyData[o], driFlyData[o + 1], driFlyData[o + 2],
-                                       t * 0.7 + ph, t * 1.1 + ph, 0, s, s, s));
+                                       Math.sin(t * 0.7 + ph) * 0.35, t * 1.1 + ph, 0, s, s, s));
     if (driFlyMesh.instanceColor) {
       // AND A SLEEPING ONE IS STILL A LIGHT. Dimmed to a third, driFlyDim
       // (0x9a8fb0) resolves to almost exactly the value of this chapter's sky,
       // and twenty-two lampflies in the orchard vanished. What separates asleep
       // from awake here is not brightness, it is TEMPERATURE: cold violet
       // against warm gold. Keep both bright and let the hue do the work.
-      const lit = state === 0 ? 0.85 + breathe * 0.35 : 1 + flare * 0.9;
+      const lit = state === 0 ? 0.85 + breathe * 0.35 : 0.72 + blink * 0.75 + flare * 0.9;
       driFlyCol.copy(state === 0 ? driFlyDimC : driFlyColour).multiplyScalar(lit);
       driFlyMesh.instanceColor.setXYZ(i, driFlyCol.r, driFlyCol.g, driFlyCol.b);
     }
     // the halo: same place, three times the size, a fifth of the strength, and
     // it swells with the breath rather than with the body
     if (driFlyHalo) {
-      const hs = s * (2.2 + breathe * 0.9);
+      const hs = s * (2.2 + breathe * 0.9 + blink * 0.8);
       driFlyHalo.setMatrixAt(i, driXform(driFlyData[o], driFlyData[o + 1], driFlyData[o + 2],
                                          0, t * 0.3 + ph, 0, hs, hs, hs));
-      driFlyCol.multiplyScalar(state === 0 ? 0.19 + breathe * 0.10 : 0.30 + flare * 0.4);
+      driFlyCol.multiplyScalar(state === 0 ? 0.19 + breathe * 0.10 : 0.20 + blink * 0.28 + flare * 0.4);
       driFlyHalo.instanceColor.setXYZ(i, driFlyCol.r, driFlyCol.g, driFlyCol.b);
     }
   }

@@ -102,7 +102,7 @@ async page => {
   }
 
   // ---- the rows ----
-  const RUN = ['hanoi']
+  const RUN = ['drift']
   const errAt = () => errs.length
 
   for (let ci = 0; ci < RUN.length; ci++) {
@@ -216,6 +216,47 @@ async page => {
       rec.wheels = { w0, w1, cub: await page.evaluate(() => { const c = window.__capy.hanoi.cub(); return { on: c.on, v: +c.v.toFixed(2) } }) }
       await shot('MOV2-hanoi-4', C, [5.0, 2.5, 2.4, 0.7, 34])      // the play angle, behind-above
       await page.keyboard.up('KeyW')
+    }
+
+    if (name === 'drift') {
+      // THE LAMPFLIES: fly 0 sleeps three steps from the spawn. Two frames
+      // 300 ms apart on it asleep (the breath, the dark head), then Q — a
+      // real key, the wheek — wakes it and it falls in overhead; two frames
+      // 300 ms apart on it awake for the blink, and a 3 s sampler of its
+      // instance colour so the blink is a number as well as a picture.
+      const L = (a) => { const b = window.__art.inst('driLampflies', a[5]); return b ? window.__art.ptShot(b.x, b.y, b.z, b.yaw, a[0], a[1], a[2], a[3], a[4]) : '' }
+      const col = (i) => { const m = window.__capy.scene.getObjectByName('driLampflies'); const c = m.instanceColor; return [+c.getX(i).toFixed(2), +c.getY(i).toFixed(2), +c.getZ(i).toFixed(2)] }
+      rec.asleep0 = await page.evaluate(() => ({ p: window.__art.inst('driLampflies', 0), n: window.__capy.drift.lampflies() }))
+      await shot('MOV2-drift-1', L, [2.4, 0.9, 0.5, 0.0, 30, 0])
+      await page.waitForTimeout(300)
+      await shot('MOV2-drift-2', L, [2.4, 0.9, 0.5, 0.0, 30, 0])
+      rec.asleepCol = await page.evaluate(col, 0)
+      // the spawn is 17 m from fly 0 today (the home's "three steps" comment
+      // is older than the spawn) and the wheek reaches 9.5: put the animal
+      // down 5 m from it, let it land, then Q
+      await page.evaluate(() => { const g = window.__capy, f = window.__art.inst('driLampflies', 0); const b = g.capy.body; b.position.set(f.x + 3.5, f.y - 0.4, f.z + 3.5); b.velocity.set(0, 0, 0); if (b.previousPosition) b.previousPosition.copy(b.position); if (b.interpolatedPosition) b.interpolatedPosition.copy(b.position) })
+      await page.waitForTimeout(1800)
+      rec.near = await page.evaluate(() => { const g = window.__capy, p = g.capy.position, f = window.__art.inst('driLampflies', 0); return { d: +Math.hypot(p.x - f.x, p.y - f.y, p.z - f.z).toFixed(1), grounded: !!g.capy.grounded } })
+      await page.keyboard.press('KeyQ')
+      await page.waitForTimeout(400)
+      rec.woke = await page.evaluate(() => window.__capy.drift.lampflies())
+      if (!rec.woke) { await page.keyboard.press('KeyQ'); await page.waitForTimeout(400); rec.woke = await page.evaluate(() => window.__capy.drift.lampflies()) }
+      await page.waitForTimeout(2600)
+      await shot('MOV2-drift-3', L, [2.4, 0.9, 0.4, 0.0, 30, 0])
+      await page.waitForTimeout(300)
+      await shot('MOV2-drift-4', L, [2.4, 0.9, 0.4, 0.0, 30, 0])
+      // the blink, sampled: the fly's instance-colour red channel every
+      // 100 ms for 3 s — a blink is a range with a flat floor and a peak
+      rec.blink = await page.evaluate(() => new Promise(res => {
+        const m = window.__capy.scene.getObjectByName('driLampflies'); const c = m.instanceColor
+        let mn = 9, mx = -9, n = 0; const rows = []
+        const t = setInterval(() => {
+          const r = c.getX(0); mn = Math.min(mn, r); mx = Math.max(mx, r); rows.push(+r.toFixed(2))
+          if (++n >= 30) { clearInterval(t); res({ min: +mn.toFixed(2), max: +mx.toFixed(2), rows }) }
+        }, 100)
+      }))
+      // the play angle: the capybara with its fly overhead
+      await shot('MOV2-drift-5', () => { const p = window.__capy.capy.position; return window.__art.cam(p.x + 4, p.y + 3.2, p.z + 6, p.x, p.y + 1.6, p.z, 40) && window.__art.render(window.__art.cam(p.x + 4, p.y + 3.2, p.z + 6, p.x, p.y + 1.6, p.z, 40)) })
     }
 
     rec.errs = errs.slice(e0)
