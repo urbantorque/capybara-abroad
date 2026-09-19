@@ -6690,7 +6690,10 @@ export function grain(m, opts) {
             ' + texture2D(uReflT, rUv + vec2(rTx.x, -rTx.y)).rgb + texture2D(uReflT, rUv + vec2(-rTx.x, rTx.y)).rgb) / 6.0;'
           : '    vec3 rC = texture2D(uReflT, rUv).rgb;',
         '    outgoingLight = mix(outgoingLight, rC, rW);',
-        m.transparent ? '    diffuseColor.a = mix(diffuseColor.a, 1.0, rW);' : '',
+        // Scaled by the sheet's own alpha: the Pantanal's flood fades to
+        // nothing at its shore through a vertex alpha, and a mirror that
+        // pushed that toward one would draw a hard sheet over dry grass.
+        m.transparent ? '    diffuseColor.a = mix(diffuseColor.a, 1.0, rW * diffuseColor.a);' : '',
         '  }',
         '}',
         '#include <opaque_fragment>',

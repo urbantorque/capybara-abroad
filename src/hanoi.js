@@ -852,7 +852,13 @@ function hanBuildLake(root) {
                                     { scale: 0.05, amount: 0.05, warp: 1.1,
                                       sparkle: 0.34, sparkleScale: 2.0, sparkleSpeed: 0.14,
                                       sparkleCut: 0.70, sparkleBand: 0.08, sparkleColor: PALETTE.hanTrim,
-                                      fresnel: 0.55 }));
+                                      fresnel: 0.55,
+                                      // ...AND A MIRROR (ROADMAP-WOW A1): the tower, Ngoc Son and
+                                      // the red bridge doubled. wobble 1 — the lake's own
+                                      // ripple is 2.5 cm and bends the picture hardly at all; the
+                                      // drifting term carries it, and at 1.4 the far shore's houses
+                                      // broke up into a band. See grain()'s reflect block.
+                                      reflect: { k: 1.0, pow: 1.0, wobble: 1.0, blur: 0 } }));
   m.receiveShadow = true; m.castShadow = false;
   m.frustumCulled = false;
   hanLakeMesh = m;

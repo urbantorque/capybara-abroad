@@ -8,7 +8,8 @@ async page => {
   // per-pixel diff inside the mask. Then the honest cost: reflectDraw +
   // post.render x 30 with a readPixels drain at each end, ten interleaved
   // reps, median per arm. Then the swim cut.
-  const CH = ['kyoto']
+  // ONE chapter per run (a run must finish in under four minutes on a loaded machine)
+  const CH = ['hanoi']
   const errs = []
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
@@ -50,6 +51,7 @@ async page => {
   const FRAME = {
     // yaw is frameShot's: the bearing from the animal to the lens, atan2(x, z), so 0 is a lens due south
     kyoto: { at: [26, 0.3, 19.5], yaw: 0, dist: 11, pitch: 0.34, raise: 1.4 },   // the pond's south shore, the pavilion across it
+    hanoi: { at: [20, 1.5, -16], yaw: 0, dist: 11, pitch: 0.30, raise: 1.6 },   // Hoan Kiem's south shore: the tower, Ngoc Son and the red bridge across it
   }
   const out = { errs, rows: {} }
   for (const name of CH) {
@@ -142,8 +144,9 @@ async page => {
     r.arrival = arrival
     out.rows[name] = r
     // ---- the swim cut: the animal into the water, E held for the dive --------
-    if (name === 'kyoto') {
-      await page.evaluate(() => { const b = window.__capy.capy.body; b.position.set(26, -0.2, -2); b.velocity.set(0, 0, 0); if (b.interpolatedPosition) b.interpolatedPosition.set(26, -0.2, -2) })
+    const SWIM = { kyoto: [26, -0.2, -2], hanoi: [0, -0.3, -58] }
+    if (SWIM[name]) {
+      await page.evaluate((p) => { const b = window.__capy.capy.body; b.position.set(p[0], p[1], p[2]); b.velocity.set(0, 0, 0); if (b.interpolatedPosition) b.interpolatedPosition.set(p[0], p[1], p[2]) }, SWIM[name])
       await page.waitForTimeout(2500)
       const swim = await page.evaluate(() => { const g = window.__capy, c = g.capy; return { swim: !!c.swimming, dive: !!c.diving, pos: c.position.toArray().map(v => +v.toFixed(1)), y: +c.position.y.toFixed(2), camY: +g.camera.position.y.toFixed(2), info: g.reflectInfo() } })
       await page.keyboard.down('KeyE')
