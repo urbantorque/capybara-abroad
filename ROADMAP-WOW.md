@@ -464,6 +464,40 @@ draw calls, a few instructions per ground fragment.
   cloud term's own A/B harness.
 - **`game.state.noDapple`.**
 
+**SHIPPED (19 Sep 2026), four chapters.** `grain(ground, { dapple: {
+cells, k, scale } })` in shared.js: at most eight `(x, z, r)` circles baked
+into the fragment source as constants (crowns do not move — no uniform
+pool), a soft disc per crown (full inside 0.7 r, gone at r, combined by
+max), two octaves of `grNoise` at 3.2 cells/m thresholded
+`smoothstep(0.34, 0.62)`, one multiply on the albedo by `1 - dap * k`; the
+sample drifts on the cloud's own accumulated wind (`_cloudP` bound a third
+time as `uGrDapDrift`, independent of the rim branching, because a ground
+material is rimmed and never saw `uGrCloudP`). In both cache keys. Zero
+draw calls, zero geometry. Sydney: the eight figs nearest the spawn
+(`envDAPPLE_FIGS`, r 4.6). Pantanal: the mango tree and seven capoes
+(`panDAPPLE`; the gallery forest is `rand()`-placed and cannot be named).
+Kyoto: the four sando maples, from one table (`kyoSANDO_MAPLES` — the
+build now reads its trunk positions from it). Manly: eight Norfolk pines,
+on the terrain AND on the verge mesh whose turf slabs cover every
+footprint (a dapple on the terrain alone measured 0.65 %). Cali skipped
+(its file was busy).
+
+**The cut is `dappleSet(on)` in shared.js** (a shared `uGrDapK` uniform, 0 is
+an exact cut). Nothing in src reads `game.state.noDapple` yet — that wire is
+one line in systems.js for W5; the probe calls the setter directly.
+
+Verified live (`qa/wow-dapple.js`, one chapter a run, pretty pinned, an own
+camera 6 m off the footprint, on/off in one evaluate, each pixel's ray met
+with the ground plane — inside the circle / a control annulus at 1.15–2 r):
+Sydney 53.6 % moved, mean 13.2 / control 0.00; Pantanal 24.7 %, 5.7 / 0.00
+(understory quads in the mask); Kyoto 60.9 %, 7.6 / 1.38 (the flat-plane
+mask on rolling ground, not the shader); Manly 32.7 %, 7.8 / 0.00. Zero
+console errors. Every ON frame read by eye: 30–50 cm shade blobs on the
+ground under the crown, nothing outside the circles, no lattice.
+
+Found on the way, not fixed: Kyoto's first sando maple (−19.5, 41.7) stands
+inside the southern machiya row.
+
 ### G3 — GROUND MIST
 
 The second reference frame is three layers of mist with trees dissolving
