@@ -637,6 +637,24 @@ shoulders, hem and placket are boxes and stay crisp, which is right:
    jacaré, the jabiru, the heron, the koi** — each is checked on the
    sheet (W0) for which of its parts are spheres and which are boxes
    that should be, and rounded on the same rule. Wings stay planar.
+   *Landed 19 Sep 2026 for npc.js's own kinds — the ibis, the gull, the
+   llama, the Pasto and Quay dogs: the animals' instances take
+   `matRound(PALETTE.sail, {vertexColors})` through a `round` argument to
+   `mkInst` (the people's and props' `instMat` is untouched — ONE PERSON
+   decides theirs), and on a part list the GEOMETRY decides: sphere and
+   cylinder parts carry smooth normals through `toNonIndexed` and go
+   round, every box part stays hard. `npcMakeGeo`'s `sph` takes
+   `sx/sy/sz` semi-axes now, and the dog's and the llama's skull boxes are
+   spheres of the same silhouette with the snout, face block and ears
+   still boxes on them. `game.state.noRound` is live — one material swap
+   per animal instance on the edge, polled in `update()`; no recompile,
+   since the flat and round materials both already exist. Segment count
+   unchanged (6×4): the read is the seams going, not the silhouette.
+   Sheet: `qa/wow-round-animals.js`, flat/round pairs from the front
+   quarter and the side (`RND-*`), 0 console errors. NOT on it: the
+   gentoos (antarctic.js), the herd (pantanal.js), the koi and heron
+   (kyoto.js), the puffins (iceland.js), the pigeons (venice.js,
+   goreme.js) — chapter-file animals, same rule, their own agents.*
 5. **The law is amended in CONTRACT.md's "Aesthetic law" when this
    lands**, in one line: *flat-shaded for the built world; smooth
    normals for anything that breathes.* Written down, not inferred.
@@ -1032,8 +1050,11 @@ the first four reads to repeat).
   as one extra `c`-banded fan each), a pennant on every hull.
   *Landed 19 Sep 2026 for the six whose files were free — see "The
   movers uplift" under "The sheet said" below: condor, ferry, party bus,
-  helicopter, manta + bangka, orca pod. The red car, the scooters, the
-  frigatebird and the balloon are in files other agents hold this round.*
+  helicopter, manta + bangka, orca pod. Batch 2, same day, see "The
+  movers uplift, batch 2": the frigatebird (both the ridden bird's plume
+  and the nine ambient fragatas), the red car (all four tourers), the
+  pho scooter (the traffic stays instanced), the lampflies. The balloon
+  is goreme.js's and still open.*
 - **Heroes:** secondary forms where a hero is one box — window bands,
   a cornice, a base course, a roofline break — reusing the merger's
   `jitter` and the beauty pass's bay-and-course treatment (the Quay
@@ -1195,6 +1216,77 @@ errors in every row):**
   the post and the OLD sheet is what you read.
 - **`qa/rv-geom.js`'s baseline** is invalidated by all six commits; not
   re-baselined (the rule below).
+
+**The movers uplift, batch 2 (19 Sep 2026, four chapters;
+`qa/wow-movers2.js` on the same two-frame own-camera pattern, one
+chapter per run, 0 console errors in every row):**
+
+- **Rio, the frigatebird** (`rio.js`): the marquee bird is condor.js's
+  model on Rio's plume, so d8e3052's five fingers and trailing fan were
+  already on it — and INVISIBLE, because the finger band is `wing`
+  inboard / `body` outboard and Rio's two blacks were five grey units
+  apart (0x14161a / 0x1b1d22). `body` is 0x352a24 now, a frigatebird's
+  brown alar bar: the band reads, and the torso reads against the wing
+  from the passenger's own camera. The nine ambient fragatas (one
+  InstancedMesh) get five baked two-tone fingers a wing, rooted along
+  the chord — all five from one point overlapped back into a paddle on
+  the first sheet — and the FORK is a moving part: its own instanced
+  mesh hinged at the tail root, scissoring on a 1.1 rad/s cycle per bird
+  (scale.x 0.55..1.05) and spreading and pitching up on the beat. **Two
+  findings, both older than this pass:** the baked fork's blades
+  CONVERGED aft (a +s yaw where a fork needs -s: a spike, not a fork),
+  and the birds circled BROADSIDE — `rioUpdateBirds` added a quarter
+  turn to the heading nobody needed, and at 40 m a W is symmetric enough
+  that nobody saw it. Heading vs velocity is 0.17 rad now (was ~1.57),
+  measured off the instance matrix over 300 ms; the bank was re-read
+  dead astern after the first guess at its sign had the right wing up
+  in a right-hand circle. The outer wing panel was also a 13 cm step
+  under the inner one — invisible from above, a gap from the side.
+  condor.js untouched: the ridden bird's tail stays the condor's fan,
+  not a fork — that hook (a `plume.forkTail`) is a condor.js edit and
+  not this agent's.
+- **Monaco, the red car** (`monaco.js`): the wheels were baked into all
+  four tourers. One mesh PER AXLE now (two draw calls a car, not four),
+  hung off the group rather than the leaning body mesh so they stay on
+  the road through the hairpin, spun by the lap-distance delta over the
+  0.36 m radius (`monCarSpin`; the seam is a wrap, a jump over 20 m is a
+  re-place), with a hub-coloured lug on each rim. Measured: 73.0 → 114.8
+  rad in 300 ms at 31.8 m/s, which is 15.1 m / 0.36. A rear wing on two
+  struts with end plates in the STRIPE colour (marble on the red car,
+  gold on the blue). A helmet in the stripe colour with a dark visor and
+  shoulders: the pack's drivers in the seat at x -0.36, the red car's
+  on the passenger side, clear of the well the animal drives from.
+  Instrument: at the start the pack is bunched, and the "starboard side"
+  frame of the red car had the silver car between it and the lens.
+- **Hanoi, the scooters** (`hanoi.js`): the Cub's two wheels out of the
+  merge (tyre, chrome hub, lug), spun by `hanCubV * dt` over 0.30 m (v is
+  signed, she backs up), and the FRONT one yaws with the bars (0.27 rad
+  with A held, 'YXZ' so the steer sits outside the spin); a chrome fork
+  and swingarm where they used to meet the body. The 240 traffic
+  scooters stay six instanced merges — a wheel per instance is not
+  wanted, and the rider-head-turn row is SKIPPED: their heads are baked
+  into the merge and there is no per-rider head channel (npc.js's gaze
+  is the capybara's, who IT looks at). Instrument: three seconds of W
+  from the stall puts her into the shophouses; the first from-ahead
+  frame was taken from inside a wall.
+- **The Drift, the lampflies** (`drift.js`): awake, every fly held one
+  brightness for ever, so twelve following read as twelve lamps on
+  strings. Each blinks on its own rate and phase now — a 2.4–3.4 s cycle,
+  lit for the top fifth, a flash not a fade; sampled at 100 ms on the
+  instance colour: flat at 0.72 for 1.1 s, 1.47 at the peak, flat again
+  — and the halo swells with it. A sleeping one keeps its breath, which
+  is its blink. And a half-size head in the rock's dark on the body's
+  +z, so a firefly is a dark insect with a lit abdomen (instanceColor
+  multiplies both: dark gold awake, dark violet asleep). The x tumble is
+  a nod, so the dark end stays an end. One sine more on a loop that
+  already ran per fly; no new draw call. Instrument: the spawn is 17 m
+  from fly 0 today and the wheek reaches 9.5 — the home's "three steps
+  from where you wake up" comment is older than the spawn.
+- **Budget, batch 2:** one draw call (the fork mesh) and nine matrices a
+  frame in Rio; two meshes a car in Monaco (eight) and two on the Cub,
+  each a rotation on an object that already moved; nothing new
+  iterated in the Drift. **`qa/rv-geom.js`'s baseline** is invalidated
+  by all four commits and by G5's two head conversions; not re-baselined.
 
 - **W4 — the uplifts**, per chapter file, alongside Part B's beats and
   Part A′'s G5 — same files, same agent per chapter. The animal's own
