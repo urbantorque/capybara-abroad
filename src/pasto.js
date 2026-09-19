@@ -1409,7 +1409,16 @@ const pastoBUNT_COL = [PALETTE.awning1, PALETTE.awning2, PALETTE.awning3, PALETT
  *
  * One pooled body, twelve shapes.
  */
-function pastoBuildBunting(game, parts) {
+// ROADMAP-WOW Part B, Pasto's beat: THE FLAGS CAST, THE CORDS DO NOT. The
+// measured artefact above is the CORD's — a 5 cm line thinner than a texel —
+// and it stays a non-caster. A 46 cm flag eleven metres up is four or five
+// texels wide, and through the contact-hardening filter its shadow is a soft
+// coin on the paving, which is what a row of papel picado actually lays
+// across a square at noon. So the flags go to their own list and their own
+// casting mesh (one more draw call), `flags`; when no second list is handed
+// in, everything stays in `parts` exactly as before.
+function pastoBuildBunting(game, parts, flags) {
+  flags = flags || parts;
   const flagG = new THREE.ConeGeometry(0.5, 1, 3);
   const pb = pastoBody(game, 0);
   for (let r = 0; r < pastoBUNT.length; r++) {
@@ -1445,7 +1454,7 @@ function pastoBuildBunting(game, parts) {
       if (i === 0 || i === n) { prevY = y; prevT = t; continue; }
       // the flag: a triangle hanging point-down off the cord
       const c = pastoBUNT_COL[(i + r * 3) % pastoBUNT_COL.length];
-      pastoPart(parts, null, c, flagG, x, y - 0.24, z,
+      pastoPart(flags, null, c, flagG, x, y - 0.24, z,
                 Math.PI, yaw + 0.22 * Math.sin(i * 1.7), 0, 0.46, 0.48, 0.05);
       prevY = y; prevT = t;
     }
@@ -1498,9 +1507,12 @@ function pastoBuildPlazaFurniture(game, root) {
   root.add(pastoTownMesh(parts, 'pastoPlazaFurniture', true, true));
 
   // …and the sky over the square, in its own non-casting mesh. See PAPEL PICADO.
-  const bunt = [];
-  pastoBuildBunting(game, bunt);
+  const bunt = [], buntFlags = [];
+  pastoBuildBunting(game, bunt, buntFlags);
   root.add(pastoTownMesh(bunt, 'pastoBunting', false, false));
+  // the flags alone cast — see the note on pastoBuildBunting. Named, so a
+  // probe can cut the term by flipping castShadow on this one mesh.
+  root.add(pastoTownMesh(buntFlags, 'pastoBuntingFlags', true, false));
   oct8.dispose(); octOpen.dispose(); clump.dispose();
 
   // -- collision. One compound body for the fountain (two crossed boxes make a

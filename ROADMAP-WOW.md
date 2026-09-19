@@ -630,6 +630,20 @@ frame or it is not a beat.
 | 18 | Monaco | "across the basin at a hundred and thirty feet of somebody else's money, the terrace lit above it" | THE BASIN MIRRORED — the open item since the first pass; the terrace lights doubled and the yacht's own; the chandeliers' rays through the salt haze (A4) | A1, A4 | reflection diff over the basin mask |
 | 19 | Hanoi | "across the water at the tower and the red bridge" | HOAN KIEM MIRRORED (A1) — the tower, the bridge and the lanterns doubled; the shower's rain-slick road takes the Kowloon treatment while wet; a lantern string as foreground | A1, A2 | reflection diff over the lake mask |
 
+### Beats shipped (19 Sep 2026, running list)
+
+- **Pasto — the bunting's shadow.** Not by making the bunting cast: the
+  cord's non-casting was a MEASURED decision (`pasto.js`'s PAPEL PICADO
+  note — a 5 cm cord thinner than a texel threw scaffolding bars across
+  the paving) and it stands. The flags alone go to their own casting
+  mesh (`pastoBuntingFlags`, one more draw call, 1 044 triangles); the
+  cords and posts stay in the non-caster. `qa/wow-pasto-flags.js`: the
+  cast-vs-not diff shows the six runs as rows of soft coins across the
+  plaza (0.9 % of frame moved, faint by design — a 46 cm flag eleven
+  metres up through the contact-hardening filter is a soft dot, which
+  is what papel picado lays on a square at noon). Cut by flipping that
+  mesh's `castShadow`.
+
 ## Part C — the model sheet: structures, movers, NPCs and the animal, biome by biome (added 19 Sep 2026)
 
 *Asked for alongside Part A′: "another deep biome-by-biome review and
