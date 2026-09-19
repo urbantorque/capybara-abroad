@@ -12,10 +12,10 @@
 // grab. The uniform is read at draw time so the second frame is the OFF arm
 // with nothing else moved (dt = 0: no wind, no clock).
 //
-// THE DIFF IS INSIDE THE FOOTPRINT'S SCREEN PROJECTION — the circle at ground
-// height projected as a 48-gon, even-odd test per pixel — never a frame mean.
-// The CONTROL is the annulus from r to 2 r: a dapple that leaks past its
-// circle shows up there, and a non-floor number in the control is a bug.
+// THE DIFF IS INSIDE THE FOOTPRINT'S SCREEN PROJECTION — each pixel's ray met
+// with the ground plane, kept if it lands inside the circle — never a frame
+// mean. The CONTROL is the annulus 1.15 r .. 2 r: a dapple that leaks past
+// its circle shows up there, and a non-floor number in the control is a bug.
 // Both frames land as PNGs to be read by eye, which is the verdict.
 async page => {
   const errs = []
@@ -23,7 +23,7 @@ async page => {
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
 
   // EDIT THIS to the chapter under test. One per run.
-  const CHAPTER = 'sydney'
+  const CHAPTER = 'pantanal'
   const out = { errs, chapter: CHAPTER }
 
   await page.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('capy3.prefs.v1', JSON.stringify({ v: 1, pf: 1 })) } catch (e) {} })
@@ -50,32 +50,43 @@ async page => {
     const g = window.__capy, T = g.THREE
     const sh = await import('/src/shared.js')
     // ---- the ground, and its cells ---------------------------------------
-    let ground = null
+    // THE LIVE BIOME'S ground, not the first dappled mesh in the scene: every
+    // chapter's world sits in the one scene (capy3-shared-space-leaks), and
+    // the first run here read Sydney's lawn while standing in the Pantanal.
+    // Visible up the whole parent chain, then the mesh whose nearest cell is
+    // nearest the animal.
+    const cp = g.capy.position
+    function shown(o) { for (let p = o; p; p = p.parent) if (p.visible === false) return false; return true }
+    let ground = null, cell = null, best = 1e9
     g.scene.traverse(o => {
-      if (ground || !o.isMesh || !o.material || !o.material.userData) return
-      const c = o.material.userData.grainDapple
-      if (c && c.length && o.geometry && o.geometry.attributes.position.count > 2000) ground = o
+      if (!o.isMesh || !o.material || !o.material.userData) return
+      const cs = o.material.userData.grainDapple
+      if (!cs || !cs.length || !o.geometry || o.geometry.attributes.position.count < 2000 || !shown(o)) return
+      for (const c of cs) { const d = Math.hypot(c.x - cp.x, c.z - cp.z); if (d < best) { best = d; cell = c; ground = o } }
     })
     if (!ground) {
       const any = []
-      g.scene.traverse(o => { if (o.isMesh && o.material && o.material.userData && o.material.userData.grainDapple) any.push(o.geometry.attributes.position.count) })
+      g.scene.traverse(o => { if (o.isMesh && o.material && o.material.userData && o.material.userData.grainDapple) any.push([o.geometry.attributes.position.count, shown(o)]) })
       return { noGround: true, dappledMeshes: any, biome: g.biome.current }
     }
     const cells = ground.material.userData.grainDapple
-    const cp = g.capy.position
-    let cell = cells[0], best = 1e9
-    for (const c of cells) { const d = Math.hypot(c.x - cp.x, c.z - cp.z); if (d < best) { best = d; cell = c } }
-    // ground height under the cell centre: a ray straight down
-    const rc = new T.Raycaster(new T.Vector3(cell.x, 60, cell.z), new T.Vector3(0, -1, 0), 0, 120)
-    const hits = rc.intersectObject(ground, false)
-    const gy = hits.length ? hits[0].point.y : cp.y
     // ---- the lens: six metres off, thirty degrees up, looking at the foot --
     // (under the crown's underside, so the line of sight to the ground does
-    // not pass through the canopy). Bearing: from the animal's side.
+    // not pass through the canopy). Bearing: from the animal's side. A fig is
+    // a 4.6 m circle and the lens looks at its centre; a capoe is a 10 m wood
+    // and a lens six metres from its centre is inside it, so for a big cell
+    // the target is a point inside the circle on the near side and the lens
+    // stays just outside the trunks.
     const a = Math.atan2(cp.x - cell.x, cp.z - cell.z)
+    const tIn = cell.r > 6 ? cell.r * 0.45 : 0
+    const tx = cell.x + Math.sin(a) * tIn, tz = cell.z + Math.cos(a) * tIn
+    // ground height under the target: a ray straight down
+    const rc = new T.Raycaster(new T.Vector3(tx, 60, tz), new T.Vector3(0, -1, 0), 0, 120)
+    const hits = rc.intersectObject(ground, false)
+    const gy = hits.length ? hits[0].point.y : cp.y
     const cam = new T.PerspectiveCamera(40, 1280 / 760, 0.05, 400)
-    cam.position.set(cell.x + Math.sin(a) * 5.2, gy + 3.0, cell.z + Math.cos(a) * 5.2)
-    cam.lookAt(cell.x, gy, cell.z); cam.updateMatrixWorld(); cam.updateProjectionMatrix()
+    cam.position.set(tx + Math.sin(a) * 5.2, gy + 3.0, tz + Math.cos(a) * 5.2)
+    cam.lookAt(tx, gy, tz); cam.updateMatrixWorld(); cam.updateProjectionMatrix()
     const cv = g.renderer.domElement
     const W = cv.width, H = cv.height
     function grab() {
@@ -94,33 +105,27 @@ async page => {
     await fetch('/shot?name=wow-dapple-' + n + '-on', { method: 'POST', body: onPng.split(',')[1] })
     await fetch('/shot?name=wow-dapple-' + n + '-off', { method: 'POST', body: offPng.split(',')[1] })
     // ---- the footprint on screen -----------------------------------------
-    function poly(r, ox, oz) {
-      const pts = []
-      for (let i = 0; i < 48; i++) {
-        const t = i / 48 * Math.PI * 2
-        const v = new T.Vector3(cell.x + (ox || 0) + Math.cos(t) * r, gy + 0.02, cell.z + (oz || 0) + Math.sin(t) * r).project(cam)
-        pts.push([(v.x * 0.5 + 0.5) * W, (0.5 - v.y * 0.5) * H])
-      }
-      return pts
+    // Per pixel: the lens's ray through it, met with the ground plane at gy,
+    // gives a world x/z; inside is distance-to-centre under 0.92 r (the mound
+    // under a capoe is not quite a plane — the margin keeps the rim honest),
+    // the control is the annulus 1.15 r .. 2.0 r. Projecting the circle as a
+    // polygon was the first build, and a lens inside a 10 m wood put half its
+    // rim behind the camera.
+    const org = cam.position.clone(), dir = new T.Vector3()
+    function groundXZ(x, y) {
+      dir.set((x + 0.5) / W * 2 - 1, 1 - (y + 0.5) / H * 2, 0.5).unproject(cam).sub(org).normalize()
+      if (dir.y >= -1e-4) return null
+      const t = (gy - org.y) / dir.y
+      return [org.x + dir.x * t, org.z + dir.z * t]
     }
-    function inside(pts, x, y) {
-      let c = false
-      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-        const xi = pts[i][0], yi = pts[i][1], xj = pts[j][0], yj = pts[j][1]
-        if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) c = !c
-      }
-      return c
-    }
-    // THE CONTROL: a disc of ground the same size, just past the footprint on
-    // the far side from the lens (1.8 r along the view, so every point of it
-    // is in front of the camera — a circle round the cell at 2 r would put its
-    // near rim behind the lens and the projection would be garbage).
-    const pIn = poly(cell.r), pOut = poly(cell.r * 0.7, -Math.sin(a) * cell.r * 1.8, -Math.cos(a) * cell.r * 1.8)
     let nIn = 0, mIn = 0, sIn = 0, sInAll = 0, nOut = 0, mOut = 0, sOut = 0
     let darkest = 0
     for (let y = 0; y < H; y += 1) for (let x = 0; x < W; x += 1) {
-      const isIn = inside(pIn, x, y)
-      const isOut = !isIn && inside(pOut, x, y)
+      const p = groundXZ(x, y)
+      if (!p) continue
+      const dd = Math.hypot(p[0] - cell.x, p[1] - cell.z)
+      const isIn = dd < cell.r * 0.92
+      const isOut = dd > cell.r * 1.15 && dd < cell.r * 2.0
       if (!isIn && !isOut) continue
       const i = (y * W + x) * 4
       const d = (Math.abs(A[i] - B[i]) + Math.abs(A[i + 1] - B[i + 1]) + Math.abs(A[i + 2] - B[i + 2])) / 3

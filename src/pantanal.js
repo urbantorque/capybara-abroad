@@ -532,7 +532,14 @@ function panVC() {
 }
 function panVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.42, amount: 0.19, warp: 0, near: 0.75, nearScale: 9, contact: 1, broad: 0.12, broadM: 20 });
+               { scale: 0.42, amount: 0.19, warp: 0, near: 0.75, nearScale: 9, contact: 1, broad: 0.12, broadM: 20,
+                 // THE DAPPLE (ROADMAP-WOW G2): light through the canopies on the
+                 // ground under them. The gallery forest itself is rand()-placed
+                 // at build and cannot be named; what CAN be is the mango tree
+                 // (the one tree everything on the farm sits under) and the
+                 // capoes, which are fixed woods with a centre and a radius —
+                 // trees to 0.75 r, crowns ~3 m past. Seven nearest the spawn.
+                 dapple: { cells: panDAPPLE, k: 0.33, scale: 3.2 } });
 }
 /** THE LEAF MATERIAL: the same grain, seen from both sides. Everything built
  *  out of `M.quad` needs this and nothing else may use it, or half the
@@ -710,6 +717,13 @@ const panCAPOES = [
   { x: 62, z: 44, r: 12, h: 1.8 }, { x: -70, z: -22, r: 10, h: 1.6 },
   { x: 14, z: 8, r: 8, h: 1.4 },   { x: -30, z: 20, r: 9, h: 1.5 },
 ];
+// THE DAPPLED CANOPIES (ROADMAP-WOW G2): grain() bakes at most eight circles
+// into the ground's fragment source. The mango tree at the fazenda (its five
+// crown blobs reach ~6.5 m from the trunk — see panBuildFazenda) and the seven
+// capoes nearest the spawn at (0, 62), at the wood's own footprint: trees to
+// 0.75 r and a crown about three metres past the outermost trunk.
+const panDAPPLE = [{ x: panFAZENDA.x + 16, z: panFAZENDA.z + 6, r: 6.5 }]
+  .concat([0, 1, 9, 8, 6, 3, 2].map(i => ({ x: panCAPOES[i].x, z: panCAPOES[i].z, r: panCAPOES[i].r * 0.75 + 3 })));
 
 /** Is (x, z) on the causeway at all, and is it over the missing plank? */
 function panOnRoad(x, z) {
