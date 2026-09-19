@@ -484,10 +484,18 @@ function quayBuildWater() {
   // water from there is a sparse field of moving points far brighter than the
   // surface. It costs four hash calls and it is the difference between a sea
   // and a sheet of coloured card. See grain() in shared.js.
+  // ...AND THE HARBOUR IS A MIRROR (ROADMAP-WOW A1). The bridge eighty metres
+  // out, the ferry on her berth and the wharves' piles doubled in the water
+  // they stand in. The sheet's own ripple (quaySurfaceY, 0.29 m at the worst)
+  // bends the sample per facet through the geometric normal, so out in the
+  // stream the picture breaks up the way a harbour's does and in the lee of
+  // the wharves it holds. sysREFLECT.quay carries the plane at quayWATER_Y.
+  // Never clone this material after this call: the clone drops the hook.
   const m = new THREE.Mesh(g, grain(mat(0xffffff, { vertexColors: true }),
     { scale: 0.4, amount: 0.05, warp: 0,
       sparkle: 0.62, sparkleScale: 0.95, sparkleSpeed: 0.28, sparkleCut: 0.635, fresnel: 0.65,
-      sparkleColor: PALETTE.foam }));
+      sparkleColor: PALETTE.foam,
+      reflect: { k: 1.0, pow: 1.0, wobble: 1.0, blur: 0 } }));
   m.receiveShadow = true;
   m.castShadow = false;
   m.frustumCulled = false;

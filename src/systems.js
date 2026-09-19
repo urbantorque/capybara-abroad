@@ -3082,6 +3082,7 @@ const sysREFLECT = {
   hanoi:    { y: -0.5, k: 1.0, lift: 0.05, box: [-58, -96, 58, -20] },  // Hoan Kiem (hanWATER; ripple amp 0.025)
   pantanal: { y: 0.25, k: 1.0, lift: 0.05, box: [-130, -126, 130, 106] }, // the flood (panWATER), the whole map
   monaco:   { y: -0.6, k: 1.0, lift: 0.06, box: [-270, -330, 270, 220] },  // the basin and the sea (monWATER; basin ripple 0.035)
+  quay:     { y: -0.5, k: 1.0, lift: 0.10, box: [-420, -760, 460, 120] },  // the harbour (quayWATER_Y; ripple amp 0.29 — the sheet is FrontSide, never in its own mirror)
 };
 const sysLENS = {
   //             wide  splitW splitC

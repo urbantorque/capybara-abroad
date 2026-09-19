@@ -9,7 +9,7 @@ async page => {
   // post.render x 30 with a readPixels drain at each end, ten interleaved
   // reps, median per arm. Then the swim cut.
   // ONE chapter per run (a run must finish in under four minutes on a loaded machine)
-  const CH = ['monaco']
+  const CH = ['quay']
   const errs = []
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
@@ -54,6 +54,8 @@ async page => {
     hanoi: { at: [20, 1.5, -16], yaw: 0, dist: 11, pitch: 0.30, raise: 1.6 },   // Hoan Kiem's south shore: the tower, Ngoc Son and the red bridge across it
     pantanal: { at: [-12, 0.8, 6], yaw: Math.PI / 2, dist: 11, pitch: 0.30, raise: 1.6 },  // the baía's east shore, the gallery trees across it
     monaco: { at: [20, 3.4, -82], yaw: Math.PI, dist: 11, pitch: 0.28, raise: 1.8 },   // the quay's south edge, the yacht and the terrace across the basin
+    // W3 (the A1 rollout)
+    quay: { at: [14, 0.6, 17.5], yaw: 0.25, dist: 12, pitch: 0.30, raise: 1.8 },   // the apron's edge by the ferry's berth (6.6, 6), the bridge at z -58 across the harbour
   }
   const out = { errs, rows: {} }
   for (const name of CH) {
@@ -146,7 +148,8 @@ async page => {
     r.arrival = arrival
     out.rows[name] = r
     // ---- the swim cut: the animal into the water, E held for the dive --------
-    const SWIM = { kyoto: [26, -0.2, -2], hanoi: [0, -0.3, -58], pantanal: [-34, 0.3, -68], monaco: [-10, -0.4, -40] }
+    const SWIM = { kyoto: [26, -0.2, -2], hanoi: [0, -0.3, -58], pantanal: [-34, 0.3, -68], monaco: [-10, -0.4, -40],
+                   quay: [16, -0.4, -12] }
     if (SWIM[name]) {
       await page.evaluate((p) => { const b = window.__capy.capy.body; b.position.set(p[0], p[1], p[2]); b.velocity.set(0, 0, 0); if (b.interpolatedPosition) b.interpolatedPosition.set(p[0], p[1], p[2]) }, SWIM[name])
       await page.waitForTimeout(2500)
