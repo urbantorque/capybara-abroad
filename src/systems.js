@@ -3080,6 +3080,8 @@ const sysREFLECT = {
   // box: the water's world-xz footprint; the pass is skipped when none of it is in frame
   kyoto:    { y: -0.45, k: 1.0, lift: 0.07, box: [-8, -28, 60, 16] },   // the mirror pond (kyoWATER_Y; ripple amp 0.055)
   hanoi:    { y: -0.5, k: 1.0, lift: 0.05, box: [-58, -96, 58, -20] },  // Hoan Kiem (hanWATER; ripple amp 0.025)
+  pantanal: { y: 0.25, k: 1.0, lift: 0.05, box: [-130, -126, 130, 106] }, // the flood (panWATER), the whole map
+  monaco:   { y: -0.6, k: 1.0, lift: 0.06, box: [-270, -330, 270, 220] },  // the basin and the sea (monWATER; basin ripple 0.035)
 };
 const sysLENS = {
   //             wide  splitW splitC

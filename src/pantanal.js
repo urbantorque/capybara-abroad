@@ -570,9 +570,15 @@ function panVCW(own) {
   // grainOwn in shared.js, and the five seas that lost their glitter to a
   // clone applied one step too late.
   const base = mat(0xffffff, { vertexColors: true, transparent: true, opacity: 1, depthWrite: false });
+  // ...AND THE MIRROR ITSELF (ROADMAP-WOW A1). The header above says what
+  // the flood IS, and until now the sheen and the Fresnel were standing in
+  // for it. The gallery trees, the jabiru and the fireflies at dusk are
+  // doubled by the planar pass; the sheet's vertex alpha still fades it to
+  // nothing at the shore (grain() scales the alpha push by it).
   const o = { scale: 0.35, amount: 0.05, warp: 0,
               sparkle: 0.17, sparkleScale: 3.1, sparkleSpeed: 0.16, fresnel: 0.65,
-              sparkleCut: 0.76, sparkleBand: 0.055, sparkleColor: 0xfff0d4 };
+              sparkleCut: 0.76, sparkleBand: 0.055, sparkleColor: 0xfff0d4,
+              reflect: { k: 1.0, pow: 1.0, wobble: 1.0, blur: 0 } };
   return own ? grainOwn(base, o) : grain(base, o);
 }
 
