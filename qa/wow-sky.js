@@ -22,7 +22,7 @@ async page => {
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
 
-  const CHAPTER = 'sahara'
+  const CHAPTER = 'palawan'
   const out = { errs, chapter: CHAPTER }
 
   await page.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('capy3.prefs.v1', JSON.stringify({ v: 1, pf: 1 })) } catch (e) {} })
