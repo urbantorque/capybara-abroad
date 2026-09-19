@@ -1881,3 +1881,99 @@ thirteen chapters that show no sky; the composite's blur-tap reduction
 (still no lever); smooth normals on anything built (G5 is for what breathes); any change to Sơn Đoòng's darkness, Kyoto's lane
 width, Monaco's still air or Goreme's still air — the audit's list of
 things that are the chapter, not a gap in it.
+
+## Closed (20 Sep 2026) — the five numbers, as measured
+
+Ninety-six commits on `lift-pass` between `72792a4` and this one, every
+one gated by `node --check`, `node build.mjs` and a green `npm test`
+(24 → 25 checks; `qa/wow-person.mjs` joined the suite), every visual
+term verified by a per-pixel diff inside a mask and a screenshot read
+by eye before it landed. What shipped, against the roadmap's own table:
+
+- **Part A.** A1 reflections in twelve chapters (Kyoto, Hanoi, the
+  Pantanal, Monaco, Quay, Cali, Kowloon's wet street, Antarctica,
+  Venice at tide, Iceland, Rio's wet band, the cave — the cave at 6.5
+  levels and aurora-less Iceland at 10 honestly under the 12 target,
+  the other ten at 19–58). A2 foreground in Kyoto, Hanoi, Kowloon,
+  Cali (Manly and Sydney skipped, reasons in A2). A3: the shadow bias
+  for the three low suns, the shimmer floor recorded, the daisy fade
+  found already shipped, the cylinder widen and the mote-quad ask
+  found not to fit the code (A3's notes). A4 rays in Goreme, Kowloon,
+  Monaco and Iceland (with Iceland's lamps lighting their road at
+  last); Sahara's 61° sun unframeable from any playable lens. A5's
+  cloud band and sun disc in Sahara, Palawan, Cali, the Pantanal and
+  Goreme's own dome; the Drift has no dome to light.
+- **Part A′.** G1 grass in eight chapters (`src/grass.js`, one draw
+  call, the ground's own colour, sway, trample). G2 dapple under the
+  canopies of Sydney, the Pantanal, Kyoto, Manly. G3 ground mist in
+  all six named chapters. G4 the animal's backlit rim. G5 the living
+  made round — the capybara (authored smooth normals on the hull, a
+  12×8 step, `matRound`, the law's one-line amendment in CONTRACT.md)
+  and the npc.js animals; crowns stay flat.
+- **Part B.** Beats shipped: Pasto's flag shadows, Manly's backlit
+  spray, Palawan's caustic octave, Goreme's fleet glow and crew, the
+  Sydney skitter, the twelve A1 mirrors, the four A4 rays; Kyoto's
+  lantern pools written up as needing a spill-reach row.
+- **Part C.** The sheet (W0) and its findings; ONE PERSON — `npcPERSON`
+  exported, Marrakech's and Rio's crowds rebuilt on it with faces and
+  hair; the animal's toenails and whisker nubs (its belly band and eye
+  fleck were already there); ten movers given a moving part (condor,
+  ferry, party bus, helicopter, manta and bangka, orca pod,
+  frigatebird, Grand Prix car, the Cub, the lampflies); heroes given
+  secondary forms in Pasto, Monaco, Hanoi, the Pantanal and Rio.
+- **Part D.** The six weakest (Sahara, Iceland, Goreme, Venice, the
+  cave, Manly) each given detail, ground and a middle plane, within
+  +6 k triangles and +1 draw call, arrival frames re-read against W0.
+
+**The five numbers.**
+
+1. *Three planes.* The corrected sweep re-run (`qa/wow-depth-after.js`,
+   fresh boot per chapter, with a 0–4 m bin and a planes-only pass that
+   ignores the grass, the mist and the weather as veils): the 0–4 m
+   bin is non-empty in Kyoto (0.17), Manly (0.09), Kowloon (0.07),
+   Goreme (0.04), Monaco (0.03) — the foreground chapters — and zero
+   elsewhere (Cali's and Hanoi's strings are thinner than the ray grid
+   catches). Planes-only mid+far held or rose in 12 of 19; the biggest
+   rises are the Part D chapters (Sahara +0.12, Rio +0.13). The
+   all-hits pass reads near UP in every grass chapter, which is the
+   grass doing what the reference asked — a volume the lens looks
+   through — and is why the instrument grew the planes pass. Two runs
+   of the same sweep differ by up to 0.05 in some chapters: the
+   resting lens is not deterministic (three agents measured it), so
+   single-run deltas under that are noise.
+2. *A reflection wherever water is the subject.* Twelve chapters, ten
+   over 12 levels in-mask (19–58), two honestly under. Target met
+   where the roadmap named it (Kyoto 33–38, the Pantanal 33–46, Hanoi
+   28–29, Monaco 35).
+3. *Still pixels.* Floors recorded for nineteen before anything moved;
+   the after-sweep (`qa/wow-still-after.js`, the pass's intended motion
+   cut for both frames) reads 10 of 19 held or lower — Quay −38 %,
+   Sahara −56 %, the Pantanal −63 %, Iceland −99 %, Palawan −30 % — and
+   9 higher, the worst (Hanoi, the cave, Manly) traced to the
+   instrument's mask, not to shimmer: Hanoi's diff image is its
+   traffic, which the mask never hid and which happens to sit closer to
+   the lens on one arrival than the other. The −40 % target was A3's
+   and A3 shipped one of its four items; the instrument and the floors
+   are what this pass leaves for the next.
+4. *A wow beat in the arrival frame.* Nineteen arrival frames re-shot
+   (`qa/wow-sheet.js`, raw) and read: the mirror in the pond, the
+   flood, the basin and the harbour; the grass; the mist; Sahara's
+   riads and paving; Iceland's ribbed houses; Goreme's gored
+   envelopes and lit crew; Venice's capitals and San Giorgio. Sydney's
+   Opera House is still behind the fig crowns (A2's own finding, left
+   as a camera item, not a geometry one).
+5. *16.7 ms held.* On the quiet machine, eight chapters, five
+   interleaved reps of sixty frames, every new term live vs every one
+   cut (`qa/wow-frametime.js`): live medians 16.5–17.2 ms, cut 16.5–16.7,
+   the live-minus-cut delta 0.0–0.5 ms (Iceland the 0.5, with mist,
+   rays, spill, grass and a mirror all in one frame), rung 0 held. The
+   harness is headless, so its 16.5 is vsync and not the reference
+   machine's GPU; the A1 agent's drained-pass reading of 2.5–2.8 ms for
+   Kyoto's mirror stands as the one absolute cost measured, and every
+   term parks at rung 1.
+
+**Left open, named.** Kyoto's lantern pools (a spill-reach row); the
+Drift's own sky; the Sahara sun in frame; A3's cylinder widen and the
+mote-quad footprint; the still instrument's mask for traffic and herds;
+`qa/rv-geom.js` re-baselined after this pass, not before; Sydney's fig
+crowns and its Opera House.

@@ -1,3 +1,49 @@
+## THE ELEVENTH LIFT — THE THIRD BEAUTY PASS: MIRRORS, GRASS, THE FOREGROUND, AND THE LIVING MADE ROUND (L11 — 19–20 Sep 2026)
+
+Ninety-six commits, ROADMAP-WOW.md, all five parts closed against five
+measured numbers — see that file's "Closed" section for the table and
+every honest miss; this is the short version.
+
+**Capability the render stack did not have.** A planar reflection pass
+(`reflectRender`/`reflectSet`, `grain(..., { reflect })`, `sysREFLECT`)
+— the scene drawn once more through the water plane into a half-res
+half-float target with an oblique clip, sampled by the water's own
+fragment, in twelve chapters; grass as a volume (`src/grass.js`, one
+instanced draw of blade fans in a camera box, coloured off the ground's
+own vertices, swaying on the gust, trampled by the animal); ground mist
+(`wxMIST`, three noise-alpha sheets in one draw); dapple under the
+canopies (`grain(..., { dapple })`); rays as a radial blur of the
+existing bloom toward one projected light (`sysRAYS`); a cloud band and
+a sun disc in the shared dome (`sysSKY2`); foreground objects hung 2–3 m
+from the resting lens in four chapters (`hangThing`, static, `noFore`).
+Every term cuts on a `game.state.noX`, parks at rung 1, and was proved
+by a per-pixel diff inside a mask and a screenshot read by eye.
+
+**The law, amended in one line** (Aesthetic law, above): flat-shaded
+for the built world; smooth normals for anything that breathes. The
+capybara's hull and shin carry an authored smooth set
+(`capySmoothNormals`), its sphere parts step to 12×8, the eye accent
+goes through `matRound`; npc.js's animals follow; crowns stay flat.
+
+**The people standard.** `npcPERSON` in npc.js — the roster's skull,
+face, hair and garment bands, exported once; Marrakech and Rio, which
+rolled their own cone-headed crowds from nothing, now instance it under
+their own garments. `qa/wow-person.mjs` holds the line in `npm test`.
+
+**The things.** Ten marquee movers given a part that moves that is not
+the whole (rotor, wheels, fingers, wake, pennant, fork, fin); heroes in
+eleven chapters given secondary forms; the six weakest chapters (Sahara,
+Iceland, Goreme, Venice, the cave, Manly) a detail, ground and
+middle-plane pass within +6 k triangles each.
+
+**Two harness rules learned the hard way, now in the memory:** a single
+tool call past ~600 s kills the agent that made it (a nineteen-chapter
+sweep in one run), so probes run one chapter per invocation; and
+`playwright-cli close-all` closes every agent's browser, so an agent
+closes only its own session. A `const` read above its own declaration in
+`grain()` — `wetOnly` — took the whole game down for an hour of every
+agent's probes; the file's own comment had warned about exactly that.
+
 ## THE TENTH LIFT — THE PICKUP FELT, THE SHOP UNMISTAKABLE, AND AN AUDIT THAT SAID STOP (L10 — 19 Sep 2026)
 
 Two player-named items, both shipped, and a "raise every biome's beauty
