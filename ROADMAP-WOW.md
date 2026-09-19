@@ -576,7 +576,50 @@ cave, not Antarctica.
 - **Instrument:** `qa/wow-grass.js` — instances in frustum at arrival,
   the rAF A/B, and the still-diff (grass sway is INTENDED motion — mask
   it in `wow-still` the way motes are).
-- **`game.state.noGrass`.**
+- **.**
+
+**SHIPPED (19-20 Sep 2026), eight chapters, .** One
+InstancedMesh of four-blade fans (one triangle per blade, no alpha),
+6000 allocated, in a 24 m box around an anchor 2 m ahead of the animal
+along the lens, relaid only when it has moved 3 m (the mote field's
+wrap-into-box; the re-placement spread over four frames). Colour is the
+ground's own: the live chapter's upward, vertex-coloured faces are read
+ONCE per entry into a 2 m hash and every foot is a barycentric read of
+colour and height from the triangle under it — the topmost hit, so a
+decal blocks. **Two things the description did not know:** a painted
+face that fails the hue gate must be kept as a BLOCKER, not dropped
+(Pasto's plaza is grey faces in the same merged mesh as the green
+under them, at the same height — the first frame grew a lawn through
+the flagstones); and plain-material opaque meshes are blockers too. A
+blade whose ground hit has a blocker within −0.05/+0.5 m does not grow.
+The gate is grain()'s  with a per-row floor and a short
+ramp (full at floor + 0.03: the Pantanal's olive at d = 0.066 read 38 %
+on a ramp to 0.10). **The Drift's grass is not violet-grey** — that is
+its rock and the cloud deck, and a violet gate stood 974 fans on the
+cloud 30 m down; driGrass 0x4e7a68 is a night blue-green (d = 0.055),
+on the green gate at 0.015. Iceland's moss (d = 0.10) and Goreme's vine
+and scrub (0.11, 0.05) pass the same gate; no tussock/dry tone test was
+needed. Sway from , trample from a 16-point
+uniform ring of foot positions with the velocity they were laid with,
+fade by shrinking the blade, all in the vertex shader; mat() with
+vertexColors on a clone, the rim/shade hook chained first, the fragment
+normal forced back to up because DoubleSide flipped it and half the
+blades read grey. customProgramCacheKey begins  so masks it as intended motion. Rung 1 halves, rung 2 parks, noGrass cuts.
+
+Per chapter (, one per run; standing / in frustum at
+arrival, lower-half on/off diff): Sydney 4148/2681, 7.5 % · Pasto 0 at
+the plaza (correct), 2777/2106 from the pasture, 8.0 % · Pantanal
+2633 (the road), 3423/2852 from the verge, 2.5 % · Drift 2662/2577,
+0.7 % (the rest of the box is void) · Iceland 0 at the quay, 1843/619
+in Reykjavik · Manly 607, 621/526 on the verge above the tide · Cali
+1340/859 · Goreme 0 at the launch field, 72 on a planter bed 42 m off.
+0 console errors everywhere; +1 draw call. **Frame time not honestly
+measured:** four other agents' sessions held the machine at 100 % for
+the whole pass (both arms 36-85 ms, the OFF arm nowhere near 16.7); the
+budget claim rests on the shape (one draw, ~60 k vertices, one buffer
+rewrite per 3 m) and wants the quiet-machine A/B before it is believed.
+Scan cost 60-600 ms once per chapter entry under that load, inside the
+title-card cross.
 
 ### G2 — DAPPLE UNDER THE CANOPIES
 
@@ -992,6 +1035,30 @@ frame or it is not a beat.
   silhouette 74 % moved, mean +11 — the bloom, which a colour change
   cannot put there; rest of frame 0.03 %. The frame: warm lanterns among
   dark bags, the gores still readable.
+- **Sydney — a jacaranda petal drift on the gust across the forecourt.**
+  Found first, changed second: Sydney's mote row is `pollen` 0.85 — there
+  were NO petal motes to raise, so the audit rule's "raise nothing" did not
+  arise and the row is untouched. The chapter has the trees (eight
+  jacarandas, two on the spawn lawn at (6, 22.5) and (−6.5, 36)) and the
+  fallen blossom (`envBLOSSOM`'s decals) and not one petal that moves; and
+  the gust row (`dir` 1.05) blows toward +x+z — from the forecourt back over
+  the lawn — so petals released from those crowns would leave the arrival
+  frustum at once. The honest reading of "a drift on the gust across the
+  forecourt" is petals on the GROUND: THE SKITTER, a second field in
+  weather.js under a new optional row key (`skitter: wxSkitter('jacaranda')`
+  — a new number, not a moved one), 96 opaque folded quads in a 9 m box that
+  follows the lens like the motes' but sits on the biome's floor (the
+  mist's own ground query); a petal lies flat until a gust over 0.9 m/s
+  kicks it (1.1 /s per petal at full gust, 2.1 m/s up), then tumbles
+  downwind at windK 1.35 and falls back at 0.85 to lie again; the decal's
+  own colours (petalPurple → petalPink). Cut `game.state.noSkitter`; calm
+  mode stops the kicks. `qa/wow-sydney-petals.js` (real arrival lens,
+  instance positions projected through it, 48 samples over 12 s): in frame
+  37–50 (mean 42.2) of 96, airborne 36 on average and 51 at peak, petals up
+  in 48/48 samples; the first build (72 in the motes' 13 m box) read 24–31
+  in frame — a ground field looked at from 3 m up wastes half a 26 m box
+  beside and behind the lens. The frame: lilac flecks skittering low across
+  the lawn round the animal, the crown as foreground, the decals under them.
 
 ## Part C — the model sheet: structures, movers, NPCs and the animal, biome by biome (added 19 Sep 2026)
 
