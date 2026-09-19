@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger, mergeWearBand, makeMover, warnOnce } from './shared.js';
+import { npcPERSON } from './npc.js';
 
 // ===========================================================================
 // CHAPTER 6 — RIO DE JANEIRO
@@ -2597,6 +2598,9 @@ const rioPPL_VOLEI = 5;
 const rioVoleiIdx = [];
 let rioVoleiT = 3.0, rioVoleiLast = -1, rioVoleiCel = 0;
 let rioPplBody = null, rioPplHead = null, rioPplN = 0;
+// ...and the head's dressing (ONE PERSON): hair with both brows, in the hair
+// colour; eyes and mouth, in white. Two more instanced draws, as in Sydney.
+let rioPplHair = null, rioPplFace = null, rioPplHairCol = null;
 // x, y, z, yaw, kind, phase, rate
 const rioPplData = new Float32Array(rioPPL_MAX * 7);
 // ---- AND WHETHER ANYBODY HAS NOTICED YOU (D1) ---------------------------
@@ -2637,62 +2641,60 @@ const rioSHIRT = [PALETTE.cloth1, PALETTE.cloth2, PALETTE.cloth3, PALETTE.cloth4
                   PALETTE.rioFeather1, PALETTE.rioFeather2, PALETTE.rioFeather3,
                   PALETTE.rioFeather4, PALETTE.rioTileBlue, PALETTE.rioTileGreen];
 const rioSKIN = [PALETTE.skin1, PALETTE.skin2, PALETTE.skin3, PALETTE.skin4];
+const rioHAIR = [PALETTE.hair1, PALETTE.hair2, PALETTE.hair3, PALETTE.hair4, PALETTE.hair5];
 
 function rioBuildPeople(root) {
-  const M = rioMerger();
-  // BOXES, NOT CYLINDERS, FOR THE LEGS. Two six-sided cylinders are forty-eight
-  // triangles a person and at fifteen metres they are two boxes with the
-  // corners rounded off; the twenty-four that buys pays for the head below,
-  // which is the part anybody can actually see from this camera.
-  M.box(-0.095, 0.36, 0, 0.115, 0.72, 0.15, 0x9aa0ac);
-  M.box(0.095, 0.36, 0, 0.115, 0.72, 0.15, 0x9aa0ac);
-  M.box(0, 1.00, 0, 0.44, 0.62, 0.28, 0xffffff);
-  M.box(0, 1.33, 0, 0.46, 0.07, 0.30, 0xb8bcc4);        // a collar, so it is clothing
-  // the arms, out and a little up: from the pavement the only thing that
-  // separates a person from a bollard is that they have a width at the top
-  for (let s = -1; s <= 1; s += 2) {
-    M.box(s * 0.29, 1.10, 0.03, 0.10, 0.54, 0.10, 0xffffff, -0.30, 0, s * 0.34);
-  }
-  const bodyGeo = M.build();
-  // ---- THE HAIR WAS A LID THE FULL WIDTH OF THE HEAD ----------------------
+  // ---- ONE PERSON (ROADMAP-WOW, Part C) ----------------------------------
+  // This crowd was a 0.29 m sphere with a hair plank and a nose on two leg
+  // boxes and a torso: no eyes, no brows, no neck, and a head smaller than
+  // Sydney's by the same measure Marrakech's was. The SKELETON is the roster's
+  // now — npcPERSON in npc.js, the same part lists Sydney instances — merged
+  // at rest pose into this chapter's own two buffers (the body, the head),
+  // plus two more for the face and the hair wired as the roster wires them:
+  // eyes and mouth in one white-tinted pool, hair and both brows in one
+  // hair-coloured pool. The pools, the seven-float stride, the towels, the
+  // rock, the parade and the futevolei are untouched; only the geometry moved.
   //
-  // 0.30 x 0.09 x 0.29 of flat dark brown sitting on a head 0.29 across, and
-  // this camera looks DOWN — so from the only angle anybody ever sees them
-  // from, every one of two hundred and sixty people in Rio was a torso with a
-  // brown plank on top of it. The instrumented shot of the futevolei court is
-  // eight of them and not one has a face.
-  //
-  // The whole fix is that the hair must not reach the front or the sides: a
-  // head seen from above is mostly the crown, and the crown is SKIN-coloured
-  // with hair on the back half of it. And a nose — four centimetres, twelve
-  // triangles — is the only reason a head turning to watch you reads as a head
-  // turning rather than as a ball rotating. The locals in npc.js have had one
-  // since they were written; the crowd never did.
-  const H = rioMerger();
-  H.sph(0, 0, 0, 0.145, 0.165, 0.145, 0xffffff);
-  H.box(0, 0.075, -0.055, 0.25, 0.105, 0.19, 0x6a5040);   // hair, back of the crown only
-  H.box(0, -0.005, 0.150, 0.05, 0.05, 0.055, 0xffffff);   // and the nose
-  const headGeo = H.build();
+  // THE GARMENT LAYER is the shirt's own bands (shoulders, hem, placket) and
+  // the shorts: a merged body has one instance colour and it is the shirt's,
+  // so the hips and the legs carry the grey the old leg boxes carried
+  // (0x9aa0ac) and read as shorts in a darker tone of it. The hand box is left
+  // off — a shirt-coloured fist on a bare arm reads as a mitten.
+  const shorts = [0.33, 0.36, 0.41];    // 0x9aa0ac, linear
+  const bodyGeo = npcPERSON.geo(
+    npcPERSON.standing({ hands: false, hipsC: shorts, legsC: shorts }));
+  const headGeo = npcPERSON.geo(npcPERSON.head);
+  const hairGeo = npcPERSON.geo(npcPERSON.hair());
+  const faceGeo = npcPERSON.geo(npcPERSON.face());
 
   rioPplBody = new THREE.InstancedMesh(bodyGeo, rioVC(), rioPPL_MAX);
   rioPplHead = new THREE.InstancedMesh(headGeo, rioVC(), rioPPL_MAX);
+  rioPplHair = new THREE.InstancedMesh(hairGeo, rioVC(), rioPPL_MAX);
+  rioPplFace = new THREE.InstancedMesh(faceGeo, rioVC(), rioPPL_MAX);
   // NAMED, because qa/b6-crowds.js found every crowd in the game by measuring
   // its instances and every one of them except Marrakech's was '(unnamed)'.
   rioPplBody.name = 'rioPeople'; rioPplHead.name = 'rioPeopleHeads';
+  rioPplHair.name = 'rioPeopleHair'; rioPplFace.name = 'rioPeopleFaces';
   rioPplBodyCol = new Float32Array(rioPPL_MAX * 3);
   rioPplHeadCol = new Float32Array(rioPPL_MAX * 3);
+  rioPplHairCol = new Float32Array(rioPPL_MAX * 3);
   rioPplBody.instanceColor = new THREE.InstancedBufferAttribute(rioPplBodyCol, 3);
   rioPplHead.instanceColor = new THREE.InstancedBufferAttribute(rioPplHeadCol, 3);
-  rioPplBody.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  rioPplHead.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  rioPplHair.instanceColor = new THREE.InstancedBufferAttribute(rioPplHairCol, 3);
+  // the face pool is white for everybody (R6: the white is the material's
+  // own, the pupil carries the dark multiplier) — one attribute of ones
+  rioPplFace.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(rioPPL_MAX * 3).fill(1), 3);
+  for (const m of [rioPplBody, rioPplHead, rioPplHair, rioPplFace]) {
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    m.frustumCulled = false;
+    m.count = 0;
+    root.add(m);
+  }
   rioPplBody.castShadow = true;
   rioPplHead.castShadow = true;
-  rioPplBody.frustumCulled = false;
-  rioPplHead.frustumCulled = false;
-  rioPplBody.count = 0;
-  rioPplHead.count = 0;
-  root.add(rioPplBody);
-  root.add(rioPplHead);
+  // the hair and the face lie inside the head's own shadow
+  rioPplHair.castShadow = false; rioPplHair.userData.noShadow = true;
+  rioPplFace.castShadow = false; rioPplFace.userData.noShadow = true;
 }
 
 /**
@@ -2745,10 +2747,17 @@ function rioAddPerson(x, y, z, yaw, kind) {
   rioPplHeadCol[i * 3] = rioPplCol.r;
   rioPplHeadCol[i * 3 + 1] = rioPplCol.g;
   rioPplHeadCol[i * 3 + 2] = rioPplCol.b;
+  rioPplCol.set(rioHAIR[randInt(0, rioHAIR.length - 1)]);
+  rioPplHairCol[i * 3] = rioPplCol.r;
+  rioPplHairCol[i * 3 + 1] = rioPplCol.g;
+  rioPplHairCol[i * 3 + 2] = rioPplCol.b;
   rioPplBody.count = rioPplN;
   rioPplHead.count = rioPplN;
+  rioPplHair.count = rioPplN;
+  rioPplFace.count = rioPplN;
   rioPplBody.instanceColor.needsUpdate = true;
   rioPplHead.instanceColor.needsUpdate = true;
+  rioPplHair.instanceColor.needsUpdate = true;
   return i;
 }
 
@@ -2909,13 +2918,21 @@ function rioUpdatePeople(dt) {
     // now that the grandstand leans over the barrier as well, two hundred more.
     // The offset is the local (0, h, 0) taken through both rotations, which is
     // two sines and is exact.
-    const hh = 1.43 * sy;
+    // ...and the head's origin is the roster's now: the base of the skull at
+    // npcPERSON.HEAD_Y up the body (it was a sphere's centre at 1.43). The
+    // hair and the face are authored in head space and ride the same matrix.
+    const hh = npcPERSON.HEAD_Y * sy;
     const sr = Math.sin(rx) * hh, cr = Math.cos(rx) * hh;
-    rioPplHead.setMatrixAt(i, rioXform(x + sr * Math.sin(yaw), y + cr, z + sr * Math.cos(yaw),
-                                       rx, yaw, 0, 1, 1, 1));
+    const hm = rioXform(x + sr * Math.sin(yaw), y + cr, z + sr * Math.cos(yaw),
+                        rx, yaw, 0, 1, 1, 1);
+    rioPplHead.setMatrixAt(i, hm);
+    rioPplHair.setMatrixAt(i, hm);
+    rioPplFace.setMatrixAt(i, hm);
   }
   rioPplBody.instanceMatrix.needsUpdate = true;
   rioPplHead.instanceMatrix.needsUpdate = true;
+  rioPplHair.instanceMatrix.needsUpdate = true;
+  rioPplFace.instanceMatrix.needsUpdate = true;
 }
 
 // ==================================================================== BIRDS ==
