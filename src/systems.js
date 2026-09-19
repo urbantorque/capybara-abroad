@@ -3087,6 +3087,11 @@ const sysREFLECT = {
   kowloon:  { y: 0.01, k: 1.0, lift: 0.05, box: [-6.5, -44, 6.5, 62] },    // NOT a sea: the wet carriageway (hkBuildStreet's road plane; the material's own k is 0.55, blur 4)
   antarctic: { y: -0.6, k: 1.0, lift: 0.08, box: [-212, -512, 212, 122] }, // the sea between the floes (antWATER, a constant; swell amp 0.23, FrontSide)
   cave:     { y: -7.4, k: 1.0, lift: 0.05, box: [-38, -96, -2, 44] },       // the river under the shaft (cavWATER; the sheet is flat, the drifting term carries the wobble)
+  // TIDE-GATED, per Part B: the sheet is the same water at every height, but the
+  // beat is the square as the mirror, so the pass runs from tide 0.6 up
+  // (venTideLevel; the plateau is 1). y is the live venWaterY; NaN parks it.
+  venice:   { y: function (g) { const v = g.venice; return (v && v.tide() > 0.6) ? v.tideY() : NaN; },
+              k: 1.0, lift: 0.07, box: [-210, -105, 80, 25] },   // the acqua alta (venWaterY; swell 0.05)
 };
 const sysLENS = {
   //             wide  splitW splitC

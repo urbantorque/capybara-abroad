@@ -3885,7 +3885,14 @@ function venBuildWater(root) {
     // had no glitter on it at all. See the fwidth note in grain().
     { scale: 0.7, amount: 0.13, warp: 0,
       sparkle: 0.55, sparkleScale: 0.88, sparkleSpeed: 0.17, sparkleCut: 0.655, fresnel: 0.65,
-      sparkleBand: 0.10, sparkleColor: PALETTE.venSkyLow });
+      sparkleBand: 0.10, sparkleColor: PALETTE.venSkyLow,
+      // ...AND AT ACQUA ALTA THE SQUARE IS THE MIRROR (ROADMAP-WOW A1). The
+      // header above says a render target would cost the whole frame; it
+      // costs one more scene walk at half res (see reflectRender), and it is
+      // the photograph the chapter is named for. sysREFLECT.venice reads the
+      // live venWaterY through game.venice.tideY() and is tide-gated (0.6+).
+      // The clone is BEFORE grain (grainOwn), which is the right way round.
+      reflect: { k: 1.0, pow: 1.0, wobble: 1.0, blur: 0 } });
   venWaves(venWaterMat);
   venWaterMat.depthWrite = false;
   venWaterAttr = g.attributes.position;

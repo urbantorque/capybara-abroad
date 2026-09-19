@@ -9,7 +9,7 @@ async page => {
   // post.render x 30 with a readPixels drain at each end, ten interleaved
   // reps, median per arm. Then the swim cut.
   // ONE chapter per run (a run must finish in under four minutes on a loaded machine)
-  const CH = ['cave']
+  const CH = ['venice']
   const errs = []
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
@@ -60,6 +60,7 @@ async page => {
     kowloon: { at: [0, 0.4, 30], yaw: 0, dist: 9, pitch: 0.20, raise: 1.4 },   // the carriageway, lens low and south, looking north under the signs (no sea: the road is the 'water')
     antarctic: { at: [0, 0.9, 20], yaw: 0, dist: 11, pitch: 0.30, raise: 1.6 },   // the jetty's seaward end, lens south, the boat and the pack across the lead
     cave: { at: [-2, -6.3, -12], yaw: 0.3, dist: 11, pitch: 0.28, raise: 1.8 },   // the east bank in the passage, lens SSE, looking NNW over the river to the sky-lit cones and the glade under the doline
+    venice: { at: [-4, 1.2, -18], yaw: 0, dist: 12, pitch: 0.26, raise: 1.8, prep: 'venice' },   // the flooded piazza at the top of the tide, lens south, the Basilica closing the far end
   }
   const out = { errs, rows: {} }
   for (const name of CH) {
@@ -70,6 +71,8 @@ async page => {
     const arrival = await page.evaluate(() => { const g = window.__capy; const i = g.reflectInfo(); return { why: i.why, ms: +i.ms.toFixed(2), cam: g.camera.position.toArray().map(v => +v.toFixed(1)) } })
     if (FRAME[name]) {
       const F = FRAME[name]
+      // the tide-gated chapter: walk the phase onto the plateau (venTIDE_RISE1..FALL0) and let venWaterY damp up
+      if (F.prep === 'venice') { await page.evaluate(() => window.__capy.venice.phaseDebug(0.62)); await page.waitForTimeout(3500) }
       await put(...F.at); await page.waitForTimeout(1500)
       // a frameShot, not the hand-turned rig: the resting lens drifts back
       // behind the animal, and a shot holds its bearing for the A/B
@@ -153,7 +156,7 @@ async page => {
     out.rows[name] = r
     // ---- the swim cut: the animal into the water, E held for the dive --------
     const SWIM = { kyoto: [26, -0.2, -2], hanoi: [0, -0.3, -58], pantanal: [-34, 0.3, -68], monaco: [-10, -0.4, -40],
-                   quay: [16, -0.4, -12], cali: [-20, -1.8, 0], antarctic: [10, -0.9, 8], cave: [-20, -7.6, -30] }
+                   quay: [16, -0.4, -12], cali: [-20, -1.8, 0], antarctic: [10, -0.9, 8], cave: [-20, -7.6, -30], venice: [-4, 0.5, -34] }
     if (SWIM[name]) {
       await page.evaluate((p) => { const b = window.__capy.capy.body; b.position.set(p[0], p[1], p[2]); b.velocity.set(0, 0, 0); if (b.interpolatedPosition) b.interpolatedPosition.set(p[0], p[1], p[2]) }, SWIM[name])
       await page.waitForTimeout(2500)
