@@ -533,6 +533,119 @@ const wxFOOT_Y     = 0.34;
 // sample missed. Below this the per-ring terrain height wins, which is what
 // keeps a ring on a shelving beach out of the sand.
 const wxDECK_UP    = 0.40;
+
+// --- THE GROUND MIST (ROADMAP-WOW G3) ----------------------------------------
+// The cave builds one (`cavMist`, twenty-two flattened spheres at 0.055 alpha
+// under the doline) and nothing else does. This is the same thing said once
+// for every chapter whose mood row already describes it in words — a sea mist
+// in Iceland, the dust over Goreme's burners, the Pantanal at dusk, the Drift
+// "in the mist", Monaco's salt haze, Venice at tide — and it is DATA: a row per
+// chapter below, no per-biome code, exactly as the mote kinds are.
+//
+// WHAT IT IS. Three very large, very low sheets in ONE geometry under ONE
+// material, drawn last, never writing depth. Each sheet's alpha is a value
+// noise over WORLD x/z (so the pattern stays put when the animal walks and
+// the sheets follow it), advected by the weather's own gust, faded radially
+// from the animal so the edge of the geometry is never seen, faded near the
+// lens so it never washes the frame, and faded with height so the top of it is
+// nothing at `h` (0.8 m at most: it must never reach the animal's face). Its
+// colour is the chapter's OWN haze — the fog is what a mist is, up close —
+// so the far field and the near band agree by construction and no row of a
+// grade, a sun, a fog or a mote table moves (the audit's rule).
+//
+// COST. One draw call, six triangles, a handful of hash noises per covered
+// pixel. Per frame it is five uniform writes and a position. It parks at
+// governor rung 1 like the far cascade — allocated, skipped, never freed — and
+// `game.state.noMist` cuts it for the harness.
+//
+//   h      metres, the top of the band. The bottom sheet sits at 0.12 h.
+//   alpha  the bottom sheet's peak optical depth at the animal's own view
+//          angle (Beer-Lambert in the shader; the noise thins it)
+//   drift  how much of the gust the pattern moves on; 1 is the gust itself
+//   tint   the chapter's haze. PALETTE only.
+//   tide   optional [lo, hi] of the live biome's `waterLevel`: the band is
+//          at 0.4 of itself at low water and whole at high — Venice's tide.
+const wxMIST = {
+  // VERIFIED BY EYE (qa/wow-mist.js, qa/wow-mist-tune.js): the road behind
+  // the animal carries a low pale band under the parked cars at 2.0, and a
+  // haar is the colour the fog goes when the air has water in it.
+  iceland:  { h: 0.80, alpha: 2.0, drift: 1.0, tint: PALETTE.wxHazeWet },
+  // PROVISIONAL — the five rows below are placed, not yet read by eye
+  // (the tuning run that would have settled them hit another module's
+  // boot error); each is a tint lighter than its own ground, because the
+  // first round proved a chapter's fog colour vanishes into the ground it
+  // lies on. alpha is an OPTICAL DEPTH (see the shader), not a coverage.
+  goreme:   { h: 0.70, alpha: 2.4, drift: 0.7, tint: PALETTE.wxMote },
+  pantanal: { h: 0.80, alpha: 2.4, drift: 0.9, tint: PALETTE.panHaze },
+  drift:    { h: 0.80, alpha: 2.4, drift: 0.8, tint: PALETTE.driCloud },
+  monaco:   { h: 0.60, alpha: 2.0, drift: 0.7, tint: PALETTE.wxHazeWet },
+  venice:   { h: 0.70, alpha: 3.2, drift: 0.8, tint: PALETTE.venPigeon, tide: [-1.30, 0.95] },
+};
+const wxMIST_R       = 36;     // m, half-width of a sheet AND the radial fade's edge
+const wxMIST_LAYERS  = [0.12, 0.42, 0.72];   // fractions of h, bottom to top
+const wxMIST_FOLLOW  = 1.2;    // lambda of the band's floor chasing the ground
+const wxMIST_RAIN    = 0.55;   // a shower at full rainT adds this much alpha...
+const wxMIST_RAIN_H  = 0.30;   // ...and this much height, of the row's own
+const wxMIST_BREATH  = 0.35;   // m/s the pattern moves in still air, so it boils
+const wxMIST_ABOVE   = 6;      // m the animal may be above the ground before the
+                               // band stops following it down (a jump, a fall)
+// A hash and a value noise of its own. shared.js's grain() has one, and this
+// is a COPY rather than an import on purpose: a shader string is not a named
+// export, and the mist's is two octaves shorter than the grain's anyway.
+const wxMIST_VERT = [
+  'uniform float uH;',
+  'varying vec3 vW;',
+  'varying float vL;',
+  'void main() {',
+  '  vL = position.y;',
+  '  vec4 w = modelMatrix * vec4(position.x, position.y * uH, position.z, 1.0);',
+  '  vW = w.xyz;',
+  '  gl_Position = projectionMatrix * viewMatrix * w;',
+  '}',
+].join('\n');
+const wxMIST_FRAG = [
+  'uniform vec3 uTint;',
+  'uniform float uAlpha;',
+  'uniform vec2 uDrift;',
+  'uniform float uT;',
+  'uniform vec3 uCentre;',
+  'uniform float uR;',
+  'varying vec3 vW;',
+  'varying float vL;',
+  'float wxHash(vec2 p) {',
+  '  p = fract(p * vec2(0.3183099, 0.3678794)) + 0.1;',
+  '  p += dot(p, p.yx + 19.19);',
+  '  return fract(p.x * p.y);',
+  '}',
+  'float wxNoise(vec2 p) {',
+  '  vec2 i = floor(p), f = fract(p);',
+  '  f = f * f * (3.0 - 2.0 * f);',
+  '  return mix(mix(wxHash(i), wxHash(i + vec2(1.0, 0.0)), f.x),',
+  '             mix(wxHash(i + vec2(0.0, 1.0)), wxHash(i + vec2(1.0, 1.0)), f.x), f.y);',
+  '}',
+  'void main() {',
+  // Each sheet samples a different patch of the field (vL * 41.7) so the three
+  // never line up, which is what reads as depth when the lens moves.
+  '  vec2 p = vW.xz - uDrift + vL * 41.7;',
+  '  float n = wxNoise(p * 0.075) * 0.55 + wxNoise(p * 0.19 + uT * 0.04) * 0.30',
+  '          + wxNoise(p * 0.45 - uT * 0.06) * 0.15;',
+  '  n = smoothstep(0.32, 0.78, n);',
+  '  float d = length(vW.xz - uCentre.xz) / uR;',
+  '  float rad = 1.0 - smoothstep(0.30, 1.0, d);',
+  '  vec3 toEye = vW - cameraPosition;',
+  '  float near = smoothstep(1.2, 3.6, length(toEye));',
+  '  float hgt = pow(1.0 - vL, 1.4);',
+  // A SLAB, NOT A SHEET. A layer of air seen at a grazing angle is a longer
+  // path through the same stuff, so the band thickens toward the far side
+  // of the frame and thins straight under the lens — which is the one thing
+  // that separates a ground mist from a decal lying on the ground. Beer-
+  // Lambert on the sheet's own optical depth over the cosine of the view.
+  '  float cosT = max(abs(toEye.y) / max(length(toEye), 0.001), 0.10);',
+  '  float od = uAlpha * n * hgt * rad * near * 0.30 / cosT;',
+  '  gl_FragColor = vec4(uTint, 1.0 - exp(-od));',
+  '  #include <colorspace_fragment>',
+  '}',
+].join('\n');
 const wxFwd = new THREE.Vector3();
 const wxZAX = new THREE.Vector3(0, 0, 1);
 const wxFall = new THREE.Vector3();
@@ -686,6 +799,108 @@ export function createWeather(game) {
   // rate of zero against a pool that was visibly working.
   let ringBorn = 0;
 
+  // ---- THE GROUND MIST (G3). See the block above wxMIST. -------------------
+  // Three sheets, one buffer, eighteen vertices: x/z are the sheet's corners
+  // at wxMIST_R, y is the sheet's FRACTION of the band's height and the vertex
+  // shader scales it by the live `uH`, so a shower can lift the band without
+  // anything here touching a vertex.
+  const mistGeo = new THREEx.BufferGeometry();
+  {
+    const r = wxMIST_R, v = [];
+    for (let i = 0; i < wxMIST_LAYERS.length; i++) {
+      const y = wxMIST_LAYERS[i];
+      v.push(-r, y, -r,  r, y, -r,  r, y, r,   -r, y, -r,  r, y, r,  -r, y, r);
+    }
+    mistGeo.setAttribute('position', new THREEx.BufferAttribute(new Float32Array(v), 3));
+    mistGeo.computeBoundingSphere();
+  }
+  const mistMat = new THREEx.ShaderMaterial({
+    uniforms: {
+      uH:      { value: 0.8 },
+      uTint:   { value: new THREEx.Color(PALETTE.wxMist) },
+      uAlpha:  { value: 0 },
+      uDrift:  { value: new THREEx.Vector2() },
+      uT:      { value: 0 },
+      uCentre: { value: new THREEx.Vector3() },
+      uR:      { value: wxMIST_R },
+    },
+    vertexShader: wxMIST_VERT, fragmentShader: wxMIST_FRAG,
+    transparent: true, depthWrite: false, depthTest: true,
+    side: THREEx.FrontSide,     // from under the sheet (a dive) there is no mist
+    fog: false, lights: false,
+  });
+  const mistMesh = new THREEx.Mesh(mistGeo, mistMat);
+  mistMesh.renderOrder = 8;          // after the motes (6) and the rings (5)
+  mistMesh.frustumCulled = false;
+  mistMesh.castShadow = false;
+  mistMesh.receiveShadow = false;
+  mistMesh.visible = false;
+  mistMesh.name = 'wxMist';
+  scene.add(mistMesh);
+  let mistRow = null;                // the live wxMIST row, or null
+  let mistY = 0;                     // the band's floor, damped
+  let mistYSet = false;              // ...and whether it has been seeded yet
+
+  /** Point the band at a chapter's row: colour written once, not per frame. */
+  function wxMistTo(n) {
+    mistRow = wxMIST[n] || null;
+    mistYSet = false;
+    mistMat.uniforms.uDrift.value.set(0, 0);
+    if (mistRow) mistMat.uniforms.uTint.value.set(mistRow.tint);
+    mistMesh.visible = false;        // the step below turns it on
+  }
+
+  /** The floor the band sits on: water first, then terrain, under the animal. */
+  function wxMistGround(x, z) {
+    const api = wxApiOf(game);
+    let y;
+    if (api && typeof api.isOverWater === 'function' && api.isOverWater(x, z)) {
+      y = waterYAt(api, x, z, 0);
+    } else if (api && typeof api.terrainHeight === 'function') {
+      y = api.terrainHeight(x, z);
+    } else {
+      y = 0;
+    }
+    return (typeof y === 'number' && y === y) ? y : 0;
+  }
+
+  function wxMistStep(dt) {
+    const capy = game.capy;
+    const p = capy && capy.position;
+    const rung = (game.state && game.state.perfRung) | 0;
+    const on = !!mistRow && !!p && !(game.state && game.state.noMist) && rung < 1;
+    if (!on) { mistMesh.visible = false; return; }
+    // The floor. Damped, so a kerb is not a step in the band, and held where
+    // it was when the animal is well above the ground — a jump off the Drift's
+    // shelf must not drag the whole band into the void after it.
+    const gy = wxMistGround(p.x, p.z);
+    if (!mistYSet) { mistY = gy; mistYSet = true; }
+    else if (p.y - gy < wxMIST_ABOVE) mistY = damp(mistY, gy, wxMIST_FOLLOW, dt);
+    mistMesh.position.set(p.x, mistY + 0.02, p.z);
+    const u = mistMat.uniforms;
+    u.uCentre.value.set(p.x, mistY, p.z);
+    // The pattern rides the gust, and boils a little on its own in still air
+    // (the second and third octaves move on uT as well). Under
+    // prefers-reduced-motion it holds still: a drifting field is motion.
+    if (!wxCalm()) {
+      const k = mistRow.drift;
+      u.uDrift.value.x += (wxGust.x * k + Math.sin(wxT * 0.11) * wxMIST_BREATH) * dt;
+      u.uDrift.value.y += (wxGust.z * k + Math.cos(wxT * 0.09) * wxMIST_BREATH) * dt;
+      u.uT.value = wxT;
+    }
+    // A shower raises it — the rain rows' own line in the roadmap — and a
+    // tide row scales it by where the water is between its two marks.
+    let a = mistRow.alpha * (1 + rainT * wxMIST_RAIN);
+    if (mistRow.tide) {
+      const api = wxApiOf(game);
+      const wl = api && typeof api.waterLevel === 'number' ? api.waterLevel : mistRow.tide[0];
+      a *= 0.4 + 0.6 * clamp((wl - mistRow.tide[0]) / (mistRow.tide[1] - mistRow.tide[0]), 0, 1);
+    }
+    u.uAlpha.value = clamp(a, 0, 4);   // an optical depth, not a coverage
+    u.uH.value = mistRow.h * (1 + rainT * wxMIST_RAIN_H);
+    mistMesh.visible = true;
+  }
+
   // Per-instance state. Allocated once, at max, for both fields.
   const mx = new Float32Array(wxMOTE_MAX), my = new Float32Array(wxMOTE_MAX),
         mz = new Float32Array(wxMOTE_MAX), mph = new Float32Array(wxMOTE_MAX),
@@ -759,6 +974,7 @@ export function createWeather(game) {
     ringDue = 0;
     ringAny = false;
     wxFieldTo(row);
+    wxMistTo(name);
     // The field must not be dragged across the world from wherever it was.
     const cam = game.camera;
     if (cam) anchor.copy(cam.position);
@@ -1014,6 +1230,8 @@ export function createWeather(game) {
 
     // ---- 5. the fields ---------------------------------------------------
     wxStepFields(dt);
+    // ---- 6. the ground mist (G3) -----------------------------------------
+    wxMistStep(dt);
   }
 
   function wxStepFields(dt) {
@@ -1210,6 +1428,27 @@ export function createWeather(game) {
     /** For the QA harness and for nothing else: what the table says about a
      *  place without having to be standing in it. */
     rowOf(n) { return wxMOOD[n] || wxBASE; },
+    /** ...and the ground mist (G3): the live row, whether the band is drawn
+     *  this frame, where its floor is and what it is at. */
+    /** For the harness: re-tune a chapter's mist row live (shallow merge;
+     *  `tint` may be a hex). The shipped rows are PALETTE entries. */
+    mistSet(n, cfg) {
+      if (!n || !cfg) return;
+      const base = wxMIST[n] || { h: 0.8, alpha: 0, drift: 1, tint: PALETTE.wxMist };
+      const next = {};
+      for (const k in base) next[k] = base[k];
+      for (const k in cfg) next[k] = cfg[k];
+      wxMIST[n] = next;
+      if (n === name) wxMistTo(name);
+    },
+    mistAudit() {
+      const u = mistMat.uniforms;
+      return { row: mistRow ? (wxMIST[name] === mistRow ? name : '?') : null,
+               visible: mistMesh.visible, y: +mistY.toFixed(3),
+               alpha: +u.uAlpha.value.toFixed(3), h: +u.uH.value.toFixed(3),
+               drift: [+u.uDrift.value.x.toFixed(2), +u.uDrift.value.y.toFixed(2)],
+               rainT: +rainT.toFixed(3) };
+    },
     /**
      * ...and the same for the contact rings (D5). How many are alive, what the
      * pool is drawing, and each live ring's height ABOVE the surface the biome
