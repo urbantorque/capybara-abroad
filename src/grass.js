@@ -129,15 +129,22 @@ function grsScan(game, api, skip, gate) {
   const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
   const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), nrm = new THREE.Vector3();
   const th = api && typeof api.terrainHeight === 'function' ? api.terrainHeight : null;
-  let meshes = 0, seen = 0;
+  let meshes = 0, seen = 0, blockers = 0;
   game.scene.traverseVisible(function (o) {
     if (!o.isMesh || o.isInstancedMesh || o === skip) return;
     const g = o.geometry, m = o.material;
-    if (!g || !g.attributes || !g.attributes.color || !g.attributes.position) return;
+    if (!g || !g.attributes || !g.attributes.position) return;
     if (!m || Array.isArray(m) || m.transparent) return;
     if (o.userData && o.userData.noGrass) return;
+    // A PLAIN MESH IS A BLOCKER. Pasto's plaza is paving in one flat material
+    // laid over a ground painted green underneath (measured: the first Pasto
+    // frame grew a lawn through the flagstones). Its upward faces near the
+    // ground go in the table with no colour (-1), and a blade whose ground
+    // hit has one of them within -0.05/+0.5 m does not grow.
+    const colr = g.attributes.color || null;
+    if (!colr && m.vertexColors) return;      // painted elsewhere, not here
     meshes++;
-    const pos = g.attributes.position, colr = g.attributes.color;
+    const pos = g.attributes.position;
     const idx = g.index ? g.index.array : null;
     const n = idx ? idx.length : pos.count;
     const M = o.matrixWorld;
@@ -153,14 +160,22 @@ function grsScan(game, api, skip, gate) {
       const cx = (a.x + b.x + c.x) / 3, cy = (a.y + b.y + c.y) / 3, cz = (a.z + b.z + c.z) / 3;
       if (th) {
         const ty = th(cx, cz);
-        if (typeof ty === 'number' && ty === ty && Math.abs(cy - ty) > 0.8) continue;
+        if (typeof ty === 'number' && ty === ty && Math.abs(cy - ty) > (colr ? 0.8 : 0.6)) continue;
       }
       // Reject what is plainly not a plant by its mean colour before it costs
       // a slot: the per-blade gate runs again on the interpolated colour.
-      const r = (colr.getX(i0) + colr.getX(i1) + colr.getX(i2)) / 3;
-      const gg = (colr.getY(i0) + colr.getY(i1) + colr.getY(i2)) / 3;
-      const bb = (colr.getZ(i0) + colr.getZ(i1) + colr.getZ(i2)) / 3;
-      if (grsGate(gate, r, gg, bb) <= 0) continue;
+      // A painted face that fails the gate is a BLOCKER, not a miss: Pasto's
+      // plaza is grey flagstones inside the same merged, vertex-coloured mesh
+      // as the green ground under them, at the same height. Dropping it here
+      // let the green win (measured: the second Pasto frame, still a lawn
+      // through the paving); kept as a blocker it vetoes the blade.
+      let grows = false;
+      if (colr) {
+        const r = (colr.getX(i0) + colr.getX(i1) + colr.getX(i2)) / 3;
+        const gg = (colr.getY(i0) + colr.getY(i1) + colr.getY(i2)) / 3;
+        const bb = (colr.getZ(i0) + colr.getZ(i1) + colr.getZ(i2)) / 3;
+        grows = grsGate(gate, r, gg, bb) > 0;
+      }
       const minx = Math.min(a.x, b.x, c.x), maxx = Math.max(a.x, b.x, c.x);
       const minz = Math.min(a.z, b.z, c.z), maxz = Math.max(a.z, b.z, c.z);
       const x0 = Math.floor(minx / grsCELL), x1 = Math.floor(maxx / grsCELL);
@@ -168,9 +183,14 @@ function grsScan(game, api, skip, gate) {
       if ((x1 - x0 + 1) * (z1 - z0 + 1) > 1600) continue;  // a 80 m triangle is a floor, not a lawn
       const id = tri.length / 9;
       tri.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
-      col.push(colr.getX(i0), colr.getY(i0), colr.getZ(i0),
-               colr.getX(i1), colr.getY(i1), colr.getZ(i1),
-               colr.getX(i2), colr.getY(i2), colr.getZ(i2));
+      if (grows) {
+        col.push(colr.getX(i0), colr.getY(i0), colr.getZ(i0),
+                 colr.getX(i1), colr.getY(i1), colr.getZ(i1),
+                 colr.getX(i2), colr.getY(i2), colr.getZ(i2));
+      } else {
+        blockers++;
+        col.push(-1, -1, -1, -1, -1, -1, -1, -1, -1);
+      }
       for (let ix = x0; ix <= x1; ix++) for (let iz = z0; iz <= z1; iz++) {
         const key = (ix + 32768) * 65536 + (iz + 32768);
         let arr = cells.get(key);
@@ -179,7 +199,7 @@ function grsScan(game, api, skip, gate) {
       }
     }
   });
-  return { tri: new Float32Array(tri), col: new Float32Array(col), cells, meshes, seen, kept: tri.length / 9 };
+  return { tri: new Float32Array(tri), col: new Float32Array(col), cells, meshes, seen, blockers, kept: tri.length / 9 - blockers };
 }
 
 /** Point-in-triangle on the table; writes {y, r, g, b} of the TOPMOST hit. */
@@ -189,7 +209,7 @@ function grsLookup(tab, x, z, out) {
   const arr = tab.cells.get(key);
   if (!arr) return false;
   const T = tab.tri, C = tab.col;
-  let best = -Infinity, hit = false;
+  let best = -Infinity, hit = false, nb = 0;
   for (let k = 0; k < arr.length; k++) {
     const o = arr[k] * 9;
     const ax = T[o], az = T[o + 2], bx = T[o + 3], bz = T[o + 5], cx = T[o + 6], cz = T[o + 8];
@@ -203,6 +223,7 @@ function grsLookup(tab, x, z, out) {
     const u = 1 - v - w;                          // weight of a
     if (u < -0.002 || v < -0.002 || w < -0.002) continue;
     const y = u * T[o + 1] + w * T[o + 4] + v * T[o + 7];
+    if (C[o] < 0) { if (nb < grsBLK.length) grsBLK[nb++] = y; continue; }   // a blocker: judged after
     if (y <= best) continue;
     best = y; hit = true;
     out.y = y;
@@ -210,8 +231,11 @@ function grsLookup(tab, x, z, out) {
     out.g = u * C[o + 1] + w * C[o + 4] + v * C[o + 7];
     out.b = u * C[o + 2] + w * C[o + 5] + v * C[o + 8];
   }
-  return hit;
+  if (!hit) return false;
+  for (let k = 0; k < nb; k++) if (grsBLK[k] > best - 0.05 && grsBLK[k] < best + 0.5) return false;
+  return true;
 }
+const grsBLK = new Float32Array(32);
 
 // ---------------------------------------------------------------------------
 // The fan: four blades, each ONE triangle, foot at the origin, tip at y = 1
@@ -524,7 +548,7 @@ export function createGrass(game) {
       for (let i = 0; i < grsTR_N; i++) if (T - uTrT.value[i] < grsTR_LIFE) live++;
       return {
         biome: name, row: row ? { n: row.n, h: row.h, gate: row.gate } : null,
-        table: table ? { meshes: table.meshes, seen: table.seen, kept: table.kept, cells: table.cells.size, scanMs: +scanMs.toFixed(1) } : null,
+        table: table ? { meshes: table.meshes, seen: table.seen, kept: table.kept, blockers: table.blockers, cells: table.cells.size, scanMs: +scanMs.toFixed(1) } : null,
         count: mesh.count, visible: mesh.visible, standing, placed, recentres,
         anchor: [+anchor.x.toFixed(2), +anchor.y.toFixed(2)],
         fade: [+uBox.value.x.toFixed(2), +uBox.value.y.toFixed(2), uBox.value.z],

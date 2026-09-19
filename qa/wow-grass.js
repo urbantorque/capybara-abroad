@@ -51,6 +51,32 @@ async page => {
     if (Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 0.05) break
   }
 
+  // ---- THE ARRIVAL MAY BE PAVING. Pasto lands on its plaza, Cali on a street:
+  // where nothing stands at arrival (correctly), the body is put down on the
+  // nearest ground the table says grows (b15-shots.js's move pattern), the
+  // box relaid, and the same numbers taken there. The arrival count is kept.
+  out.arrivalStanding = await page.evaluate(() => { const a = window.__capy.grass && window.__capy.grass.audit(); return a ? a.standing : -1 })
+  if (out.arrivalStanding === 0) {
+    out.moved = await page.evaluate(() => {
+      const g = window.__capy, gr = g.grass, p = g.capy.position
+      let best = null
+      for (let r = 6; r <= 80 && !best; r += 2) for (let k = 0; k < 24 && !best; k++) {
+        const a = k / 24 * Math.PI * 2, x = p.x + Math.cos(a) * r, z = p.z + Math.sin(a) * r
+        const h = gr.probe(x, z)
+        if (h && h.gate > 0.5) best = { x: +x.toFixed(2), y: h.y, z: +z.toFixed(2), r }
+      }
+      if (best) g.capy.body.position.set(best.x, best.y + 0.6, best.z)
+      return best
+    })
+    await page.waitForTimeout(2500)
+    for (let tries = 0; tries < 10; tries++) {
+      const a = await page.evaluate(() => { const p = window.__capy.camera.position; return [p.x, p.y, p.z] })
+      await page.waitForTimeout(800)
+      const b = await page.evaluate(() => { const p = window.__capy.camera.position; return [p.x, p.y, p.z] })
+      if (Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 0.05) break
+    }
+  }
+
   out.result = await page.evaluate(async () => {
     const g = window.__capy, T = g.THREE
     const gr = g.grass
