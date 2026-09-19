@@ -148,6 +148,66 @@ was wrong.**
   right tool and is held; the frustum test still covers every bearing
   that faces away from the water.
 
+**W3 rollout (19 Sep 2026): eight more chapters opted in — the pass is
+now in twelve.** Per chapter, `qa/wow-reflect.js` (one chapter per run;
+in-mask mean diff cut-vs-live, share of water pixels over 12, outside the
+mask, the frame read by eye), all at 0 console errors, all with several
+agents' browsers live so no cost number below is a cost:
+
+- **Quay** 46.9 (92.7 % over 12; outside 0.42) — the Freshwater doubled
+  hull-and-deckhouse on her berth, the piles, Fort Denison, the buoy and
+  both headlands. The bridge deck is above the frame's top edge from the
+  apron. `c0ad693`.
+- **Cali** 38.5 (99.2 %; 0.009) — the Gato, the painted cats, the lamps,
+  the palms and the ceibas in the river. Dive cut proven. `2b8b437`.
+- **Kowloon** 25.2 (64 %; 0.84) — NOT a sea. The road slab left the one
+  merged street mesh (`hkVC()` would have mirrored every wall) and is its
+  own plane at 0.01 on the same grain plus `reflect { k 0.55, pow 1.4,
+  wobble 1.5, blur 4 }`; the signs, the taxis' lights and the lamps run
+  toward the lens as smeared bands. grain()'s reflect path has NO wetness
+  gate (it is on outgoingLight with no uGrainWet term), so it is always on
+  at that low k — the palette says the road is always wet. The row and
+  the road plane landed in `0f09848` and `183f10c`: two other agents'
+  whole-file stages took them from the shared index, so the evidence is
+  here and not in a commit of its own.
+- **Antarctica** 57.6 (98.5 %; 0.52) — both islands, the pack floe for
+  floe, the penguins on the water as paired blobs. antWATER is a constant
+  (no tide here). Dive cut proven. `1dc573a`.
+- **The cave** 6.5 (12.5 %; 0.13) — **under the target and left there.**
+  Three lenses read 7.5 / 7.9 / 6.5: what the river mirrors is dark rock
+  on dark water, and k is already 1 (a mix weight). The doubling reads by
+  eye in every frame — the glade's trunks, the sky-lit cones, the
+  glow-worms as cyan pairs — which is the lit far layer the depth audit
+  asked for. The SHAFT ITSELF cannot be in the river from a playable
+  lens: a hole 45 m up mirrors to D·h/(h+H) of the eye's ground distance,
+  under a metre from the viewer's feet. pow 0.7. `dbaa78e`.
+- **Venice** 36.2 (95.6 %; 0.17) — tide-gated: the row's `y` is a
+  function, `game.venice.tideY()` while `tide() > 0.6`, NaN below (the
+  pass reads 'no water' at arrival, 'drawn' on the plateau). The
+  Basilica's front, the clock tower, both arcades, the banners, the
+  umbrellas and the pigeons in the flooded square. `817bfb4`.
+- **Iceland** 10.0 without the aurora, **23.1 with it** (63.6 %; 0.31) —
+  one row at -1.0 serves the sea and the lagoon. The spawn's frame sees no
+  water (the harbour is behind the house row) and still pays the pass —
+  the Kyoto-arrival case again. `qa/wow-reflect-scout.js` (one position,
+  four bearings, the mask of each) picked the pier head. `4e714ed`.
+- **Rio** 19.0 (52 %; 0.01) — the wet band is a NEW strip mesh
+  (`rioBuildWetBand`: the beach is part of the merged ground), vertex
+  alpha fading up the slope, blur 6, sharing the sea's plane; the Atlantic
+  itself does not ask (a 1.7 m swell would mirror a sky it shows). 5a9b151.
+- **The dive does not engage** in the Quay's harbour or Venice's flooded
+  square (swimming yes, `diving` stays false through a held E), so the
+  swim cut is provable only where the dive exists; the eye never goes
+  under there.
+- **Two arrival frames now pay for a mirror they cannot show** (Iceland,
+  Kyoto). The occlusion query stays the right tool; W5 should count how
+  many of the twelve arrival frames are in this state before deciding.
+- **A trap for the next agent on a shared tree:** `git add <file>` puts
+  the file in the SHARED index, and the next `git commit` by anyone takes
+  it. Four of this rollout's rows and one chapter's code landed in other
+  agents' commits that way. Stage and commit in one command, and stage a
+  shared file by hunk (`git apply --cached` of the one hunk), never whole.
+
 ### A2 — THE FOREGROUND (the near 3 m, empty in nineteen frames)
 
 *"The near 3 m of every frame being empty — foreground framing is the
@@ -798,6 +858,11 @@ frame or it is not a beat.
   the azimuths facing the sun — a frame mean could not see it (0.05
   levels), the leaf pass's own lesson, so the instrument counts the
   pixels the cut moved and the motion did not.
+- **A1 in eight more chapters (the W3 rollout)** — Quay, Cali, Kowloon
+  (the wet street), Antarctica, the cave, Venice (tide-gated), Iceland
+  (the aurora doubled when it comes), Rio (the wet band, a new strip
+  mesh). Numbers, frames and the two honest misses (the cave under
+  target, Iceland under it until the aurora) in A1's W3 note above.
 - **Palawan — caustics on the sand under the shallows.** The row's
   premise was half wrong: the chapter already HAS a caustic — the
   vertex-alpha additive net `palBuildCaustics` (1.77 m cells, 7-10 m
