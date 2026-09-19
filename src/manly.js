@@ -1413,7 +1413,27 @@ function manBuildTown(game, root) {
 
   // the promenade wall along the top of the beach
   M.box(0, manPROM_Y - 0.25, manPROM_Z - 0.4, 128, 1.1, 0.8, PALETTE.manKerb);
-  manStaticBox(game, 0, manPROM_Y - 0.25, manPROM_Z - 0.4, 128, 1.1, 0.8);
+  // ---- AND IT IS A SEAWALL, NOT A SLAB (ROADMAP-WOW Part D) ---------------
+  // The W0 arrival frame (qa/WOW-manly-hero-arrive.png) has this wall in the
+  // near plane, bottom right, as one 128 m box in one value. A seawall has a
+  // coping course along the top, a pilaster every bay, and the sand the
+  // wind piles against its foot. All three in this merger: no draw call.
+  // The top is hopable from the promenade (0.3 m, and it is how the animal
+  // reaches the sand), so there is NO rail — one would either block the route
+  // or be walk-through, and the beach steps below are the openings instead.
+  // The collider grows with the coping (drawn top = solid top, the pool
+  // wall's own lesson).
+  M.box(0, manPROM_Y + 0.38, manPROM_Z - 0.4, 128.2, 0.16, 1.04, PALETTE.manPromenade);
+  manStaticBox(game, 0, manPROM_Y - 0.22, manPROM_Z - 0.4, 128, 1.36, 0.8);
+  for (let k = 0; k <= 16; k++) {
+    const px = -64 + k * 8;
+    if (Math.abs(px + 12) < 1.5 || Math.abs(px + 36) < 1.5 || Math.abs(px + 60) < 1.5) continue;   // the steps are here
+    M.box(px, manPROM_Y - 0.15, manPROM_Z - 0.4, 0.5, 1.5, 1.05, PALETTE.manKerbDk);
+  }
+  for (let k = 0; k < 9; k++) {
+    const dx = -58 + k * 14.5 + (k % 2) * 3;
+    M.sph(dx, manProfile(dx, manPROM_Z - 1.3) - 0.05, manPROM_Z - 1.25, 2.6 + (k % 3) * 0.5, 0.42, 1.1, PALETTE.manSand, 8);
+  }
 
   // ---- the surf club: cream deco, one red stripe, and a flat roof you can
   // see the whole beach from. It is the only building on the sand side.
@@ -1558,6 +1578,78 @@ function manBuildTown(game, root) {
     M.cyl(x, manPROM_Y + 0.55, manPROM_Z + 2.2, 0.5, 1.1, PALETTE.manBin, 0, 0, 0, 8);
     M.cyl(x, manPROM_Y + 1.14, manPROM_Z + 2.2, 0.55, 0.14, PALETTE.manRockDk, 0, 0, 0, 8);
     manPoolBox(furn, x, manPROM_Y + 0.55, manPROM_Z + 2.2, 0.5, 0.55, 0.5);
+  }
+  // ---- THE BEACH STEPS (Part D): three flights down through the seawall at
+  // x -12, -36, -60 — 22, 44 and 66 m from the resting lens, which sits at
+  // (11.6, 6.7, 48.4) looking west along the front, so they are the middle
+  // plane on the promenade line. Three treads of 0.25 m from the coping to
+  // the sand, a cheek wall each side; solid through the furniture body.
+  for (const sx of [-12, -36, -60]) {
+    for (let k = 0; k < 3; k++) {
+      const y = manPROM_Y + 0.46 - 0.25 * (k + 1), z = manPROM_Z - 1.05 - k * 0.5;
+      M.box(sx, y - 0.1, z, 2.4, 0.2, 0.5, PALETTE.manPromenade);
+      manPoolBox(furn, sx, y - 0.1, z, 1.2, 0.1, 0.25);            // half-extents
+    }
+    for (let s = -1; s <= 1; s += 2) {
+      M.box(sx + s * 1.35, manPROM_Y + 0.05, manPROM_Z - 1.55, 0.3, 1.0, 1.5, PALETTE.manKerb);
+      manPoolBox(furn, sx + s * 1.35, manPROM_Y + 0.05, manPROM_Z - 1.55, 0.15, 0.5, 0.75);
+    }
+  }
+  // ---- THE HEADLAND HAS PINES ON IT (Part D's middle plane for Manly) ------
+  // The western headland is the far end of the arrival frame, a bare wedge
+  // at 80–120 m with sky over it. Manly's Norfolk row does not stop at the
+  // end of the promenade; it climbs the headland, and that climbing line of
+  // black-green is what closes the frame. Five, simpler than the street's
+  // (eight tiers, no pruning stubs), static in this merger rather than in the
+  // swaying pines mesh — its sway window is grown from manPROM_Y, and a trunk
+  // footed at 10 m would move at the foot. A band of wind-shorn scrub on the
+  // face under them, which is what the real one wears.
+  for (let i = 0; i < 5; i++) {
+    const x = -80 - i * 6, z = 30 + i * 2.2;      // bases 3.5 → 15 m up the rise
+    const base = manTerrain(x, z);
+    if (!Number.isFinite(base)) continue;
+    const h = 15 + (i % 3) * 1.6;
+    M.cyl(x, base + h * 0.5, z, 0.40, h, PALETTE.manTrunk, 0, 0, 0, 6);
+    for (let k = 0; k < 8; k++) {
+      const t = k / 7;
+      const r = (t < 0.22 ? lerp(1.9, 2.7, t / 0.22) : lerp(2.7, 0.45, (t - 0.22) / 0.78));
+      M.cone(x, base + h * 0.42 + t * h * 0.55, z, r, 1.7, k % 2 ? PALETTE.manPine : PALETTE.manPineLt, 0, 0, 0, 8);
+    }
+  }
+  // ---- THE CORNER PUB. The Corso's nine shops stop at x = -46 and the first
+  // cut of this block left the far end of the street as sky over a one-storey
+  // parapet — the bins did not move. What stands on that corner in Manly is
+  // a three-storey Federation hotel with an iron-lace verandah on two
+  // levels, and from the resting lens it is the one built thing at the far
+  // end tall enough to take the sky: 70 m out, 12 m high, cream with the
+  // club's red trim, the verandahs as two slabs on a row of posts.
+  {
+    const px = -60, pz = manSHOP_Z + 4, pw = 16, pd = 14, ph = 12;
+    M.box(px, manPROM_Y + ph * 0.5, pz, pw, ph, pd, PALETTE.manClub);
+    M.box(px, manPROM_Y + ph + 0.3, pz, pw + 0.6, 0.6, pd + 0.6, PALETTE.manKerb);        // the parapet
+    M.box(px, manPROM_Y + ph + 1.1, pz - 2, 5, 1.6, 1.2, PALETTE.manClub);                 // the pediment
+    M.box(px, manPROM_Y + ph + 2.0, pz - 2, 5.6, 0.3, 1.5, PALETTE.manClubTrim);
+    for (let L = 0; L < 2; L++) {
+      const vy = manPROM_Y + 3.6 + L * 3.8;
+      M.box(px, vy, pz - pd * 0.5 - 1.4, pw + 0.4, 0.28, 2.8, PALETTE.manClubRoof);       // the verandah floor
+      M.box(px, vy + 0.55, pz - pd * 0.5 - 2.7, pw + 0.4, 0.9, 0.12, PALETTE.manClubTrim); // the lace balustrade
+      for (let k = 0; k <= 6; k++) {
+        M.cyl(px - pw * 0.5 + k * (pw / 6), vy + 1.9, pz - pd * 0.5 - 2.7, 0.09, 3.6, PALETTE.manPole, 0, 0, 0, 4);
+      }
+      for (let k = 0; k < 5; k++) {
+        M.box(px - 6 + k * 3, vy + 2.0, pz - pd * 0.5 - 0.05, 1.3, 2.2, 0.2, PALETTE.manClubRoof);   // the windows
+      }
+    }
+    M.box(px, manPROM_Y + 11.4, pz - pd * 0.5 - 1.4, pw + 0.4, 0.28, 2.8, PALETTE.manClubRoof);      // the verandah roof
+    manStaticBox(game, px, manPROM_Y + ph * 0.5, pz, pw, ph, pd);
+    manPerch.push(px - 5, manPROM_Y + ph + 0.65, pz - pd * 0.5 + 0.2);
+    manPerch.push(px + 5, manPROM_Y + ph + 0.65, pz - pd * 0.5 + 0.2);
+  }
+  for (let i = 0; i < 22; i++) {
+    const x = -68 - (i % 11) * 2.8 - (i > 10 ? 1.4 : 0), z = 8 + (i % 4) * 6.5 + (i > 10 ? 3 : 0);
+    const base = manTerrain(x, z);
+    if (!Number.isFinite(base) || base < 1.2) continue;
+    M.cone(x, base + 0.5, z, 1.1 + (i % 3) * 0.35, 1.2, i % 2 ? PALETTE.manScrub : PALETTE.manScrubDry, 0, 0, 0, 8);
   }
   for (let i = 0; i < 4; i++) {
     const x = -30 + i * 22;
