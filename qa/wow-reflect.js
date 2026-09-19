@@ -9,7 +9,7 @@ async page => {
   // post.render x 30 with a readPixels drain at each end, ten interleaved
   // reps, median per arm. Then the swim cut.
   // ONE chapter per run (a run must finish in under four minutes on a loaded machine)
-  const CH = ['iceland']
+  const CH = ['rio']
   const errs = []
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
@@ -63,6 +63,7 @@ async page => {
     venice: { at: [-4, 1.2, -18], yaw: 0, dist: 12, pitch: 0.26, raise: 1.8, prep: 'venice' },   // the flooded piazza at the top of the tide, lens south, the Basilica closing the far end
     // (the arrival frame sees no water: the harbour is behind the house row from the spawn, mask 0 — and the pass still draws there, the Kyoto-arrival case)
     iceland: { at: [26, 0.8, 139], yaw: Math.PI / 2, dist: 11, pitch: 0.28, raise: 1.6, prep: 'iceland' },   // the old pier's head, lens east, the moored boats and the lamps over the bay (qa/wow-reflect-scout.js picked it)
+    rio: { at: [0, 0.3, -8], yaw: 0, dist: 8, pitch: 0.35, raise: 1.6 },   // the beach's slope, lens landward (+z), the wet band at the break straight ahead (the 'water' here is the band, not the sea)
   }
   const out = { errs, rows: {} }
   for (const name of CH) {

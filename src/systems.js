@@ -3094,6 +3094,7 @@ const sysREFLECT = {
   venice:   { y: function (g) { const v = g.venice; return (v && v.tide() > 0.6) ? v.tideY() : NaN; },
               k: 1.0, lift: 0.07, box: [-210, -105, 80, 25] },   // the acqua alta (venWaterY; swell 0.05)
   iceland:  { y: -1.0, k: 1.0, lift: 0.07, box: [-260, -78, 260, 317] },   // ONE plane, two sheets: the old harbour's sea (iceSEA_Y) and the lagoon (iceLAG_Y), both -1.0
+  rio:      { y: -1.0, k: 1.0, lift: 0.10, box: [-200, -18, 200, -12] },   // the wet band on the sand (rioBuildWetBand; the sea itself does not ask — its swell rides 1.7 m over the plane)
 };
 const sysLENS = {
   //             wide  splitW splitC

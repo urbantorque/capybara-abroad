@@ -855,6 +855,47 @@ function rioBuildSea() {
   return m;
 }
 
+/**
+ * THE WET BAND (ROADMAP-WOW A1, Part B row 6): at the break, where the paving
+ * goes to mirror. The beach is part of the one merged ground mesh and the
+ * planar reflection is an option on a MATERIAL, so the strip of sand the
+ * swash keeps wet is its own plane: from the waterline (rioSHORE_Z, rioSEA_Y)
+ * six metres up the slope, laid on rioTerrain a centimetre and a half proud
+ * of the sand, vertex alpha 1 at the water fading to 0 at the top — the
+ * Pantanal's shore rule; grain() scales the alpha push by it, so the mirror
+ * dies where the sand dries. reflect at HIGH blur: wet sand is not a pond,
+ * it is a smear of sky and the Two Brothers. It samples the SAME pass as the
+ * sea (sysREFLECT.rio at rioSEA_Y), up to 0.75 m above that plane, which at
+ * this blur is a displacement nobody can see. Never clone this material.
+ */
+function rioBuildWetBand() {
+  const Z0 = rioSHORE_Z, Z1 = rioSHORE_Z + 6, X0 = -200, X1 = 200, NX = 40, NZ = 6;
+  const g = new THREE.PlaneGeometry(X1 - X0, Z1 - Z0, NX, NZ);
+  g.rotateX(-Math.PI / 2);
+  g.translate((X0 + X1) * 0.5, 0, (Z0 + Z1) * 0.5);
+  const p = g.attributes.position.array;
+  const n = g.attributes.position.count;
+  const col = new Float32Array(n * 4);
+  const c = new THREE.Color(PALETTE.rioSandDark);
+  for (let v = 0; v < n; v++) {
+    const i = v * 3, o = v * 4;
+    const x = p[i], z = p[i + 2];
+    p[i + 1] = rioTerrain(x, z) + 0.015;
+    const t = clamp((z - Z0) / (Z1 - Z0), 0, 1);
+    col[o] = c.r; col[o + 1] = c.g; col[o + 2] = c.b;
+    col[o + 3] = (1 - t) * (1 - t) * 0.85;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 4));
+  g.computeVertexNormals();
+  const m = new THREE.Mesh(g, grain(mat(0xffffff, { vertexColors: true, transparent: true, opacity: 1, depthWrite: false }),
+    { scale: 0.45, amount: 0.06, warp: 0,
+      reflect: { k: 0.9, pow: 0.8, wobble: 0.6, blur: 6 } }));
+  m.receiveShadow = true;
+  m.frustumCulled = false;
+  m.renderOrder = 2;
+  return m;
+}
+
 /** The Atlantic has a real swell on it, so this is a longer, slower wave than
  *  the Rio Cali's ripple — and it runs UP the beach, not across it. */
 /**
@@ -4914,6 +4955,7 @@ function rioBuild(game) {
   rioRoot.add(rioBuildGroundMesh());
   rioBuildGroundBody(game);
   rioRoot.add(rioBuildSea());
+  rioRoot.add(rioBuildWetBand());
   rioRoot.add(rioBuildCalcadao());
   // The cast is built FIRST and filled in by everything after it: the beach,
   // Arpoador and the grandstand all call rioAddPerson, and the two instanced
