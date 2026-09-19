@@ -9,7 +9,7 @@ async page => {
   // post.render x 30 with a readPixels drain at each end, ten interleaved
   // reps, median per arm. Then the swim cut.
   // ONE chapter per run (a run must finish in under four minutes on a loaded machine)
-  const CH = ['venice']
+  const CH = ['iceland']
   const errs = []
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
@@ -61,6 +61,8 @@ async page => {
     antarctic: { at: [0, 0.9, 20], yaw: 0, dist: 11, pitch: 0.30, raise: 1.6 },   // the jetty's seaward end, lens south, the boat and the pack across the lead
     cave: { at: [-2, -6.3, -12], yaw: 0.3, dist: 11, pitch: 0.28, raise: 1.8 },   // the east bank in the passage, lens SSE, looking NNW over the river to the sky-lit cones and the glade under the doline
     venice: { at: [-4, 1.2, -18], yaw: 0, dist: 12, pitch: 0.26, raise: 1.8, prep: 'venice' },   // the flooded piazza at the top of the tide, lens south, the Basilica closing the far end
+    // (the arrival frame sees no water: the harbour is behind the house row from the spawn, mask 0 — and the pass still draws there, the Kyoto-arrival case)
+    iceland: { at: [26, 0.8, 139], yaw: Math.PI / 2, dist: 11, pitch: 0.28, raise: 1.6, prep: 'iceland' },   // the old pier's head, lens east, the moored boats and the lamps over the bay (qa/wow-reflect-scout.js picked it)
   }
   const out = { errs, rows: {} }
   for (const name of CH) {
@@ -73,6 +75,8 @@ async page => {
       const F = FRAME[name]
       // the tide-gated chapter: walk the phase onto the plateau (venTIDE_RISE1..FALL0) and let venWaterY damp up
       if (F.prep === 'venice') { await page.evaluate(() => window.__capy.venice.phaseDebug(0.62)); await page.waitForTimeout(3500) }
+      // the aurora chapter: the beat is the harbour mirroring the aurora WHEN IT COMES, so bring it (auroraForce 1) and let it fade up
+      if (F.prep === 'iceland') { await page.evaluate(() => window.__capy.iceland.auroraForce(1)); await page.waitForTimeout(4000) }
       await put(...F.at); await page.waitForTimeout(1500)
       // a frameShot, not the hand-turned rig: the resting lens drifts back
       // behind the animal, and a shot holds its bearing for the A/B
@@ -156,7 +160,7 @@ async page => {
     out.rows[name] = r
     // ---- the swim cut: the animal into the water, E held for the dive --------
     const SWIM = { kyoto: [26, -0.2, -2], hanoi: [0, -0.3, -58], pantanal: [-34, 0.3, -68], monaco: [-10, -0.4, -40],
-                   quay: [16, -0.4, -12], cali: [-20, -1.8, 0], antarctic: [10, -0.9, 8], cave: [-20, -7.6, -30], venice: [-4, 0.5, -34] }
+                   quay: [16, -0.4, -12], cali: [-20, -1.8, 0], antarctic: [10, -0.9, 8], cave: [-20, -7.6, -30], venice: [-4, 0.5, -34], iceland: [0, -1.3, 150] }
     if (SWIM[name]) {
       await page.evaluate((p) => { const b = window.__capy.capy.body; b.position.set(p[0], p[1], p[2]); b.velocity.set(0, 0, 0); if (b.interpolatedPosition) b.interpolatedPosition.set(p[0], p[1], p[2]) }, SWIM[name])
       await page.waitForTimeout(2500)

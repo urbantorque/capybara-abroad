@@ -1007,7 +1007,12 @@ function iceBuildSea() {
   const m = new THREE.Mesh(g, grainOwn(mat(0xffffff, { vertexColors: true, transparent: true, opacity: 0.9 }),
     { scale: 0.45, amount: 0.05, warp: 0,
       sparkle: 0.26, sparkleScale: 1.2, sparkleSpeed: 0.24, sparkleCut: 0.68, fresnel: 0.65,
-      sparkleColor: PALETTE.iceSkyLow }));
+      sparkleColor: PALETTE.iceSkyLow,
+      // ...AND THE HARBOUR MIRRORS THE AURORA WHEN IT COMES (ROADMAP-WOW A1):
+      // the quay's lamps, the boat's lit wheelhouse and the sky doubled in the
+      // black water. sysREFLECT.iceland carries one plane at -1.0 for this
+      // sheet and the lagoon's. The clone is before grain (grainOwn): right.
+      reflect: { k: 1.0, pow: 1.0, wobble: 1.0, blur: 0 } }));
   m.receiveShadow = true;
   m.frustumCulled = false;
   iceSeaAttr = g.attributes.position;
@@ -1033,7 +1038,9 @@ function iceBuildLagoon(root) {
   const m = new THREE.Mesh(g, grain(mat(0xffffff, { vertexColors: true, transparent: true, opacity: 0.88 }),
     { scale: 0.5, amount: 0.05, warp: 0,
       sparkle: 0.22, sparkleScale: 1.4, sparkleSpeed: 0.16, sparkleCut: 0.69, fresnel: 0.65,
-      sparkleColor: PALETTE.iceSkyLow }));
+      sparkleColor: PALETTE.iceSkyLow,
+      // the same plane as the sea (both -1.0): the snout and the bergs doubled
+      reflect: { k: 1.0, pow: 1.0, wobble: 1.0, blur: 0 } }));
   m.receiveShadow = true;
   iceLagAttr = g.attributes.position;
   iceLagMesh = m;
