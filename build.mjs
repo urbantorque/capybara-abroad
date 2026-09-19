@@ -37,6 +37,7 @@ const ORDER = [
   'src/monaco.js',
   'src/hanoi.js',
   'src/weather.js',
+  'src/grass.js',
   'src/props.js',
   'src/capybara.js',
   'src/condor.js',
