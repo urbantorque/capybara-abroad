@@ -5348,5 +5348,39 @@ function caliBuild(game) {
     game.addHide({ biome: 'cali', x: caliCANE.x0 + 4 * 3.1, z: caliCANE.z0 + (10 / 14) * (caliCANE.z1 - caliCANE.z0), r: 3.0, kind: 'the cane' });
   }
 
+  caliBuildForeground(game, caliRoot);
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(caliRoot);
+}
+
+// ---- ROADMAP-WOW A2, THE FOREGROUND (W1) -----------------------------------
+// Same fix as the other landed chapters: the arrival frame's near 0-4 m is
+// empty. The roadmap's own suggestion is "a cable and a kite string" — this
+// chapter already draws both (caliBuildWires' catenary, caliBuildKites'
+// diamonds-on-a-line), so two short thin boxes in the same colours read as
+// the near end of those same things rather than a new object family: a power
+// cable (PALETTE.caliCable, the wires' own colour) crossing one corner, and a
+// taut kite string (PALETTE.caliStoneDark, the kites' own line colour)
+// crossing the other. Static, no sway, gated on noFore, built once (caliBuild
+// runs exactly once, caliBuilt guards it).
+function caliBuildForeground(game, root) {
+  if (game.state && game.state.noFore) return;
+  const M = caliMerger();
+  // The cable: one thin box, angled slightly off-axis the way a wire crossing
+  // the top of frame actually reads (not perfectly horizontal).
+  M.box(0, 0, 0, 0.06, 0.06, 1.6, PALETTE.caliCable, 0.08, 0.5, 0.05);
+  // The kite string: thinner, steeper, a few tens of centimetres off to the
+  // side of the cable so the two read as two different things crossing the
+  // corner rather than one thick one.
+  M.box(0.55, -0.22, -0.05, 0.03, 0.03, 1.3, PALETTE.caliStoneDark, 0.6, 0.3, 0);
+  const g = new THREE.Mesh(M.build(), caliVC());
+  g.castShadow = false;
+  g.userData.noShadow = true;
+  // Measured 19 Sep 2026 from the live resting camera at the Cali arrival
+  // (cam ~ (-26.71, 4.10, -25.42), fwd/right/up read off camera.matrixWorld,
+  // fov 48 (vertical), aspect 1.684): world position = cam + fwd*3.0 +
+  // right*1.91 + up*1.00 — top-RIGHT corner (top-left is under the to-do
+  // card the whole time, not just at rest), over the trees rather than into
+  // the pole and its own cables already crossing frame-centre.
+  g.position.set(-24.98, 4.68, -22.21);
+  root.add(g);
 }

@@ -27,6 +27,7 @@ async page => {
     { name: 'kyoto', anchor: [-23.27, 4.70, 57.10] },
     { name: 'hanoi', anchor: [-64.01, 5.60, -74.22] },
     { name: 'kowloon', anchor: [8.32, 4.82, 37.27] },
+    { name: 'cali', anchor: [-24.98, 4.68, -22.21] },
   ];
 
   const out = { errs, chapters: {} };
@@ -47,6 +48,19 @@ async page => {
     await page.waitForTimeout(1500);
     await page.evaluate((n) => window.__capy.hud.cross(n), row.name);
     await page.waitForTimeout(9500);
+    // Not every chapter's rig is done moving at 9.5 s (Manly measured three
+    // DIFFERENT poses on three fresh boots at this mark, one still mid dolly-
+    // in; a multi-chapter run in one page can also simply run slower per
+    // wall-clock second than a solo one, landing this same wait at an earlier
+    // sim state). Poll camera position until two 1 s-apart samples agree
+    // within 5 cm, up to 20 s more, rather than trust a fixed delay.
+    for (let tries = 0; tries < 20; tries++) {
+      const a = await page.evaluate(() => { const p = window.__capy.camera.position; return [p.x, p.y, p.z]; });
+      await page.waitForTimeout(1000);
+      const b = await page.evaluate(() => { const p = window.__capy.camera.position; return [p.x, p.y, p.z]; });
+      const moved = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+      if (moved < 0.05) break;
+    }
     const res = await page.evaluate((anchorArr) => {
       const g = window.__capy, T = g.THREE;
       const anchor = new T.Vector3(anchorArr[0], anchorArr[1], anchorArr[2]);
