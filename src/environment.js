@@ -268,6 +268,12 @@ const envFIG_SPOTS = [[-19, 5], [-25, 11], [18.5, 2.5], [27, 7.5], [34.5, 12],
                       // the walk up to the railing has something in it.
                       [55, 47], [61.5, 38], [59, 57], [48, 62],
                       [33.5, 62], [17, 58.5], [3, 52], [-20, 50]];
+// THE DAPPLED FIGS (ROADMAP-WOW G2): grain()'s dapple bakes at most eight
+// circles into the lawn's fragment source, so these are the eight of the
+// twenty-one nearest the spawn at (0, 22) — every one the player stands under
+// in the first minute. Indices into envFIG_SPOTS, so a moved fig moves its
+// shade; the radius is envCAM_FIG_R's own crown footprint.
+const envDAPPLE_FIGS = [10, 11, 12, 5, 7, 0, 2, 1].map(i => ({ x: envFIG_SPOTS[i][0], z: envFIG_SPOTS[i][1], r: 4.6 }));
 const envJAC_SPOTS = [[30, 20], [40.5, 26], [47, 45], [26.5, 49], [54, 36], [21, 27],
                       [6, 22.5], [-6.5, 36],
                       // the junctions of the eastern walks
@@ -2415,7 +2421,14 @@ export function createEnvironment(game) {
                          { scale: 0.68, amount: 0.17, warp: 0, near: 1.00, speck: 0.70, nearScale: 8, contact: 1, broad: 0.11, broadM: 17,
                            // the mid octave (L6, E6): worn dry patches on the lawn
                            // in eight-metre pieces, yellowing toward grassPale
-                           mid: 0.06, midM: 8, midColor: PALETTE.grassPale, midBase: PALETTE.grass });
+                           mid: 0.06, midM: 8, midColor: PALETTE.grassPale, midBase: PALETTE.grass,
+                           // THE DAPPLE (ROADMAP-WOW G2): light through the fig
+                           // crowns on the lawn under them. The eight figs nearest
+                           // the spawn at (0, 22) — the three over the spawn lawn,
+                           // the avenue pair, the three framing the Opera House —
+                           // at the crown's own footprint (envCAM_FIG_R, the blobs
+                           // reach ~4.1 m and the ground shadow a little past).
+                           dapple: { cells: envDAPPLE_FIGS, k: 0.35, scale: 3.2 } });
   const matVC2  = mat(envVC_BASE2, { vertexColors: true, side: THREE.DoubleSide });
   // DoubleSide defaults shadowSide to DoubleSide -> the open sail surfaces would
   // sample their own depth and speckle. Front faces only.

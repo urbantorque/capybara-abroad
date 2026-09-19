@@ -5706,6 +5706,34 @@ export function reflectRender(renderer, scene, camera, cut, rung, scale) {
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// DAPPLE (ROADMAP-WOW G2) — LIGHT THROUGH LEAVES, ON THE GROUND UNDER A CROWN.
+//
+// The cloud term above (_cloudP, rmCloud) subtracts direct light through a
+// drifting noise keyed to the SKY: one field over the whole chapter. A dapple
+// is the same idea keyed to the GROUND inside each canopy's footprint — a
+// finer noise (20-40 cm blobs, which is what sun through a fig canopy actually
+// throws) inside a soft circle per crown, and nothing outside it. The crowns
+// do not move, so the circles are baked into the fragment source as constants
+// (no uniform pool, no per-frame writes); the noise drifts on the cloud's OWN
+// accumulated wind (`_cloudP.xy`, bound here under a second name) so the
+// pattern slides the way the crowns sway, in the same direction, and stops
+// when they do (the calm / reduced-motion clock).
+//
+// `_dappleK` is the cut. `dappleSet(0)` is what a probe calls for its OFF arm
+// and what `game.state.noDapple` will drive once W5 wires it in systems.js —
+// today NOTHING in src reads state.noDapple; the setter is the whole switch,
+// and this comment is here so nobody assumes otherwise.
+const _dappleK = { value: 1 };
+/** The dapple's master strength, 0..1. 0 is an exact cut (one coherent branch). */
+export function dappleSet(on) {
+  const v = on === true ? 1 : on === false ? 0 : +on;
+  _dappleK.value = v > 0 ? (v < 1 ? v : 1) : 0;
+}
+/** What the dapple is doing, for an audit. */
+export function dappleInfo() { return { k: _dappleK.value, driftX: _cloudP.value.x, driftZ: _cloudP.value.y }; }
+const _DAPPLE_N = 8;
+
 const _grainCache = new Map();
 export function grain(m, opts) {
   const o = opts || {};
@@ -5968,6 +5996,29 @@ export function grain(m, opts) {
   const reflPow = refl ? (refl.pow === undefined ? 1.0 : refl.pow) : 1;
   const reflWob = refl ? (refl.wobble === undefined ? 1.0 : refl.wobble) : 0;
   const reflBlur = refl ? (refl.blur === undefined ? 0 : refl.blur) : 0;
+  // ---------------------------------------------------------------------
+  // DAPPLE (ROADMAP-WOW G2) — see the block above _dappleK. Opt-in per ground
+  // material: `dapple: { cells: [{x, z, r}, ...], k, scale }`.
+  //
+  //   cells   the chapter's canopy list, at most _DAPPLE_N circles, world x/z
+  //           and footprint radius in metres. Baked as constants: the source
+  //           differs per list, so the list is in both cache keys.
+  //   k       the most a full leaf-shadow darkens the albedo (0.35: a shadow
+  //           under a canopy is skylit, not black).
+  //   scale   noise cells per metre. 3.2 puts a blob at 20-40 cm, which is
+  //           the size the sun's disc smears a leaf gap to at crown height.
+  //
+  // Never on the wet-only build (no noise helpers in it; and a prop is not a
+  // lawn). The gate reads `o.wetOnly` because `const wetOnly` is declared
+  // BELOW this line, and a bare `wetOnly` here is a TDZ ReferenceError.
+  const dap = (o.wetOnly === true || !o.dapple || typeof o.dapple !== 'object' ||
+               !Array.isArray(o.dapple.cells) || o.dapple.cells.length === 0) ? null : o.dapple;
+  const dapCells = dap ? dap.cells.slice(0, _DAPPLE_N).map(function (c) {
+    return { x: +c.x || 0, z: +c.z || 0, r: c.r > 0 ? +c.r : 4 };
+  }) : [];
+  const dapK = dap ? (dap.k === undefined ? 0.35 : dap.k) : 0;
+  const dapScale = dap ? (dap.scale === undefined ? 3.2 : dap.scale) : 3.2;
+  const dapKey = dapCells.map(function (c) { return c.x.toFixed(2) + ',' + c.z.toFixed(2) + ',' + c.r.toFixed(2); }).join(';');
   // cloud shadows: a multiplier on the shared uniform, 1 by default (see _cloudK)
   const cloud = o.wetOnly === true ? 0 : (o.cloud === undefined ? 1 : o.cloud);
   // How the per-channel gain splits. Red rises fastest and blue slowest, so
@@ -6064,7 +6115,8 @@ export function grain(m, opts) {
               '|' + speck + '|' + speckScale + '|' + speckCut + '|' + speckCol + '|' + cloud +
               '|' + mid + '|' + midM + '|' + midColor + '|' + midBase + '|' + midHue +
               '|' + tri + '|' + course + '|' + rock + '|' + mirror +
-              '|' + reflK + '|' + reflPow + '|' + reflWob + '|' + reflBlur;
+              '|' + reflK + '|' + reflPow + '|' + reflWob + '|' + reflBlur +
+              '|' + dapK + '|' + dapScale + '|' + dapKey;
   const hit = _grainCache.get(key);
   if (hit) return hit;
 
@@ -6129,6 +6181,14 @@ export function grain(m, opts) {
       shader.uniforms.uGrCloudP = _cloudP;
       shader.uniforms.uGrCloudS = _cloudS;
     }
+    // THE DAPPLE (G2): the cloud's drift object under a third name, bound
+    // whether or not the rim is here — a ground material usually IS rimmed
+    // and so never sees uGrCloudP above. Same object, so the leaf shadows
+    // slide on exactly the wind the cloud does.
+    if (dapK > 0) {
+      shader.uniforms.uGrDapDrift = _cloudP;
+      shader.uniforms.uGrDapK = _dappleK;
+    }
     if (fres > 0) {
       shader.uniforms.uGrSkyC = _grainSkyC;
       shader.uniforms.uGrFresK = _grainFresK;
@@ -6186,6 +6246,8 @@ export function grain(m, opts) {
         !rimHere ? 'uniform vec4 uGrCloudP;' : '',
         !rimHere ? 'uniform vec2 uGrCloudS;' : '',
         !rimHere ? _CLOUD_GLSL : '',
+        dapK > 0 ? 'uniform vec4 uGrDapDrift;' : '',
+        dapK > 0 ? 'uniform float uGrDapK;' : '',
         (fres > 0 || mirror > 0) ? 'uniform vec3 uGrSkyC;' : '',
         fres > 0 ? 'uniform float uGrFresK;' : '',
         // THE REFLECTION (L7, E4): the pools, under grain's names.
@@ -6404,6 +6466,33 @@ export function grain(m, opts) {
         speck > 0 ? '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(' +
                     skc.r.toFixed(4) + ', ' + skc.g.toFixed(4) + ', ' + skc.b.toFixed(4) + '), skM * ' +
                     speck.toFixed(4) + ');' : '',
+        // ---- THE DAPPLE (ROADMAP-WOW G2). See the block above _dappleK.
+        // The footprint first: a soft disc per crown (full inside 0.7 r, gone
+        // at r), combined with MAX and not a sum for the reason the contact
+        // term gives — two crowns that overlap are one shade, not a pit. Then
+        // the leaf noise, two octaves so the lattice does not show (the
+        // near-field octave's lesson, above), thresholded so a shadow is a
+        // SHAPE with an edge and the gaps between the shapes are full sun.
+        // The sample drifts on the cloud's wind, slowly — a canopy sways a
+        // few tens of centimetres, it does not cross the lawn.
+        // AFTER the speck, so a daisy under the fig is in the shade too, and
+        // BEFORE the wet term, which is a property of the surface, not the
+        // light on it.
+        dapK > 0 ? [
+          '  if (uGrDapK > 0.001) {',
+          '    float dpM = 0.0;',
+        ].concat(dapCells.map(function (c) {
+          return '    dpM = max(dpM, 1.0 - smoothstep(' + (c.r * 0.7).toFixed(3) + ', ' + c.r.toFixed(3) +
+                 ', distance(vGrainW.xz, vec2(' + c.x.toFixed(3) + ', ' + c.z.toFixed(3) + '))));';
+        })).concat([
+          '    if (dpM > 0.001) {',
+          '      vec2 dpq = (vGrainW.xz + uGrDapDrift.xy * 0.12) * ' + dapScale.toFixed(4) + ';',
+          '      float dpn = grNoise(dpq) * 0.62 + grNoise(dpq * 2.17 + 7.3) * 0.38;',
+          '      float dap = smoothstep(0.34, 0.62, dpn) * dpM;',
+          '      diffuseColor.rgb *= 1.0 - dap * ' + dapK.toFixed(4) + ' * uGrDapK;',
+          '    }',
+          '  }',
+        ]).join('\n') : '',
         wet ? [
           // ---- THE WET SURFACE ------------------------------------------
           // GATED ON WHICH WAY THE FACE POINTS, and that gate is most of what
@@ -6718,6 +6807,7 @@ export function grain(m, opts) {
   if (!g.userData) g.userData = {};
   g.userData.grainShore = shore;
   g.userData.grainReflect = reflK;   // qa/wow-reflect.js finds the water by this
+  g.userData.grainDapple = dapK > 0 ? dapCells : null;   // qa/wow-dapple.js finds the ground by this
   g.needsUpdate = true;
   _grainCache.set(key, g);
   return g;
