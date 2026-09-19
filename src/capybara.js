@@ -3568,6 +3568,22 @@ export function createCapybara(game) {
       g.add(pv);
     }
   }
+  // WHISKER NUBS (ROADMAP-WOW, the animal). A whisker that comes out of a
+  // flat brown face is a stick glued to a box; a whisker that comes out of a
+  // dark follicle is a whisker. Three beads a side on the muzzle's flank at
+  // the roots — the same column the sticks pivot from, pushed out to the
+  // side face so half a bead stands proud — in the nose's dark. `capyNose`
+  // is the palette's existing accent for the face's dark marks (brows, mouth
+  // interior); no new hex. At the 6 m the game is played at they are a
+  // dotted pad on the muzzle side, which is the read a capybara's has.
+  // On `mat()`, not the fur: an accent, never on the outline, no coat.
+  for (let i = 0; i < 3; i++) {
+    for (const sgn of [1, -1]) {
+      const nub = capyAddPart(head, capyGeoBead, mNose, sgn * 0.160, -0.010 + i * 0.012, 0.430,
+                              0.010, 0.0075, 0.010);
+      nub.castShadow = false;
+    }
+  }
 
   // ears are a capyDark accent — at this size the dark cup IS the whole ear
   const earL = new THREE.Group();
@@ -3647,6 +3663,21 @@ export function createCapybara(game) {
     shin.userData.coat = { limb: true, nook: [0, 1, 0],
                            band: { y: -0.145 + capyANKLE_H } };
     foot.userData.coat = { limb: true };
+    // TOENAILS (ROADMAP-WOW, the animal). R4 cut the toes; nothing said where
+    // a toe ends. A capybara's nails are dark, hoof-like caps on the tip of
+    // each toe, so: one small box per tip, on the foot's front, low, in the
+    // nose's dark (the palette's dark accent — no new hex). The tips are
+    // read back off capyFootGeo's own spacing (the outer two ARE the corners)
+    // so a re-proportioned foot keeps its nails on its toes. Children of the
+    // foot, so the loaf's ankle carries them. Twelve triangles a nail, no
+    // shadow: a 2 cm cap is not a shadow.
+    const toes = i < 2 ? 4 : 3;
+    for (let t = 0; t < toes; t++) {
+      const tx = -capyFOOT_W * 0.5 + capyFOOT_W * (t / (toes - 1));
+      const nail = capyAddPart(foot, capyGeoBox, mNose, tx, -0.008, capyFOOT_D * 0.5 + 0.004,
+                               0.020, 0.016, 0.014);
+      nail.castShadow = false;
+    }
     wetParts.push({ m: shin, dry: mDark, wet: mDarkWet });
     wetParts.push({ m: foot, dry: mDark, wet: mDarkWet });
     legs.push(g);

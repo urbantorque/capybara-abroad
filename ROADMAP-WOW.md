@@ -567,6 +567,23 @@ closeout is whether a round body under a brick head wants the skull's
 top edges softened too — not done, not decided. `qa/rv-geom.js`'s
 baseline is invalidated by the segment step and NOT re-baselined here.
 
+**The animal's own uplift (Part C), same day — two of the four were
+already there.** The belly band is R1's coat (`capyCOAT_BELLY`, a `c`
+multiplier on the hull's underside, plus the `capyLight` belly part)
+and the eye highlight fleck is L6's catchlight (`mCatch`, `matEmit`
+over `EMIT_OVER`, a bead on each eye's upper front) — both read on the
+sheet at 3 m and in the 7 m play frame before this pass touched
+anything. What was missing: **toenails** (one dark box per toe tip on
+R4's toed feet, positions read off `capyFootGeo`'s own spacing; 4+4+3+3)
+and **whisker nubs** (three dark beads a side on the muzzle flank at
+v54's whisker roots, so the sticks leave a follicle rather than a box).
+Both in `capyNose`, the palette's existing dark accent for the face —
+no new hex — on `mat()`, no shadow, ~360 triangles between them. Read
+on the re-shot sheet (`WR2-*`) and the two close-ups
+(`qa/wow-round-close.js`): the nails are dark caps at 1.6 m and a dark
+tick line along the foot fronts at 7 m; the nubs a dotted pad where the
+whiskers come out.
+
 
 ### What the reference has that this game should NOT chase
 

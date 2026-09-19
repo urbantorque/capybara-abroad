@@ -5,7 +5,7 @@ async page => {
   // `game.state.noRound = true` (flat) and false (round), same pose, same sun.
   // Plus a head close-up per state and ONE composite play-distance frame
   // (frameShot, ~7 m) for the eye fleck at the distance the game is played at.
-  const PREFIX = 'WR'
+  const PREFIX = 'WR2'
   const errs = []
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
