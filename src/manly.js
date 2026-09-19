@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, placeCue, swayMesh, makeMerger } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, placeCue, swayMesh, makeMerger, leafMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 14 — MANLY. THE SEA HAS A SHAPE HERE.
@@ -3142,6 +3142,11 @@ function manBuildFoam(root) {
   manFoamMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   manFoamMesh.frustumCulled = false;
   manFoamMesh.renderOrder = 3;
+  // ROADMAP-WOW Part B, Manly's beat: the break's spray BACKLIT. Foam is
+  // translucent — light comes through white water the way it comes through
+  // a leaf — so it takes the leaf term, and reads bright against the sun at
+  // the seaward azimuth and as itself everywhere else. Cut by noLeaf.
+  leafMesh(manFoamMesh, 0.9);
   manFoamX = new Float32Array(manFOAM_N);
   manFoamZ = new Float32Array(manFOAM_N);
   manFoamLife = new Float32Array(manFOAM_N);
@@ -3164,6 +3169,7 @@ function manBuildSpray(root) {
   manSprayMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   manSprayMesh.frustumCulled = false;
   manSprayMesh.renderOrder = 4;
+  leafMesh(manSprayMesh, 1.1);
   manSprayX = new Float32Array(manSPRAY_N);
   manSprayY = new Float32Array(manSPRAY_N);
   manSprayZ = new Float32Array(manSPRAY_N);

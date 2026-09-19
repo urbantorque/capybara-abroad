@@ -643,6 +643,16 @@ frame or it is not a beat.
   metres up through the contact-hardening filter is a soft dot, which
   is what papel picado lays on a square at noon). Cut by flipping that
   mesh's `castShadow`.
+- **Manly — the break's spray backlit.** `leafMesh()` on the foam
+  streaks (k 0.9) and the lip spray (k 1.1) — the leaf term the canopies
+  already carry, a foam being translucent the way a leaf is. Two lines
+  in `manBuildFoam`/`manBuildSpray`; cut by the existing `noLeaf`.
+  `qa/wow-manly-foam.js` (eight azimuths round the foam field's own
+  centroid, the cut's diff against a same-gap control of the foam's own
+  motion): 900–3 000 px per frame brightened by 23–36 levels, most at
+  the azimuths facing the sun — a frame mean could not see it (0.05
+  levels), the leaf pass's own lesson, so the instrument counts the
+  pixels the cut moved and the motion did not.
 
 ## Part C — the model sheet: structures, movers, NPCs and the animal, biome by biome (added 19 Sep 2026)
 
