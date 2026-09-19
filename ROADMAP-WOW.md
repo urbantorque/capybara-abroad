@@ -1392,6 +1392,10 @@ the first four reads to repeat).
   a cornice, a base course, a roofline break — reusing the merger's
   `jitter` and the beauty pass's bay-and-course treatment (the Quay
   apron's eleven bays) rather than new geometry types.
+  *Landed 20 Sep 2026 for five chapters whose files were free — see
+  "The heroes uplift" under "The sheet said" below: Pasto, Monaco, Hanoi,
+  the Pantanal, Rio. Part D already did this for its six; the other eight
+  chapters' heroes are still to be read against the rubric.*
 - **NPCs:** the roster figure already has hem and placket; the sheet
   will say whether it needs a third band (a collar) and whether the
   hand-built locals each carry one asymmetric thing. Vehicle riders
@@ -1620,6 +1624,62 @@ chapter per run, 0 console errors in every row):**
   each a rotation on an object that already moved; nothing new
   iterated in the Drift. **`qa/rv-geom.js`'s baseline** is invalidated
   by all four commits and by G5's two head conversions; not re-baselined.
+
+**The heroes uplift (20 Sep 2026, Part C's "Heroes" bullet, five
+chapters; `qa/wow-heroes.js` — Part D's `partd-probe-b` method: title-card
+arrival, the corrected bins on the live lens and on a PINNED pose, the
+chapter root's merged-triangle / mesh / instanced-mesh counts, the raw
+own-camera frame; `qa/wow-heroes-look.js` for pinned looks at named
+places; `qa/wow-heroes-what.js` raycasts a frame point and names the
+hit). Baselines by `git stash push -- <file>`. Two more things about the
+instrument, on top of Part D's three:**
+
+- **Renderer counts are not comparable across minutes.** Another agent's
+  uncommitted `grass.js` landed mid-pass: the Pantanal's live lens read
+  195 calls / 373 k triangles before and 160 / 219 k after, Rio's 226 →
+  193, with eighteen and twenty-two meshes under the root both times. Part
+  D said this of draw calls; it is true of `renderer.info.triangles` too.
+  The honest budget number is the root's merged triangles plus its mesh
+  and instanced-mesh counts, and every row below uses those.
+- **Rand-placed scenery is a noise floor on merged triangles as well as on
+  the bins.** Hanoi's terrace is `rand()`-placed (two baselines 176 922 and
+  175 630), Rio's parasols and crowd (64 356 / 63 540). A delta under ~1 k
+  in those two chapters is inside it.
+- **Where the heroes are.** Three of the five arrival lenses do not look
+  at the table's hero: Monaco's (0, 6.5, −86 looking ENE) has only the
+  Casino's two cupolas in its top-right corner at 210 m; the Pantanal's
+  spawn is on the DIRT causeway with the first bridge 40 m south and the
+  pen behind the lens; Rio's looks west along Copacabana with Sugarloaf
+  behind it. Part D found the same in Iceland and Venice. The rubric was
+  read on what the lens shows AND on the table's hero where it stands.
+
+**Read against the rubric (silhouette / secondary forms / one asymmetry;
+two colours where a person drives one), then built — all in each
+chapter's own merger or its existing instanced pool, no new material, no
+new mesh in any chapter:**
+
+| chapter | the sheet said | built | Δ merged tris | meshes / imeshes | pinned mid+far |
+|---|---|---|---|---|---|
+| Pasto (`8fe6110`) | church PASSES (portal, espadaña, cornice, pilasters, rose window; the lean is its asymmetry); fountain PASSES forms (two basins, plinth, column, jet) but is mirrored on eight faces; the far cordillera is single triangles; Galeras' snow is a level 54 m contour | a shoulder cone on every near-ring peak, snow on it where the parent is capped; the snow threshold swings ±2.5 m on the existing `mottle` (zero triangles, `qa/WOW-H-pasto-galeras.png`); a spout, trickle and stain on the fountain's east face — the face the lens sees | +184 | 23 / 8 → same | 0.368 → 0.385 |
+| Monaco (`8b986fc`) | yacht PASSES (two-tone hull, three decks, rails, mast, an off-axis stair, the ensign); Casino PASSES forms but its towers are blind stone at 210 m; the quay wall FAILS (coping on a slab) | string course, tide band (monStoneSh) and fender timbers every 12 m on every basin face; 4 × 3 lit panes on each tower's three outer faces and a second row over the colonnade, into the one pane pool; the flag on the east tower only | +384 | 146 / 11 → same | 0.342 → 0.384 (sky 0.103 → 0.034 is the fronds swaying, not this) |
+| Hanoi (`1495f42`) | shophouses PASS (awning, balconies, shutters, cornice, parapet, an off-centre tank); Long Biên PASSES (the rising lattice); Thap Rua PASSES forms but its eave slabs are 30 cm ledges and it is mirrored; the one flat thing in frame is a terrace's END house — 11 × 15 m of one hex at 21 m (`qa/wow-heroes-what.js`: the quarter merge, not a backdrop block) | `hanTerrace` tracks runs; the house opening or closing one gets `hanFlank`: a hanTrim string course and two panes per floor on the exposed side (local +x is MINUS the lane tangent for `off > 0` — the first cut had the sign wrong); a 14 cm lip a metre wider on each of the tower's eaves; a tree on the islet's east side | +4 896 (noise ±1.3 k) | 143 / 25 → same | 0.462 → 0.479 |
+| Pantanal (`c38286f`) | the arrival frame is the causeway (ruts, puddles, crown grass, a marker post — passes as a road); bridge FAILS forms as seen from the campo (loose planks and a rail on one post a bay, nothing under the deck); pen FAILS (21 posts, rails in every OTHER bay, no gate) | a rail post every 2 m, two panTrunk piles and a cross-brace per bay, capped head posts at both abutments of all five bridges (one pooled body), a spare baulk leaning on the rail at the north end of every bridge that has all its planks — the missing-plank bridge has none; rails in every bay but the gate's two, a lintel and a leaf (stile, three rails, diagonal) swung INTO the pen off the north post | +2 356 | 18 / 20 → same | 0.384 → 0.453 (grass edit between runs) |
+| Rio (`201cc3f`) | wave paving PASSES; the blocks PASS; kiosk FAILS forms from the lens side — counter, board, cooler, coconuts, stools are all on −z and the lens sees a drum under a cone; Sugarloaf's summit is a slab and a mast | a blue valance with a white hem under the eave, a dark base course, a finial, a green hatch and shelf on the 67.5° facet the lens sees (yawed flush — the 8-gon has a corner at +x); the summit station's four posts, canopy slab and terrace rail | +1 900 (noise ±800) | 22 / 12 → same | 0.41 → 0.342 (a bather in the lens, near 0.444 → 0.53) |
+
+Frames read against W0: `qa/WOW-H-pasto-hero-arrive-pinned.png` (the
+centre-left peak is two summits), `qa/WOW-H-monaco-quay.png` and
+`-casino.png`, `qa/WOW-H-hanoi-hero-arrive-pinned.png` (courses and lit
+panes on the flank) and `-tower.png`, `qa/WOW-H-pantanal-bridge.png`
+(piles to the water, posts at 2 m, head posts) and `-gate.png`,
+`qa/WOW-H-rio-hero-arrive-pinned.png` (cone, valance, drum, hatch, base —
+five forms from the arrival side) and `-summit.png`. 0 console errors in
+every run; `npm test` 25/25 each commit; no grade, sun, fog, mote or spawn
+row touched; no chapter gained a mesh or a material. **Two colours on
+what a person drives** was not re-read here: the movers uplift's batch 2
+already did the red car and the pho scooter. **Not done:** the other
+eight chapters' heroes against the rubric (Sydney, Quay, Kyoto, Cali,
+Kowloon, Palawan, the Drift, Antarctica), and `qa/rv-geom.js`'s baseline
+is invalidated by all five commits.
 
 - **W4 — the uplifts**, per chapter file, alongside Part B's beats and
   Part A′'s G5 — same files, same agent per chapter. The animal's own
