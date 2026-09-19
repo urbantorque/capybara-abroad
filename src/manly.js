@@ -306,9 +306,20 @@ function manVC() {
                { scale: 0.45, amount: 0.085, warp: 0.55, near: 0.30, nearScale: 8, contact: 1 });
 }
 /** Ground strength, and no vertical shear: the sand is horizontal. */
+// THE DAPPLED PINES (ROADMAP-WOW G2): grain() bakes at most eight circles into
+// the ground's fragment source, so these are the eight of the ten Norfolk
+// pines nearest the beach's centreline (the row is -50.4 + i * 11.2 on
+// manPINE_Z — see the pine build; the two ends are left out). r 3.2: the
+// widest whorl is 2.9 m and its shade a little past it. The promenade is the
+// ground mesh itself (manVCG; the profile is held at manPROM_Y past z = 30).
+const manDAPPLE_PINES = [1, 2, 3, 4, 5, 6, 7, 8].map(i => ({ x: -50.4 + i * 11.2, z: manPINE_Z, r: 3.2 }));
 function manVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.5, amount: 0.16, warp: 0, near: 0.44, speck: 0.65, nearScale: 8, contact: 1, broad: 0.1, broadM: 18 });
+               { scale: 0.5, amount: 0.16, warp: 0, near: 0.44, speck: 0.65, nearScale: 8, contact: 1, broad: 0.1, broadM: 18,
+                 // THE DAPPLE (ROADMAP-WOW G2): light through the pines on the
+                 // promenade under them. A Norfolk's crown is open whorls, so
+                 // its shade is more gap than leaf: a lower k, a coarser noise.
+                 dapple: { cells: manDAPPLE_PINES, k: 0.28, scale: 2.6 } });
 }
 /**
  * THE SEA, AND IT IS THE BRIGHTEST WATER IN THE GAME.
@@ -1917,7 +1928,14 @@ function manBuildTown(game, root) {
               0.13, a, k % 2 ? 0.24 : -0.24);
       }
     }
-    const gm = new THREE.Mesh(G.build(), manVC());
+    // THE VERGE IS THE GROUND UNDER THE PINES (ROADMAP-WOW G2): its two slabs
+    // cover the whole of every pine's footprint, so a dapple on the terrain
+    // mesh beneath them is buried. This mesh takes the same whisper grain as
+    // manVC() plus the pines' dapple — its own compiled material, the same
+    // one draw call it always was.
+    const gm = new THREE.Mesh(G.build(), grain(mat(0xffffff, { vertexColors: true }),
+      { scale: 0.45, amount: 0.085, warp: 0.55, near: 0.30, nearScale: 8, contact: 1,
+        dapple: { cells: manDAPPLE_PINES, k: 0.28, scale: 2.6 } }));
     gm.castShadow = true;
     gm.receiveShadow = true;
     root.add(gm);
