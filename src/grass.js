@@ -89,11 +89,13 @@ function grsHash(i, k) {
 /** The per-row growth gate on a LINEAR colour. Returns 0..1, a density. */
 function grsGate(gate, r, g, b) {
   if (typeof gate === 'number') {
-    // grain()'s speck gate: smoothstep(0.02, 0.10) on the green dominance,
-    // here with the row's own floor so a chapter can ask for a harder edge.
+    // grain()'s speck gate on the green dominance, with the row's own floor
+    // and a short ramp above it: the Pantanal's meadow is a darker olive
+    // (d = 0.066 against Sydney's 0.14) and a ramp that ran to 0.10 thinned
+    // it to 38 % (measured); full density is gate + 0.03 now.
     const d = g - Math.max(r, b);
     if (d <= gate) return 0;
-    const t = clamp((d - gate) / (0.10 - gate), 0, 1);
+    const t = clamp((d - gate) / 0.03, 0, 1);
     return t * t * (3 - 2 * t);
   }
   if (gate === 'drift') {

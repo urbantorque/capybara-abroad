@@ -23,7 +23,7 @@ async page => {
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
 
   // EDIT THIS to the chapter under test. One per run.
-  const CHAPTER = 'sydney'
+  const CHAPTER = 'pantanal'
   const out = { errs, chapter: CHAPTER }
 
   await page.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('capy3.prefs.v1', JSON.stringify({ v: 1, pf: 1 })) } catch (e) {} })
@@ -56,7 +56,8 @@ async page => {
   // nearest ground the table says grows (b15-shots.js's move pattern), the
   // box relaid, and the same numbers taken there. The arrival count is kept.
   out.arrivalStanding = await page.evaluate(() => { const a = window.__capy.grass && window.__capy.grass.audit(); return a ? a.standing : -1 })
-  if (out.arrivalStanding === 0) {
+  out.arrivalUnderfoot = await page.evaluate(() => { const g = window.__capy, p = g.capy.position; return g.grass ? g.grass.probe(p.x, p.z) : null })
+  if (out.arrivalStanding === 0 || !out.arrivalUnderfoot || out.arrivalUnderfoot.gate < 0.5) {
     out.moved = await page.evaluate(() => {
       const g = window.__capy, gr = g.grass, p = g.capy.position
       let best = null
