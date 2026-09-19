@@ -310,6 +310,14 @@ let condorSpawnY = 0;
 let condorSpawnR = 0;
 
 let condorFlapT = 0, condorFlapCool = 0, condorFlapPhase = 0;
+// THE AI'S BEAT, DRAWN (ROADMAP-WOW Part C). The seek loop below holds the
+// un-mounted bird up with a sustentation force that already pulses on
+// condorFlapPhase — and nothing drew it: condorFlapT is only ever set in
+// mounted flight, so a summoned condor climbing forty metres on the inbound
+// spiral did it with its wings held rigid. 0..1, how hard the AI is asking to
+// climb, damped; condorAnimate blends the glide pose toward the beat by it.
+// Level soaring stays a soar, which is what a condor mostly does.
+let condorAiBeat = 0;
 // (condorBankSm / condorPitchSm lived here and were damped every frame by the
 // render pose without ever being read; condorSpeedSm and condorAoASm below are
 // read by the trim loop and the stall term and are not the same thing.)
@@ -813,6 +821,12 @@ function condorBuildMesh(root, plume) {
     // — it read as a seagull. Everything aft of the throat is near-black now.
     { g: new THREE.SphereGeometry(0.30, 8, 6), c: RUFF, m: condorXf(0, 0.14, 0.50, 0, 0, 0, 1.16, 0.88, 0.88) },
     { g: new THREE.BoxGeometry(0.44, 0.10, 0.20), c: RUFF, m: condorXf(0, 0.20, 0.30) },
+    // THE RUFF IS TWO TONES (ROADMAP-WOW Part C): a collar is a thing with an
+    // edge, and one hex of white from throat to nape reads as a bandage. The
+    // beak's pale tan on its rim — the seam seen from above where the white
+    // meets the black, and the shadow line under the throat from the side.
+    { g: new THREE.BoxGeometry(0.46, 0.06, 0.08), c: BEAK, m: condorXf(0, 0.245, 0.215) },
+    { g: new THREE.BoxGeometry(0.62, 0.05, 0.56), c: BEAK, m: condorXf(0, -0.02, 0.50) },
   ];
   for (let s = -1; s <= 1; s += 2) {
     bodyParts.push({ g: new THREE.BoxGeometry(0.09, 0.42, 0.11), c: SKIN, m: condorXf(s * legX, -0.42, 0.10) });
@@ -874,20 +888,36 @@ function condorBuildMesh(root, plume) {
     wrist.position.set(outerLen, 0, 0);
     elbow.add(wrist);
 
-    // primaries: the four fingers were only ever splayed by one shared scalar, so
+    // primaries: the fingers were only ever splayed by one shared scalar, so
     // the fan is baked and the whole hand is animated as one object.
+    //
+    // FIVE FINGERS, NOT FOUR, AND EACH ONE IS TWO COLOURS (ROADMAP-WOW Part C,
+    // the movers uplift). An Andean condor's hand is the one part of the
+    // silhouette anybody can name, and four equal black slats read as a comb.
+    // Five, splayed a little wider, the inboard half in the wing's own near-
+    // black and the outboard half in the body's warmer dark, so the fan has
+    // a band across it where the fingers separate — the same c-band trick the
+    // roster figure's hem uses. Still one merged mesh per hand, still planar.
+    // The flex is on the pivot (see condorAnimate: the fan lags the flap).
     const fan = new THREE.Object3D();
     wrist.add(fan);
     const primParts = [];
-    for (let i = 0; i < 4; i++) {
-      const a = (i - 1.5) * 0.13;
+    const innerFrac = 0.56;
+    for (let i = 0; i < 5; i++) {
+      const a = (i - 2) * 0.125;
+      const place = condorXf(0, 0, -0.30 + i * 0.152, 0, a, 0);
+      const len0 = primLen * innerFrac, len1 = primLen - len0;
       primParts.push({
-        g: new THREE.BoxGeometry(primLen, 0.050, primChord), c: DARK,
-        m: condorXf(0, 0, -0.26 + i * 0.173, 0, a, 0).multiply(condorXf(primLen * 0.5, 0, 0)),
+        g: new THREE.BoxGeometry(len0, 0.050, primChord), c: DARK,
+        m: place.clone().multiply(condorXf(len0 * 0.5, 0, 0)),
+      });
+      primParts.push({
+        g: new THREE.BoxGeometry(len1, 0.042, primChord * 0.82), c: BODY,
+        m: place.clone().multiply(condorXf(len0 + len1 * 0.5, 0, 0)),
       });
     }
     fan.add(condorPart(primParts));
-    condorWings.push({ shoulder, elbow, wrist, fan, sign });
+    condorWings.push({ shoulder, elbow, wrist, fan, sign, lagD: 0 });
   }
 
   // --- tail: short, starting straight off the torso. Baked fan, one mesh; the
@@ -1596,6 +1626,7 @@ function condorUpdate(dt) {
     targetBank = clamp(lat / (mEff * g) * 1.3, -condorMAX_BANK, condorMAX_BANK);
     targetPitch = clamp((condorSeek.y - vel.y) * 0.035, -condorMAX_PITCH, condorMAX_PITCH);
     condorFlapPhase += (2.4 + clamp(condorSeek.y * 0.25, 0, 4)) * dt;
+    condorAiBeat = damp(condorAiBeat, clamp(condorSeek.y * 0.14, 0, 1), 3, dt);
     condorLandSpeed = 0;
 
     // Tested last so a mount takes effect from the NEXT frame — the seek force
@@ -2780,6 +2811,15 @@ function condorAnimate(dt, airspeed, bank, pitch, mounted) {
     sweep = lerp(0.04, 0.52, fast);
     elbowFold = lerp(0.02, -0.30, fast);
     splay = lerp(0.34, 0.06, fast);
+    // ...and the AI's climb beat on top, in the SAME phase the sustentation
+    // force pulses on (sin(phase * 2), see the seek loop), so what the bird
+    // is drawn doing and what is holding it up are one thing.
+    if (!mounted && condorAiBeat > 0.02) {
+      const b = Math.sin(condorFlapPhase * 2) * condorAiBeat;
+      dihedral += b * 0.42;
+      elbowFold += b * 0.18;
+      splay += clamp(b, 0, 1) * 0.10;
+    }
   }
   // pulling up fans everything out as an airbrake
   const brake = clamp(pitch * 1.6, 0, 1);
@@ -2797,7 +2837,16 @@ function condorAnimate(dt, airspeed, bank, pitch, mounted) {
     w.elbow.rotation.y = damp(w.elbow.rotation.y, w.sign * sweep * 0.6, 12, dt);
     // the hand is one baked mesh now: splay is a cock of the whole fan
     w.fan.rotation.y = damp(w.fan.rotation.y, w.sign * (splay - 0.20) * 0.55, 12, dt);
-    w.fan.rotation.z = damp(w.fan.rotation.z, splay * 0.34, 12, dt);
+    // ...AND THE FINGERS TRAIL THE BEAT (ROADMAP-WOW Part C). A hand on a
+    // wing that is being driven through the air bends the other way: down on
+    // the upstroke, up on the downstroke, and it comes back to flat when the
+    // wing does. `lagD` is the dihedral a few frames late, and the difference
+    // is the flex — zero in a glide, about a third of a radian at the bottom
+    // of a laboured beat. It costs one damp per wing and reads at the play
+    // distance as the one thing on the bird that is not the whole bird.
+    w.lagD = damp(w.lagD, dihedral, 5.5, dt);
+    const flex = clamp((w.lagD - dihedral) * 0.85, -0.42, 0.42);
+    w.fan.rotation.z = damp(w.fan.rotation.z, splay * 0.34 + flex, 12, dt);
   }
 
   // tail: closed in a glide, fanned wide as an airbrake. One baked mesh, so the
