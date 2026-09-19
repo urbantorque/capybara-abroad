@@ -3174,8 +3174,11 @@ const sysRAYS = {
     sysRaysV.set(760, lerp(-120, 300, s), -70);
     return sysRaysV;
   }, { spill: 'near' }] },
-  // noon, 61 degrees up: off the frame at the walking lens by construction,
-  // present the moment the lens is pitched at the sky (a helm, the postcard)
+  // noon, 61 degrees up: MEASURED zero at every yaw, under the resting
+  // crane, the eye-raise and a marquee shot pitched at the sky — a 61-degree
+  // sun cannot be framed by any lens this chapter has. The row stays because
+  // gated it costs nothing, and it fires the day A5's disc or a lower sun
+  // exists (neither is this pass's to move; see the A4 section).
   sahara:  { k: 0.45, len: 0.50, r: 0.14, src: 'sun' },
   // the big one (hkSIGN, published as kowloon.sign) is 9.2 m up and 41 m out
   // at arrival: 12.5 degrees of elevation against a walking lens whose top

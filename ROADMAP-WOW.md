@@ -457,6 +457,77 @@ at low strength — no new scene render, ~0.3 ms.
 - **Instrument:** the per-pixel diff cut vs live; the rAF A/B.
 - **`game.state.noRays`.**
 
+**Built (19 Sep 2026; `0f09848`, `5ee2572`, `804e9d1`, `cc851b3`).**
+`MAIN_POST_RAYS` in main.js: two passes of eight taps (the second at 8x
+the step, 64 effective) from quarter-res `bloomA` into `bloomB`, then into
+eighth-res `wideB` — both free once the bloom and wide chains are done, so
+nothing is allocated and rung-1 parking is allocated-but-skipped. The
+first pass admits only bloom inside `r` frame heights of the light, so what
+radiates is the light and not every sign in the frame. `sysRAYS` beside
+`sysLENS` in systems.js: `{ k, len, r, src }`, `src` the sun, a chapter-
+published landmark, a spill cluster (`'near'` = the in-frame cluster the
+frame is about, strength / (0.15 + ndc²); or nearest an xz anchor), or an
+ordered list, first in-frame wins. Projected every frame; ZERO unless
+camera-space z < −0.5 and inside the frame within `sysRAYS_MARGIN`. Cut by
+`noRays`, swept by `state.raysK`, audited by `game.raysAudit()`.
+Verification `qa/wow-rays.js`, one chapter a run, dt = 0 arms grabbed
+synchronously (an `await` between them let the page's rAF run the world on:
+21–35 % "floor"), on/on floor then on/off:
+
+| chapter | source at arrival | on/off (frame / annulus) | k |
+|---|---|---|---|
+| Goreme | the plaza stall's light (nearest lit cluster) | 33.5 % @ 6.1 / 100 % @ 7.6 | 0.40 |
+| Kowloon | the pink stall sign (frame-about cluster) | 28.4 % @ 8.7 / 95 % @ 11.6 | 0.30 |
+| Monaco | the quay lamp over the stern arrival | 23.2 % @ 11.3 / 100 % @ 14.5 | 0.50 |
+| Iceland | a lit window; faced, the lamp before the white house | 8.3 % @ 3.9 / 46 %; 14.8 % @ 7.7 / 94 % | 0.50 |
+| Sahara | — (see below) | 0.00 % at every yaw | 0.45 |
+
+Kowloon yawed away (yaws 2.6–5.0 hold no source) is the off-frame proof:
+`raysLive` 0, 0.00 % moved. Frame time was CONTAMINATED in every run (five
+agents' browsers; the OFF arm sat at 45–100 ms, never 16.7): not measured.
+
+**What was learned, and what is owed.**
+- **A weighted mean is under one sRGB level.** A 6-px bulb seed averaged
+  over 8 then 8 taps is ~0.01 linear (0.00 % moved). A ray is the light
+  summed along the line; the passes use a fixed eighth gain. At a quarter
+  the festoon washed 48 % of Goreme's frame at mean 21.
+- **The named lights are above the walking lens.** Goreme's disc tops out
+  at 21° behind a crest at 33° from the ground (a balloon event; the plaza
+  arrival faces west with the sun at its back, camera-space z +620 — an ndc
+  gate would have read it as "nearly on the left edge"). Kowloon's big sign
+  is 12.5° up against a +7° top edge. So both rows are `[the named light,
+  the nearest lit cluster]`; the frame the player sees gets the light it
+  has.
+- **Sahara cannot be framed.** A 61° sun, a 52° lens pitched 19° down:
+  zero at every yaw, under the resting crane, the eye-raise and a marquee
+  shot pitched at the sky. The row stays (gated, it costs nothing) and
+  fires the day A5's disc or a lower sun exists; neither is this pass's to
+  move. **Owed to A5.**
+- **The spill pool's positions were wrong in two ways nobody had seen.**
+  Monaco's 121 lamp globes are one InstancedMesh placed at each post's
+  FOOT (the globe at +5.0 in the geometry), so every lamp cluster sat on
+  the quay five metres under its light (`sysSPL_GEO_CENTRE`, gated to
+  Monaco; the general fix — cluster at the geometry's bounding-sphere
+  centre — belongs everywhere, with an A/B per chapter). Iceland's 26
+  heads and every window are one merged mesh whose origin is the root, so
+  the scan saw two clusters in the town; `sysSPL_SPLIT_MERGED` walks its
+  vertices in the heads' height band (the stars are a merged emitter too:
+  unbanded, 96 of 96 clusters were stars). **Iceland's spill sub-item is
+  done**: lower half of the frame 53 % at mean 3.9 with `noSpill`, a pool
+  on the pavement and wall under each lamp, the street still blue. With
+  every window in and the sign-bank reach of 14 m it was 99.8 % at 47 —
+  the coldest chapter re-graded to a sodium street; hence the band and a
+  7 m reach (`sysSPL_REACH_BY`), 2.5 m clusters (`sysSPL_CLUS_BY`).
+- **Monaco's terrace never makes the pool** (24 brightest: lamps and
+  yachts), and the yacht's cabin panes are unlit Basic boxes the scan
+  cannot see. "The chandeliers' rays through the salt haze" wants either
+  the terrace published as a landmark or the scan taught EMIT_OVER Basic
+  panes — a monaco.js/shared.js question. **Owed.**
+- **Rays are streaks only where something occludes the source** — Monaco's
+  palm fronds standing dark in the lamp's glow. An unoccluded lamp gives a
+  radial glow that fades, which is what a light in haze looks like and is
+  what this term is.
+
 ### A5 — CLOUDS FOR THE SIX THAT SHOW SKY, AND THE SUN DISC
 
 The sky is 0 % of the frame in most chapters and this pass respects
