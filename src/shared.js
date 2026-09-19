@@ -5732,6 +5732,27 @@ export function dappleSet(on) {
 }
 /** What the dapple is doing, for an audit. */
 export function dappleInfo() { return { k: _dappleK.value, driftX: _cloudP.value.x, driftZ: _cloudP.value.y }; }
+// CAUSTICS (ROADMAP-WOW Part B, Palawan) — rippling sunlight on a sand bed
+// under clear shallow water. One more octave in the SHORE path, because the
+// shore path is the one place a fragment already knows how deep under the
+// waterline it is (`sd`). Two value-noise fields multiplied — the sparkle's
+// own trick, which is what puts the light in sparse bright ridges rather
+// than an even wash — drifting on uGrainT in two directions, the second
+// field rotated a radian so they share no lattice boundary; the product is
+// thresholded and MULTIPLIED onto the albedo, so it is brighter sand rather
+// than paint. Gated on depth: nothing on dry sand or in the swash (in over
+// the first 0.3 m), and gone by 2.5 m, past which the depth tint and the
+// chapter's underwater fog own the bed. `_causticK` is the cut;
+// `causticSet(0)` is what a probe calls for its OFF arm and what a chapter's
+// own update drives from `game.state.noCaustic` (palawan.js does).
+const _causticK = { value: 1 };
+/** The caustics' master strength, 0..1. 0 is an exact cut (one coherent branch). */
+export function causticSet(on) {
+  const v = on === true ? 1 : on === false ? 0 : +on;
+  _causticK.value = v > 0 ? (v < 1 ? v : 1) : 0;
+}
+/** What the caustics are doing, for an audit. */
+export function causticInfo() { return { k: _causticK.value }; }
 const _DAPPLE_N = 8;
 
 const _grainCache = new Map();
@@ -6101,6 +6122,13 @@ export function grain(m, opts) {
   const shoreTintC = o.shoreTintColor === undefined ? 0x2a6f86 : o.shoreTintColor;
   const shoreCol = o.shoreColor === undefined ? 0xffffff : o.shoreColor;
   const shoreScale = o.shoreScale === undefined ? 1.6 : o.shoreScale;
+  // CAUSTICS — see the block above _causticK. A sub-option of the shore path
+  // (`caustic: { k, scale, speed }`), because it reads the shore's `sd`; off
+  // unless a chapter asks and off whenever the shore is.
+  const cau = (shore > 0 && o.caustic && typeof o.caustic === 'object') ? o.caustic : null;
+  const cauK = cau ? (cau.k === undefined ? 0.45 : cau.k) : 0;
+  const cauScale = cau ? (cau.scale === undefined ? 1.1 : cau.scale) : 1.1;
+  const cauSpeed = cau ? (cau.speed === undefined ? 0.16 : cau.speed) : 0.16;
   // BOTH CACHES COME OFF THIS ONE STRING — the material cache below and
   // customProgramCacheKey at the bottom of the hook — so a new option that is
   // not in it gets two call sites sharing one compiled program, and which one
@@ -6116,7 +6144,8 @@ export function grain(m, opts) {
               '|' + mid + '|' + midM + '|' + midColor + '|' + midBase + '|' + midHue +
               '|' + tri + '|' + course + '|' + rock + '|' + mirror +
               '|' + reflK + '|' + reflPow + '|' + reflWob + '|' + reflBlur +
-              '|' + dapK + '|' + dapScale + '|' + dapKey;
+              '|' + dapK + '|' + dapScale + '|' + dapKey +
+              '|' + cauK + '|' + cauScale + '|' + cauSpeed;
   const hit = _grainCache.get(key);
   if (hit) return hit;
 
@@ -6189,6 +6218,7 @@ export function grain(m, opts) {
       shader.uniforms.uGrDapDrift = _cloudP;
       shader.uniforms.uGrDapK = _dappleK;
     }
+    if (cauK > 0) shader.uniforms.uGrCauK = _causticK;
     if (fres > 0) {
       shader.uniforms.uGrSkyC = _grainSkyC;
       shader.uniforms.uGrFresK = _grainFresK;
@@ -6248,6 +6278,7 @@ export function grain(m, opts) {
         !rimHere ? _CLOUD_GLSL : '',
         dapK > 0 ? 'uniform vec4 uGrDapDrift;' : '',
         dapK > 0 ? 'uniform float uGrDapK;' : '',
+        cauK > 0 ? 'uniform float uGrCauK;' : '',
         (fres > 0 || mirror > 0) ? 'uniform vec3 uGrSkyC;' : '',
         fres > 0 ? 'uniform float uGrFresK;' : '',
         // THE REFLECTION (L7, E4): the pools, under grain's names.
@@ -6588,6 +6619,37 @@ export function grain(m, opts) {
           '    sLace *= clamp(1.0 - max(fwidth(slq.x), fwidth(slq.y)) * 0.30, 0.0, 1.0);',
           '    diffuseColor.rgb += sLace * ' + shore.toFixed(4) +
             ' * vec3(' + shc.r.toFixed(4) + ', ' + shc.g.toFixed(4) + ', ' + shc.b.toFixed(4) + ');',
+          // 4. THE CAUSTICS. See the block above _causticK. After the lace,
+          //    so the swash stays foam and the light starts where the water
+          //    is clear and standing; a MULTIPLY on the albedo, so the sun's
+          //    own shading (and the depth tint above) still act on it.
+          cauK > 0 ? [
+            '    if (uGrCauK > 0.001) {',
+            '      float cDep = smoothstep(0.0, 0.30, sd) * (1.0 - smoothstep(1.4, 2.5, sd));',
+            '      if (cDep > 0.001) {',
+            '        vec2 cq = vGrainW.xz * ' + cauScale.toFixed(4) + ' + gn * 1.6',
+            '                + vec2(uGrainT * ' + cauSpeed.toFixed(4) + ', uGrainT * ' + (-cauSpeed * 0.71).toFixed(4) + ');',
+            '        vec2 cq2 = vec2(cq.x * 0.5403 - cq.y * 0.8415, cq.x * 0.8415 + cq.y * 0.5403) * 1.37',
+            '                 + vec2(uGrainT * ' + (-cauSpeed * 0.53).toFixed(4) + ', uGrainT * ' + (cauSpeed * 0.37).toFixed(4) + ') + 3.7;',
+            // RIDGES, NOT BLOBS. Value noise folded about its middle is bright
+            // along its 0.5 level set, which is a connected net of curves —
+            // the thing a swell throws on a bed. Each net is thresholded
+            // NARROWLY (the first build ramped the product of two folds from
+            // 0.42 and measured as a 13-level wash over the whole flat: a
+            // fold averages 0.68, so a wide ramp lights everything a little);
+            // two nets drifting apart are summed, so the crossings saturate.
+            // 0.74..0.90 (full inside 5 cm of noise-value of the level set,
+            // gone at 13): the second build ramped 0.66..0.97 and the ridges
+            // never saturated — 17 levels max over 1 m of water against the
+            // chapter's own vertex net at 84.
+            '        float cn1 = smoothstep(0.74, 0.90, 1.0 - abs(grNoise(cq) - 0.5) * 2.0);',
+            '        float cn2 = smoothstep(0.74, 0.90, 1.0 - abs(grNoise(cq2) - 0.5) * 2.0);',
+            '        float cau = clamp(cn1 + cn2, 0.0, 1.0);',
+            '        cau *= clamp(1.0 - max(fwidth(cq.x), fwidth(cq.y)) * 0.45, 0.0, 1.0);',
+            '        diffuseColor.rgb *= 1.0 + cau * cDep * ' + cauK.toFixed(4) + ' * uGrCauK;',
+            '      }',
+            '    }',
+          ].join('\n') : '',
           '  }',
         ].join('\n') : '',
         fres > 0 ? [

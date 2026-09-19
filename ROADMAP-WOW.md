@@ -780,6 +780,35 @@ frame or it is not a beat.
   the azimuths facing the sun — a frame mean could not see it (0.05
   levels), the leaf pass's own lesson, so the instrument counts the
   pixels the cut moved and the motion did not.
+- **Palawan — caustics on the sand under the shallows.** The row's
+  premise was half wrong: the chapter already HAS a caustic — the
+  vertex-alpha additive net `palBuildCaustics` (1.77 m cells, 7-10 m
+  period, in at 0.35 m, out by 15 m), whose comment records that a
+  `grain()` SPARKLE on an additive sheet was tried and rejected for its
+  SHAPE (specks, not a web). What shipped is the octave that sheet cannot
+  draw: `caustic: { k, scale, speed }` in `grain()`'s shore path (it
+  reads the shore's own `sd`), two value-noise fields folded about their
+  middle so each is bright along its 0.5 level set — a connected net of
+  curves — thresholded 0.74..0.90, summed so the crossings saturate,
+  drifting apart on `uGrainT`, gated in over 0.3 m and out by 2.5 m,
+  MULTIPLIED onto the albedo; on `palVCG` only (the one sea you can see
+  through), k 1.2. Cut: `causticSet()` / `game.state.noCaustic` (read in
+  palawan.js's update). Found on the way: a multiply on that bed is
+  capped by the bed itself — teal vertex colour × swash darkening ×
+  depth tint × 0.55 sea opacity leaves ~30 levels of sand in the pixel,
+  so k 0.55 measured 13 levels and k 1.2 measures 32; the chapter's own
+  comment ("a caustic is LIGHT") was right about the additive net and
+  this rides under it as the fine web. `qa/wow-palawan-caustic.js` (mask
+  from geometry: an override material writing metres-below-waterline,
+  the sea sheet hidden): from the arrival lens the 0.3-2.5 m band is 2.2 %
+  of the frame at a grazing angle 30 m out — 571 px moved, max 25, deep
+  0, sky 0, dry 0.1 % (silhouette edges of posts over the strip); from a
+  lens 7 m off a metre of water (`-diag.js`) 24 % of the bed moves, max
+  32, and the frame reads as a web on the sand, nothing on the dry sand.
+  Honest note for the row's own measure: at the ARRIVAL lens neither
+  caustic is a picture (the net moves 632 px of the same band) — the
+  spawn looks along the beach, not down at the bed, and the spawn row is
+  frozen.
 
 ## Part C — the model sheet: structures, movers, NPCs and the animal, biome by biome (added 19 Sep 2026)
 

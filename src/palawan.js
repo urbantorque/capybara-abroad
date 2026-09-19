@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matOwn, EMIT_OVER, emitSet, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue, swayMesh, makeMerger, mergeWearBand, warnOnce } from './shared.js';
+import { PALETTE, mat, matOwn, EMIT_OVER, emitSet, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue, swayMesh, makeMerger, mergeWearBand, warnOnce, causticSet } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 12 — PALAWAN. THE INTERESTING HALF IS UNDERNEATH.
@@ -333,7 +333,14 @@ function palVCG() {
                  // those two makes the reef black instead of deep.
                  shore: 0.40, shoreBand: 0.42, shoreWet: 0.55, shoreDark: 0.78,
                  shoreScale: 1.35, shoreColor: PALETTE.foam,
-                 shoreTint: 0.34, shoreDeep: 5.0, shoreTintColor: PALETTE.palShallow });
+                 shoreTint: 0.34, shoreDeep: 5.0, shoreTintColor: PALETTE.palShallow,
+                 // THE CAUSTICS (ROADMAP-WOW Part B, this chapter's beat):
+                 // rippling light on the sand bed under the clear shallows,
+                 // one more octave in the shore path (see _causticK in
+                 // shared.js). The bay is the only sea you can see through, so
+                 // this is the only sand that can carry it. Cut by
+                 // game.state.noCaustic, read in update() below.
+                 caustic: { k: 1.2, scale: 1.1, speed: 0.16 } });
 }
 
 /**
@@ -5036,6 +5043,8 @@ export function createPalawan(game) {
         if (palLagoonBed) { palLagoonBed.at(lp2.x, palWATER + 0.2, lp2.z); palLagoonBed.set(1); }
       }
       palTime += dt;
+      // The caustics' cut (Part B). One shared float; a probe's OFF arm.
+      causticSet(!(game.state && game.state.noCaustic));
 
       palUpdateClock(game, dt);
       palUpdateBangka(game, dt);
