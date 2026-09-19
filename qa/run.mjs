@@ -67,6 +67,10 @@ const ASSERTS = [
   // everyday six sum to 730, the three capstones add 1020, the hop apex's own
   // two constants never multiplied by a mod.
   ['qa/l8-catalogue.mjs',   'sysUPGRADES: ids read, the everyday/capstone sums, the apex untouched'],
+  // ONE PERSON (ROADMAP-WOW, Part C): npcPERSON exported once with its
+  // numbers pinned, the roster reads it, every crowd builder (Marrakech, Rio)
+  // imports it and builds through it, and nobody puts a sphere on a body.
+  ['qa/wow-person.mjs',     'npcPERSON: exported, pinned, read by the roster and every crowd builder'],
   // HANOI, SMOOTHED (L9, T): hanLaneYawAt is a real 3 m central difference,
   // hanLaneAtS's own position/yaw outputs are untouched, all five read sites
   // (bikes, the ride, the folk) actually call it, and the open-lane recycle

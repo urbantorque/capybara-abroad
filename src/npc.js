@@ -886,6 +886,154 @@ function npcBlink(rec, dt) {
 }
 
 // ===========================================================================
+// ONE PERSON (ROADMAP-WOW, Part C — "the people standard").
+//
+// There were three ways a human was built in this tree: the roster figure
+// below, the hand-built locals, and two chapters — Marrakech and Rio — that
+// rolled their own crowd from nothing: a 0.27 m SPHERE on a 6-segment cylinder,
+// no eyes, no brows, no hair, no neck. Head-to-height was 0.20 here and 0.17 in
+// the square, and a sphere reads smaller than a box of the same width; that is
+// exactly the "heads too small, quality low compared to Sydney" the player
+// saw, measured (qa/WOW-sahara-roster.png beside qa/WOW-sydney-roster.png).
+//
+// This is the skeleton, written ONCE. The roster reads these SAME part lists
+// (so its geometry is bit-for-bit what it was — qa/rv-geom.js checks), and
+// every crowd builder reads them too (qa/l8-catalogue.mjs checks that each
+// one imports this). A chapter's costume is a GARMENT LAYER over it — the
+// djellaba in Marrakech, the canga in Rio — never a different skeleton.
+//
+// Part lists are npcMakeGeo's format; `c` is a LINEAR multiplier on whatever
+// instance colour the part's mesh is given (see the note above npcSRGB).
+// Numbers are metres, feet at y = 0, the figure facing +Z.
+//
+// TWO WAYS TO READ IT. The roster instances every limb separately so it can
+// animate a knee; a static crowd cannot afford twelve draws and does not need
+// them, so `standing()` returns the whole body at rest pose as ONE part list
+// for one merged buffer, and `face()` / `hair()` return the head's dressing in
+// HEAD-LOCAL space — so a chapter's head, hair and eyes pools share the one
+// matrix per person its update already composes for the head.
+export const npcPERSON = {
+  HEAD: 0.32,          // the skull box, m
+  HEAD_Y: 1.34,        // where the head node sits on the body (bob space)
+  CROWN_Y: 1.705,      // top of the hair at scale 1 — the figure's height
+  SHOULDER: { x: 0.34, y: 1.18 },
+  HIP: { x: 0.13, y: 0.62 },
+  UARM: 0.29, THIGH: 0.31, SHIN: 0.29,   // shoulder->elbow, hip->knee, knee->ankle
+  CHILD_HEAD: npcCHILD_HEAD,             // a child's head is 22 % too big for it
+  CHILD_H: npcCHILD_H,
+  JITTER: [0.92, 1.09],                  // the square's "not everybody is the same height"
+  // the face nodes, in head space (the head geometry runs y 0..0.32; the face
+  // is the z = +0.155 plane, and the parts sit 3 mm proud of it)
+  EYE: { x: 0.072, y: 0.192, z: 0.158 },
+  BROW: { x: 0.072, y: 0.253, z: 0.158 },
+  // UNDER the nose (0.11..0.17), not at 0.150 inside it: the mouth was tuned
+  // at a height nobody could check because it never rendered (see buildHuman)
+  MOUTH: { y: 0.085, z: 0.158 },
+  torso: [
+    { w: 0.50, h: 0.60, d: 0.30, y: 1.02 },
+    // The shoulders slab is where a shirt has a seam and a person has a
+    // collarbone, and it is the only horizontal on the torso: 0.88 turns it
+    // from a step in the outline into a step in the GARMENT.
+    { w: 0.62, h: 0.14, d: 0.32, y: 1.24, c: npcSRGB(0.88) },   // shoulders
+    // The torso runs y 0.72..1.32, so the hem sits on its bottom edge.
+    { w: 0.516, h: 0.085, d: 0.316, y: 0.757, c: npcSRGB(0.80) },  // hem
+    // ...and the placket, on the front face at z = +0.15 and 6 mm proud.
+    { w: 0.085, h: 0.44, d: 0.02, y: 1.03, z: 0.156, c: npcSRGB(0.91) },
+  ],
+  hips: [{ w: 0.46, h: 0.26, d: 0.32, y: 0.68 }],
+  head: [
+    { w: 0.32, h: 0.32, d: 0.31, y: 0.16 },
+    { w: 0.07, h: 0.06, d: 0.06, y: 0.14, z: 0.17, c: npcSRGB(0.94) },  // nose
+    // ...and the neck, which is the one that stops a head being a box
+    // BALANCED on a box: 0.86 is a head sitting on something.
+    { w: 0.16, h: 0.14, d: 0.12, y: 0.00, c: npcSRGB(0.86) },           // neck
+  ],
+  hairParts: [
+    { w: 0.35, h: 0.13, d: 0.34, y: 0.30 },
+    { w: 0.30, h: 0.18, d: 0.10, y: 0.17, z: -0.15, c: npcSRGB(0.92) },  // hair has a part
+  ],
+  // both eyes in one buffer, centred on the origin (see THE FACE, below)
+  eyes: [
+    { w: 0.088, h: 0.050, d: 0.016, x: -0.072, z: -0.004 },   // the white
+    { w: 0.088, h: 0.050, d: 0.016, x: 0.072, z: -0.004 },
+    { w: 0.058, h: 0.044, d: 0.02, x: -0.072, c: npcOf(PALETTE.capyEye, PALETTE.sail) },
+    { w: 0.058, h: 0.044, d: 0.02, x: 0.072, c: npcOf(PALETTE.capyEye, PALETTE.sail) },
+  ],
+  brow: [{ w: 0.092, h: 0.020, d: 0.022 }],
+  mouth: [{ w: 0.034, h: 0.010, d: 0.014, c: npcOf(PALETTE.capyEye, PALETTE.sail) }],
+  arm: [{ w: 0.12, h: 0.31, d: 0.12, y: -0.145 }],            // upper arm, 0.01 .. -0.30
+  forearm: [
+    { w: 0.113, h: 0.27, d: 0.113, y: -0.125 },
+    { w: 0.13, h: 0.13, d: 0.13, y: -0.24 },                 // hand
+  ],
+  leg: [{ w: 0.15, h: 0.33, d: 0.16, y: -0.155 }],           // thigh, 0.01 .. -0.32
+  shin: [{ w: 0.142, h: 0.30, d: 0.152, y: -0.145 }],
+  shoe: [{ w: 0.17, h: 0.10, d: 0.24, y: 0.03, z: 0.04, c: npcSRGB3(0.55, 0.55, 0.58) }],
+
+  /** A part list translated by (dx, dy, dz), optionally re-multiplied by `c`. */
+  at(parts, dx, dy, dz, c) {
+    const out = [];
+    for (let i = 0; i < parts.length; i++) {
+      const p = Object.assign({}, parts[i]);
+      p.x = (p.x || 0) + dx; p.y = (p.y || 0) + dy; p.z = (p.z || 0) + dz;
+      if (c !== undefined) {
+        // a garment's own tone on top of the part's (the hem stays darker
+        // than the shirt whatever the shirt is)
+        const m = p.c === undefined ? [1, 1, 1] : typeof p.c === 'number' ? [p.c, p.c, p.c] : p.c;
+        p.c = [m[0] * c[0], m[1] * c[1], m[2] * c[2]];
+      }
+      out.push(p);
+    }
+    return out;
+  },
+  /**
+   * The body at rest pose as ONE part list: torso with its bands, hips, both
+   * arms hanging (a little out, as a person's do), both legs and shoes. For a
+   * static crowd that instances one merged buffer. Options drop what a garment
+   * covers — `legs: false` under a robe — so hidden triangles are not paid for.
+   * `arms`/`legs`/`hips` take a multiplier for the parts that are not the shirt
+   * (trousers, skin) since a merged body has one instance colour.
+   */
+  standing(o) {
+    o = o || {};
+    const P = npcPERSON;
+    let parts = P.torso.slice();
+    if (o.hips !== false) parts = parts.concat(P.at(P.hips, 0, 0, 0, o.hipsC));
+    if (o.arms !== false) {
+      for (let s = -1; s <= 1; s += 2) {
+        const sx = s * P.SHOULDER.x, sy = P.SHOULDER.y;
+        parts = parts.concat(P.at(P.arm, sx, sy, 0, o.armsC));
+        // a long sleeve hides the hand box (Marrakech); a short one shows it
+        const fa = o.hands === false ? P.forearm.slice(0, 1) : P.forearm;
+        parts = parts.concat(P.at(fa, sx, sy - P.UARM, 0, o.handsC || o.armsC));
+      }
+    }
+    if (o.legs !== false) {
+      for (let s = -1; s <= 1; s += 2) {
+        const hx = s * P.HIP.x, hy = P.HIP.y;
+        parts = parts.concat(P.at(P.leg, hx, hy, 0, o.legsC));
+        parts = parts.concat(P.at(P.shin, hx, hy - P.THIGH, 0, o.legsC));
+        parts = parts.concat(P.at(P.shoe, hx, hy - P.THIGH - P.SHIN, 0, o.legsC));
+      }
+    }
+    return parts;
+  },
+  /** Eyes and mouth in head space, for a pool whose instance colour is white. */
+  face() {
+    const P = npcPERSON;
+    return P.at(P.eyes, 0, P.EYE.y, P.EYE.z).concat(P.at(P.mouth, 0, P.MOUTH.y, P.MOUTH.z));
+  },
+  /** Hair and both brows in head space, for a pool coloured with the hair. */
+  hair() {
+    const P = npcPERSON;
+    return P.hairParts.slice()
+      .concat(P.at(P.brow, -P.BROW.x, P.BROW.y, P.BROW.z))
+      .concat(P.at(P.brow, P.BROW.x, P.BROW.y, P.BROW.z));
+  },
+  geo(parts) { return npcMakeGeo(parts); },
+};
+
+// ===========================================================================
 export function createNPCs(game) {
   const scene = game.scene;
   const THREE_ = game.THREE || THREE;
@@ -917,29 +1065,15 @@ export function createNPCs(game) {
   // the same instanced draw call. Nothing here is a new mesh: a per-person
   // part is a whole new buffer and a whole new draw call, which is why the
   // umbrella in weather.js is locals-only and why this is not a pocket.
-  const gTorso = npcMakeGeo([
-    { w: 0.50, h: 0.60, d: 0.30, y: 1.02 },
-    // The shoulders slab is where a shirt has a seam and a person has a
-    // collarbone, and it is the only horizontal on the torso: 0.88 turns it
-    // from a step in the outline into a step in the GARMENT.
-    { w: 0.62, h: 0.14, d: 0.32, y: 1.24, c: npcSRGB(0.88) },   // shoulders
-    // The torso runs y 0.72..1.32, so the hem sits on its bottom edge.
-    { w: 0.516, h: 0.085, d: 0.316, y: 0.757, c: npcSRGB(0.80) },  // hem
-    // ...and the placket, on the front face at z = +0.15 and 6 mm proud.
-    { w: 0.085, h: 0.44, d: 0.02, y: 1.03, z: 0.156, c: npcSRGB(0.91) },
-  ]);
-  const gHips = npcMakeGeo([{ w: 0.46, h: 0.26, d: 0.32, y: 0.68 }]);
-  const gHead = npcMakeGeo([
-    { w: 0.32, h: 0.32, d: 0.31, y: 0.16 },
-    { w: 0.07, h: 0.06, d: 0.06, y: 0.14, z: 0.17, c: npcSRGB(0.94) },  // nose
-    // ...and the neck, which is the one that stops a head being a box
-    // BALANCED on a box: 0.86 is a head sitting on something.
-    { w: 0.16, h: 0.14, d: 0.12, y: 0.00, c: npcSRGB(0.86) },           // neck
-  ]);
-  const gHair = npcMakeGeo([
-    { w: 0.35, h: 0.13, d: 0.34, y: 0.30 },
-    { w: 0.30, h: 0.18, d: 0.10, y: 0.17, z: -0.15, c: npcSRGB(0.92) },  // hair has a part
-  ]);
+  //
+  // THE NUMBERS LIVE IN npcPERSON NOW (ONE PERSON, above): the torso with its
+  // shoulders, hem and placket; the hips; the head with its nose and neck;
+  // the hair with its part. Same lists, same buffers — and the same lists
+  // Marrakech and Rio merge their crowds from.
+  const gTorso = npcMakeGeo(npcPERSON.torso);
+  const gHips = npcMakeGeo(npcPERSON.hips);
+  const gHead = npcMakeGeo(npcPERSON.head);
+  const gHair = npcMakeGeo(npcPERSON.hairParts);
   // ---- THE FACE (v54) ---------------------------------------------------
   // Both eyes in ONE geometry, because nothing in this game ever winks: that
   // is one InstancedMesh for the pair instead of two. Both BROWS are one mesh
@@ -969,20 +1103,16 @@ export function createNPCs(game) {
   // multiplier in this file is then at or below 1, which is the direction that
   // cannot clip, and the pupil is derived from the palette rather than written
   // out twice. See iEyes.setColorAt.
-  const gEyes = npcMakeGeo([
-    // WIDER THAN THE ROADMAP SAID, and only the render showed why. At its
-    // 0.070 x 0.052 the pale stands 6 mm proud at the sides and 4 mm at the
-    // top, which is a uniform BORDER: it reads as a pair of spectacles, not as
-    // an eye. An eye is a wide white with a dark iris somewhere in the middle,
-    // so the ring has to be three times wider at the sides than above.
-    { w: 0.088, h: 0.050, d: 0.016, x: -0.072, z: -0.004 },   // the white
-    { w: 0.088, h: 0.050, d: 0.016, x: 0.072, z: -0.004 },
-    { w: 0.058, h: 0.044, d: 0.02, x: -0.072, c: npcOf(PALETTE.capyEye, PALETTE.sail) },
-    { w: 0.058, h: 0.044, d: 0.02, x: 0.072, c: npcOf(PALETTE.capyEye, PALETTE.sail) },
-  ]);
-  const gBrow = npcMakeGeo([{ w: 0.092, h: 0.020, d: 0.022 }]);
+  //
+  // WIDER THAN THE ROADMAP SAID, and only the render showed why. At
+  // 0.070 x 0.052 the pale stands 6 mm proud at the sides and 4 mm at the
+  // top, which is a uniform BORDER: it reads as a pair of spectacles, not as
+  // an eye. An eye is a wide white with a dark iris somewhere in the middle,
+  // so the ring has to be three times wider at the sides than above.
+  const gEyes = npcMakeGeo(npcPERSON.eyes);
+  const gBrow = npcMakeGeo(npcPERSON.brow);
   // the mouth (L3-9): a 3 cm dark box, scaled by npcFace
-  const gMouth = npcMakeGeo([{ w: 0.034, h: 0.010, d: 0.014, c: npcOf(PALETTE.capyEye, PALETTE.sail) }]);
+  const gMouth = npcMakeGeo(npcPERSON.mouth);
   // ---- THE LIMBS HAVE JOINTS IN THEM NOW (v56) --------------------------
   // A leg was ONE box pivoting at the hip and an arm was ONE box pivoting at
   // the shoulder, and this file admitted it twice in its own comments ("the
@@ -1003,33 +1133,21 @@ export function createNPCs(game) {
   // COST is four more instanced buffers per cast — shin L/R and forearm L/R —
   // plus two for the shoes, and NOT one mesh per person: a per-person mesh is
   // a draw call, which is the rule the umbrella and the pocket both lost to.
-  const npcUARM_L  = 0.29;    // shoulder -> elbow
-  const npcTHIGH_L = 0.31;    // hip -> knee
-  const npcSHIN_L  = 0.29;    // knee -> ankle
-  const gArm = npcMakeGeo([
-    { w: 0.12, h: 0.31, d: 0.12, y: -0.145 },          // upper arm, 0.01 .. -0.30
-  ]);
-  const gForearm = npcMakeGeo([
-    // Slightly thinner than the upper arm, which is the cheapest way to make
-    // a bend read as a JOINT rather than as a box that has come apart.
-    { w: 0.113, h: 0.27, d: 0.113, y: -0.125 },
-    { w: 0.13, h: 0.13, d: 0.13, y: -0.24 },           // hand
-  ]);
-  const gLeg = npcMakeGeo([
-    { w: 0.15, h: 0.33, d: 0.16, y: -0.155 },          // thigh, 0.01 .. -0.32
-  ]);
-  const gShin = npcMakeGeo([
-    { w: 0.142, h: 0.30, d: 0.152, y: -0.145 },
-  ]);
-  const gShoe = npcMakeGeo([
-    // A SHOE IS THE CHEAPEST COLOUR ON A PERSON. It is at the bottom of the
-    // silhouette, where the eye starts, it is already its own box, and it is
-    // the one edge every real garment has. Slightly blue, because leather is.
-    // It is its OWN buffer now rather than a part of the leg, and only so that
-    // an ankle can hold the sole level through stance — see THE FOOT PLANT.
-    { w: 0.17, h: 0.10, d: 0.24, y: 0.03, z: 0.04,
-      c: npcSRGB3(0.55, 0.55, 0.58) },
-  ]);
+  const npcUARM_L  = npcPERSON.UARM;     // shoulder -> elbow
+  const npcTHIGH_L = npcPERSON.THIGH;    // hip -> knee
+  const npcSHIN_L  = npcPERSON.SHIN;     // knee -> ankle
+  const gArm = npcMakeGeo(npcPERSON.arm);
+  // The forearm is slightly thinner than the upper arm, which is the cheapest
+  // way to make a bend read as a JOINT rather than as a box that has come apart.
+  const gForearm = npcMakeGeo(npcPERSON.forearm);
+  const gLeg = npcMakeGeo(npcPERSON.leg);
+  const gShin = npcMakeGeo(npcPERSON.shin);
+  // A SHOE IS THE CHEAPEST COLOUR ON A PERSON. It is at the bottom of the
+  // silhouette, where the eye starts, it is already its own box, and it is
+  // the one edge every real garment has. Slightly blue, because leather is.
+  // It is its OWN buffer now rather than a part of the leg, and only so that
+  // an ankle can hold the sole level through stance — see THE FOOT PLANT.
+  const gShoe = npcMakeGeo(npcPERSON.shoe);
   // THE BRIM IS TWO CYLINDERS NOW, and only so that its UNDERSIDE can be dark
   // (R6): a part is the smallest thing `c` can address, and a brim that is one
   // cylinder cannot have a lit top and a shaded bottom. Split at y 0.317, same
@@ -8529,9 +8647,9 @@ export function createNPCs(game) {
     holdN.position.set(0.02, 1.02, 0.20);
     holdN.scale.setScalar(0);
 
-    head.position.set(0, 1.34, 0);
-    armL.position.set(-0.34, 1.18, 0);
-    armR.position.set(0.34, 1.18, 0);
+    head.position.set(0, npcPERSON.HEAD_Y, 0);
+    armL.position.set(-npcPERSON.SHOULDER.x, npcPERSON.SHOULDER.y, 0);
+    armR.position.set(npcPERSON.SHOULDER.x, npcPERSON.SHOULDER.y, 0);
     // -0.56 from the SHOULDER is where it was; -0.27 from an elbow at -0.29 is
     // the same point with the arm straight, so every pose keeps its hand.
     handR.position.set(0, -0.27, 0);
@@ -8544,13 +8662,18 @@ export function createNPCs(game) {
     camN.position.set(0, 0.02, 0.12);
     toolN.position.set(0, 0.0, 0.06);
     coneN.position.set(0, -0.02, 0.12);
-    legL.position.set(-0.13, 0.62, 0);
-    legR.position.set(0.13, 0.62, 0);
+    legL.position.set(-npcPERSON.HIP.x, npcPERSON.HIP.y, 0);
+    legR.position.set(npcPERSON.HIP.x, npcPERSON.HIP.y, 0);
     // gHead is 0.32 deep centred at y 0.16, so the face is the z = +0.155
     // plane. 3 mm proud of it, or the brow z-fights the forehead at range.
-    eyeN.position.set(0, 0.192, 0.158);
-    browL.position.set(-0.072, 0.253, 0.158);
-    browR.position.set(0.072, 0.253, 0.158);
+    eyeN.position.set(0, npcPERSON.EYE.y, npcPERSON.EYE.z);
+    browL.position.set(-npcPERSON.BROW.x, npcPERSON.BROW.y, npcPERSON.BROW.z);
+    browR.position.set(npcPERSON.BROW.x, npcPERSON.BROW.y, npcPERSON.BROW.z);
+    // ...AND THE MOUTH WAS NEVER ON THE FACE. L3-9 added it, npcFace writes
+    // its y, and nothing ever gave it a z: it sat at (0, 0.150, 0), inside a
+    // 0.31 m head, for every roster figure in the game. On the face plane
+    // with the eyes now (ONE PERSON); the locals' has always been there.
+    mouthN.position.set(0, npcPERSON.MOUTH.y, npcPERSON.MOUTH.z);
     hatN.scale.setScalar(0);
     camN.scale.setScalar(0);
     toolN.scale.setScalar(0);
@@ -8613,7 +8736,7 @@ export function createNPCs(game) {
                eyeN, browL, browR,
                hipsN, kneeL, kneeR, footL, footR, elbowL, elbowR },
       // the face pack npcFace() takes, and the two clocks that drive it
-      face: { eyeN: eyeN, browL: browL, browR: browR, browY: 0.253, mouthN: mouthN, mouthY: 0.150 },
+      face: { eyeN: eyeN, browL: browL, browR: browR, browY: npcPERSON.BROW.y, mouthN: mouthN, mouthY: npcPERSON.MOUTH.y },
       blinkT: rand(0, npcBLINK_MAX), mood: 0,
       // build (see THREE BUILDS above). bLeg is read by animHuman, which is
       // the only place allowed to touch legL.scale.y.

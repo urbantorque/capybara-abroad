@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, swayMesh, makeMerger, mergeWearBand, makeMover } from './shared.js';
+import { npcPERSON } from './npc.js';
 
 // ===========================================================================
 // CHAPTER 8 — MARRAKECH AND THE ERG
@@ -1853,6 +1854,9 @@ const sahPART_L  = 2.4;         // how fast it lets go
 const sahPART_YAW = 0.62;       // rad at full — a turn, not a pirouette
 const sahPART_LEAN = 0.20;      // ...and the sway that goes with it
 let sahPplBody = null, sahPplHead = null, sahPplN = 0;
+// ...and the head's dressing (ONE PERSON): hair with both brows, in the hair
+// colour; eyes and mouth, in white. Two more instanced draws, as in Sydney.
+let sahPplHair = null, sahPplFace = null, sahPplHairCol = null;
 const sahPplBodies = [];        // one static box per instanced person
 // x, y, z, yaw, kind, phase, rate, halqa (index+1 or 0), height,
 // fidget clock, fidget now, fidget target, step distance this frame, gait phase,
@@ -1869,64 +1873,87 @@ const sahROBE = [PALETTE.sahCanvas, PALETTE.sahAwning, PALETTE.sahOchrePale,
                  PALETTE.sahDye1, PALETTE.sahDye2, PALETTE.sahDye3,
                  PALETTE.sahDye4, PALETTE.sahDye5, PALETTE.sahTent];
 const sahSKIN = [PALETTE.skin3, PALETTE.skin4, PALETTE.skin2, PALETTE.skin3];
+// ...and hair, which the square never had. The dark three of the roster's five.
+const sahHAIR = [PALETTE.hair1, PALETTE.hair2, PALETTE.hair4, PALETTE.hair1];
+
+// ---- THE DJELLABA, AS A GARMENT LAYER (ONE PERSON) --------------------------
+// The skirt: from the torso's own hem band to the sand, over where the legs
+// would be (which are not built — a robe covers them, and a hundred and
+// seventy pairs of hidden legs is 12,000 triangles for nothing). Six segments,
+// like every cylinder in this chapter. Top radius 0.30, because the roster's
+// torso is 0.50 wide and its hem band 0.516: a hexagon's flats are 0.87 of
+// its radius, and at 0.27 the band's corners came through the cloth.
+const sahDJELLABA = [
+  { k: 'cyl', rt: 0.30, rb: 0.34, h: 0.74, seg: 6, y: 0.39 },                         // 0.02..0.76
+  // the border at the hem (L3-9's second ring): a fraction of the robe
+  { k: 'cyl', rt: 0.35, rb: 0.35, h: 0.06, seg: 6, y: 0.06, c: [0.59, 0.59, 0.59] },
+  // the hood, thrown back — in BODY space, so it is the robe's colour rather
+  // than the skin's (which is what it was when it lived in the head buffer).
+  // A COWL BEHIND THE SHOULDERS, not a cone round the head: the first cut sat
+  // it at the head's rest height, and a sitter's body is squashed to 0.62
+  // while the head is not, so on every cross-legged figure the cone landed
+  // exactly where the skull is and swallowed it (qa/WOW2-probe-nohead.png).
+  // Its base is inside the torso top, its point 17 cm behind the neck.
+  { k: 'cone', r: 0.21, h: 0.34, seg: 6, y: 1.27, z: -0.20, rx: -0.75, c: [0.80, 0.80, 0.80] },
+  // ---- AND FEET, WHICH ARE WHAT SAY WHICH WAY SOMEBODY IS FACING ----------
+  // ONE box, not two — at 172 people a second foot is 2,064 triangles, and at
+  // this camera height the pair reads as one pale slab under the hem anyway.
+  // Babouches: pale, and the robe's own tone.
+  { w: 0.28, h: 0.07, d: 0.27, y: 0.035, z: 0.13, c: [0.67, 0.62, 0.55] },
+];
 
 function sahBuildPeople(root) {
-  const M = sahMerger();
-  // A DJELLABA IS A CONE WITH A HOOD ON IT. That is not a simplification for
-  // the poly budget — it is what the garment is, and it is why a crowd here
-  // reads completely differently from a crowd in Rio at the same vertex count.
-  M.cyl(0, 0.44, 0, 0.20, 0.88, 0xffffff, 0, 0, 0, 6);
-  M.cyl(0, 1.02, 0, 0.26, 0.62, 0xffffff, 0, 0, 0, 6);
-  M.cyl(0, 1.34, 0, 0.19, 0.18, 0xdedede, 0, 0, 0, 6);
-  // ---- A BELT AND A HEM (L3-9). At twelve metres the cones were
-  // indistinguishable from the traffic cones beside them (l3-sahara.png):
-  // two darker bands — a sash at the waist and a border at the hem — are
-  // what a garment has and a cone does not, and they are two more rings in
-  // the same merged buffer. Fractions of white, so they darken whatever robe
-  // the instance was given.
-  M.cyl(0, 0.90, 0, 0.275, 0.07, 0x8c8478, 0, 0, 0, 6);
-  M.cyl(0, 0.05, 0, 0.215, 0.06, 0x9a9288, 0, 0, 0, 6);
-  // the sleeves, which hang
-  for (let s = -1; s <= 1; s += 2) {
-    M.box(s * 0.26, 1.06, 0.02, 0.14, 0.58, 0.16, 0xffffff, -0.14, 0, s * 0.16);
-  }
-  // ---- AND FEET, WHICH ARE WHAT SAY WHICH WAY SOMEBODY IS FACING ----------
-  // A hundred and seventy cones with a ball on top: from this camera the only
-  // cue to a person's heading was the hood, and the hood is 19 cm across. Rio's
-  // crowd learned the same thing about a nose. ONE box, not two — at 172 people
-  // a second foot is 2,064 triangles in a chapter with three thousand to spare,
-  // and at this camera height the pair reads as one pale slab under the hem
-  // anyway.
-  M.box(0, 0.035, 0.11, 0.28, 0.07, 0.27, 0xd8d0c4);
-  const bodyGeo = M.build();
-  const H = sahMerger();
-  H.sph(0, 0, 0, 0.135, 0.155, 0.135, 0xffffff);
-  // and the hood, thrown back, which is the whole silhouette
-  H.cone(0, 0.13, -0.10, 0.19, 0.36, 0xe8e8e8, -0.55, 0, 0, 6);
-  // A NOSE AND A BEARD, and nothing else — 24 triangles across 172 people.
-  // instanceColor MULTIPLIES vColor, so both are authored as a fraction of
-  // white and come out as a darker version of whatever skin the person got,
-  // which is the only way a shared head mesh can carry a feature at all. The
-  // nose is what makes the head a face at fifteen metres and it is the entire
-  // reason a crowd of hooded figures has a direction; Rio's crowd learned this
-  // and the medina's never did.
-  H.box(0, -0.005, 0.135, 0.055, 0.075, 0.075, 0xcbb2a2);
-  H.box(0, -0.098, 0.085, 0.135, 0.075, 0.105, 0x8f7a68);
-  const headGeo = H.build();
+  // ---- ONE PERSON (ROADMAP-WOW, Part C) ----------------------------------
+  // This crowd was a 0.27 m SPHERE on a 6-segment cylinder with a nose block
+  // and a cone for a hood: no eyes, no brows, no hair, no neck, and a head
+  // that measured 0.17 of the figure where Sydney's is 0.20. The player saw it
+  // ("their heads seem too small and the quality is low compared to Sydney")
+  // and qa/WOW-sahara-roster.png beside qa/WOW-sydney-roster.png shows it.
+  //
+  // The SKELETON is the roster's now — npcPERSON in npc.js, the same part
+  // lists Sydney instances — merged at rest pose into this chapter's own two
+  // buffers (the body, and the head), plus two more for the face and the hair
+  // wired exactly as the roster wires them: eyes and mouth in one white-tinted
+  // pool, hair and both brows in one hair-coloured pool. The djellaba is a
+  // GARMENT LAYER over that skeleton (sahDJELLABA above), not a different one.
+  // Everything else about this crowd — the pools, the sixteen-float stride, the
+  // halqa rings, the decision clock — is untouched; only the geometry moved.
+  //
+  // A ROBE HAS NO HANDS SHOWING, so the forearm's hand box is left off: a
+  // merged body has one instance colour and it is the cloth's.
+  const bodyGeo = npcPERSON.geo(
+    npcPERSON.standing({ legs: false, hips: false, hands: false }).concat(sahDJELLABA));
+  // the head: skull, nose, neck — the skin colour is the instance's
+  const headGeo = npcPERSON.geo(npcPERSON.head);
+  const hairGeo = npcPERSON.geo(npcPERSON.hair());
+  const faceGeo = npcPERSON.geo(npcPERSON.face());
 
   sahPplBody = new THREE.InstancedMesh(bodyGeo, sahVC(), sahPPL_MAX);
   sahPplHead = new THREE.InstancedMesh(headGeo, sahVC(), sahPPL_MAX);
+  sahPplHair = new THREE.InstancedMesh(hairGeo, sahVC(), sahPPL_MAX);
+  sahPplFace = new THREE.InstancedMesh(faceGeo, sahVC(), sahPPL_MAX);
   // Named like sahStorks and sahFronds are, because an anonymous InstancedMesh
   // is invisible to every audit that walks the scene graph — and the crowd is
   // the thing most worth measuring in this chapter.
   sahPplBody.name = 'sahPeople';
   sahPplHead.name = 'sahPeopleHeads';
+  sahPplHair.name = 'sahPeopleHair';
+  sahPplFace.name = 'sahPeopleFaces';
   sahPplBodyCol = new Float32Array(sahPPL_MAX * 3);
   sahPplHeadCol = new Float32Array(sahPPL_MAX * 3);
+  sahPplHairCol = new Float32Array(sahPPL_MAX * 3);
   sahPplBody.instanceColor = new THREE.InstancedBufferAttribute(sahPplBodyCol, 3);
   sahPplHead.instanceColor = new THREE.InstancedBufferAttribute(sahPplHeadCol, 3);
+  sahPplHair.instanceColor = new THREE.InstancedBufferAttribute(sahPplHairCol, 3);
+  // the face pool is white for everybody (R6: the white is the material's
+  // own, the pupil carries the dark multiplier), so it needs no per-person
+  // colour at all — one attribute of ones, written once.
+  const white = new Float32Array(sahPPL_MAX * 3).fill(1);
+  sahPplFace.instanceColor = new THREE.InstancedBufferAttribute(white, 3);
   sahPplBody.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   sahPplHead.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  sahPplHair.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  sahPplFace.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   sahPplBody.castShadow = true;
   // ---- AND A HEAD DOES NOT CAST ITS OWN SHADOW ---------------------------
   // Measured: 174 people at 108 triangles a body and 72 a head is 31,320
@@ -1940,12 +1967,23 @@ function sahBuildPeople(root) {
   // rendered frame of the square is bit-for-bit what it was.
   sahPplHead.castShadow = false;
   sahPplHead.userData.noShadow = true;
+  // ...and neither do the hair and the face, for the same reason
+  sahPplHair.castShadow = false;
+  sahPplHair.userData.noShadow = true;
+  sahPplFace.castShadow = false;
+  sahPplFace.userData.noShadow = true;
   sahPplBody.frustumCulled = false;
   sahPplHead.frustumCulled = false;
+  sahPplHair.frustumCulled = false;
+  sahPplFace.frustumCulled = false;
   sahPplBody.count = 0;
   sahPplHead.count = 0;
+  sahPplHair.count = 0;
+  sahPplFace.count = 0;
   root.add(sahPplBody);
   root.add(sahPplHead);
+  root.add(sahPplHair);
+  root.add(sahPplFace);
 }
 
 function sahAddPerson(x, y, z, yaw, kind) {
@@ -1980,10 +2018,17 @@ function sahAddPerson(x, y, z, yaw, kind) {
   sahPplHeadCol[i * 3] = sahPplCol.r;
   sahPplHeadCol[i * 3 + 1] = sahPplCol.g;
   sahPplHeadCol[i * 3 + 2] = sahPplCol.b;
+  sahPplCol.set(sahHAIR[randInt(0, sahHAIR.length - 1)]);
+  sahPplHairCol[i * 3] = sahPplCol.r;
+  sahPplHairCol[i * 3 + 1] = sahPplCol.g;
+  sahPplHairCol[i * 3 + 2] = sahPplCol.b;
   sahPplBody.count = sahPplN;
   sahPplHead.count = sahPplN;
+  sahPplHair.count = sahPplN;
+  sahPplFace.count = sahPplN;
   sahPplBody.instanceColor.needsUpdate = true;
   sahPplHead.instanceColor.needsUpdate = true;
+  sahPplHair.instanceColor.needsUpdate = true;
 }
 
 /**
@@ -2220,11 +2265,29 @@ function sahUpdatePeople(dt) {
       rz  += part * sahPART_LEAN;
     }
     sahPplBody.setMatrixAt(i, sahXform(x, y, z, rx, yaw, rz, tall, sy, tall));
-    sahPplHead.setMatrixAt(i, sahXform(x - rz * 1.3 * tall, y + 1.42 * sy, z + rx * 1.3 * tall,
-                                       rx, yaw, rz, tall, tall, tall));
+    // The head's origin is the roster's — the base of the skull, npcPERSON.HEAD_Y
+    // up the body (it was a sphere's centre at 1.42) — and the hair and the
+    // face ride the SAME matrix: they are authored in head space, so this is
+    // two copies of a matrix already composed.
+    //
+    // THE NECK IS ON THE BODY, AND THE BODY LEANS. The offset used to be
+    // (x - rz*1.3, y + 1.42*sy, z + rx*1.3): a shove along the WORLD axes for
+    // a lean that is about the body's own, which is only right for somebody
+    // facing +Z. A sitter facing the camera at rx -0.2 had his head 27 cm
+    // back inside his own chest. sahXform has just left the body's rotation
+    // in sahQ, so the local (0, HEAD_Y * sy, 0) goes through that — the same
+    // "two sines and it is exact" Rio's head already does, without the sines.
+    sahV3.set(0, npcPERSON.HEAD_Y * sy, 0).applyQuaternion(sahQ);
+    const hx = x + sahV3.x, hy = y + sahV3.y, hz = z + sahV3.z;
+    const hm = sahXform(hx, hy, hz, rx, yaw, rz, tall, tall, tall);
+    sahPplHead.setMatrixAt(i, hm);
+    sahPplHair.setMatrixAt(i, hm);
+    sahPplFace.setMatrixAt(i, hm);
   }
   sahPplBody.instanceMatrix.needsUpdate = true;
   sahPplHead.instanceMatrix.needsUpdate = true;
+  sahPplHair.instanceMatrix.needsUpdate = true;
+  sahPplFace.instanceMatrix.needsUpdate = true;
 }
 
 // ============================================================ THE PURSUIT ====
@@ -2249,23 +2312,35 @@ function sahBuildPursuers(root) {
   // the men chasing you are visibly the men whose stalls you just robbed), plus
   // two arms swinging forward — because the ONE thing that has to read at
   // twenty metres in a covered alley is that they are running.
-  const PM = sahMerger();
-  PM.cyl(0, 0.46, 0, 0.22, 0.92, PALETTE.sahCanvas, 0, 0, 0, 6);
-  PM.cyl(0, 1.06, 0, 0.28, 0.62, PALETTE.sahCanvas, 0, 0, 0, 6);
-  PM.cyl(0, 1.38, 0, 0.20, 0.18, PALETTE.sahOchreDust, 0, 0, 0, 6);
-  // the arms, out in front — a man at six metres a second is reaching
-  PM.box(-0.28, 1.12, 0.22, 0.13, 0.56, 0.16, PALETTE.sahCanvas, -0.85, 0, 0.22);
-  PM.box(0.28, 1.05, -0.14, 0.13, 0.56, 0.16, PALETTE.sahCanvas, 0.55, 0, -0.22);
-  // and a leg forward, so the silhouette is mid-stride rather than standing
-  PM.box(-0.10, 0.30, 0.26, 0.15, 0.62, 0.18, PALETTE.sahOchreDust, -0.42, 0, 0);
-  const im = new THREE.InstancedMesh(PM.build(), sahVC(), sahPURSUER_N);
+  //
+  // ONE PERSON: the same roster torso and the same djellaba skirt the crowd
+  // wears (sahDJELLABA, minus its hood — a running man's hood is down), with
+  // the canvas baked in as the part multiplier since this pool has no
+  // instance colour. The arms and the leg are this file's own, because they
+  // are the pose, and a rest-pose skeleton has no run in it.
+  const canvas = new THREE.Color(PALETTE.sahCanvas), dust = new THREE.Color(PALETTE.sahOchreDust);
+  const cC = [canvas.r, canvas.g, canvas.b], cD = [dust.r, dust.g, dust.b];
+  const pParts = npcPERSON.at(npcPERSON.torso, 0, 0, 0, cC)
+    .concat(npcPERSON.at(sahDJELLABA.slice(0, 2), 0, 0, 0, cC))
+    .concat([
+      // the arms, out in front — a man at six metres a second is reaching
+      { w: 0.13, h: 0.56, d: 0.16, x: -0.28, y: 1.12, z: 0.22, rx: -0.85, rz: 0.22, c: cC },
+      { w: 0.13, h: 0.56, d: 0.16, x: 0.28, y: 1.05, z: -0.14, rx: 0.55, rz: -0.22, c: cC },
+      // and a leg forward, so the silhouette is mid-stride rather than standing
+      { w: 0.15, h: 0.62, d: 0.18, x: -0.10, y: 0.30, z: 0.26, rx: -0.42, c: cD },
+    ]);
+  const im = new THREE.InstancedMesh(npcPERSON.geo(pParts), sahVC(), sahPURSUER_N);
   im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   im.castShadow = true;
   im.frustumCulled = false;
-  const HM = sahMerger();
-  HM.sph(0, 0, 0, 0.14, 0.16, 0.14, PALETTE.skin3);
-  HM.cone(0, 0.14, -0.10, 0.20, 0.38, PALETTE.sahCanvas, -0.55, 0, 0, 6);
-  const hd = new THREE.InstancedMesh(HM.build(), sahVC(), sahPURSUER_N);
+  // The head: the roster's skull, nose and neck with skin3 baked in, its hair
+  // and brows in hair2, and its eyes — one buffer for six men, which is what
+  // this pool was already, now with a face in it.
+  const skin = new THREE.Color(PALETTE.skin3), hair = new THREE.Color(PALETTE.hair2);
+  const hParts = npcPERSON.at(npcPERSON.head, 0, 0, 0, [skin.r, skin.g, skin.b])
+    .concat(npcPERSON.at(npcPERSON.hair(), 0, 0, 0, [hair.r, hair.g, hair.b]))
+    .concat(npcPERSON.face());
+  const hd = new THREE.InstancedMesh(npcPERSON.geo(hParts), sahVC(), sahPURSUER_N);
   hd.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   hd.castShadow = true;
   hd.frustumCulled = false;
@@ -2310,7 +2385,8 @@ function sahPursuerSync() {
     const yaw = sahPurData[o + 4];
     sahPursuerMesh.setMatrixAt(i, sahXform(x, gy + bob, z, lean, yaw, 0, 1, 1, 1));
     if (sahPursuerHeads) {
-      sahPursuerHeads.setMatrixAt(i, sahXform(x + Math.sin(yaw) * lean * 1.5, gy + 1.46 + bob,
+      // the skull's base, not a sphere's centre (ONE PERSON)
+      sahPursuerHeads.setMatrixAt(i, sahXform(x + Math.sin(yaw) * lean * 1.5, gy + npcPERSON.HEAD_Y + bob,
         z + Math.cos(yaw) * lean * 1.5, lean, yaw, 0, 1, 1, 1));
     }
     // and the dust off their feet, which is the other half of "they are moving"
