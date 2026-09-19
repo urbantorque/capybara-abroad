@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger, hangThing } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 3 — SYDNEY HARBOUR: CIRCULAR QUAY TO MANLY
@@ -222,6 +222,7 @@ const quayWakeYw = new Float32Array(quayWakeN);   // her heading when it was dro
 let quayWakeHead = 0, quayWakeT = 0;
 
 let quayBoatGroup = null, quayBoatBody = null, quayWheelMesh = null, quayFlagMesh = null;
+let quayPennant = null;             // the masthead sock: streams with the speed, leans with the helm
 let quayBoatYaw = 0, quayBoatSpeed = 0, quayRudder = 0, quayThrottle = 0;
 let quayBoatX = quayBERTH.x, quayBoatZ = quayBERTH.z;
 let quayHelmOn = false, quayHelmCool = 0;
@@ -3227,6 +3228,26 @@ function quayBuildBoat(game, root) {
   staff.position.set(0, 3.05, -3.4);
   g.add(staff);
 
+  // ---- THE MASTHEAD PENNANT (ROADMAP-WOW Part C, the movers uplift) ------
+  // The ensign at the stern streams with the speed and the wheel turns with
+  // the rudder, and both are aft and low from the play angle. The mast is the
+  // tallest thing on her and carried nothing. A sock from shared.js's
+  // hangThing — red and cream, the house colours — hung from the truck: it
+  // hangs limp at the berth, streams aft as she gets under way and leans into
+  // the helm, which is the one read of "she is turning" that survives the
+  // lens being behind and above the wheelhouse. Two draw calls, no texture.
+  quayPennant = hangThing('sock', { a: PALETTE.hullRed, b: PALETTE.hullCream, c: PALETTE.woodDark, len: 0.95 });
+  quayPennant.position.set(0, 4.52, -0.2);
+  g.add(quayPennant);
+  // ...AND ONE THING THAT IS NOT MIRRORED: a lifebuoy on the PORT bulwark
+  // aft, and only there. Every other thing on her is built in s = -1..1
+  // pairs; the rubric's "one asymmetry" is this ring.
+  const buoy = new THREE.Mesh(new THREE.TorusGeometry(0.30, 0.075, 6, 10), mat(PALETTE.hullRed));
+  buoy.position.set(-(HX - 0.12) - 0.19, 0.92, -3.6);
+  buoy.rotation.y = Math.PI * 0.5;
+  buoy.castShadow = true;
+  g.add(buoy);
+
   root.add(g);
   quayBoatGroup = g;
 
@@ -5211,6 +5232,14 @@ function quayStepBoat(game, dt) {
     quayFlagMesh.rotation.y = Math.PI * 0.5;
     quayFlagMesh.rotation.z = -st * 0.9 + Math.sin(quayTime * 6) * 0.10 * st;
     quayFlagMesh.scale.set(0.35 + st * 0.65, 1, 1);
+  }
+  if (quayPennant) {
+    // the sock streams AFT (-Z in boat space) with the speed, flutters a
+    // little once it is lifted, and leans across with the rudder
+    const st = clamp(Math.abs(quayBoatSpeed) / quayBOAT_VMAX, 0, 1);
+    const dir = quayBoatSpeed < 0 ? -1 : 1;
+    quayPennant.rotation.x = dir * (0.12 + st * 1.15) + Math.sin(quayTime * 7.3) * 0.09 * st;
+    quayPennant.rotation.z = -quayRudder * 0.28 + Math.sin(quayTime * 4.1) * 0.05;
   }
 
   // ---- the passenger at the wheel -----------------------------------------
