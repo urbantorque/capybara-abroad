@@ -64,14 +64,17 @@ const grsSLICES  = 4;       // frames a full re-placement is spread over
 
 // One row per chapter that grows anything. h is [min, max] fan height in
 // metres; n the fan count at rung 0; gate the green margin (linear, on
-// g - max(r, b)) or a named tone test for the two dry chapters; minY a floor
+// g - max(r, b)) or the named tone test for the two dry chapters; minY a floor
 // under which nothing grows (Manly: the tide line); sway metres of tip travel
 // at a full gust.
 const grsROW = {
   sydney:   { n: 5000, h: [0.22, 0.42], gate: 0.04, sway: 0.09 },
   pasto:    { n: 5000, h: [0.28, 0.50], gate: 0.04, sway: 0.10 },
   pantanal: { n: 5500, h: [0.35, 0.60], gate: 0.04, sway: 0.11 },
-  drift:    { n: 4500, h: [0.25, 0.45], gate: 'drift', sway: 0.10 },
+  // The Drift's grass is a night blue-green (driGrass 0x4e7a68: g - max(r, b)
+  // = 0.055 linear, driGrassDark 0.021); its VIOLET is the rock and the cloud
+  // deck below, which a violet gate grew grass on (measured, first frame).
+  drift:    { n: 4500, h: [0.25, 0.45], gate: 0.015, sway: 0.10 },
   iceland:  { n: 4500, h: [0.25, 0.42], gate: 'tussock', sway: 0.12 },
   manly:    { n: 4000, h: [0.30, 0.55], gate: 0.04, sway: 0.12, minY: 1.2 },
   cali:     { n: 4500, h: [0.25, 0.45], gate: 0.04, sway: 0.09 },
@@ -97,15 +100,6 @@ function grsGate(gate, r, g, b) {
     if (d <= gate) return 0;
     const t = clamp((d - gate) / 0.03, 0, 1);
     return t * t * (3 - 2 * t);
-  }
-  if (gate === 'drift') {
-    // The Drift's ground is violet-grey: g is NOT dominant. What is not
-    // grass there is its decking and its stone — both near-neutral and
-    // darker — so the test is "tinted toward blue-violet and not dark".
-    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    const violet = (b - g);
-    if (lum < 0.10 || violet < 0.02) return 0;
-    return clamp((violet - 0.02) / 0.06, 0, 1);
   }
   if (gate === 'tussock' || gate === 'dry') {
     // Olive / ochre: warm and green-leaning against blue, and not grey.
