@@ -281,7 +281,12 @@ function pastoTerrainColour(out, y, slope, x, z) {
   out.lerp(pastoColRock, pastoSmooth((y - 30) / 8));
   out.lerp(pastoColRockD, 0.32 * mottle * pastoSmooth((y - 33) / 6));
   out.lerp(pastoColAsh, pastoSmooth((y - 42) / 5));
-  out.lerp(pastoColSnow, pastoSmooth((y - 54) / 3.5));
+  // ROADMAP-WOW Part C (Heroes): the snow line BREAKS. A level 54 m contour is
+  // one shape on the cone; `mottle` (a ~20 m grid, already computed) swings
+  // the threshold +/-2.5 m so the snow runs down the gullies in tongues and
+  // stops short on the ribs, the way it sits on a real stratovolcano's summit.
+  // Zero triangles: the same vertices, coloured on a wobbling line.
+  out.lerp(pastoColSnow, pastoSmooth((y - 54 + (mottle - 0.5) * 5.0) / 3.5));
   // The vent. Keyed on distance from the axis, not on altitude — the cone
   // crosses the crater-floor height again out on its flanks at d ~ 28.
   const cdx = x - pastoGAL_X, cdz = z - pastoGAL_Z;
@@ -586,6 +591,33 @@ function pastoBuildFarPeaks() {
         g: (i % 2) ? cone5 : cone4, c: ring.c, gain: ring.gain,
         m: pastoXf(px, ring.y + hh * 0.5, pz, 0, yaw, 0, ww * 0.5, hh, ww * 0.5),
       });
+      // ROADMAP-WOW Part C (Heroes): a SHOULDER on every near-ring peak. One
+      // triangle in the sky is one form; a cone with a lower summit grown off
+      // one flank is a mountain, and it is the one asymmetry the rubric asks
+      // for. The shoulder is offset along the ring's tangent, its apex clear
+      // of the parent's flank at that height (0.38 ww out against a parent
+      // radius of 0.20 ww there), base on the same ring.y so no bottom edge
+      // ever shows, and pushed off the sheet by the same rule as its parent.
+      if (ring.snow) {
+        const side = (i % 2) ? 1 : -1;
+        const tx = -Math.sin(a) * side, tz = Math.cos(a) * side;
+        let sx = px + tx * ww * 0.38, sz = pz + tz * ww * 0.38;
+        const sm = Math.abs(sx) > Math.abs(sz) ? Math.abs(sx) : Math.abs(sz);
+        if (sm < 142) { const k = 142 / sm; sx *= k; sz *= k; }
+        const sh = hh * pastoRndR(0.56, 0.66), sw = ww * 0.62;
+        parts.push({
+          g: (i % 2) ? cone4 : cone5, c: ring.c, gain: ring.gain,
+          m: pastoXf(sx, ring.y + sh * 0.5, sz, 0, yaw + 0.5, 0, sw * 0.5, sh, sw * 0.5),
+        });
+        // snow on the shoulder too where the parent wears it: the line then
+        // steps down between the two summits instead of ringing one of them
+        if (i % 3 === 0) {
+          parts.push({
+            g: cone5, c: PALETTE.volcanoSnow, gain: 1.55,
+            m: pastoXf(sx, ring.y + sh * 0.84, sz, 0, yaw + 0.5, 0, sw * 0.08, sh * 0.16, sw * 0.08),
+          });
+        }
+      }
       if (ring.snow && i % 3 === 0) {
         // Radius ww*0.10 at height fraction 0.80 is EXACTLY the parent cone's
         // own radius there, and the cap's apex lands on the parent's apex, so
@@ -1485,6 +1517,17 @@ function pastoBuildPlazaFurniture(game, root) {
   pastoPart(parts, fb, PALETTE.water, oct8, 0, 2.83, 0, 0, 0, 0, 1.25, 0.09, 1.25);
   pastoPart(parts, fb, PALETTE.foam, oct8, 0, 3.35, 0, 0, 0, 0, 0.16, 1.1, 0.16);
   pastoPart(parts, fb, PALETTE.foam, new THREE.OctahedronGeometry(0.42, 0), 0, 4.0, 0);
+  // ROADMAP-WOW Part C (Heroes): the fountain's ONE ASYMMETRY. Eight equal
+  // faces and a jet on the axis is a drawing; a colonial basin has a spout on
+  // one side where the overflow was cut, a wet stain under it, and it is the
+  // face the arrival lens (x +11, looking west) sees. Stone block, a trickle
+  // in the basin's own water colour, the stain in stoneDark on the plinth.
+  // (World frame, not `fb`: the basin is yawed PI/8, so world +x is a FACE
+  // centre of the octagon and local +x a corner.)
+  const fx = pastoFTN_X + pastoFTN_R, fz = pastoFTN_Z;
+  pastoBox(parts, null, PALETTE.stoneDark, fx + 0.22, 1.16, fz, 0.30, 0.13, 0.22);
+  pastoBox(parts, null, PALETTE.water, fx + 0.46, 0.62, fz, 0.05, 0.46, 0.06);
+  pastoBox(parts, null, PALETTE.stoneDark, fx - 0.06, 0.22, fz, 0.12, 0.22, 0.34);
 
   // -- benches ringing the fountain
   for (let i = 0; i < pastoBenchN; i++) pastoBenchAt(parts, i);
