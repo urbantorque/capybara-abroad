@@ -1964,8 +1964,22 @@ function manBuildTown(game, root) {
 // haze. Bases at -30, on a sea that is a flat sheet.
 //
 // And the ferry. The one thing everybody knows crosses this water: cream
-// hull, twenty-four triangles, west to east across the mouth at z -520,
+// hull, twenty-four triangles, west to east across the mouth at z -290,
 // a hundred and ten seconds a loop, seventy-seven of them under way.
+//
+// ROADMAP-WOW3 D5: it used to run at z -500..-530, seaward of both Heads,
+// which is honest geography but reads wrong from the arrival lens — pitched
+// ~21-22 deg down at the sets, that line sits near the frame's TOP EDGE
+// (qa/wow3-d5-ferry-check.js's own arrival-lens pin: NDC y 0.86-0.88 toward
+// the North Head side of its run, against a top edge at 1.0). z -290..-300
+// is still well out from the shore (manSHORE_Z = 24) and inside the mouth
+// between the Heads (North Head's nearest wedge is z -190, South Head
+// -580..-600), and the SAME camera pin reads it at NDC y ~0.50-0.55 there —
+// comfortably inside the frame rather than clipping its top — with neither
+// path end occluded by a Head's own far-layer geometry (qa/w1-ferry-sweep
+// swept z -530..-220 x -320..320 against a raycast on the far layer: only
+// z in roughly [-340, -260] clears BOTH the North Head side, at x 150, and
+// the South Head side, at x 320, at once).
 function manBuildFar(root) {
   const tone = farTone(PALETTE.manScrub, PALETTE.manHaze, 0.30);
   manFar = farBundle({
@@ -1989,7 +2003,7 @@ function manBuildFar(root) {
     }),
     mover: farMover({
       kind: 'ferry', color: PALETTE.sail, scale: 1.2, period: 110, duty: 0.7, phase: 0.3,
-      path: [[-320, 0, -500], [320, 0, -530]],
+      path: [[-320, 0, -290], [320, 0, -300]],
     }),
   });
   root.add(manFar.group);
