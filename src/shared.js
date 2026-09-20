@@ -5892,6 +5892,20 @@ export function reflectSet(y, k, under, sky, locals, lift, box) {
   // pond is one corner of a chapter and the lane never sees it.
   _reflSt.box = (box && box.length === 4) ? box : null;
 }
+/**
+ * The reflection target itself (ROADMAP-WOW3 Part D item 1). Returns the
+ * SAME `{ value }` object every water shader's `uReflT` already points at
+ * (shared.js:6584) — not a copy — so a caller that reads `.value` fresh each
+ * frame sees exactly what the water sees, including the "last picture holds
+ * while parked" behaviour reflectRender already has: `.value` is null only
+ * when no water in the chapter has ever asked for a reflection (k 0, no
+ * water plane, or the target has never been allocated). A caller must treat
+ * a null `.value` as "nothing to sample" and fall back — never assume it is
+ * live THIS frame; `reflectInfo().on` is the flag for that.
+ */
+export function reflectTex() {
+  return _reflTex;
+}
 /** For the probes: what the pass did on the last frame. */
 export function reflectInfo() {
   return { y: _reflSt.y, want: _reflSt.k, k: _reflK.value, on: _reflOn.value, under: _reflSt.under,

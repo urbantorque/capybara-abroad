@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, clamp, spillSlots, spillUniforms, calmOn, reflectRender, reflectInfo } from './shared.js';
+import { PALETTE, clamp, spillSlots, spillUniforms, calmOn, reflectRender, reflectInfo, reflectTex } from './shared.js';
 import { createEnvironment } from './environment.js';
 import { createPhysicsWorld, createProps } from './props.js';
 import { createCapybara } from './capybara.js';
@@ -1121,6 +1121,11 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   'uniform float uSubCeilK;',
   'uniform float uSubT;',
   'uniform float uBeadT;',
+  // ROADMAP-WOW3 Part D item 1: the real reflection target (shared.js's
+  // reflectTex(), the same texture every water's uReflT samples), when the
+  // JS side has one to hand this frame; uReflCeilOn says whether it does.
+  'uniform sampler2D tReflC;',
+  'uniform float uReflCeilOn;',
   'const vec3 MAIN_LUMA = vec3(0.2126, 0.7152, 0.0722);',
   // Six beads, hand-scattered rather than gridded (a grid reads as a UI
   // overlay, not glass) in frame-height units the same way MAIN_POST_RAYS'
@@ -1369,23 +1374,37 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   '    vec3 wc = lin * (0.25 + 0.75 * uSub.rgb * 1.6) + uSub.rgb * (0.03 + 0.05 * vUv.y);',
   '    lin = mix(lin, wc, uSub.a * 0.85);',
   '  }',
-  // ---- THE CEILING (ROADMAP-WOW2 V4.1) -----------------------------------
+  // ---- THE CEILING (ROADMAP-WOW2 V4.1, real texture: ROADMAP-WOW3 D1) ----
   // "The ceiling of light every dive shot has." A1's own reflection target
-  // (reflectRender/reflectInfo, shared.js) is the exact picture here — the
-  // sky and the bank, mirrored back down — but its texture (_reflTex) is a
-  // module-private object shared.js never exports a getter for: reflectInfo()
-  // returns only y/want/k/on/why/size/hidden/cover/small/allocated, no
-  // sampler. A `reflectTex()` export is the follow-up this term wants and
-  // does not have (see the V4 report). Until then this is built fresh, here,
-  // entirely from what the composite already owns: a rippled brightening
-  // weighted to the top of the frame, in the chapter's own sysSUB colour, so
-  // it reads as a moving surface rather than a flat gradient. Before the
-  // bloom, like the tint above it — it is light on the way to the lens.
+  // (reflectRender/reflectTex, shared.js) is the exact picture here — the
+  // sky and the bank, mirrored back down — now sampled directly when the JS
+  // side hands this pass a texture (uReflCeilOn > 0.5): the SAME uReflT
+  // every water shader reads, in the same screen-space UV the water shader
+  // computes off gl_FragCoord (shared.js:7281), just built from vUv here
+  // since this pass already has it normalised. reflectRender itself refuses
+  // to render while the eye is BELOW the water plane (shared.js's
+  // `_reflSt.under` gate) — exactly the case a dive puts the eye in — so
+  // what this samples is the LAST picture the target held from the moment
+  // before the eye went under (the target is never cleared, only
+  // overwritten on the next live render), not a live one; still the real
+  // mirrored scene rather than a formula, and it re-syncs to live the next
+  // time the eye surfaces. When nothing has ever been rendered into it
+  // (`.value` null — no water in the chapter, or reflect k 0), this falls
+  // back to the original rippled-brightening formula rather than sampling a
+  // null texture. Before the bloom, like the tint above it — it is light on
+  // the way to the lens.
   '  if (uSubCeilK > 0.001) {',
   '    float ceilY = smoothstep(0.05, 0.95, vUv.y);',
-  '    float r1 = sin(vUv.x * 26.0 + uSubT * 1.6) * 0.5 + 0.5;',
-  '    float r2 = sin(vUv.y * 19.0 - uSubT * 2.1 + vUv.x * 9.0) * 0.5 + 0.5;',
-  '    float ripple = r1 * 0.6 + r2 * 0.4;',
+  '    float ripple;',
+  '    if (uReflCeilOn > 0.5) {',
+  '      vec2 rUv = vec2(1.0 - vUv.x, vUv.y);',
+  '      vec3 rC = texture(tReflC, rUv).rgb;',
+  '      ripple = clamp(dot(rC, MAIN_LUMA) * 1.4, 0.0, 1.0);',
+  '    } else {',
+  '      float r1 = sin(vUv.x * 26.0 + uSubT * 1.6) * 0.5 + 0.5;',
+  '      float r2 = sin(vUv.y * 19.0 - uSubT * 2.1 + vUv.x * 9.0) * 0.5 + 0.5;',
+  '      ripple = r1 * 0.6 + r2 * 0.4;',
+  '    }',
   '    lin += uSub.rgb * ceilY * (0.35 + 0.65 * ripple) * uSubCeilK * 0.6;',
   '  }',
   '  lin += texture(tBloom, vUv).rgb * uBloom;',
@@ -1748,6 +1767,8 @@ function mainMakePost(game) {
       tRays: { value: mainPostBlack }, uRaysK: { value: 0 },  // (ROADMAP-WOW A4)
       // (ROADMAP-WOW2 V4) the ceiling, its ripple clock, and the surfacing beads
       uSubCeilK: { value: 0 }, uSubT: { value: 0 }, uBeadT: { value: 0 },
+      // (ROADMAP-WOW3 D1) the real reflection texture for the ceiling above
+      tReflC: { value: mainPostBlack }, uReflCeilOn: { value: 0 },
       uCamPos: { value: new THREE.Vector3() },
       uRayBL: { value: new THREE.Vector3() },
       uRayDX: { value: new THREE.Vector3() },
@@ -2025,6 +2046,16 @@ function mainMakePost(game) {
     const subOn = !game.state.noSub2 && ((game.state.perfRung | 0) < 1);
     const subK = subOn ? (p.sub || 0) : 0;
     cu.uSubCeilK.value = subK;
+    // ROADMAP-WOW3 D1: hand the ceiling term the real reflection texture
+    // when one has ever been rendered (see the block above uSubCeilK); the
+    // shader falls back to its own formula when `.value` is null.
+    if (subK > 0.001) {
+      const rt = reflectTex();
+      if (rt && rt.value) { cu.tReflC.value = rt.value; cu.uReflCeilOn.value = 1; }
+      else { cu.tReflC.value = mainPostBlack; cu.uReflCeilOn.value = 0; }
+    } else {
+      cu.uReflCeilOn.value = 0;
+    }
     // The ripple's own clock. Not a logical trigger — nothing reads uSubT to
     // decide anything, only to animate — so wall-clock rather than a dt this
     // function is never given costs nothing an A/B could see.
