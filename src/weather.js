@@ -771,6 +771,32 @@ const wxMIST_FRAG = [
 const wxFwd = new THREE.Vector3();
 const wxZAX = new THREE.Vector3(0, 0, 1);
 const wxFall = new THREE.Vector3();
+// ---- A MINIMUM SCREEN FOOTPRINT FOR THE MOTE QUADS (ROADMAP-WOW3 D10) ----
+// ROADMAP-WOW.md's A3.1 named this and did not build it: every mote (the
+// main field AND the bursts, V1.3) tumbles on all three Euler axes every
+// frame, and a FLAT quad — uniform scale, no billboarding — presents
+// edge-on to the camera once a spin cycle regardless of how big `s` is, so
+// its screen footprint collapses to a sub-pixel hairline and pops back.
+// The same family of problem as A3.1's thin cylinders, and the same shape
+// of fix: not a material flag (alpha-to-coverage was tried and is a no-op
+// on this OPAQUE geometry, see A3's own reality check) but a floor on how
+// foreshortened the quad is allowed to read as. `wxNrm` is scratch, reused
+// every call the way wxV1/wxQ1 already are.
+const wxNrm = new THREE.Vector3();
+const wxFOOT_FLOOR = 0.22;   // |cos| between the quad's face and the view ray, below which it boosts
+const wxFOOT_MAX = 2.4;      // never inflate a mote past this multiple of its own scale
+/** How much to inflate a mote's uniform scale so it never reads thinner
+ *  than wxFOOT_FLOOR of its own footprint, however edge-on the tumble has
+ *  turned it this frame. `quat` is the mote's own rotation (already set);
+ *  wx/wy/wz its world position; `cam` the live camera. 1 = no change,
+ *  which is every frame the quad is not near edge-on. */
+function wxFootK(quat, wx, wy, wz, cam) {
+  wxNrm.copy(wxZAX).applyQuaternion(quat);
+  const dx = wx - cam.position.x, dy = wy - cam.position.y, dz = wz - cam.position.z;
+  const dl = Math.hypot(dx, dy, dz) || 1;
+  const fs = Math.abs((wxNrm.x * dx + wxNrm.y * dy + wxNrm.z * dz) / dl);
+  return fs < wxFOOT_FLOOR ? Math.min(wxFOOT_MAX, wxFOOT_FLOOR / Math.max(fs, 0.02)) : 1;
+}
 /**
  * THE LIVE BIOME'S API — capybara.js's and props.js's resolution rule, third
  * copy, and it is a copy on purpose: `game.env` is Sydney's and it stays
@@ -1475,6 +1501,9 @@ export function createWeather(game) {
         wxV1.set(anchor.x + mx[i], anchor.y + my[i], anchor.z + mz[i]);
         wxE1.set(wxT * spin * sp + ph, ph * 1.7, wxT * spin * sp * 0.61 + ph * 0.4);
         wxQ1.setFromEuler(wxE1);
+        // ROADMAP-WOW3 D10: never let the tumble foreshorten past the floor.
+        const fk = wxFootK(wxQ1, wxV1.x, wxV1.y, wxV1.z, cam);
+        s *= fk;
         wxS1.set(s, s, s);
         wxM1.compose(wxV1, wxQ1, wxS1);
         moteMesh.setMatrixAt(i, wxM1);
@@ -1802,6 +1831,7 @@ export function createWeather(game) {
    *  and a matrix per live slot, and the quad mesh's count set to the row's
    *  instances plus the live extent. */
   function wxStepBursts(dt) {
+    const cam = game.camera;
     const base = moteMesh === moteQuad ? moteN : 0;
     if (burstHi <= 0) {
       if (moteQuad.count !== base) moteQuad.count = base;
@@ -1830,10 +1860,15 @@ export function createWeather(game) {
       // the size: full for most of the life, gone over the last third — the
       // quads are opaque, so a shrink is the only fade there is
       const t = blife[i] / blife0[i];
-      const s = bsz[i] * (t < 0.33 ? t / 0.33 : 1);
+      let s = bsz[i] * (t < 0.33 ? t / 0.33 : 1);
       wxV1.set(bx[i], by[i], bz[i]);
       wxE1.set(wxT * k.spin + bph[i], bph[i] * 1.7, wxT * k.spin * 0.61 + bph[i] * 0.4);
       wxQ1.setFromEuler(wxE1);
+      // ROADMAP-WOW3 D10: the same floor the main field gets, below — a
+      // spin: 0 kind (bubble, drip) never tumbles but can still be born
+      // edge-on by a bad roll of its own random phase (bph), and cam is
+      // cheap to reach here now the function takes it.
+      if (cam) { s *= wxFootK(wxQ1, wxV1.x, wxV1.y, wxV1.z, cam); }
       wxS1.set(s, s, s);
       wxM1.compose(wxV1, wxQ1, wxS1);
       moteQuad.setMatrixAt(base + i, wxM1);
