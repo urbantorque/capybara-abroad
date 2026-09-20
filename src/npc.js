@@ -5068,7 +5068,11 @@ export function createNPCs(game) {
       if (!r || !r.group || !r.group.visible) continue;
       // The terrace is a set with its own furniture in it and the waiter has a
       // circuit; pulling either onto the lawn leaves a laid table nobody is at.
-      if (r.kind === 'patron' || r.kind === 'waiter') continue;
+      // ROADMAP-WOW3 D9: nor the gardener — it has its own finale spot now
+      // (beside the traveller, see npcGardenerSitSpot/'gardenerSit'), and
+      // 'gather' is a state thinkHuman never re-tasks a record out of, so a
+      // gardener swept in here would sit in the crowd instead, silently.
+      if (r.kind === 'patron' || r.kind === 'waiter' || r.kind === 'gardener') continue;
       if (r.carryT >= 0) continue;
       const dx = r.group.position.x - sysFIN_LAWN_X, dz = r.group.position.z - sysFIN_LAWN_Z;
       const d2 = dx * dx + dz * dz;
@@ -5375,6 +5379,38 @@ export function createNPCs(game) {
     });
   }
   game.events.on('finale:staged', npcTravellerHome);
+
+  // ---- THE GARDENER'S SIT-DOWN (ROADMAP-WOW3, Part D item 9) -------------
+  // N4 shipped the stand-down (startChase refuses once game.state.finaleOn,
+  // above) but never the sit the roadmap actually asked for. `sysFinDone` —
+  // whether the closing beat on the lawn has ALSO been spent, not just
+  // staged — is a systems.js-local `let` with no getter this file can reach
+  // without a systems.js edit (out of this file's ownership this wave), so
+  // this gates on `finaleOn` alone: it is already the flag that means the
+  // shelf is laid out and the traveller (npcTravFin, just above) is standing
+  // on the ring, which is the honest simplification the roadmap allows.
+  // Beside them, not on top of the ring's open mouth: the same bearing the
+  // traveller faces the horseshoe on, offset a half-turn perpendicular, so
+  // the gardener does not stand between the traveller and the thing they
+  // are both looking at.
+  // The roster carries two gardeners (`roster.push('gardener')` twice) and
+  // one fixed anchor for both would seat the second one inside the first —
+  // measured live, 0.3 m apart, practically one mesh. `i` spreads them 1.4 m
+  // further along the same perpendicular each time; `npcGardenerSeatN`
+  // hands each RECORD its own `i` once, the first time it is ever seated,
+  // and never again (see the call site: cached on `rec.gardenerSeatI`).
+  let npcGardenerSeatN = 0;
+  function npcGardenerSitSpot(i) {
+    if (!npcTravFin || !npcTravFin.group) return null;
+    const p = npcTravFin.group.position;
+    const faceYaw = Math.atan2(sysFIN_LAWN_X - p.x, sysFIN_LAWN_Z - p.z);
+    const side = faceYaw + Math.PI * 0.5;
+    const along = 1.8 + (i || 0) * 1.4;
+    return {
+      x: p.x + Math.sin(side) * along, z: p.z + Math.cos(side) * along,
+      yaw: faceYaw, lookX: sysFIN_LAWN_X, lookZ: sysFIN_LAWN_Z,
+    };
+  }
 
   // ===== THE SHELF, AND THE GARDENER'S TAKE ON IT (ROADMAP-WOW2, N1) =====
   // systems.js (sysShelfStage) lays each new keepsake on the shelf the
@@ -10481,6 +10517,22 @@ export function createNPCs(game) {
     }
     if (rec.kind === 'gardener') {
       if (st === 'calm' || st === 'retrieve') return;
+      // ROADMAP-WOW3 D9: once the finale is staged, sit beside the traveller
+      // instead of cycling wander/work — set once (st !== 'gardenerSit'
+      // guards re-entry) and left alone; a chase already in progress is not
+      // interrupted (startChase's own gate above stops the NEXT one).
+      if (game.state && game.state.finaleOn) {
+        if (st !== 'gardenerSit') {
+          if (rec.gardenerSeatI === undefined) rec.gardenerSeatI = npcGardenerSeatN++;
+          const seat = npcGardenerSitSpot(rec.gardenerSeatI);
+          if (seat) {
+            rec.seatX = seat.x; rec.seatZ = seat.z; rec.seatYaw = seat.yaw;
+            rec.seatLookX = seat.lookX; rec.seatLookZ = seat.lookZ;
+            setState(rec, 'gardenerSit');
+          }
+        }
+        return;
+      }
       if (st === 'work' && npcDwell(rec, rec.stateT, 4, 9)) { pickBed(rec); setState(rec, 'wander'); }
       else if (st === 'idle' || st === 'lookAt') { pickBed(rec); setState(rec, 'wander'); }
       return;
@@ -11511,6 +11563,30 @@ export function createNPCs(game) {
         spd = 1.1;
         rec.lookX = rec.seatX; rec.lookZ = rec.seatZ;
         if (d < 0.35 || rec.stateT > 9) { setState(rec, 'seated'); rec.seated = 1; }
+        break;
+      }
+      // ROADMAP-WOW3 D9: the gardener's own loaf, chair height reused for a
+      // spot on the grass (this rig has no legs to tell the difference — see
+      // the note on 'seated', above — so the chair crouch reads the same as
+      // a sit on the lawn does). Walks to the seat once, same shape as
+      // 'resit', then holds it; no 'seated' hand-off because nothing here
+      // ever stands this figure back up.
+      case 'gardenerSit': {
+        // Gardener-to-lawn is park-scale, the SAME crossing 'gather' budgets
+        // 30 s for (npcGATHER_CEIL/SPD) — 9 s (the terrace's own 'resit'
+        // ceiling) left a gardener started at the far side of the gardens
+        // frozen mid-lawn in a sitting pose, nowhere near the seat.
+        const d = steerTo(rec, rec.seatX, rec.seatZ, dt);
+        if (d < 0.4 || rec.stateT > npcGATHER_CEIL) {
+          spd = 0;
+          rec.tgtCrouch = npcSEAT_CROUCH;
+          rec.tgtArmL = -0.45; rec.tgtArmR = -0.45;
+          rec.yaw = npcDampAngle(rec.yaw, rec.seatYaw, 5, dt);
+          rec.lookX = rec.seatLookX; rec.lookZ = rec.seatLookZ;
+        } else {
+          spd = npcGATHER_SPD;
+          rec.lookX = rec.seatX; rec.lookZ = rec.seatZ;
+        }
         break;
       }
       case 'serve': {    // waiter: counter -> table -> counter, tray held level
