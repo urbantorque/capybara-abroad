@@ -2097,6 +2097,65 @@ export function sky2Info() {
            sun: { dir: [+s.x.toFixed(3), +s.y.toFixed(3), +s.z.toFixed(3)], k: +s.w.toFixed(3),
                   c: [+c.r.toFixed(2), +c.g.toFixed(2), +c.b.toFixed(2)], haloP: _sky2SunP.value.x, cosR: +_sky2SunP.value.y.toFixed(5) } };
 }
+// ---------------------------------------------------------------------------
+// THE RAINBOW (ROADMAP-WOW2 V5.1) — the shower's own afterword, not a fourth
+// sky2 term. It rides the SAME hook (every dome that goes through
+// skyDomeLit already carries vSky2W and the live sun axis in uSky2Sun.xyz,
+// written every frame regardless of whether a chapter has a sysSKY2 row —
+// see systems.js's sky2SunTick fallback), but it is drawn independently of
+// uSky2K/uSky2Sun.w so a chapter with no cloud band or sun disc of its own
+// (Kyoto, Hanoi, Manly — none of the three are in sysSKY2) still gets one.
+//
+// A rainbow sits 42 degrees off the point directly opposite the sun,
+// regardless of the sun's own elevation, which is why the angle is taken
+// against -uSky2Sun.xyz rather than against "up". systems.js decides WHEN
+// (rainT falling back through 0.3, sun above 8 degrees, some cloud still in
+// the sky) and ramps uRainK there; this shader only draws the ring and does
+// not know why it is visible.
+// ---------------------------------------------------------------------------
+const _rainK = { value: 0 };
+/** Once a frame from systems.js: the ring's own strength, 0 = inert. */
+export function rainbowTick(k) { _rainK.value = k > 0 ? (k < 1 ? k : 1) : 0; }
+export function rainbowInfo() { return { k: +_rainK.value.toFixed(3) }; }
+// Seven PALETTE-mixed stops, baked as GLSL constants once at module load —
+// a rainbow's own colours do not vary by chapter, only whether it is shown
+// does, and that is uRainK's job. No hex outside PALETTE: orange and indigo
+// are a mix of their neighbours, exactly as the roadmap asked for.
+function _rgb3(c) { return 'vec3(' + c.r.toFixed(4) + ',' + c.g.toFixed(4) + ',' + c.b.toFixed(4) + ')'; }
+const _RAINBOW_PARS = (function () {
+  const red = new THREE.Color(PALETTE.petalRed);
+  const orange = new THREE.Color(PALETTE.petalRed).lerp(new THREE.Color(PALETTE.petalYellow), 0.5);
+  const yellow = new THREE.Color(PALETTE.petalYellow);
+  const green = new THREE.Color(PALETTE.leafC);
+  const blue = new THREE.Color(PALETTE.petalBlue);
+  const indigo = new THREE.Color(PALETTE.petalBlue).lerp(new THREE.Color(PALETTE.petalPurple), 0.5);
+  const violet = new THREE.Color(PALETTE.petalPurple);
+  return 'uniform float uRainK;\n' +
+    'vec3 rainbowRamp(float t) {\n' +
+    '  float f = t * 6.0;\n' +
+    '  vec3 c = mix(' + _rgb3(red) + ', ' + _rgb3(orange) + ', clamp(f, 0.0, 1.0));\n' +
+    '  c = mix(c, ' + _rgb3(yellow) + ', clamp(f - 1.0, 0.0, 1.0));\n' +
+    '  c = mix(c, ' + _rgb3(green) + ', clamp(f - 2.0, 0.0, 1.0));\n' +
+    '  c = mix(c, ' + _rgb3(blue) + ', clamp(f - 3.0, 0.0, 1.0));\n' +
+    '  c = mix(c, ' + _rgb3(indigo) + ', clamp(f - 4.0, 0.0, 1.0));\n' +
+    '  c = mix(c, ' + _rgb3(violet) + ', clamp(f - 5.0, 0.0, 1.0));\n' +
+    '  return c;\n' +
+    '}';
+})();
+// The ring: a smooth band 2.2 degrees either side of 42, faded 0 at the
+// horizon-ish (sd.y < -0.03, a rainbow does not paint the ground) and mixed
+// in at half strength — low alpha, as asked, because the sky behind it is
+// still doing the work of reading as "just after rain".
+const _RAINBOW_OUT = `if (uRainK > 0.0005) {
+  vec3 rsd = normalize(vSky2W - cameraPosition);
+  float rAng = acos(clamp(dot(rsd, -uSky2Sun.xyz), -1.0, 1.0)) * 57.29578;
+  float rw = 1.0 - smoothstep(0.0, 2.2, abs(rAng - 42.0));
+  if (rw > 0.001 && rsd.y > -0.03) {
+    float rt = clamp((rAng - 40.0) / 4.0, 0.0, 1.0);
+    outgoingLight = mix(outgoingLight, rainbowRamp(rt), rw * uRainK * 0.5);
+  }
+}
+`;
 const _SKY2_PARS = `
 uniform float uSky2K;
 uniform vec4 uSky2Ramp;
@@ -2135,7 +2194,7 @@ const _SKY2_OUT = `if (uSky2K > 0.0005 || uSky2Sun.w > 0.0005) {
     outgoingLight = mix(outgoingLight, cc, c * bw * uSky2K);
   }
 }
-#include <opaque_fragment>`;
+` + _RAINBOW_OUT + `#include <opaque_fragment>`;
 function _skyDomeInject(shader) {
   shader.uniforms.uKeyDome = _keyDome;
   shader.uniforms.uSky2K = _sky2K;
@@ -2146,12 +2205,13 @@ function _skyDomeInject(shader) {
   shader.uniforms.uSky2Sun = _sky2Sun;
   shader.uniforms.uSky2SunC = _sky2SunC;
   shader.uniforms.uSky2SunP = _sky2SunP;
+  shader.uniforms.uRainK = _rainK;
   shader.vertexShader = shader.vertexShader
     .replace('#include <common>', '#include <common>\nvarying vec3 vSky2W;')
     .replace('#include <begin_vertex>', '#include <begin_vertex>\n\tvSky2W = (modelMatrix * vec4(transformed, 1.0)).xyz;');
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <opaque_fragment>', _SKY2_OUT)
-    .replace('#include <lights_pars_begin>', '#include <lights_pars_begin>\nuniform vec3 uKeyDome;' + _SKY2_PARS)
+    .replace('#include <lights_pars_begin>', '#include <lights_pars_begin>\nuniform vec3 uKeyDome;' + _SKY2_PARS + '\n' + _RAINBOW_PARS)
     .replace('#include <lights_fragment_begin>', THREE.ShaderChunk.lights_fragment_begin
       .replace('directionalLight = directionalLights[ i ];',
                'directionalLight = directionalLights[ i ];\n\t\tdirectionalLight.color *= ( UNROLLED_LOOP_INDEX == 0 ) ? uKeyDome.x : uKeyDome.y;')
@@ -6025,6 +6085,20 @@ export function dappleSet(on) {
 }
 /** What the dapple is doing, for an audit. */
 export function dappleInfo() { return { k: _dappleK.value, driftX: _cloudP.value.x, driftZ: _cloudP.value.y }; }
+// THE PUDDLE'S CUT (ROADMAP-WOW2 V5.2), the exact `_dappleK` pattern: the
+// wetness gate and the mask are baked into the shader wherever `reflect.wet`
+// asks for them (`reflWet && wet`, grain()'s own option block) — that part
+// cannot be undone at runtime without a recompile — but the ONE branch that
+// spends the two extra grNoise calls and the extra multiply is a uniform,
+// so `noPuddle` (systems.js) can turn it off for ~nothing without touching
+// the material at all. Off, `rW` is exactly the pre-V5.2 number: Kowloon's
+// road (the only live caller) goes back to always-on at its static k.
+const _puddleOn = { value: 1 };
+export function puddleSet(on) {
+  const v = on === true ? 1 : on === false ? 0 : +on;
+  _puddleOn.value = v > 0 ? (v < 1 ? v : 1) : 0;
+}
+export function puddleInfo() { return { on: _puddleOn.value }; }
 // CAUSTICS (ROADMAP-WOW Part B, Palawan) — rippling sunlight on a sand bed
 // under clear shallow water. One more octave in the SHORE path, because the
 // shore path is the one place a fragment already knows how deep under the
@@ -6311,6 +6385,33 @@ export function grain(m, opts) {
   const reflWob = refl ? (refl.wobble === undefined ? 1.0 : refl.wobble) : 0;
   const reflBlur = refl ? (refl.blur === undefined ? 0 : refl.blur) : 0;
   // ---------------------------------------------------------------------
+  // THE WETNESS GATE AND THE PUDDLE MASK (ROADMAP-WOW2 V5.2). `reflect.wet`
+  // opts a GROUND material — not a body of water — into a mirror that
+  // exists only while it is actually wet: `k` above is the puddle's PEAK
+  // strength, and this multiplies it by `uGrainWet` (the same "wetness
+  // above the chapter's own baseline" term the sheen already reads — see
+  // wetTick above), which is 0 at the chapter's dry baseline and ramps with
+  // an active shower's rainT and decays with it after. `reflect` on every
+  // OTHER call site in the game (the ponds, the lakes, the harbours, the
+  // tide-gated squares) is a real body of water and must stay reflective
+  // whether or not it is currently raining, so this is opt-in and changes
+  // nothing there.
+  //
+  // A gate alone would still paint the mirror edge-to-edge across the whole
+  // surface, and a road does not puddle evenly — it puddles where the
+  // ground actually dips. The mask is a fresh, cheap low-frequency sample
+  // (grNoise is the dome's neighbour, not the ground's own baked `gn` —
+  // that local is scoped to color_fragment and is out of reach by
+  // opaque_fragment, so this takes one more octave at the same kind of
+  // wavelength rather than fight the scope) thresholded so only a patchwork
+  // of it ever reaches full strength, which is what "a road breaks into
+  // mirrors" asks for.
+  //
+  // Only ever paired with a GROUND material (`wet` below, spark <= 0): a
+  // sparkling sea has its own glitter for this job and no uGrainWet binding
+  // to read.
+  const reflWet = refl ? refl.wet === true : false;
+  // ---------------------------------------------------------------------
   // DAPPLE (ROADMAP-WOW G2) — see the block above _dappleK. Opt-in per ground
   // material: `dapple: { cells: [{x, z, r}, ...], k, scale }`.
   //
@@ -6484,6 +6585,7 @@ export function grain(m, opts) {
       shader.uniforms.uReflRes = _reflRes;
       shader.uniforms.uReflK = _reflK;
       shader.uniforms.uReflOn = _reflOn;
+      if (reflWet && wet) shader.uniforms.uPuddleOn = _puddleOn;
     }
     if (cloud > 0) shader.uniforms.uCloudK = _cloudK;
     if (shore > 0) shader.uniforms.uShoreY = _shoreY;
@@ -6565,6 +6667,7 @@ export function grain(m, opts) {
         reflK > 0 ? 'uniform vec2 uReflRes;' : '',
         reflK > 0 ? 'uniform float uReflK;' : '',
         reflK > 0 ? 'uniform float uReflOn;' : '',
+        (reflWet && wet) ? 'uniform float uPuddleOn;' : '',
         cloud > 0 ? 'uniform float uCloudK;' : '',
         shore > 0 ? 'uniform float uShoreY;' : '',
         cont > 0 ? 'uniform vec4 uCtcP[' + _CONTACT_N + '];' : '',
@@ -7157,6 +7260,21 @@ export function grain(m, opts) {
         '  vec3 rV = normalize(cameraPosition - vGrainW);',
         '  float rW = pow(1.0 - clamp(rV.y, 0.0, 1.0), ' + reflPow.toFixed(3) + ') * ' +
              reflK.toFixed(4) + ' * uReflK;',
+        // THE WETNESS GATE AND THE PUDDLE MASK (V5.2). See the option block
+        // above `reflWet`. `gn` is not in scope here — it is a color_fragment
+        // local and this is opaque_fragment — so the mask takes its own
+        // grNoise sample at a puddle's own size (a metre and a half-ish cell)
+        // rather than reuse it. Wrapped in `uPuddleOn`, not baked as a JS
+        // `if`: `noPuddle` (systems.js) needs to cut this WITHOUT a material
+        // rebuild, the same reason the dapple's own strength is a uniform
+        // and not a second grain() cache key.
+        (reflWet && wet) ? [
+          '  if (uPuddleOn > 0.5) {',
+          '    rW *= clamp(uGrainWet, 0.0, 1.0);',
+          '    float pn = grNoise(vGrainW.xz * 0.34 + 51.3) * 0.66 + grNoise(vGrainW.xz * 0.79 - 22.1) * 0.34;',
+          '    rW *= smoothstep(0.40, 0.62, pn);',
+          '  }',
+        ].join('\n') : '',
         '  if (rW > 0.001) {',
         // (1 - u, v): the virtual camera is a rotation, so its picture is
         // mirrored left-to-right. See the block above _reflRT.
@@ -7204,6 +7322,7 @@ export function grain(m, opts) {
   if (!g.userData) g.userData = {};
   g.userData.grainShore = shore;
   g.userData.grainReflect = reflK;   // qa/wow-reflect.js finds the water by this
+  g.userData.grainReflectWet = reflWet && wet;   // qa/wow2-shower.js finds a puddle road by this
   g.userData.grainDapple = dapK > 0 ? dapCells : null;   // qa/wow-dapple.js finds the ground by this
   g.needsUpdate = true;
   _grainCache.set(key, g);

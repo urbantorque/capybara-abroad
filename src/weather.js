@@ -184,6 +184,66 @@ const wxSKIT_R = 9;
 /** A skitter row is `{ kind }`, and the kind's own numbers do the rest. */
 function wxSkitter(kind) { return wxSKIT[kind] ? { kind: kind } : null; }
 
+// ---- THE GUST STRIPS THE TREES, AND THE DRIP AFTER RAIN --------------------
+// (ROADMAP-WOW2 V5.3/V5.4). Both read the SAME canopy positions: the
+// dapple's own baked cells (`material.userData.grainDapple` — shared.js's
+// grain(), the G2 opt-in), found by walking the live scene once per
+// chapter rather than importing a chapter's own table. This file may only
+// import from shared.js, and the dapple lists themselves — kyoSANDO_MAPLES,
+// panDAPPLE, manDAPPLE_PINES, envDAPPLE_FIGS — are module-private consts in
+// four files this pass does not own; grain() already bakes them onto the
+// ground material's userData for exactly this kind of probe (qa/wow-dapple.js
+// finds the ground the same way), so reading them back costs one scene walk,
+// cached until the next `biome:enter`.
+//
+// THE HONEST MISS: Sydney's jacarandas are NOT in the dapple system — only
+// its figs are (envDAPPLE_FIGS) — so there is no baked position to find for
+// them, and the purple gust the roadmap asked for stays with the ground
+// petals the skitter above already throws (wxSKIT.jacaranda IS a gust
+// reaction on those same trees, just petals already down rather than leaves
+// coming off). The figs get the airborne leaf instead, in their own green.
+// Kyoto's eaves, Hanoi's shophouses and Kowloon's signs are architecture, not
+// a canopy, and carry no equivalent baked list at all, so V5.4 (the drip)
+// rides the same four canopy chapters V5.3 does rather than the roadmap's
+// named buildings. See the V5 shipped note for the full accounting.
+const wxSTRIP = {
+  sydney:   { col: PALETTE.leafB,     h: 4.9 },  // the figs (envDAPPLE_FIGS); see envBuildLorikeets' own 4.9 m crown centre
+  kyoto:    { col: PALETTE.momiji,    h: 5.0 },  // the sando's maples (kyoSANDO_MAPLES; h 4.2-6.0 per tree)
+  manly:    { col: PALETTE.manPine,   h: 7.5 },  // the promenade pines (manDAPPLE_PINES)
+  pantanal: { col: PALETTE.panCanopy, h: 4.5 },  // the fazenda mango and the nearest capoes (panDAPPLE)
+};
+/** Cached per chapter: the live biome's own dapple cells, {x,z,r}[]. Never
+ *  another chapter's — the shared-space trap (capy3-shared-space-leaks) — a
+ *  hidden chapter's ground still carries its baked userData, so every mesh
+ *  found here is checked visible up its whole parent chain. */
+let wxStripCells = null, wxStripCellsFor = null;
+function wxStripShown(o) { for (let p = o; p; p = p.parent) if (p.visible === false) return false; return true; }
+// `chapterName` is passed in rather than read off a module-level `name` —
+// this table and this scan sit above createWeather() so wxSTRIP can be a
+// plain module constant like wxKIND and wxSKIT; the live chapter name is
+// createWeather's own closure variable, one call down.
+function wxStripFind(scene, chapterName) {
+  if (wxStripCellsFor === chapterName) return wxStripCells;
+  wxStripCellsFor = chapterName;
+  wxStripCells = [];
+  const row = wxSTRIP[chapterName];
+  if (!row || !scene) return wxStripCells;
+  const seen = {};
+  scene.traverse(function (o) {
+    if (!o.isMesh || !o.material || !o.material.userData || !wxStripShown(o)) return;
+    const cs = o.material.userData.grainDapple;
+    if (!cs || !cs.length) return;
+    for (let i = 0; i < cs.length; i++) {
+      const c = cs[i];
+      const key = c.x.toFixed(1) + ',' + c.z.toFixed(1);
+      if (seen[key]) continue;
+      seen[key] = true;
+      wxStripCells.push(c);
+    }
+  });
+  return wxStripCells;
+}
+
 /** Convenience: a mote row is `[kind, density]`, density scaling wxKIND.n. */
 function wxMotes(kind, density, size) {
   const k = wxKIND[kind];
@@ -740,6 +800,16 @@ export function createWeather(game) {
   let thunderAt = 0;              // s until this shower is allowed a rumble
   let live = true;                // false while the title card is up
 
+  // THE STRIP AND THE DRIP (V5.3/V5.4). Declared up here rather than beside
+  // wxStepStrip below, because wxPrime resets them on every `biome:enter`
+  // and wxPrime is CALLED once, synchronously, a few lines down — a `let`
+  // declared after that call site would still be in its own temporal dead
+  // zone the first time wxPrime's body ran and read it (the exact `wetOnly`
+  // class of bug the L11 postmortem is in memory for).
+  let wxStripCd = 0;     // s until the gust may strip another canopy
+  let wxDripLeft = 0;    // s of "a shower just happened here" left to drip in
+  let wxDripDue = 0;     // s until the next drop
+
   // ---- THE FRONT (L7, F4) --------------------------------------------------
   // A single scalar, -1..1, the front's position along the chapter's wind:
   // negative is still approaching, 0 is the line itself, positive is past.
@@ -1094,6 +1164,13 @@ export function createWeather(game) {
     ringMesh.count = 0;
     ringDue = 0;
     ringAny = false;
+    // ...and the drip (V5.4), for the same reason: sixty seconds owed by a
+    // shower that just ended in Kowloon must not pay out under Kyoto's
+    // maples the moment the crossing lands. The canopy cache goes with it —
+    // wxStripFind re-derives it from the new chapter's own scene on first
+    // use, cheaply (it is cached again the instant it is found).
+    wxStripCd = 0; wxDripLeft = 0; wxDripDue = 0;
+    wxStripCells = null; wxStripCellsFor = null;
     wxFieldTo(row);
     wxMistTo(name);
     // The field must not be dragged across the world from wherever it was.
@@ -1407,6 +1484,9 @@ export function createWeather(game) {
     // ---- the bursts (V1.3). See the block above wxBURST_MAX. -------------
     wxStepBursts(dt);
 
+    // ---- the strip and the drip (V5.3/V5.4). See the block above wxSTRIP.
+    wxStepStrip(dt);
+
     // ---- the skitter (Part B). See the block above wxSKIT. ---------------
     // Horizontally it is the motes' box — it follows the lens and wraps, so
     // the petals are always in the frame the lens is looking at. Vertically
@@ -1488,6 +1568,73 @@ export function createWeather(game) {
 
     // ---- ...AND WHERE IT LANDS (D5) --------------------------------------
     wxStepRings(dt);
+  }
+
+  /**
+   * THE GUST STRIPS THE TREES, AND THE DRIP AFTER RAIN (V5.3/V5.4). See the
+   * block above wxSTRIP for the canopy list and the honest miss. One canopy
+   * a go for each (the nearest to the animal), so this is a compare and a
+   * couple of `burst()` calls even in a chapter with eight cells in its
+   * table — the cost lives in `burst()`/`wxStepBursts`, already paid.
+   * `wxStripCd`/`wxDripLeft`/`wxDripDue` are declared up with `live`, above
+   * — see the comment there for why.
+   */
+  function wxStepStrip(dt) {
+    const cut = (game.state && game.state.noStrip) || (((game.state && game.state.perfRung) | 0) >= 1);
+    const strip = wxSTRIP[name];
+    if (cut || !strip) { wxDripLeft = 0; return; }
+    const cells = wxStripFind(scene, name);
+    if (!cells.length) return;
+    const capy = game.capy, cp = capy && capy.position;
+    if (!cp) return;
+    // ---- the gust strip: the canopy nearest the animal sheds a few leaves
+    // when the gust is near its own peak for this chapter's row. -----------
+    wxStripCd -= dt;
+    if (wxStripCd <= 0) {
+      const peak = row.gust.base + row.gust.swing;
+      const gm = Math.hypot(wxGust.x, wxGust.z);
+      if (peak > 0.05 && gm > peak * 0.84) {
+        let best = null, bd = 22 * 22;
+        for (let i = 0; i < cells.length; i++) {
+          const c = cells[i], dx = c.x - cp.x, dz = c.z - cp.z, d = dx * dx + dz * dz;
+          if (d < bd) { bd = d; best = c; }
+        }
+        if (best) {
+          const a = rand(0, 6.28318);
+          const bx = best.x + Math.cos(a) * best.r, bz = best.z + Math.sin(a) * best.r;
+          const fy = wxFloorAt(bx, bz, capy);
+          burst(bx, bz, 'leaf', Math.round(rand(12, 20)),
+                { color: strip.col, y: fy + strip.h * rand(0.7, 1.0), floor: fy });
+          wxStripCd = rand(2.6, 4.4);
+        } else {
+          wxStripCd = 0.6;
+        }
+      } else {
+        wxStripCd = 0.4;
+      }
+    }
+    // ---- the drip: for 60 s after a shower, the nearest canopy within 12 m
+    // drops a mote a second. `rainT` rather than `wetness()` on purpose — a
+    // chapter's baseline dampness (Venice, the cave) must not drip forever.
+    if (rainT > 0.05) wxDripLeft = 60;
+    else if (wxDripLeft > 0) wxDripLeft = Math.max(0, wxDripLeft - dt);
+    if (wxDripLeft > 0) {
+      wxDripDue -= dt;
+      if (wxDripDue <= 0) {
+        let best = null, bd = 12 * 12;
+        for (let i = 0; i < cells.length; i++) {
+          const c = cells[i], dx = c.x - cp.x, dz = c.z - cp.z, d = dx * dx + dz * dz;
+          if (d < bd) { bd = d; best = c; }
+        }
+        if (best) {
+          const a = rand(0, 6.28318), r = rand(0, best.r * 0.55);
+          const bx = best.x + Math.cos(a) * r, bz = best.z + Math.sin(a) * r;
+          const fy = wxFloorAt(bx, bz, capy);
+          burst(bx, bz, 'drip', 1, { y: fy + strip.h * 0.85, floor: fy });
+        }
+        wxDripDue = rand(0.85, 1.15);
+      }
+    }
   }
 
   /**

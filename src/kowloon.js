@@ -1148,11 +1148,16 @@ function hkBuildStreet(game, root) {
   // fake spill's own comment in shared.js says why a smeared reflection under
   // neon is right: a wet road at a metre and a half is a mirror at a very
   // shallow incidence, and what it shows is the signs as long broken streaks
-  // running toward you, never a sharp picture. grain()'s reflect path has no
-  // wetness gate (it is on outgoingLight, before opaque_fragment, with no
-  // uGrainWet term), so this is always on at a low k — which is also true
-  // of the road: the palette calls it hkWet "which is always wet". The
-  // slab's old sides sat under the kerbs and were never seen; the ground
+  // running toward you, never a sharp picture. grain()'s reflect USED TO have
+  // no wetness gate (it was on outgoingLight, before opaque_fragment, with no
+  // uGrainWet term), so this ran always-on at a low k — which happened to
+  // read fine here anyway, because the palette calls the road hkWet "which is
+  // always wet". ROADMAP-WOW2 V5.2 gave `reflect` an opt-in gate (`wet:
+  // true` — 0 at the chapter's dry baseline, up with an actual shower's
+  // rainT, down after) and a puddle mask, so Neon Rain's floor now BREATHES
+  // with the shower rather than sitting at one damp k all chapter: darker and
+  // mirror-patched between showers, a fuller sheet during and just after one.
+  // The slab's old sides sat under the kerbs and were never seen; the ground
   // plane (hkBuild, y 0) is a centimetre under this and was under the slab.
   // Never clone this material: the clone drops the hook.
   {
@@ -1161,7 +1166,7 @@ function hkBuildStreet(game, root) {
     rg.translate(0, 0.01, (hkST_Z0 + hkST_Z1) * 0.5);
     const rm = new THREE.Mesh(rg, grain(mat(PALETTE.hkWet),
       { scale: 0.5, amount: 0.085, warp: 0.6, near: 0.34, nearScale: 6, contact: 1, broad: 0.07, broadM: 14,
-        reflect: { k: 0.55, pow: 1.4, wobble: 1.5, blur: 4 } }));
+        reflect: { k: 0.55, pow: 1.4, wobble: 1.5, blur: 4, wet: true } }));
     rm.receiveShadow = true;
     rm.frustumCulled = false;
     root.add(rm);

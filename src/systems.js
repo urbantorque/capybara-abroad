@@ -8,7 +8,8 @@ import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount,
          rimTick, cloudTick, skyTick, fresnelTick, paleTick, triTick, mirrorTick, shadeTick, bounceSlots, bounceTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo, keyDomeTick, keyDomeInfo, skyDomeLit, sky2CloudTick, sky2SunTick, sky2Info,
-         exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt, lensFadeUniform, lensCapTick, reflectSet, dappleSet } from './shared.js';
+         exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt, lensFadeUniform, lensCapTick, reflectSet, dappleSet,
+         rainbowTick, puddleSet } from './shared.js';
 // THE CHARACTER KEY (L7, E4)
 import { capyKeyTick } from './capybara.js';
 
@@ -2762,6 +2763,29 @@ const sysSKY2_LAMBDA = 2.0;    // the band walks in at the zenith's own rate
 const sysSKY2_DRIFT  = 0.004;  // cells per second per m/s of gust: weather, not a flicker
 let   sysSky2K = 0, sysSky2SunK = 0, sysSky2OffX = 0, sysSky2OffZ = 0;
 const sysSky2Tint = new THREE.Color(), sysSky2Base = new THREE.Color(), sysSky2SunC = new THREE.Color();
+
+// ---------------------------------------------------------------------------
+// THE RAINBOW (ROADMAP-WOW2 V5.1). See rainbowTick / _RAINBOW_OUT in
+// shared.js for the shader; this is only "which chapters, and when".
+//
+// NOT sysSKY2's chapter list — checked first, because the two do not agree.
+// sysSKY2 (A5's cloud band and sun disc) exists for exactly five rows
+// (sahara, pantanal, palawan, cali, goreme), and the roadmap's own rainbow
+// list (Kyoto, Hanoi, Cali, the Pantanal, Manly) only overlaps it at cali
+// and pantanal — Kyoto, Hanoi and Manly have no sysSKY2 row at all. The
+// rainbow does not need one: every dome that goes through skyDomeLit
+// carries the live sun axis in uSky2Sun.xyz regardless (sky2SunTick's
+// fallback below always writes `dir`, even when the disc strength is 0),
+// so this rides that and is gated on its own table instead.
+//
+// Cross-checked against sysSKY_OWN (below): none of the five is Sydney,
+// the Drift, Goreme or the cave, so all five draw through the ONE shared
+// sysSkyMesh this file builds (sysBuildSky) and none needs a special case.
+const sysRAINBOW = { kyoto: 1, hanoi: 1, cali: 1, pantanal: 1, manly: 1 };
+const sysRAINBOW_SUN_MIN = Math.sin(8 * Math.PI / 180);   // "the sun above 8 degrees"
+const sysRAINBOW_IN  = -Math.log(0.05) / 6;    // ~95% there in 6 s
+const sysRAINBOW_OUT = -Math.log(0.05) / 40;   // ~95% gone in 40 s
+let sysRainbowK = 0;
 const sysSKY_TOP = {
   pasto:   PALETTE.andesSkyTop,
   quay:    PALETTE.skyTop,        // it IS Sydney, an hour later and a mile out
@@ -38968,6 +38992,10 @@ export function createSystems(game) {
       }
       // ROADMAP-WOW G2's cut, wired (W5): the dapple's shared gain, 0 or 1.
       dappleSet(game.state.noDapple ? 0 : 1);
+      // ROADMAP-WOW2 V5.2's cut: the puddle's wetness gate and mask, 0 or 1
+      // — off, Kowloon's road (the only live `reflect.wet` caller) is back
+      // to its pre-V5.2 always-on k. Parked at rung 1 like the dapple.
+      puddleSet((game.state.noPuddle || sysPerfRung >= 1) ? 0 : 1);
       cloudTick(game.state.noCloud ? 0 : sysCloudK, sysCloudX, sysCloudZ,
                 sysCLOUD_WAVE, sysCLOUD_LO, sysCLOUD_HI);
     }
@@ -39160,6 +39188,33 @@ export function createSystems(game) {
       } else {
         sky2SunTick(sysAxDir, 0, null, 300, 1.6);
       }
+    }
+    // ---- THE RAINBOW (ROADMAP-WOW2 V5.1). See sysRAINBOW above and
+    // _RAINBOW_OUT in shared.js. Outside the sky2 block on purpose, for the
+    // same reason sky2 itself sits outside the visible-dome branch: the
+    // uniform is shared by every dome through skyDomeLit and a chapter with
+    // no row must drive it to zero rather than leave the last chapter's
+    // rainbow up. Cut by noRainbow; parked at rung 1.
+    //
+    // "As rainT falls through 0.3" is read here as a LEVEL, not an edge: the
+    // tail of a shower, after its own peak, while there is still enough of
+    // it left (and enough cloud still in the sky, `cloud()`) to be worth
+    // painting. A level is what a probe can force and hold (trap 35) without
+    // having to catch one frame's edge, and it produces the same shape asked
+    // for — the ring fades up as the shower eases below 0.3 and fades down
+    // once it, and the cloud behind it, are gone.
+    {
+      const cut = !!game.state.noRainbow || sysPerfRung >= 1;
+      let want = 0;
+      if (!cut && sysRAINBOW[name] && game.weather && subT <= 0.002) {
+        const rt = game.weather.drizzle();
+        const cv = typeof game.weather.cloud === 'function' ? clamp(game.weather.cloud(), 0, 1) : 0;
+        if (rt > 0.01 && rt < 0.30 && sysAxDir.y > sysRAINBOW_SUN_MIN) want = clamp(cv * 1.6, 0, 1);
+      }
+      const rlam = want > sysRainbowK ? sysRAINBOW_IN : sysRAINBOW_OUT;
+      sysRainbowK += (want - sysRainbowK) * (1 - Math.exp(-rlam * dt));
+      if (sysRainbowK < 0.0015) sysRainbowK = 0;
+      rainbowTick(cut ? 0 : sysRainbowK);
     }
     // ---- THE PLANAR REFLECTION (ROADMAP-WOW A1). See sysREFLECT. ---------
     // Here, after the dome has been placed and before main.js draws, because
