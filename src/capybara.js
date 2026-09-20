@@ -1603,6 +1603,30 @@ const capyHOP_VEL    = 8.0;   // ...and the kick out of it. MEASURED at 120 Hz
                               // third too generous. 8.0 puts the stretch peak
                               // at 0.35, which is where takeoff always had it.
 const capyHOP_POP    = 0.30;  // an in-progress stretch this big or bigger wins
+// ---- ...AND THE STRETCH FOLLOWS THE VELOCITY (ROADMAP-WOW2, V1.2) ---------
+// The pop above is the squash node's Y, so a running hop — whose velocity is
+// mostly FORWARD — stretched the animal upward and read as a jump from a
+// standstill however fast it left. This is the other half: six per cent
+// along the velocity, split between the node's forward and up by the
+// velocity's own shares, full for the first capySTRETCH_T of the arc and
+// let go over the rest of it. The pop is untouched; this multiplies beside
+// it. And the LANDING SQUASH is sized by the impact now rather than a fixed
+// -0.34 for everything over 3 m/s: a bench and a forty-metre arrival had the
+// same dip and only the sound said which was which.
+const capySTRETCH_K   = 0.06;   // along the velocity, at the start of the arc
+const capySTRETCH_T   = 0.12;   // s held at full before the decay
+const capySTRETCH_LAM = 5.0;    // decay after it
+const capyLAND_SQ0    = 0.10;   // pop at the 3 m/s threshold...
+const capyLAND_SQ_K   = 0.045;  // ...plus this per m/s of impact
+const capyLAND_SQ_MAX = 0.50;   // the spring's own floor
+// ...AND THE STROKE HAS A BOB. Swimming, the squash node held a flat 1.0
+// while the legs paddled underneath: 3 % on the Y at the stroke's own
+// phase (two per leg cycle, the couplet), faded in on its own weight so the
+// water's edge is not a step.
+const capySWIM_BOB    = 0.03;
+let capyStretch = 0;            // 0..1 the along-velocity weight
+let capyStretchT = 0;           // s left of the full-strength hold
+let capySwimBobW = 0;           // 0..1 the bob's weight, damped
 // ---- THE ARMED CROUCH (L6, E2 / art #3) -----------------------------------
 // The anticipation above was 23 ms — a frame and a half — and measured at
 // 60 Hz the animal was grounded with pop 0 on one frame and airborne with pop
@@ -1930,6 +1954,34 @@ let capyDiveDeep = 0;               // deepest point of this dive, metres
 let capySwamOnce = false;
 let capyWetLevel = 0;
 let capyWetDark = false;
+// ---- THE COAT DRIES SLOWLY, AND IT DRIPS (ROADMAP-WOW2, V1.4) --------------
+// The wet coat was a SWITCH: the six fur materials swapped to their dark
+// twins at 0.42 of capyWetLevel and back at 0.28, and since the level falls
+// at 1/8 a second the dark coat was gone 5.8 s after the harbour — a coat
+// that dries in the time it takes to walk up the beach. And it was reachable
+// only through the level, which the sound, the slip and the shake all read,
+// so the picture could not have its own clock without moving theirs.
+//
+// So the picture gets its own number. `capyWetVis` follows the level UP
+// (about a second to soak) and comes down on a clock of its own: 25 s from
+// soaked to dry, and 8 s once the shake-dry has run — the shake takes most
+// of the water and the fade is what a coat does after that. The dark twins'
+// colours are LERPED from the dry colours by it each frame (three uniform
+// writes; the coat's vertex colours ride on top untouched), so there is no
+// switch to see, and the swap to the twins happens under the lerp where the
+// two are the same colour. And for the first capyDRIP_T out of the water,
+// while the coat is still soaked, a drip falls from under the belly every
+// capyDRIP_GAP through weather.js's burst pool (V1.3's). Under noAlive the
+// old switch runs exactly as it did.
+const capyWETVIS_T     = 25;        // s, soaked to dry
+const capyWETVIS_SHAKE = 8;         // s, once the shake-dry has run
+const capyWETVIS_CUT   = 0.55;      // what the shake leaves of it
+const capyDRIP_T       = 6.0;       // s out of the water the belly drips
+const capyDRIP_GAP     = 0.40;      // s between drips
+let capyWetVis = 0;                 // 0..1 how wet the COAT LOOKS
+let capyWetVisRate = 1 / capyWETVIS_T;
+let capyDripT = 0;                  // s to the next drip
+let capyDripN = 0;                  // which of the three belly points
 // ---- THE SHAKE-DRY (see capySHAKE_DUR / capySHAKE_DELAY / capyWET_FAST) ----
 // Three constants that had been sitting in this file since v1, referenced by
 // nothing, with a comment further down asserting that "the shake sets
@@ -3012,6 +3064,38 @@ function capySurfacePitch(game, env, x, z, y) {
   return capySurf(0.82, 'grass');
 }
 
+/**
+ * THE FOOTFALL'S PICTURE (ROADMAP-WOW2, V1.3). See the call in the gait.
+ *
+ * Reads the last answer of capySurfacePitch (`capySurfMat`), which the step
+ * voice has just asked for, so this costs no second surface query. The foot
+ * is placed from the yaw the model is drawn at: forward is (sin, cos), the
+ * model's local +x is (cos, -sin), and the diagonal pair's front foot is
+ * 0.28 m ahead and 0.15 m to one side, the side alternating with the phase.
+ * The burst count follows the speed — two at a walk, six at a sprint, the
+ * pool's own cap — and the shallows get one ring rather than a puff.
+ */
+const capyFOOT_FWD = 0.28, capyFOOT_SIDE = 0.15;
+const capyFOOT_MIN_V = 1.0;           // m/s — under this a step raises nothing
+let capyFootX = 0, capyFootZ = 0;     // the last footfall's own position
+let capyStepN = 0;                    // footfalls, counted up for ever (the audit's)
+function capyFootfallFx(game, px, pz, speed, overWater) {
+  capyStepN++;
+  const side = capyStepPhase % 2 === 0 ? 1 : -1;
+  const fs = Math.sin(capyYaw), fc = Math.cos(capyYaw);
+  capyFootX = px + fs * capyFOOT_FWD + fc * side * capyFOOT_SIDE;
+  capyFootZ = pz + fc * capyFOOT_FWD - fs * side * capyFOOT_SIDE;
+  const wx = game.weather;
+  if (!wx || (game.state && game.state.noFootfall) || speed < capyFOOT_MIN_V) return;
+  const m = capySurfMat;
+  const n = 2 + Math.round(clamp((speed - capyFOOT_MIN_V) / (capyRUN - capyFOOT_MIN_V), 0, 1) * 4);
+  if (overWater && typeof wx.ringHere === 'function') wx.ringHere(capyFootX, capyFootZ);
+  else if (typeof wx.burst !== 'function') return;
+  else if (m === 'sand') wx.burst(capyFootX, capyFootZ, 'dust', n);
+  else if (m === 'gravel') wx.burst(capyFootX, capyFootZ, 'dust', n > 2 ? n - 2 : 1);
+  else if (m === 'snow') wx.burst(capyFootX, capyFootZ, 'snow', n);
+}
+
 function capyWrapAngle(a) {
   while (a > Math.PI) a -= Math.PI * 2;
   while (a < -Math.PI) a += Math.PI * 2;
@@ -3400,6 +3484,13 @@ export function createCapybara(game) {
   // The set the coat pass finds its meshes by. See capyPaintCoat, note 4.
   const capyFurMats = new Set([mFur, mFurWet, mBelly, mBellyWet, mDark, mDarkWet]);
   const wetParts = [];
+  // ...and the three twins' dry and wet colours, for the lerp (WOW2 V1.4).
+  // Built once; the lerp writes the twin's own colour and nothing else.
+  const capyWetLerp = [
+    { m: mFurWet,   dry: new THREE.Color(PALETTE.capy),      wet: new THREE.Color(PALETTE.capyDark) },
+    { m: mBellyWet, dry: new THREE.Color(PALETTE.capyLight), wet: new THREE.Color(PALETTE.capy) },
+    { m: mDarkWet,  dry: new THREE.Color(PALETTE.capyDark),  wet: new THREE.Color(PALETTE.capyNose) },
+  ];
 
   // -------------------------------------------------------------------
   // RIG HIERARCHY
@@ -5128,7 +5219,15 @@ export function createCapybara(game) {
                // still cannot see and a probe at 60 Hz can. See qa/l6-body.js.
                hopArm: capyHopArm, airPitch: capyAirPitch, landHold: capyLandHold,
                lungeW: capyLungeW, inhaleW: capyInhaleW, sqY: capySquash.scale.y,
-               headScale: head.scale.x, lungeZ: capySquash.position.z };
+               headScale: head.scale.x, lungeZ: capySquash.position.z,
+               // ---- WOW2, V1.2: the along-velocity stretch and the bob ----
+               sqZ: capySquash.scale.z, sqX: capySquash.scale.x, stretch: capyStretch,
+               swimBobW: capySwimBobW,
+               // ---- WOW2, V1.3/V6: the footfall's own count and place ----
+               stepPhase: capyStepPhase, stepN: capyStepN, footX: capyFootX, footZ: capyFootZ, surfMat: capySurfMat,
+               // ---- WOW2, V1.4: the coat's look against the level ----
+               wetLevel: capyWetLevel, wetVis: capyWetVis, wetDark: capyWetDark, swimAgo: capySwimAgo,
+               furR: capyWetLerp[0].m.color.r };
     },
     // ---- THE POSE FOR THE CAMERA (L4, F1a) ---------------------------------
     // systems.js calls this once a frame while the camera is out and the
@@ -6478,6 +6577,9 @@ export function createCapybara(game) {
       // — and overshoots to the same 0.42 peak it always had. The policy on the
       // guard is unchanged: a bigger stretch already in flight (a wheek) wins.
       if (capyPop < capyHOP_POP) { capyPop = capyHOP_CROUCH; capyPopVel = capyHOP_VEL; }
+      // ...and along the velocity (WOW2 V1.2; under noAlive with the rest of
+      // the animal's life — it is a scale, it costs nothing to park)
+      if (!(game.state && game.state.noAlive)) { capyStretch = 1; capyStretchT = capySTRETCH_T; }
       capyLandHold = 0;                  // a hop out of a held landing is a hop
       capyEarFlick = 1;
       capySfxOpts.pitch = capySwimming ? 0.9 : 1.35;
@@ -6685,7 +6787,10 @@ export function createCapybara(game) {
       // Any landing off a real hop; a kerb (under 2 m/s) keeps the old spring.
       if (fall > 2.0 && capyHopArm <= 0) capyLandHold = capyLAND_HOLD;
       if (fall > 3) {
-        capyPop = capyPop > -0.34 ? -0.34 : capyPop;
+        // sized by the impact (WOW2 V1.2): -0.24 off a kerb, -0.45 off a hop, -0.50 off a roof
+        const sq = (game.state && game.state.noAlive) ? -0.34
+                 : -clamp(capyLAND_SQ0 + fall * capyLAND_SQ_K, 0, capyLAND_SQ_MAX);
+        capyPop = capyPop > sq ? sq : capyPop;
         capyPopVel = -4;
         capySfxOpts.pitch = clamp(1.18 - fall * 0.035, 0.72, 1.18);
         capySfxOpts.volume = clamp(fall * 0.06, 0.15, 0.6);
@@ -7258,6 +7363,10 @@ export function createCapybara(game) {
         capyShakeP = 0;
         capyShakeSpray = 0;
         capyEarFlick = 1;
+        // ...and the coat's look loses most of its water here and dries on
+        // the short clock after (WOW2 V1.4): see capyWETVIS_SHAKE
+        if (capyWetVis > capyWETVIS_CUT) capyWetVis = capyWETVIS_CUT;
+        capyWetVisRate = 1 / capyWETVIS_SHAKE;
         // ITS OWN VOICE (L6, E2 / audio #7). This was 'rustle' — dry leaves
         // for a wet animal shaking itself off, the funniest sound it could
         // make. sfxShake is seven to nine low-passed puffs at the roll's own
@@ -7891,6 +8000,19 @@ export function createCapybara(game) {
           const wade = Math.max(drip, overWater ? capyWADE_IN : 0);
           capySfxOpts.wet = Math.max(game.weather ? game.weather.splash() : 0, wade);
           game.sfx('step', capySfxOpts);
+          // ---- THE FOOT TOUCHES THE GROUND (ROADMAP-WOW2, V1.3) ------------
+          // The sound has known what the foot is on since L4 (`capySurfMat`,
+          // read on the line above); the picture never did — the run's dust
+          // (below) is the flow's, colourless as to the ground, and the walk
+          // had nothing. So each footfall puts a few of the weather field's
+          // own quads under the foot that landed, keyed to the material the
+          // sound already keys on: sand and gravel a pale puff, snow a white
+          // one, the shallows a ring, stone and timber nothing (a paw on
+          // granite raises nothing). More at a run, a walk puffs, and the
+          // stand cannot reach this block at all. The foot is the diagonal
+          // pair's front foot, alternating sides with the phase. Cut by
+          // `game.state.noFootfall`; weather.js parks it at rung 1.
+          capyFootfallFx(game, px, pz, gaitSpeed, overWater);
           // ...and at a run it kicks up whatever it is running on
           if (gaitSpeed > capyWALK * 1.05 && capyStepPhase % 2 === 0) {
             capyDigPayload.position = capyPosition;
@@ -8549,7 +8671,28 @@ export function createCapybara(game) {
     // second scale channel to say nothing.
     const sqY = 1 + capyPop * 0.38 + capyBreath;
     const sqXZ = 1 - capyPop * 0.19 + capyBreath * (capyBREATH_X / capyBREATH_Y);
-    capySquash.scale.set(sqXZ, sqY, sqXZ);
+    // ---- ALONG THE VELOCITY (WOW2 V1.2): see capySTRETCH_K -----------------
+    // Held for capySTRETCH_T from the fire frame, then decayed; weighted by
+    // the air pose so a kerb cannot stretch anything; the velocity's shares
+    // put it on the node's forward (z) and up (y) — the body is yawed to its
+    // travel and pitched by the arc, so local forward-and-up IS the arc's
+    // direction to within the pitch clamp — and a little off the width, so
+    // it reads as the same animal pulled rather than a bigger one.
+    if (capyStretchT > 0) capyStretchT -= dt;
+    else capyStretch = damp(capyStretch, 0, capySTRETCH_LAM, dt);
+    let stZ = 0, stY = 0, stX = 0;
+    if (capyStretch > 0.002) {
+      const vx = body.velocity.x, vy = body.velocity.y, vz = body.velocity.z;
+      const vh = Math.sqrt(vx * vx + vz * vz), vm = Math.sqrt(vh * vh + vy * vy);
+      if (vm > 0.5) {
+        const w = capySTRETCH_K * capyStretch * capyAirPose;
+        stZ = w * (vh / vm); stY = w * (Math.abs(vy) / vm); stX = -w * 0.5;
+      }
+    }
+    // ...and the stroke's bob (WOW2 V1.2): see capySWIM_BOB
+    capySwimBobW = damp(capySwimBobW, capySwimming && !capyDiving && !(game.state && game.state.noAlive) ? 1 : 0, 6, dt);
+    const swimBob = capySwimBobW > 0.002 ? Math.sin(capyLegPhase * 2) * capySWIM_BOB * capySwimBobW : 0;
+    capySquash.scale.set(sqXZ * (1 + stX) * (1 - swimBob * 0.5), sqY * (1 + stY) * (1 + swimBob), sqXZ * (1 + stZ));
 
     // ---- THE TAIL (R5) ---------------------------------------------------
     // It had no writer at all. A sway on the same rest weight the breath uses,
@@ -8813,14 +8956,42 @@ export function createCapybara(game) {
     // is the brow, and a brow is worth having on a shut eye.
     capyFacePose(capyMood, Math.max(capyBlinkK(), capyNap));
 
-    // wet fur darkening (hysteresis so it doesn't strobe at the threshold)
-    const wantDark = capyWetLevel > (capyWetDark ? 0.28 : 0.42);
+    // ---- THE COAT, WET (see capyWETVIS_T) ---------------------------------
+    // The look's own number: up with the level, down on its own clock.
+    const wetCut = !!(game.state && game.state.noAlive);
+    if (capyWetLevel > capyWetVis) capyWetVis = damp(capyWetVis, capyWetLevel, 3, dt);
+    else if (capyWetVis > 0) { capyWetVis -= capyWetVisRate * dt; if (capyWetVis < 0) capyWetVis = 0; }
+    if (capySwimming) capyWetVisRate = 1 / capyWETVIS_T;
+    // wet fur darkening. Under the cut: the old switch, hysteresis so it
+    // doesn't strobe at the threshold. Live: the swap happens under the lerp
+    // where the twin IS the dry colour, so there is nothing to strobe.
+    const wantDark = wetCut ? capyWetLevel > (capyWetDark ? 0.28 : 0.42) : capyWetVis > 0.02;
     if (wantDark !== capyWetDark) {
       capyWetDark = wantDark;
       for (let i = 0; i < wetParts.length; i++) {
         wetParts[i].m.material = wantDark ? wetParts[i].wet : wetParts[i].dry;
       }
     }
+    if (capyWetDark) {
+      const k = wetCut ? 1 : capyWetVis;
+      for (let i = 0; i < 3; i++) capyWetLerp[i].m.color.lerpColors(capyWetLerp[i].dry, capyWetLerp[i].wet, k);
+    }
+    // ...and the drips (see capyDRIP_T): out of the water, still soaked, on
+    // its feet — one from under the belly every capyDRIP_GAP, three points
+    // along it in turn, through the burst pool (V1.3), which puts the floor
+    // under them and lets them die on it.
+    if (!wetCut && !capySwimming && grounded && capySwimAgo < capyDRIP_T && capyWetVis > 0.3) {
+      capyDripT -= dt;
+      if (capyDripT <= 0) {
+        capyDripT = capyDRIP_GAP;
+        const wx = game.weather;
+        if (wx && typeof wx.burst === 'function') {
+          const off = ((capyDripN++ % 3) - 1) * 0.16;
+          wx.burst(capyRenderPos.x + Math.sin(capyYaw) * off, capyRenderPos.z + Math.cos(capyYaw) * off,
+                   'drip', 1, { y: capyRenderPos.y - 0.12 });
+        }
+      }
+    } else capyDripT = 0;
 
     // ---- fx: the wheek, made visible ---------------------------------
     // The signature verb of the whole game was, visually, a squash and a

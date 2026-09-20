@@ -564,6 +564,37 @@ const wxFOOT_Y     = 0.34;
 // keeps a ring on a shelving beach out of the sand.
 const wxDECK_UP    = 0.40;
 
+// --- THE BURST (ROADMAP-WOW2, V1.3 — and V4/V5's hook) ------------------------
+// The mote field is a WEATHER: a box of specks around the lens that wraps
+// and never spawns or dies. Nothing in the game could put a few quads at a
+// POINT — a footfall on sand, a drip off a wet belly, a leaf knocked off a
+// branch, a bubble off a diver — without a pool of its own, and props.js's
+// dust is one such pool with one colour and one shape. This is the other
+// answer: the mote field's own instanced quads, wxBURST_MAX of them at the
+// TOP of moteQuad's buffer, above whatever the live row is drawing, born at
+// a point with a velocity and dead when their life or the floor says so.
+//
+// THE QUARTER RULE (the roadmap's law for every pool consumer): 48 of 200,
+// and never a slot the chapter's own row is using — the row is `moteN`
+// instances from zero, the bursts sit from `moteN` up, and where a heavy row
+// (the Drift's 170) leaves fewer than 48 the bursts take what is left. A
+// row that draws tetrahedra leaves the whole quad buffer free.
+//
+// A kind is DATA, like wxKIND: the colours (or `null` — the caller brings
+// one, for a leaf off a particular tree), the quad's size, how hard it is
+// thrown up and out, how fast it falls, how much the air holds it, how long
+// it lives, how fast it tumbles. Everything the loop needs and nothing it
+// does not; a caller says `burst(x, z, 'dust', 5)` and no more.
+const wxBURST_MAX = 48;
+const wxBURST = {
+  //          colours                                  size   up    out   grav  drag  life  spin
+  dust:   { cols: [PALETTE.wxMote, PALETTE.sandDark],  size: 0.050, up: 0.85, out: 0.65, grav: 1.4, drag: 3.2, life: 0.55, spin: 5 },
+  snow:   { cols: [PALETTE.wxSnowflake, PALETTE.foam], size: 0.055, up: 1.05, out: 0.75, grav: 2.0, drag: 2.6, life: 0.60, spin: 6 },
+  leaf:   { cols: null,                                size: 0.090, up: 1.20, out: 0.90, grav: 3.0, drag: 1.8, life: 0.90, spin: 7 },
+  drip:   { cols: [PALETTE.wxDrizzle],                 size: 0.028, up: 0.00, out: 0.12, grav: 9.8, drag: 0.3, life: 0.80, spin: 0 },
+  bubble: { cols: [PALETTE.foam],                      size: 0.032, up: 0.00, out: 0.20, grav: -1.6, drag: 2.4, life: 0.90, spin: 0 },
+};
+
 // --- THE GROUND MIST (ROADMAP-WOW G3) ----------------------------------------
 // The cave builds one (`cavMist`, twenty-two flattened spheres at 0.055 alpha
 // under the doline) and nothing else does. This is the same thing said once
@@ -838,6 +869,10 @@ export function createWeather(game) {
   const ringY = new Float32Array(wxRING_MAX);
   const ringZ = new Float32Array(wxRING_MAX);
   let ringHead = 0, ringDue = 0, ringAny = false;
+  // ...and a lift on the pool's opacity for a ring born OUTSIDE the rain
+  // (V1.3: a footfall in the shallows, a drip's arrival), which otherwise
+  // draws at the dry floor of 0.10 and is not there. Decays on its own.
+  let ringBoost = 0;
   // A LIFETIME COUNT, for the audit and for nothing else. The rate is the one
   // number in this block a screenshot cannot settle, and counting births from
   // outside by watching lives reset does not work: a ring is born at 0.52 and
@@ -960,6 +995,19 @@ export function createWeather(game) {
         rz = new Float32Array(wxRAIN_MAX);
   const anchor = new THREEx.Vector3();
   let kind = null;                  // the live wxKIND row, or null
+  let moteN = 0;                    // ...and how many instances the row draws
+  // ---- THE BURST'S OWN STATE (V1.3). See the block above wxBURST_MAX. ----
+  // Allocated once; a slot is live while blife > 0. `bfloor` is the height
+  // the quad dies at (the ground under it, or the surface a bubble reaches),
+  // resolved at birth so the loop never asks the biome anything.
+  const bx = new Float32Array(wxBURST_MAX), by = new Float32Array(wxBURST_MAX),
+        bz = new Float32Array(wxBURST_MAX), bvx = new Float32Array(wxBURST_MAX),
+        bvy = new Float32Array(wxBURST_MAX), bvz = new Float32Array(wxBURST_MAX),
+        blife = new Float32Array(wxBURST_MAX), blife0 = new Float32Array(wxBURST_MAX),
+        bsz = new Float32Array(wxBURST_MAX), bph = new Float32Array(wxBURST_MAX),
+        bfloor = new Float32Array(wxBURST_MAX);
+  const bkind = new Array(wxBURST_MAX).fill(null);
+  let burstHead = 0, burstHi = 0, burstBorn = 0;   // next slot, live extent, lifetime count
 
   for (let i = 0; i < wxMOTE_MAX; i++) {
     mx[i] = rand(-wxBOX_R, wxBOX_R); my[i] = rand(-wxBOX_H, wxBOX_H);
@@ -976,7 +1024,11 @@ export function createWeather(game) {
    *  never changes colour is the sort of cost that only shows up on a laptop. */
   function wxFieldTo(rw) {
     moteQuad.count = 0; moteTetra.count = 0;
-    kind = null;
+    kind = null; moteN = 0;
+    // ...and the bursts die with the row: a puff of Palawan's sand must not
+    // finish its arc over Antarctic snow (the rings' own rule).
+    for (let i = 0; i < wxBURST_MAX; i++) blife[i] = 0;
+    burstHi = 0;
     const mo = rw && rw.motes;
     if (!mo) return;
     const k = wxKIND[mo.kind];
@@ -985,7 +1037,7 @@ export function createWeather(game) {
     kind._sizeK = mo.sizeK;
     moteMesh = (k.geo === 'tetra') ? moteTetra : moteQuad;
     const n = Math.min(wxMOTE_MAX, Math.max(0, Math.round(k.n * mo.density)));
-    moteMesh.count = n;
+    moteMesh.count = n; moteN = n;
     if (!moteMesh.instanceColor && n > 0) {
       moteMesh.instanceColor =
         new THREEx.InstancedBufferAttribute(new Float32Array(wxMOTE_MAX * 3), 3);
@@ -1317,8 +1369,8 @@ export function createWeather(game) {
     const gx = wxGust.x, gz = wxGust.z;
 
     // ---- the motes -------------------------------------------------------
-    if (kind && moteMesh.count > 0) {
-      const n = moteMesh.count;
+    if (kind && moteN > 0) {
+      const n = moteN;
       const sizeK = kind._sizeK || 1;
       const wk = kind.windK, fall = kind.fall, sway = kind.sway;
       const swayW = kind.swayHz * 6.28318, spin = kind.spin, blink = kind.blink;
@@ -1350,6 +1402,8 @@ export function createWeather(game) {
       }
       moteMesh.instanceMatrix.needsUpdate = true;
     }
+    // ---- the bursts (V1.3). See the block above wxBURST_MAX. -------------
+    wxStepBursts(dt);
 
     // ---- the skitter (Part B). See the block above wxSKIT. ---------------
     // Horizontally it is the motes' box — it follows the lens and wraps, so
@@ -1496,6 +1550,148 @@ export function createWeather(game) {
     // that is still bright when the last drop falls is the tell that this was
     // bolted on to the rain rather than driven by it.
     ringMesh.material.opacity = clamp(0.10 + rainT * 0.34, 0, 0.44);
+    if (ringBoost > 0) {
+      ringBoost -= dt * 1.4;
+      const b = 0.36 * clamp(ringBoost, 0, 1);
+      if (b > ringMesh.material.opacity) ringMesh.material.opacity = b;
+    }
+  }
+
+  /**
+   * ONE RING, EXACTLY HERE (V1.3): a footfall in the shallows, a drip
+   * arriving, a stroke. The rain's own ring with the disc's scatter taken
+   * off and the pool's opacity lifted (see ringBoost). `o.y` places it on a
+   * surface the caller knows better than the floor query does.
+   */
+  function ringHere(x, z, o) {
+    if (!live || (((game.state && game.state.perfRung) | 0) >= 1)) return false;
+    const y = (o && typeof o.y === 'number') ? o.y : wxFloorAt(x, z, game.capy);
+    const i = ringHead;
+    ringHead = (ringHead + 1) % wxRING_MAX;
+    ringX[i] = x; ringY[i] = y + 0.03; ringZ[i] = z;
+    ringLife[i] = wxRING_LIFE;
+    ringBorn++;
+    ringAny = true;
+    ringBoost = 1;
+    return true;
+  }
+
+  /**
+   * THE FLOOR UNDER A POINT, the way a ring finds it: the live water surface
+   * first, then the terrain, then zero (Sydney); and if the animal is standing
+   * on something the terrain has never heard of — a deck, a raft, a bridge —
+   * that, for anything near its feet. `capy` may be null.
+   */
+  function wxFloorAt(x, z, capy) {
+    const api = wxApiOf(game);
+    let y;
+    if (api && typeof api.isOverWater === 'function' && api.isOverWater(x, z)) {
+      y = waterYAt(api, x, z, 0);
+    } else if (api && typeof api.terrainHeight === 'function') {
+      y = api.terrainHeight(x, z);
+    } else {
+      y = 0;
+    }
+    if (typeof y !== 'number' || y !== y) y = 0;
+    if (capy && capy.grounded && capy.position) {
+      const foot = capy.position.y - wxFOOT_Y;
+      const dx = capy.position.x - x, dz = capy.position.z - z;
+      if (foot - y > wxDECK_UP && dx * dx + dz * dz < 4) y = foot;
+    }
+    return y;
+  }
+
+  /**
+   * A BURST (V1.3): `n` quads of `kind` thrown from (x, floor, z) — or from
+   * `o.y` when the caller says where (a drip off a belly, a bubble off a
+   * diver) — on the mote field's own buffer above the live row. Returns how
+   * many were born, which is `n` unless the quarter rule, the governor
+   * (parked at rung 1 like the mist), the title card or an unknown kind says
+   * fewer. `o.color` is a hex for a kind with no colours of its own (leaf);
+   * `o.top` is the height a rising kind dies at (a bubble at the surface).
+   * Allocates nothing after the first call in a chapter.
+   */
+  function burst(x, z, kindName, n, o) {
+    const k = wxBURST[kindName];
+    if (!k || !(n > 0) || !live) return 0;
+    if (((game.state && game.state.perfRung) | 0) >= 1) return 0;
+    const base = moteMesh === moteQuad ? moteN : 0;
+    const cap = Math.min(wxBURST_MAX, wxMOTE_MAX - base);
+    if (cap <= 0) return 0;
+    if (!moteQuad.instanceColor) {
+      moteQuad.instanceColor =
+        new THREEx.InstancedBufferAttribute(new Float32Array(wxMOTE_MAX * 3), 3);
+    }
+    const capy = game.capy;
+    const floor = (o && typeof o.floor === 'number') ? o.floor : wxFloorAt(x, z, capy);
+    const y0 = (o && typeof o.y === 'number') ? o.y : floor + 0.03;
+    const cols = k.cols || null;
+    if (!cols) wxCol.set(o && o.color !== undefined ? o.color : PALETTE.leafPale);
+    let born = 0;
+    for (let j = 0; j < n && j < cap; j++) {
+      const i = burstHead;
+      burstHead = (burstHead + 1) % cap;
+      const a = rand(0, 6.28318), out = k.out * rand(0.35, 1);
+      bx[i] = x + Math.cos(a) * 0.04; bz[i] = z + Math.sin(a) * 0.04; by[i] = y0;
+      bvx[i] = Math.cos(a) * out; bvz[i] = Math.sin(a) * out;
+      bvy[i] = k.up * rand(0.6, 1.15);
+      blife0[i] = blife[i] = k.life * rand(0.7, 1.1);
+      bsz[i] = k.size * rand(0.75, 1.3);
+      bph[i] = rand(0, 6.283);
+      bfloor[i] = k.grav < 0 ? ((o && typeof o.top === 'number') ? o.top : y0 + 2) : floor;
+      bkind[i] = k;
+      if (cols) wxCol.set(cols[(burstBorn + j) % cols.length]);
+      moteQuad.setColorAt(base + i, wxCol);
+      if (i + 1 > burstHi) burstHi = i + 1;
+      born++;
+    }
+    if (born > 0) { burstBorn += born; moteQuad.instanceColor.needsUpdate = true; }
+    return born;
+  }
+
+  /** The bursts' frame. A compare when none is live; otherwise an integrate
+   *  and a matrix per live slot, and the quad mesh's count set to the row's
+   *  instances plus the live extent. */
+  function wxStepBursts(dt) {
+    const base = moteMesh === moteQuad ? moteN : 0;
+    if (burstHi <= 0) {
+      if (moteQuad.count !== base) moteQuad.count = base;
+      return;
+    }
+    let hi = 0;
+    for (let i = 0; i < burstHi; i++) {
+      if (blife[i] <= 0) {
+        wxV1.set(0, -900, 0); wxS1.set(0.0001, 0.0001, 0.0001);
+        wxM1.compose(wxV1, wxQ1.set(0, 0, 0, 1), wxS1);
+        moteQuad.setMatrixAt(base + i, wxM1);
+        continue;
+      }
+      const k = bkind[i];
+      blife[i] -= dt;
+      // the throw: gravity (negative for a bubble), the air's drag, the gust
+      const dr = 1 - Math.min(1, k.drag * dt);
+      bvy[i] = (bvy[i] - k.grav * dt) * dr;
+      bvx[i] = bvx[i] * dr + wxGust.x * 0.08 * dt;
+      bvz[i] = bvz[i] * dr + wxGust.z * 0.08 * dt;
+      bx[i] += bvx[i] * dt; by[i] += bvy[i] * dt; bz[i] += bvz[i] * dt;
+      // dead on the floor (or, rising, at the surface) — a drip does not
+      // hang under the ground, and a bubble does not leave the water
+      if (k.grav >= 0 ? by[i] <= bfloor[i] : by[i] >= bfloor[i]) { blife[i] = 0; continue; }
+      hi = i + 1;
+      // the size: full for most of the life, gone over the last third — the
+      // quads are opaque, so a shrink is the only fade there is
+      const t = blife[i] / blife0[i];
+      const s = bsz[i] * (t < 0.33 ? t / 0.33 : 1);
+      wxV1.set(bx[i], by[i], bz[i]);
+      wxE1.set(wxT * k.spin + bph[i], bph[i] * 1.7, wxT * k.spin * 0.61 + bph[i] * 0.4);
+      wxQ1.setFromEuler(wxE1);
+      wxS1.set(s, s, s);
+      wxM1.compose(wxV1, wxQ1, wxS1);
+      moteQuad.setMatrixAt(base + i, wxM1);
+    }
+    burstHi = hi;
+    moteQuad.count = base + hi;
+    moteQuad.instanceMatrix.needsUpdate = true;
   }
 
   /** One ring, somewhere in the disc, on whatever surface is under that point. */
@@ -1577,6 +1773,18 @@ export function createWeather(game) {
      * landed on the ferry deck or in the water beneath it, and is not
      * something a screenshot of a shower can settle.
      */
+    /** THE BURST (V1.3) and the ring at a point, for the footfall (capybara.js),
+     *  the drips, and V4/V5's callers: `burst(x, z, kind, n, o)`,
+     *  `ringHere(x, z, o)`. See the block above wxBURST_MAX. */
+    burst: burst,
+    ringHere: ringHere,
+    /** ...and its audit: live slots, the lifetime count, where the slots sit. */
+    burstAudit() {
+      let alive = 0;
+      for (let i = 0; i < wxBURST_MAX; i++) if (blife[i] > 0) alive++;
+      return { alive, hi: burstHi, born: burstBorn, base: moteMesh === moteQuad ? moteN : 0,
+               max: wxBURST_MAX, count: moteQuad.count, rowN: moteN, mesh: moteQuad };
+    },
     ringAudit() {
       const rows = [];
       const api = wxApiOf(game);
