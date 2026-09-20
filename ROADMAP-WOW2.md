@@ -474,6 +474,134 @@ harness` traps 52–55).
   sweeps re-run quiet; nineteen arrival frames read; CONTRACT.md's
   twelfth lift; this file's Closed section.
 
+## W0 — the motion sheet, before (20 Sep 2026)
+
+Measured on the lift-pass HEAD before any wave touched src (719b3e3, an
+isolated worktree, its own server on 5189, session `w0`), one chapter per
+`run-code`, `qa/wow2-motion-sheet.js`, results in
+`qa/wow2-motion-sheet-before.json.png` and the contact sheets
+`qa/wow2-motion-<chapter>-capy.png` / `-crowd.png` (frame A | frame B over
+mask | diff of the last pair, through the pinned lens — `page.screenshot`
+only ever shows the resting lens).
+
+**The instrument.** Ten frame pairs 120 ms apart, one every ~1.9 s, over
+~20 s of real rAF time with no input; threshold 8 on any channel; moved
+pixels counted inside a hide-and-diff mask; px/s = mean moved per pair /
+0.12. *The animal:* a lens 3 m off at its own eye height, front quarter
+(the other quarters when a collider is there), the body's mask taken with
+its shadow switched off, and everyone else — roster, locals, movers,
+vehicles — hidden, because the first Pasto run had a local standing over
+the animal and two more walking through its mask. *The crowd:* the
+living layer, which is the still instrument's mask inverted and then
+made honest — the roster by material (npc.js `instMat`, vertexColors over
+`PALETTE.sail`; the still's 72-vertex key was the torso alone), the live
+chapter's locals, every instanced mover whose instances are
+figure-sized (a chapter crowd, a herd, a scooter and rider, the
+penguins), their small parts by shared count and origin (`rioPeopleHeads`),
+and any moved single mesh whose enclosing group is figure-sized (Sahara's
+foreground man, who was red in the diff and absent from the mask until
+that rule). A moved van or ferry is named and left out. The cluster is
+the figure with the most neighbours within 3 m inside 40 m of the
+animal (a pair beyond 40 m beats a loner inside it), the lens 6 m off at
+1.5 m over its feet, never under the chapter's `terrainHeight`, on the
+first of eight bearings whose mask has pixels in a 48 px window around
+the cluster's chest — a cannon ray had called Rio's hillside clear and
+the lens sat inside it. Weather (renderOrder 6) and every sway-hooked
+material are hidden for both subjects, and the self-diff of two
+synchronous renders (a cloud material reads the clock in
+onBeforeRender) is subtracted from every mask.
+
+| chapter | animal px/s (median pair) | mask px | crowd px/s (median pair) | cluster / in view / mask px |
+|---|---|---|---|---|
+| sydney | 27,846 (21,133) | 17,179 | 80,648 (73,888) | 9 roster @ 40 m / 15 / 45,405 |
+| pasto | 8,622 (3,225) | 17,426 | 94,785 (105,071) | 3 roster @ 1 m / 4 / 17,400 |
+| quay | 17,510 (7,654) | 18,511 | 37,985 (32,450) | 6 locals @ 9 m / 9 / 28,237 |
+| kyoto | 7,913 (6,271) | 17,476 | 5,652 (1,713) | 1 local @ 4 m / 4 / 13,676 |
+| cali | 10,232 (4,317) | 16,523 | 38,145 (37,983) | 2 dancers @ 66 m / 9 / 9,563 |
+| rio | 20,623 (6,500) | 17,470 | 151,307 (153,488) | 7 rioPeople @ 39 m / 21 / 88,582 |
+| iceland | 7,428 (5,950) | 16,299 | 24,368 (23,046) | 7 sheep @ 76 m / 13 / 18,216 |
+| sahara | 13,043 (5,254) | 17,581 | 30,280 (24,242) | 12 locals @ 13 m / 30 / 45,837 |
+| drift | 9,931 (5,883) | 17,076 | 5,488 (2,254) | 1 local @ 27 m / 1 / 5,605 |
+| venice | 18,898 (5,929) | 18,235 | 155,603 (145,896) | 8 pigeons and walkers @ 36 m / 25 / 75,154 |
+| kowloon | 14,544 (9,533) | 17,586 | 41,469 (35,546) | 6 walkers @ 20 m / 9 / 34,643 |
+| palawan | 12,368 (6,233) | 16,280 | 11,256 (9,325) | 2 locals @ 20 m / 2 / 8,598 |
+| goreme | 11,629 (3,942) | 18,536 | 6,829 (4,079) | 2 figures @ 33 m / 2 / 11,043 |
+| manly | 11,864 (5,696) | 16,748 | 14,768 (11,017) | 4 figures @ 30 m / 10 / 12,248 |
+| pantanal | 10,168 (6,092) | 16,734 | 14,473 (8,979) | 2 the herd @ 30 m / 4 / 10,518 |
+| cave | 9,545 (4,917) | 16,549 | 2,078 (317) | 1 local @ 33 m / 1 / 4,089 |
+| antarctic | 15,737 (13,288) | 9,598 | 30,178 (28,788) | 7 penguins @ 39 m / 82 / 22,758 |
+| monaco | 7,768 (6,133) | 9,626 | 4,276 (2,967) | 1 local @ 7 m / 1 / 5,475 |
+| hanoi | 19,328 (14,083) | 17,704 | 286,033 (233,008) | 6 scooters @ 12 m / 14 / 87,296 |
+
+**The baselines.** Animal at rest: median **11,864 px/s** over the
+nineteen (a mask of ~17,000 px at 3 m, so ~7 % of the animal's pixels
+change per 120 ms). Crowd: median **30,178 px/s** over nineteen
+chapters — but that median is a median of unlike things: the top five
+(Hanoi, Venice, Rio, Pasto, Sydney) are traffic, pigeons, a beach
+crowd walking, three men who have crowded up to the animal, and a
+waiter, and the bottom five (cave, monaco, drift, kyoto, goreme) are
+one local each. W1 doubles the first number; W3 doubles the second.
+W3 should judge itself per chapter against this table rather than
+against the median, and should know that Venice's number is mostly
+the pigeon flock and Hanoi's is the scooters.
+
+**Read by eye (the animal).** Sydney: red streaks down through the
+head and back — the blossom petals falling across the mask, not the
+animal (neither the renderOrder-6 hide nor the mover census caught
+them: a pool that falls in its shader, not by matrix); Sydney's 27,846 is the petals plus a head edge, and W1
+should hide that pool or measure Sydney on a still day. Kyoto, Hanoi, Pasto (seen from behind — the front quarter
+was a wall): a thin red outline around the whole silhouette and the
+feet, a one-pixel body shift, no ear, no blink, no weight change;
+between events the animal is dead still (Pasto's last pair: 42 px of
+17,426). The animal's pairs are spiky everywhere — Quay 259..9,912,
+Cali 53..7,633, Pasto 42..5,397 — an idle made of occasional events, not a breathing
+body, which is exactly what V1 is for. Monaco and Antarctic masks are
+half size (9,626 / 9,598): a kerb and a rock ledge hide the lower body
+from any lens 3 m off; their numbers are the head and back.
+
+**Read by eye (the crowd).** Hanoi: a river of scooters, every rider
+red, nothing standing. Venice: the pigeon pile by the well is a red
+mass, the Venetians around it are grey — still — save two walkers.
+Sahara: twelve at the souk tables, red only on outlines and one arm; a
+crowd that sits. Sydney (the café at 40 m): patrons grey, the waiter
+and two walkers red. Cali: the salsa pair red in the middle of a grey
+ring of onlookers. Antarctic: two or three penguins waddling among
+eighty still ones. Kyoto, cave, monaco, drift: one person, and the
+diff is a few dozen pixels. Standing people do not move at all; the
+only life at rest is the walkers.
+
+**The still mask, extended (`qa/wow2-still-mask.js`,
+`qa/wow2-still-mask.json.png`).** A copy of wow-still.js measuring the
+floor under its own mask and under the extension in the same 120 ms
+window, least of three pairs. The old mask, read as code: `swayD` is
+grass.js alone (shared.js's swayMesh keys `'sway'+k`, the leaf term
+prefixes `leaf1|`), the 72-vertex key is the torso alone, and nothing
+moving by position was hidden. The extension adds the whole roster by
+material, every `sway` key, and anything whose world translation or
+any instance moved > 1 cm across 120 ms. Moved % of the frame (lower
+third): hanoi **10.26 → 0.85** (22.1 → 2.0; the resting lens had
+traffic in it — the L11 row was 3.19), pantanal **1.29 → 0.03**
+(0.59 → 0.04), sydney **0.74 → 0.08** (0.43 → 0.03), manly **1.12 →
+0.41** (0.13 → 0.19), cave **0.043 → 0.005**. Extra objects hidden: 52
+roster parts, 87 sway materials, and 13–155 movers per chapter (unnamed
+meshes for the most part — whatever a chapter moves every frame; Manly's
+155 and the cave's 124 were not identified by name). Caveat: the extended mask hides anything that moves > 1 cm,
+so a positional jitter would be hidden with the traffic — it measures
+the shading and texel floor only. W6 should use the extended mask for
+the still sweep and read the moved-object names it prints.
+
+**Instrument findings for the waves.** (1) Hand-built people who are
+not locals (Sahara's foreground man, the salsa pair) are single meshes
+in a group — any NPC-layer mask must find them by shape, not by list.
+(2) The roster is parked invisible outside Sydney/Pasto (`rosterShown`
+false everywhere else): its matrices are still there and a probe that
+counts instances counts ghosts. (3) `l9DropAura` and Pasto's thermal
+motes are figure-height instanced movers; exclude translucent
+materials. (4) The resting animal is not deterministic in yaw or pose
+between arrivals; the mask varies ±1,000 px run to run and the px/s by
+about ±30 % (Sydney 20,636 / 31,638 / 27,846 in three runs) — a W1
+after must be judged over at least ten pairs and preferably two runs.
+
 ## Rules for every agent
 
 - Check CONTRACT.md's section list before building: this game has the
