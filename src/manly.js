@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, placeCue, swayMesh, makeMerger, leafMesh } from './shared.js';
+import { farLayer, farMover, farBundle, farTone } from './far.js';
 
 // ===========================================================================
 // CHAPTER 14 — MANLY. THE SEA HAS A SHAPE HERE.
@@ -137,6 +138,7 @@ const manPINE_Z = 39.5;
 let manGame = null;
 let manBuilt = false;
 let manRoot = null;
+let manFar = null;      // the Heads running out, and the ferry (far.js)
 let manTime = 0;
 
 // the drawn surf surface
@@ -983,6 +985,7 @@ function manBuild(game) {
   manBuildBarrel(manRoot);
   manBuildSpray(manRoot);
   manBuildHaze(manRoot);
+  manBuildFar(manRoot);
   manBuildWater(manRoot);        // last: transparent, and it must sort over
 
   // ---- THE PEOPLE WHO LIVE HERE ------------------------------------------
@@ -1946,6 +1949,50 @@ function manBuildTown(game, root) {
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   root.add(mesh);
+}
+
+// ---- ROADMAP-WOW2 V3, THE FAR PLANE: THE HEADS ------------------------------
+// North Head is the eastern wall of the world (manBuildPoint, below) and
+// stops at z -60. Out to sea — which is where the lens rests, pitched down
+// at the sets with the horizon a hand's width from the top of the frame —
+// there was a sea sheet to z -1522 and nothing on it. What a person on this
+// sand actually sees is the Head running out and down to the south, and
+// across the mouth of the harbour, South Head answering it. So: North Head's
+// seaward run in three wedges at 150–460 m (18–30 % of the chapter's own
+// 110–1150 haze, never re-based), lower as it goes, and South Head across
+// the water at 540–600 m (37–43 %), scrub on sandstone pulled toward the
+// haze. Bases at -30, on a sea that is a flat sheet.
+//
+// And the ferry. The one thing everybody knows crosses this water: cream
+// hull, twenty-four triangles, west to east across the mouth at z -520,
+// a hundred and ten seconds a loop, seventy-seven of them under way.
+function manBuildFar(root) {
+  const tone = farTone(PALETTE.manScrub, PALETTE.manHaze, 0.30);
+  manFar = farBundle({
+    name: 'manly',
+    layer: farLayer({
+      name: 'far-manly', color: tone,
+      wedges: [
+        // North Head, running out
+        { x: 150, z: -190, w: 160, d: 70, yaw: 1.35,
+          profile: [[-1, 0], [-0.5, 30], [0, 36], [0.5, 28], [1, 0]] },
+        { x: 178, z: -330, w: 170, d: 70, yaw: 1.45,
+          profile: [[-1, 0], [-0.6, 26], [-0.1, 32], [0.4, 24], [0.8, 20], [1, 0]] },
+        { x: 196, z: -460, w: 120, d: 60, yaw: 1.6,
+          profile: [[-1, 0], [-0.3, 20], [0.3, 16], [1, 0]] },
+        // South Head, across the mouth, and the coast falling away west
+        { x: 40, z: -580, w: 190, d: 80, yaw: 0.1,
+          profile: [[-1, 0], [-0.5, 28], [-0.1, 40], [0.3, 34], [0.7, 26], [1, 0]] },
+        { x: -150, z: -600, w: 220, d: 80, yaw: -0.25,
+          profile: [[-1, 0], [-0.5, 22], [0, 30], [0.5, 18], [1, 0]] },
+      ],
+    }),
+    mover: farMover({
+      kind: 'ferry', color: PALETTE.sail, scale: 1.2, period: 110, duty: 0.7, phase: 0.3,
+      path: [[-320, 0, -500], [320, 0, -530]],
+    }),
+  });
+  root.add(manFar.group);
 }
 
 // ---------------------------------------------------------------- the point --
@@ -5025,6 +5072,7 @@ export function createManly(game) {
       if (!manBuilt) return;
       if (!game.biome.isActive('manly')) return;
       manTime += dt;
+      if (manFar) manFar.update(game, dt);
 
       manUpdateSurface(dt);
       manUpdateFoam(dt);

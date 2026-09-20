@@ -24,7 +24,14 @@ async page => {
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
 
   const CHAPTER = '__CHAPTER__'
-  const out = { errs, chapter: CHAPTER }
+  // Optional: radians to TURN the lens by before measuring (null keeps the
+  // arrival pose): the camera keys Z (+) and X (-) held for |LOOK| / 2.4 s
+  // (sysCAM_KEY_RATE), because camYaw is a closure in systems.js that nothing
+  // outside writes. For a chapter whose far layer stands behind the arrival
+  // lens — Kowloon's Lion Rock is up the street, and the lens rests on the
+  // frontage across it; Hanoi's far spans are 53° off the lake lens.
+  const LOOK = __LOOK__
+  const out = { errs, chapter: CHAPTER, look: LOOK }
 
   await page.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('capy3.prefs.v1', JSON.stringify({ v: 1, pf: 1 })) } catch (e) {} })
   await page.setViewportSize({ width: 1280, height: 760 })
@@ -41,6 +48,11 @@ async page => {
     await page.waitForTimeout(6000)
   } else {
     await page.waitForTimeout(4000)
+  }
+  if (LOOK !== null) {
+    const key = LOOK > 0 ? 'KeyZ' : 'KeyX'
+    await page.keyboard.down(key); await page.waitForTimeout(Math.abs(LOOK) / 2.4 * 1000); await page.keyboard.up(key)
+    await page.waitForTimeout(2500)
   }
   for (let tries = 0; tries < 15; tries++) {
     const a = await page.evaluate(() => { const p = window.__capy.camera.position; return [p.x, p.y, p.z] })
@@ -133,10 +145,18 @@ async page => {
                       calls: callsOn - callsOff, tris: trisOn - trisOff },
              far, mover, diff, rung: g.state.perfRung }
   })
-  await page.screenshot({ path: 'qa/wow2-far-' + CHAPTER + '-on.png' })
+  const TAG = CHAPTER + (LOOK === null ? '' : '-look')
+  await page.screenshot({ path: 'qa/wow2-far-' + TAG + '-on.png' })
+  // ...and the diff's own bbox, padded, as a crop to read the band up close
+  const bb = out.result.diff && out.result.diff.bbox
+  if (bb) {
+    const x = Math.max(0, bb[0] - 40), y = Math.max(0, bb[1] - 60)
+    const w = Math.min(1280 - x, bb[2] - bb[0] + 80), h = Math.min(760 - y, bb[3] - bb[1] + 120)
+    await page.screenshot({ path: 'qa/wow2-far-' + TAG + '-crop.png', clip: { x, y, width: w, height: h } })
+  }
   await page.evaluate(() => { window.__capy.state.noFar = true })
   await page.waitForTimeout(300)
-  await page.screenshot({ path: 'qa/wow2-far-' + CHAPTER + '-off.png' })
+  await page.screenshot({ path: 'qa/wow2-far-' + TAG + '-off.png' })
   await page.evaluate(() => { window.__capy.state.noFar = false })
-  await page.evaluate(async (o) => { await fetch('/shot?name=wow2-far-depth-' + o.chapter + '.json', { method: 'POST', body: btoa(unescape(encodeURIComponent(JSON.stringify(o, null, 1)))) }) }, out)
+  await page.evaluate(async (o) => { await fetch('/shot?name=wow2-far-depth-' + o.chapter + (o.look === null ? '' : '-look') + '.json', { method: 'POST', body: btoa(unescape(encodeURIComponent(JSON.stringify(o, null, 1)))) }) }, out)
 }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger, hangThing } from './shared.js';
+import { farLayer, farBundle, farTone } from './far.js';
 
 // ===========================================================================
 // CHAPTER 3 — SYDNEY HARBOUR: CIRCULAR QUAY TO MANLY
@@ -208,6 +209,7 @@ let quayGame = null;
 let quayLocBusker = null, quayTuneMv = null;
 let quayBuilt = false;
 let quayRoot = null;
+let quayFar = null;     // the Kirribilli roofs on the north abutment (far.js)
 let quayTime = 0;
 
 let quayWaterMesh = null, quayWaterAttr = null, quayRippleT = 0;
@@ -1412,6 +1414,42 @@ function quayHeadland(M, cx, cz, r, h, seed, cliff, scrub, cf, shadeIn) {
     M.tri(cap[i], peak, cap[j]);
   }
   void base;
+}
+
+// ---- ROADMAP-WOW2 V3, THE FAR PLANE: THE KIRRIBILLI ROOFS ------------------
+// This chapter's far plane was the first one built: thirteen headlands out to
+// Manly, Fort Denison, Shark Island, the Freshwater on her run to the Heads,
+// six yachts on their reaches and the gulls over the buoys — nothing to add
+// out there. What the bridge landed on was bare bluff. Where the Harbour
+// Bridge comes ashore on the north side is Kirribilli, and Kirribilli is a
+// roofline: terraces and a tower or two on the bluff, seen from the water
+// under the deck. Fourteen little gables on the western abutment's cap
+// (the arrival lens rests WNW, at that bluff, with the bridge across the
+// bow), each standing on its own base at the bluff's height, in a roof tone
+// pulled toward the harbour haze. 195 m under a 240–1250 m haze (never
+// re-based) is inside the clear air — a skyline, not a silhouette. No
+// mover: the ferry, the fleet and the gulls already cross the arrival frame.
+function quayBuildFar(root) {
+  const tone = farTone(PALETTE.caliRoof, PALETTE.harbourHaze, 0.35);
+  const cs = Math.cos(quayBRIDGE.yaw), sn = Math.sin(quayBRIDGE.yaw);
+  const ax = quayBRIDGE.x - quayABUT.u * cs, az = quayBRIDGE.z + quayABUT.u * sn;
+  const top = quayABUT.h * 1.05;
+  const wedges = [];
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 14) * Math.PI * 2 + 0.3;
+    const r = 10 + (i % 3) * 8;
+    const h = 4 + (i % 4) * 1.4;
+    wedges.push({ x: ax + Math.cos(a) * r, z: az + Math.sin(a) * r * 0.8, w: 9 + (i % 3) * 3, d: 7,
+                  yaw: a + 0.6 * (i % 2), y: top, y0: top - 2.5, profile: [[-1, 0], [0, h], [1, 0]] });
+  }
+  // and one block of flats over the lot, the way there is
+  wedges.push({ x: ax - 6, z: az + 10, w: 14, d: 12, yaw: 0.4, y: top, y0: top - 2.5,
+                profile: [[-1, 0], [-0.9, 12], [0.9, 12], [1, 0]] });
+  quayFar = farBundle({
+    name: 'quay',
+    layer: farLayer({ name: 'far-quay', color: tone, wedges }),
+  });
+  root.add(quayFar.group);
 }
 
 function quayBuildLand(game, root) {
@@ -5884,6 +5922,7 @@ function quayBuild(game) {
   quayBuildCats(quayRoot);
   quayBuildSpray(quayRoot);
   quayBuildTraffic(quayRoot);
+  quayBuildFar(quayRoot);
   quayBuildBerthed(game, quayRoot);
   quayBuildCrowd(game, quayRoot);
   quayBuildPax(quayRoot);
@@ -6478,6 +6517,7 @@ export function createQuay(game) {
       if (!quayBuilt) return;
       if (!game.biome.isActive('quay')) return;
       quayTime += dt;
+      if (quayFar) quayFar.update(game, dt);
       quayUpdateWater(dt);
       quayStepBoat(game, dt);
       quayUpdateWake(dt);

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, matOwn, EMIT_OVER, emitSet, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue, swayMesh, makeMerger, mergeWearBand, warnOnce, causticSet } from './shared.js';
+import { farLayer, farMover, farBundle, farTone } from './far.js';
 
 // ===========================================================================
 // CHAPTER 12 — PALAWAN. THE INTERESTING HALF IS UNDERNEATH.
@@ -121,6 +122,7 @@ const palPt = { x: 0, y: 0, z: 0 };
 let palGame = null;
 let palBuilt = false;
 let palRoot = null;
+let palFar = null;      // the second island and the sail (far.js)
 let palTime = 0;
 let palPhase = 0.10;
 // THE FIRST ARM (L7, F3): the bloom does not count down from the moment
@@ -954,6 +956,48 @@ function palBuildIsland(game, root) {
   mesh.castShadow = true; mesh.receiveShadow = true;
   mesh.name = 'palIsland';
   root.add(mesh);
+}
+
+// ---- ROADMAP-WOW2 V3, THE FAR PLANE: THE SECOND ISLAND ---------------------
+// The island closes its own skyline with seven far towers at z -140..-170
+// (above), and past them the sea ran to the fog with nothing on it. An
+// archipelago has more than one island: the next one stands off to the
+// west-south-west at 320–400 m — the left-of-centre of the arrival frame,
+// which rests looking out over the bay — five karst wedges 24–52 m high in
+// the limestone's shadow tone pulled toward the chapter's haze (90–700 m,
+// never re-based: 38–51 %, so it is a blue shape on the water and not a
+// second set piece; measured at 400–470 it read as three faint pyramids).
+// Bases at -30 on a flat sea.
+//
+// And a sail: a bangka under a single sail crossing behind the island
+// gap, thirteen triangles, white, a hundred seconds a loop, seventy under
+// way at seven and a half metres a second.
+function palBuildFar(root) {
+  const tone = farTone(PALETTE.palKarstShadow, PALETTE.palFog, 0.30);
+  palFar = farBundle({
+    name: 'palawan',
+    layer: farLayer({
+      name: 'far-palawan', color: tone,
+      wedges: [
+        // karst: steep sides, a broken plateau on top, not a peak
+        { x: -250, z: -250, w: 120, d: 64, yaw: 0.6,
+          profile: [[-1, 0], [-0.75, 34], [-0.5, 46], [-0.1, 50], [0.35, 44], [0.7, 36], [1, 0]] },
+        { x: -200, z: -300, w: 90, d: 50, yaw: 0.4,
+          profile: [[-1, 0], [-0.7, 38], [-0.3, 54], [0.3, 50], [0.7, 32], [1, 0]] },
+        { x: -310, z: -200, w: 80, d: 46, yaw: 0.9,
+          profile: [[-1, 0], [-0.65, 26], [0, 36], [0.6, 30], [1, 0]] },
+        { x: -150, z: -345, w: 70, d: 40, yaw: 0.2,
+          profile: [[-1, 0], [-0.6, 30], [0.2, 34], [0.7, 22], [1, 0]] },
+        { x: -360, z: -140, w: 60, d: 36, yaw: 1.2,
+          profile: [[-1, 0], [-0.5, 24], [0.4, 28], [1, 0]] },
+      ],
+    }),
+    mover: farMover({
+      kind: 'sail', color: PALETTE.sail, scale: 1.3, period: 100, duty: 0.7, phase: 0.25,
+      path: [[-330, 0, -230], [200, 0, -300]],
+    }),
+  });
+  root.add(palFar.group);
 }
 
 // =============================================================== THE BEACH ==
@@ -5025,6 +5069,7 @@ export function createPalawan(game) {
     update(dt) {
       if (!palBuilt) return;
       if (!game.biome.isActive('palawan')) return;
+      if (palFar) palFar.update(game, dt);
       // ---- TWELVE CHAPTERS OF PADDLING AND NO SEA (M13) ---------------
       // palBEACH_Z is where the sand goes under, so it is the waterline, and
       // the nearest point of it is directly offshore of wherever you are.
@@ -5220,6 +5265,7 @@ function palBuild(game) {
   palBuildBubbles(palRoot);
   palBuildShafts(palRoot);
   palBuildBloom(palRoot);
+  palBuildFar(palRoot);
   palBuildWater(palRoot);       // last: it is transparent and it must sort over
 
   // ---- THE PEOPLE WHO LIVE HERE ------------------------------------------

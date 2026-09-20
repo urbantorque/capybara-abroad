@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, placeCue, makeMerger } from './shared.js';
+import { farMover, farBundle } from './far.js';
 
 // ===========================================================================
 // CHAPTER 17 — THE ANTARCTIC PENINSULA
@@ -165,6 +166,7 @@ const antCol = new THREE.Color();
 let antGame = null;
 let antBuilt = false;
 let antRoot = null;
+let antFar = null;      // the ship in the channel (far.js)
 let antTime = 0;
 
 let antSeaMesh = null, antSeaAttr = null, antSeaT = 0;
@@ -915,6 +917,7 @@ function antBuild(game) {
   antBuildCalving(antRoot);
   antBuildDrift(antRoot);
   antBuildSpray(antRoot);
+  antBuildFar(antRoot);
   antBuildLocals(game);
 
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(antBoatGroup);
@@ -1266,6 +1269,30 @@ function antSyncPack() {
 }
 
 // ------------------------------------------------------------------- bergs --
+// ---- ROADMAP-WOW2 V3, THE FAR PLANE: THE SHIP --------------------------------
+// This chapter's far plane was already built: the shelf wall at z -504 (the
+// loop below, where the world stops), the big berg at 465 m, the two gate
+// bastions at 420, five small bergs, and out there the orca pod on its 172 s
+// ellipse and fifty-four cape petrels round the bastions. Nothing to add to
+// the silhouette; the roadmap's own item was the one thing missing — a sail.
+// It is a ship here, because that is what crosses this water: a red-hulled
+// expedition vessel (the huts' red; the tender is the one orange thing)
+// crossing the channel from the western gate to the eastern, twenty-four
+// triangles, a hundred and twenty seconds a loop, eighty-four under way at
+// five metres a second, at 210–320 m from the station, which under a
+// 320–1900 m haze (never re-based) is full colour: a small far thing seen
+// clearly, which is what the air here does.
+function antBuildFar(root) {
+  antFar = farBundle({
+    name: 'antarctic',
+    mover: farMover({
+      kind: 'ship', color: PALETTE.antHutRed, scale: 1.4, period: 120, duty: 0.7, phase: 0.45,
+      path: [[-212, antWATER + 0.4, -160], [0, antWATER + 0.4, -215], [212, antWATER + 0.4, -270]],
+    }),
+  });
+  root.add(antFar.group);
+}
+
 /**
  * THE BIG BERG, AND THE ARCH THROUGH IT.
  *
@@ -6261,6 +6288,7 @@ export function createAntarctic(game) {
       if (!antBuilt) return;
       if (!game.biome.isActive('antarctic')) return;
       antTime += dt;
+      if (antFar) antFar.update(game, dt);
       antUpdateSea(dt);
       antStepBoat(game, dt);
       antUpdateWake(dt);

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh, makeMerger, hangThing } from './shared.js';
+import { farLayer, farMover, farBundle, farTone } from './far.js';
 
 // ===========================================================================
 // CHAPTER 19 — HANOI
@@ -174,6 +175,7 @@ const hanOpt = {};                // see placeCue: copied, never written into
 let hanGame = null;
 let hanBuilt = false;
 let hanRoot = null;
+let hanFar = null;      // Long Biên running out, and the train on it (far.js)
 let hanTime = 0;
 
 // the lake
@@ -4645,6 +4647,49 @@ function hanBuildScatter(root) {
   put(weed, bladeGeo, PALETTE.hanShutter, false);
 }
 
+// ---- ROADMAP-WOW2 V3, THE FAR PLANE: LONG BIÊN RUNNING OUT -----------------
+// The bridge is eighty-two metres of lattice from the dyke to z 250, where
+// the way out is, and then the river — a flat sheet to z 335 — and then the
+// dome. Long Biên is a mile and a half long. So the trusses run on: eight
+// more humps at 30 m pitch out to z 500, 9–13 m of lattice each, standing
+// on a deck line at y 3 rather than on the river bed (per-wedge y0), and at
+// the end of them the far bank — Gia Lâm, a low line of roofs and trees at
+// z 520–560 — with its base at -30 on the water. Steel pulled a fifth
+// toward the chapter's haze (85–1050 m, never re-based: 33 % at 400, 43 %
+// at 500). Not in the arrival frame — the lens rests on the lake and the
+// bridge is 53° off its axis — but in every frame from the dyke, the bridge
+// deck and the way out, which is where a bridge running out belongs.
+//
+// And the train, the roadmap's own item: three cars, thirty-six triangles,
+// out along the far spans every ninety seconds, forty-five of them crossing
+// at a Long Biên walking pace. The chapter's own train runs Train Street,
+// not the bridge; this one is the one you see from the water.
+function hanBuildFar(root) {
+  const tone = farTone(PALETTE.hanSteel, PALETTE.hanHaze, 0.20);
+  const wedges = [];
+  const bx = hanBRIDGE.x;
+  for (let i = 0; i < 8; i++) {
+    const z = 262 + i * 30;
+    const rise = 9 + (i % 3) * 2;
+    wedges.push({ x: bx, z, w: 30, d: 5, yaw: Math.PI / 2, y0: 3,
+                  profile: [[-1, 0], [-0.55, rise * 0.7], [0, rise], [0.55, rise * 0.7], [1, 0]] });
+  }
+  // the far bank
+  wedges.push({ x: -80, z: 530, w: 260, d: 40, yaw: 0.05,
+                profile: [[-1, 0], [-0.6, 9], [-0.2, 12], [0.2, 8], [0.6, 11], [1, 0]] });
+  wedges.push({ x: 170, z: 545, w: 240, d: 40, yaw: -0.08,
+                profile: [[-1, 0], [-0.5, 10], [0, 7], [0.4, 12], [0.8, 8], [1, 0]] });
+  hanFar = farBundle({
+    name: 'hanoi',
+    layer: farLayer({ name: 'far-hanoi', color: tone, wedges }),
+    mover: farMover({
+      kind: 'train', color: farTone(PALETTE.hanSteel, PALETTE.hanHaze, 0.1), scale: 0.9, period: 90, duty: 0.5, phase: 0.6,
+      path: [[bx, 3.2, 252], [bx, 3.2, 506]],
+    }),
+  });
+  root.add(hanFar.group);
+}
+
 // ---- ROADMAP-WOW A2, THE FOREGROUND (W1) -----------------------------------
 // Same argument as Kyoto's kyoBuildForeground: the arrival frame's near 0-4 m
 // is empty, and the fix is one static hung thing placed once from the LIVE
@@ -4702,6 +4747,7 @@ function hanBuild(game) {
   hanBuildSigns(hanRoot);
   hanBuildLocals(game);
   hanBuildForeground(game, hanRoot);
+  hanBuildFar(hanRoot);
 
   if (typeof game.registerShadowTarget === 'function' && hanTrainG) {
     game.registerShadowTarget(hanTrainG);
@@ -4933,6 +4979,7 @@ export function createHanoi(game) {
       if (!hanBuilt) return;
       if (!game.biome.isActive('hanoi')) return;
       hanTime += dt;
+      if (hanFar) hanFar.update(game, dt);
       // the props are staged on the first LIVE frame: props.js may not exist
       // when a lazily-built chapter is built.
       if (!hanSpawned && game.physics && typeof game.physics.spawnProp === 'function') {

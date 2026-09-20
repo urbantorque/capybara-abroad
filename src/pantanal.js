@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, placeCue, swayMesh, makeMerger } from './shared.js';
+import { farLayer, farMover, farBundle, farTone } from './far.js';
 
 // ===========================================================================
 // CHAPTER 15 — THE PANTANAL. WHERE YOU ARE, AS IT HAPPENS, FROM.
@@ -82,6 +83,7 @@ const panCROSS = { x: -34, z0: -54, z1: -84 };  // where the herd goes over
 let panGame = null;
 let panBuilt = false;
 let panRoot = null;
+let panFar = null;      // the tree line at 300 m and the ibis (far.js)
 let panTime = 0;
 
 // the herd
@@ -933,6 +935,7 @@ function panBuild(game) {
   panBuildBugs(panRoot);
   panBuildEgrets(panRoot);
   panBuildCrossing(game, panRoot);
+  panBuildFar(panRoot);
   panBuildWater(panRoot);          // last: transparent, sorts over
   panBuildLilies(panRoot);         // ...and these sit ON it
   panBuildRipples(panRoot);
@@ -2011,6 +2014,47 @@ function panBuildLilies(root) {
     wm.renderOrder = 1;
     root.add(wm);
   }
+}
+
+// ---- ROADMAP-WOW2 V3, THE FAR PLANE: THE TREE LINE --------------------------
+// The world here is 264 x 236 m of ground and then the dome: from the road
+// the campo ran out at 130 m into the horizon colour and stopped. The
+// Pantanal is flat to the edge of sight and what closes it is a tree line —
+// the next cordilheira of forest, low and dark and broken, a long way off.
+// Seven wedges tangent to a 300 m circle round the spawn, from south-south-
+// west round to north-west (the arrival lens rests looking WSW over the
+// campo; the fazenda and its trees close the east), 6–9 m of canopy on a
+// 30 m strip, in the gallery forest's green pulled toward the chapter's
+// haze (60–760 m, never re-based: 34 % at 300). Bases at -30 so the strip
+// sits on the horizon and never floats over it.
+//
+// And the ibis: a line of seven crossing south to north down the western
+// sky at 26–30 m, ninety seconds a loop, sixty of them on the wing —
+// fourteen triangles, pale under-wings, because that is the thing you look
+// up at here at the end of the day.
+function panBuildFar(root) {
+  const tone = farTone(PALETTE.panForest, PALETTE.panHaze, 0.35);
+  const wedges = [];
+  const cx = 0, cz = 62, R = 300;
+  const profs = [
+    [[-1, 0], [-0.7, 6], [-0.4, 8.5], [-0.1, 7], [0.3, 9], [0.6, 6], [1, 0]],
+    [[-1, 0], [-0.6, 7], [-0.2, 5.5], [0.2, 8.5], [0.7, 7], [1, 0]],
+    [[-1, 0], [-0.5, 7.5], [0, 9], [0.4, 6], [0.8, 7.5], [1, 0]],
+  ];
+  for (let i = 0; i < 7; i++) {
+    const th = (190 + i * 17) * Math.PI / 180;          // bearing round the circle
+    wedges.push({ x: cx + Math.sin(th) * R, z: cz + Math.cos(th) * R, w: 120, d: 30, yaw: th,
+                  profile: profs[i % 3] });
+  }
+  panFar = farBundle({
+    name: 'pantanal',
+    layer: farLayer({ name: 'far-pantanal', color: tone, wedges }),
+    mover: farMover({
+      kind: 'birds', color: farTone(PALETTE.panHaze, PALETTE.panSkyLow, 0.5), period: 90, duty: 0.66, phase: 0.55,
+      path: [[-210, 26, -320], [-236, 30, 40], [-210, 27, 380]],
+    }),
+  });
+  root.add(panFar.group);
 }
 
 /** The gallery forest, the capoes, and one tree in flower. */
@@ -6002,6 +6046,7 @@ export function createPantanal(game) {
     update(dt) {
       if (!panBuilt) return;
       if (!game.biome.isActive('pantanal')) return;
+      if (panFar) panFar.update(game, dt);
       // ---- THE RIVER, WHICH IS THE CHAPTER (M13) ----------------------
       // Four of this chapter's twelve rows begin with the word Cross, and
       // the thing being crossed made no sound at all. It is a band in z, so

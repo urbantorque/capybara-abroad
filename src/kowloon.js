@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, matEmit, emitSet, EMIT_OVER, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, makeMerger, makeMover, warnOnce, hangThing } from './shared.js';
+import { farLayer, farMover, farBundle, farTone } from './far.js';
 
 // ===========================================================================
 // CHAPTER 11 — HONG KONG. UP IS A DIRECTION HERE.
@@ -129,6 +130,7 @@ function hkPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx,
 let hkGame = null;
 let hkBuilt = false;
 let hkRoot = null;
+let hkFar = null;       // Lion Rock over the roofs, and the approach (far.js)
 let hkTime = 0;
 let hkPhase = 0.06;
 // THE FIRST ARM (L7, F3): the evening does not count down from the moment
@@ -3655,6 +3657,49 @@ function hkBuildHarbour(game, root) {
   hkWaterMesh = wm;
 }
 
+// ---- ROADMAP-WOW2 V3, THE FAR PLANE: LION ROCK, AND THE APPROACH ----------
+// The far shore across the water is built (below: sixteen towers at z -186
+// with their own window mesh and aircraft lights — the night-light item the
+// roadmap names for this chapter already exists there). What the street
+// never had was the OTHER way: Kowloon has a mountain at the end of every
+// north-running street, and it is Lion Rock. Four wedges at z 230–290, up
+// to 120 m, in the far-tower blue pulled a little toward the chapter's
+// fog (34–420 m, never re-based: 51–63 % at these distances, which is why
+// it stands this close), darker than the glow the sky carries at this hour.
+// Not in the arrival frame — the lens rests on the frontage across the
+// street and the frame has no sky in it at all (the depth sweep's sky share
+// here is 0.000) — but in every frame that looks up the street.
+//
+// And the approach: this was Kai Tak's city. A jet low over the harbour
+// from the west, wheels down, eighteen triangles, ninety seconds a loop,
+// sixty of them on the path from 80 m down to 42, over the water between
+// the pier and the far shore where the street opens onto it.
+function hkBuildFar(root) {
+  const tone = farTone(PALETTE.hkTowerB, PALETTE.hkFog, 0.10);
+  hkFar = farBundle({
+    name: 'kowloon',
+    layer: farLayer({
+      name: 'far-kowloon', color: tone,
+      wedges: [
+        { x: -140, z: 250, w: 220, d: 90, yaw: 0.2,
+          profile: [[-1, 0], [-0.5, 70], [-0.1, 96], [0.4, 80], [1, 0]] },
+        // the Rock itself — the lion's head, a steep front and a long back
+        { x: 40, z: 270, w: 200, d: 90, yaw: 0.0,
+          profile: [[-1, 0], [-0.55, 84], [-0.3, 122], [-0.1, 112], [0.4, 90], [0.8, 60], [1, 0]] },
+        { x: 220, z: 285, w: 220, d: 90, yaw: -0.25,
+          profile: [[-1, 0], [-0.5, 66], [0, 98], [0.5, 72], [1, 0]] },
+        { x: 380, z: 240, w: 180, d: 80, yaw: -0.6,
+          profile: [[-1, 0], [-0.4, 50], [0.2, 70], [1, 0]] },
+      ],
+    }),
+    mover: farMover({
+      kind: 'plane', color: PALETTE.hkPoleSteel, lit: PALETTE.hkNeonWhite, scale: 0.8, period: 90, duty: 0.66, phase: 0.7,
+      path: [[-340, 80, -150], [-40, 60, -125], [320, 42, -100]],
+    }),
+  });
+  root.add(hkFar.group);
+}
+
 /**
  * THE FAR SHORE, and the whole reason this chapter has a marquee.
  *
@@ -5679,6 +5724,7 @@ export function createKowloon(game) {
       if (!hkBuilt) return;
       if (!game.biome.isActive('kowloon')) return;
       hkTime += dt;
+      if (hkFar) hkFar.update(game, dt);
 
       hkUpdateShow(game, dt);
       hkUpdateHeli(game, dt);   // X2
@@ -5778,6 +5824,7 @@ function hkBuild(game) {
   hkBuildMarket(game, hkRoot);
   hkBuildHarbour(game, hkRoot);
   hkBuildSkyline(hkRoot);
+  hkBuildFar(hkRoot);
   hkBuildFerry(game, hkRoot);
   hkBuildJunk(hkRoot);
   hkBuildCrowd(game, hkRoot);

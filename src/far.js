@@ -73,7 +73,8 @@ export function farTone(base, haze, k) {
  *             the ridge's bearing. Or the short form { x, z, w, h, d, yaw }
  *             for a plain three-point hill with its peak at `skew` (-1..1).
  *   color   a hex number (use farTone)
- *   y0      the base, default -30
+ *   y0      the base, default -30; a wedge may carry its own `y0` (a truss
+ *           hump stands on a deck, not on the sea floor)
  *   name    'far-<chapter>' — the depth instruments find the layer by this
  */
 export function farLayer(spec) {
@@ -84,6 +85,7 @@ export function farLayer(spec) {
   for (const w of spec.wedges || []) {
     const yaw = w.yaw || 0, cy = Math.cos(yaw), sy = Math.sin(yaw);
     const hw = (w.w || 60) * 0.5, hd = (w.d || 24) * 0.5;
+    const wy0 = w.y0 === undefined ? y0 : w.y0;
     let prof = w.profile;
     if (!prof) {
       const s = w.skew || 0;
@@ -95,10 +97,10 @@ export function farLayer(spec) {
     const crest = [], front = [], back = [];
     for (let i = 0; i < N; i++) {
       const u = prof[i][0] * hw;
-      const h = (i === 0 || i === N - 1) ? y0 : (w.y === undefined ? 0 : w.y) + prof[i][1];
+      const h = (i === 0 || i === N - 1) ? wy0 : (w.y === undefined ? 0 : w.y) + prof[i][1];
       let p = at(u, 0);  crest.push(push(p[0], h, p[1]));
-      p = at(u, hd);     front.push(push(p[0], y0, p[1]));
-      p = at(u, -hd);    back.push(push(p[0], y0, p[1]));
+      p = at(u, hd);     front.push(push(p[0], wy0, p[1]));
+      p = at(u, -hd);    back.push(push(p[0], wy0, p[1]));
     }
     for (let i = 0; i < N - 1; i++) {
       // front slope (faces +v), back slope (faces -v), wound outward
@@ -169,6 +171,8 @@ export function farMover(spec) {
     farQuad(P, I, [-13, 0, 2], [13, 0, 2], [13, 0, -2], [-13, 0, -2]);   // wing  2
     farQuad(P, I, [-5, 0, -10], [5, 0, -10], [5, 0, -12], [-5, 0, -12]); // tail  2
     farQuad(P, I, [0, 0, -8], [0, 0, -12], [0, 5, -13], [0, 5, -10]);    // fin   2
+    litFrom = I.length;
+    farQuad(P, I, [-0.8, -0.8, 11.1], [0.8, -0.8, 11.1], [0.8, 0.8, 11.1], [-0.8, 0.8, 11.1]); // landing light 2 (lit)
   } else if (kind === 'sail') {
     farBox(P, I, 0, 0.8, 0, 3, 1.6, 10);            // hull       12
     litFrom = I.length;

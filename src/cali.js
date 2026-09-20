@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger, makeMover } from './shared.js';
+import { farLayer, farBundle, farTone } from './far.js';
 
 // ===========================================================================
 // CHAPTER 5 — SANTIAGO DE CALI, VALLE DEL CAUCA
@@ -190,6 +191,7 @@ let caliLocMusician = null;   // (L7, F2) the soloist, on the salsoteca floor
 let caliGame = null;
 let caliBuilt = false;
 let caliRoot = null;
+let caliFar = null;     // the Farallones and the Cordillera Central (far.js)
 let caliTime = 0;
 
 let caliRiverMesh = null, caliRiverAttr = null, caliRipT = 0;
@@ -3847,6 +3849,48 @@ function caliUpdateCane() {
   caliCaneMesh.instanceMatrix.needsUpdate = true;
 }
 
+// ---- ROADMAP-WOW2 V3, THE FAR PLANE: THE FARALLONES, AND THE OTHER SIDE ---
+// caliTerrain calls its western shoulder "the Farallones", and it is 46 m
+// high at 84 m radius — Cristo's hill. The Farallones are four thousand
+// metres over a city at a thousand; from anywhere in Cali they are a wall
+// with the afternoon behind it. So the wall: two wedges to 170 m at 330–380
+// m behind Cristo, high enough to stand over his hill from the river
+// (measured, the shoulder's top is 23° up from the spawn and the wall's
+// crest 23.5°), in the far-ridge tone the palette has carried unused since
+// the chapter was built (caliRidgeFar) pulled toward its warm haze.
+//
+// And the other side of the valley: the arrival lens rests looking ESE down
+// the river, over the cane, at nothing. Across the Cauca there is the
+// Cordillera Central, low and blue and far. Four wedges at 400–460 m
+// (120–800 m haze, never re-based: 41–46 %), 55–90 m high. Bases at -30;
+// the ground mesh ends at 210.
+function caliBuildFar(root) {
+  const tone = farTone(PALETTE.caliRidgeFar, PALETTE.caliHaze, 0.20);
+  caliFar = farBundle({
+    name: 'cali',
+    layer: farLayer({
+      name: 'far-cali', color: tone,
+      wedges: [
+        // the Farallones, behind Cristo
+        { x: -340, z: -120, w: 300, d: 120, yaw: 1.35,
+          profile: [[-1, 0], [-0.6, 110], [-0.2, 168], [0.2, 150], [0.6, 120], [1, 0]] },
+        { x: -330, z: 140, w: 240, d: 110, yaw: 1.55,
+          profile: [[-1, 0], [-0.5, 96], [0, 140], [0.5, 104], [1, 0]] },
+        // the Cordillera Central, across the valley
+        { x: 430, z: -220, w: 260, d: 100, yaw: 1.65,
+          profile: [[-1, 0], [-0.5, 56], [0, 78], [0.5, 60], [1, 0]] },
+        { x: 440, z: 20, w: 260, d: 100, yaw: 1.5,
+          profile: [[-1, 0], [-0.6, 62], [-0.2, 90], [0.3, 70], [0.7, 80], [1, 0]] },
+        { x: 420, z: 250, w: 240, d: 100, yaw: 1.3,
+          profile: [[-1, 0], [-0.4, 58], [0.1, 74], [0.6, 52], [1, 0]] },
+        { x: 250, z: 420, w: 260, d: 100, yaw: 0.7,
+          profile: [[-1, 0], [-0.5, 48], [0, 64], [0.5, 44], [1, 0]] },
+      ],
+    }),
+  });
+  root.add(caliFar.group);
+}
+
 // ================================================================ CRISTO REY ==
 function caliBuildCristo(game, root) {
   const C = caliMerger();
@@ -4883,6 +4927,7 @@ export function createCali(game) {
       if (caliMotoMover) caliMotoMover.step(dt);
       if (!caliBuilt) return;
       if (!game.biome.isActive('cali')) return;
+      if (caliFar) caliFar.update(game, dt);
       // ---- THE RIVER IS A LINE YOU CAN WALK TOWARD (M13) --------------
       // The channel is single-valued in z, so the nearest point on it is
       // directly across from wherever you are standing and this is one
@@ -5103,6 +5148,7 @@ function caliBuild(game) {
   caliBuildWatchers(game, caliRoot);
   caliBuildCane(caliRoot);
   caliBuildCristo(game, caliRoot);
+  caliBuildFar(caliRoot);
   caliBuildFlora(game, caliRoot);
   caliBuildSparks(caliRoot);
   caliBuildMoto(game, caliRoot);

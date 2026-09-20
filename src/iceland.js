@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, grainOwn, makeSolidIndex, swayMesh, makeMerger, makeMover } from './shared.js';
+import { farLayer, farMover, farLights, farBundle, farTone } from './far.js';
 
 // ===========================================================================
 // CHAPTER 7 — ICELAND
@@ -192,6 +193,7 @@ const iceM  = new THREE.Matrix4();
 let iceGame = null;
 let iceBuilt = false;
 let iceRoot = null;
+let iceFar = null;      // Esja, the far shore's lights and the geese (far.js)
 // The eight people who live here, kept so that addExchange can pair them up.
 // See THE PEOPLE WHO LIVE HERE at the foot of iceBuild.
 let iceLocPylsa = null, iceLocPier = null, iceLocStreet = null, iceLocChurch = null;
@@ -2708,6 +2710,60 @@ function iceUpdateSteam(dt) {
   iceSteamSync();
 }
 
+// ---- ROADMAP-WOW2 V3, THE FAR PLANE: ESJA ---------------------------------
+// The northern horizon here was the glacier's valley wall and every other
+// one was the sea running out to the fog. Esja is the mountain Reykjavík
+// looks at across the bay — a long flat-crested massif — and it goes in
+// twice over, because the lens does not rest one way: a range across the
+// water at z 380–420 (the harbour's view, the sea sheet ends at 317) and its
+// eastern shoulders curving round from north-east to east at 300–420 m, which
+// is the right-hand third of the arrival frame (the lens rests looking NNE
+// over the town rows). The chapter's fog (130–940, never re-based) puts
+// them at 27–33 % haze; the tone is basalt pulled a little toward the night
+// haze — DARKER than the sky's northern band, because a mountain at night
+// is the thing the light is not (the moraine's grey measured lighter than
+// the sky and read as nothing).
+//
+// Under the range across the bay, the far shore's lights: thirty-four dots,
+// window colour, over-white, in one instanced draw, for the bloom to take.
+// And the geese: a V of seven, fourteen triangles, west to east over the
+// town at 26–32 m, eighty seconds a loop, on the wing sixty of them — pale,
+// moonlit, because a dark bird on a dark sky is a bird nobody sees.
+function iceBuildFar(root) {
+  const tone = farTone(PALETTE.iceBasalt, PALETTE.iceHaze, 0.15);
+  const lights = [];
+  for (let i = 0; i < 34; i++) {
+    const t = i / 33;
+    lights.push([-190 + t * 400 + Math.sin(i * 2.3) * 5, 2.2 + (i % 3) * 0.9, 384 + Math.cos(i * 1.7) * 6]);
+  }
+  iceFar = farBundle({
+    name: 'iceland',
+    layer: farLayer({
+      name: 'far-iceland', color: tone,
+      wedges: [
+        // Esja across the bay — flat-topped, the long crest
+        { x: -60, z: 410, w: 300, d: 120, yaw: 0.05,
+          profile: [[-1, 0], [-0.7, 48], [-0.4, 74], [0.1, 78], [0.5, 70], [0.8, 40], [1, 0]] },
+        { x: 190, z: 400, w: 220, d: 100, yaw: -0.15,
+          profile: [[-1, 0], [-0.5, 44], [0, 66], [0.5, 50], [1, 0]] },
+        // its shoulders, north-east round to east
+        { x: 330, z: 150, w: 200, d: 90, yaw: 1.2,
+          profile: [[-1, 0], [-0.5, 40], [0, 62], [0.4, 56], [1, 0]] },
+        { x: 340, z: -40, w: 220, d: 90, yaw: 1.5,
+          profile: [[-1, 0], [-0.6, 50], [-0.2, 72], [0.3, 64], [0.7, 46], [1, 0]] },
+        { x: 290, z: -230, w: 200, d: 90, yaw: 1.9,
+          profile: [[-1, 0], [-0.4, 44], [0.1, 58], [0.6, 36], [1, 0]] },
+      ],
+    }),
+    lights: farLights({ points: lights, color: PALETTE.iceWindow, size: 1.8 }),
+    mover: farMover({
+      kind: 'birds', color: farTone(PALETTE.iceMoraine, PALETTE.iceSnow, 0.35), period: 80, duty: 0.75, phase: 0.4,
+      path: [[-320, 32, -50], [0, 30, -20], [320, 26, 20]],
+    }),
+  });
+  root.add(iceFar.group);
+}
+
 // =================================================================== SKY ====
 /**
  * STARS. There is no unlit material in this game's law and there is not going
@@ -5014,6 +5070,7 @@ export function createIceland(game) {
       if (!iceBuilt) return;
       if (!game.biome.isActive('iceland')) return;
       iceTime += dt;
+      if (iceFar) iceFar.update(game, dt);
       // ---- THE STEAM (L3-9): the field's bed, from the nearest vent ------
       if (!iceSteamMover && game.sfxMover) iceSteamMover = game.sfxMover('steam', { key: 'ice:steam', near: 14, far: 90 });
       if (iceSteamMover && game.capy && game.capy.position) {
@@ -5844,6 +5901,7 @@ function iceBuild(game) {
   iceBuildSteam(iceRoot);
   iceBuildAurora(iceRoot);
   iceBuildStars(iceSkyRig || iceRoot);
+  iceBuildFar(iceRoot);
 
   // ---- THE PEOPLE WHO LIVE HERE ------------------------------------------
   // See npc.js, THE LOCALS. Each of these is a point somebody is standing at,

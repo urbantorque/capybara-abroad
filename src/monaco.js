@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, EMIT_OVER, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh, makeMerger, makeMover } from './shared.js';
+import { farLayer, farMover, farLights, farBundle, farTone } from './far.js';
 
 // ===========================================================================
 // CHAPTER 18 — MONTE CARLO
@@ -384,6 +385,7 @@ const monOpt = {};
 let monGame = null;
 let monBuilt = false;
 let monRoot = null;
+let monFar = null;      // the Tête de Chien, the corniche and its car (far.js)
 let monTime = 0;
 
 // the sea and the basin
@@ -1498,6 +1500,66 @@ function monBuildTown(game, root) {
   m.castShadow = true; m.receiveShadow = true;
   root.add(m);
   monPoolDone(game, body);
+}
+
+// ---- ROADMAP-WOW2 V3, THE FAR PLANE: THE TÊTE DE CHIEN ---------------------
+// The mountain over the town is a terrain pad (monHILL) that the ground mesh
+// cuts off at z 220 with its top at 120 m — a hump, not the wall Monaco lives
+// under. The wall goes in behind it: the Tête de Chien's rock crest at z
+// 300–340, 190–225 m high so it stands over the hump from the quay (from the
+// arrival lens, resting NE across the basin, the hump's top is 21° up and
+// the crest 26°), Cap d'Ail's heights falling west and the Menton heights
+// east, at 300–560 m where the chapter's own haze (90–1500 m,
+// never re-based) reads 15–25 %: the Rock's dark pulled toward the dusk
+// haze, which is the blue a mountain goes at twenty past eight.
+//
+// On its face, the corniche: forty-four lights along the road cut at 80–96
+// m, window colour, over-white in one instanced draw, and one car's lamps
+// (four triangles, over-white) running the length of it every hundred
+// seconds — the thing that says the road is a road.
+function monBuildFar(root) {
+  const tone = farTone(PALETTE.monRockDk, PALETTE.monHaze, 0.35);
+  const lights = [];
+  for (let i = 0; i < 44; i++) {
+    const t = i / 43;
+    const x = -230 + t * 470;
+    lights.push([x, 82 + Math.sin(t * 5.1) * 7 + (i % 2) * 1.5, 296 + Math.cos(t * 3.3) * 4]);
+  }
+  const road = [];
+  for (let i = 0; i < 12; i++) {
+    const t = i / 11, x = -250 + t * 510;
+    road.push([x, 83 + Math.sin(t * 5.1) * 7, 297 + Math.cos(t * 3.3) * 4]);
+  }
+  monFar = farBundle({
+    name: 'monaco',
+    layer: farLayer({
+      name: 'far-monaco', color: tone,
+      wedges: [
+        // the Tête de Chien, the crest over the town
+        { x: -50, z: 330, w: 280, d: 110, yaw: 0.05,
+          profile: [[-1, 0], [-0.6, 150], [-0.25, 212], [0.1, 225], [0.45, 200], [0.8, 160], [1, 0]] },
+        { x: 170, z: 345, w: 240, d: 100, yaw: -0.1,
+          profile: [[-1, 0], [-0.5, 140], [0, 190], [0.5, 150], [1, 0]] },
+        // Cap d'Ail's heights, west, lower
+        { x: -280, z: 290, w: 220, d: 90, yaw: 0.35,
+          profile: [[-1, 0], [-0.4, 110], [0.1, 150], [0.6, 96], [1, 0]] },
+        // and east, over the eastern headland: the Menton heights and the
+        // Italian coast behind them — the arrival lens rests ENE across the
+        // basin, and monEAST (52 m at 260 m) hid anything lower than 10° up
+        // there; these stand 14–16° up at 480–560 m
+        { x: 450, z: 150, w: 260, d: 110, yaw: 1.0,
+          profile: [[-1, 0], [-0.5, 96], [-0.1, 142], [0.3, 120], [0.7, 84], [1, 0]] },
+        { x: 540, z: -70, w: 240, d: 100, yaw: 1.35,
+          profile: [[-1, 0], [-0.4, 88], [0.1, 124], [0.6, 76], [1, 0]] },
+      ],
+    }),
+    lights: farLights({ points: lights, color: PALETTE.monWindow, size: 1.8 }),
+    mover: farMover({
+      kind: 'car', lit: PALETTE.monWindow, scale: 2.2, period: 100, duty: 0.8, phase: 0.1,
+      path: road,
+    }),
+  });
+  root.add(monFar.group);
 }
 
 /**
@@ -5180,6 +5242,7 @@ function monBuild(game) {
   // LAST, because every builder above may have asked for a lit window and this
   // is the one draw call all of them land in.
   monBuildWindows(monRoot);
+  monBuildFar(monRoot);
   monBuildScooter(game, monRoot);
   monBuildLocals(game);
 
@@ -5638,6 +5701,7 @@ export function createMonaco(game) {
       if (!monBuilt) return;
       if (!game.biome.isActive('monaco')) return;
       monTime += dt;
+      if (monFar) monFar.update(game, dt);
       // The two things that need props are staged on the first live frame
       // rather than in the build, because props.js may not exist yet when a
       // chapter is built lazily on first entry.
