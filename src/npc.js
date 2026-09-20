@@ -644,6 +644,53 @@ const npcELBOW_SWING = 0.34;  // rad more at the front of the swing
 const npcTORSO_TWIST = 0.105;  // rad on the shoulders at full speed
 const npcHEAD_HOLD   = 0.8;    // ...of which the head refuses to come along
 
+// ===========================================================================
+// THREE GAITS (ROADMAP-WOW2 V2.1). Every figure of a kind walked the same
+// walk: one stride expression, scaled by three builds. A build is a SIZE and
+// a gait is a RHYTHM, and it is the rhythm that says how old somebody is
+// from forty metres. Four rows, one per profile, read by animHuman (the
+// swing), moveRec/paMove (the speed and the pause) and thinkHuman (the tired
+// one's longer sit). Chosen ONCE from the figure's own seed in buildHuman.
+//
+//   plain   what everybody was.
+//   skip    a child: a second, higher bounce inside every step (|sin 2φ| on
+//           top of the |cos φ| the walk already bobs on), the knee coming up
+//           further and the arms going wider. npcCHILD_HEAD already marks
+//           them; this is the walk to go with the head.
+//   shuffle an elder: the stride cut to 0.62 of the rig's, the speed to 0.72,
+//           a lean forward from the hips, and every ~6 m a stop of a second
+//           and a half, because that is what walking slowly actually looks
+//           like — not a slow walk but a walk with stops in it.
+//   tired   0.85 of the speed, and when they stop they sit down (stepHuman's
+//           idle) and stay sat three times as long as anybody else dwells.
+//
+// `strideK` scales BOTH the swing (animHuman) and the stride the cadence is
+// derived from (moveRec), so the feet stay locked to the ground — the same
+// invariant THE STRIDE IS THIS PERSON'S keeps for the builds. Exported on
+// npcPERSON.gait() for the merged pools (Marrakech, Rio) whose bob is their
+// own; those files are not this pass's to edit, so it is offered, not wired.
+const npcGAIT = [
+  { n: 'plain',   strideK: 1,    speedK: 1,    lean: 0,    hop: 0,     knee: 1,   arm: 1,   pauseM: 0 },
+  { n: 'skip',    strideK: 1,    speedK: 1.05, lean: 0,    hop: 0.07,  knee: 1.3, arm: 1.4, pauseM: 0 },
+  { n: 'shuffle', strideK: 0.62, speedK: 0.72, lean: 0.14, hop: 0,     knee: 0.9, arm: 0.7, pauseM: 6 },
+  { n: 'tired',   strideK: 0.85, speedK: 0.85, lean: 0.05, hop: 0,     knee: 1,   arm: 0.8, pauseM: 0 },
+];
+const npcGAIT_PAUSE   = 1.5;    // s the shuffle stands still, every pauseM
+const npcGAIT_SIT_CR  = -0.34;  // poseCrouch of the tired one sat on the ground
+const npcGAIT_SIT_ARM = -0.55;  // ...with the hands on the knees
+// Which profile a unit seed lands on: one in five shuffles, one in five is
+// tired, the rest are plain. A child is always the skip. A crowd more than a
+// fifth elderly reads as a coach party, which Sydney is not.
+function npcGaitPick(u, child) {
+  if (child) return 1;
+  return u < 0.20 ? 2 : u < 0.40 ? 3 : 0;
+}
+// The states a gait is allowed to slow: the unhurried ones. A fleeing elder
+// flees at the rig's speed — the chase caps in this file were measured
+// against that speed and a slower prey breaks the joke the other way.
+const npcGAIT_STATES = { wander: 1, idle: 1, lookAt: 1, queue: 1, calm: 1,
+                         walk: 1, drift: 1, stand: 1 };
+
 const npcSKINS = [PALETTE.skin1, PALETTE.skin2, PALETTE.skin3, PALETTE.skin4];
 const npcHAIRS = [PALETTE.hair1, PALETTE.hair2, PALETTE.hair3, PALETTE.hair4, PALETTE.hair5];
 const npcCLOTH = [PALETTE.cloth1, PALETTE.cloth2, PALETTE.cloth3, PALETTE.cloth4,
@@ -1036,6 +1083,13 @@ export const npcPERSON = {
       .concat(P.at(P.brow, P.BROW.x, P.BROW.y, P.BROW.z));
   },
   geo(parts) { return npcMakeGeo(parts); },
+  /**
+   * THE GAIT ROW for a unit seed (ROADMAP-WOW2 V2.1) — see npcGAIT. A merged
+   * pool that bobs its own bodies can read `hop`, `strideK` and `speedK` off
+   * this for the same three walks the roster has, from the same seed rule.
+   */
+  gait(u, child) { return npcGAIT[npcGaitPick(u, child)]; },
+  GAIT: npcGAIT,
 };
 
 // ===========================================================================
@@ -8764,6 +8818,9 @@ export function createNPCs(game) {
       // build (see THREE BUILDS above). bLeg is read by animHuman, which is
       // the only place allowed to touch legL.scale.y.
       bH: bH, bGirth: bGirth, bLeg: bLeg, arch: child ? 3 : arch, child: child,
+      // ---- THE GAIT (ROADMAP-WOW2 V2.1). See npcGAIT. Written below, from
+      // the figure's own seed, once the record's clocks exist to seed it.
+      gait: 0, gaitOdo: 0, gaitPause: 0, gaitSit: 0,
       // ---- A VOICE OF THEIR OWN (F2). See the same field on addLocal ------
       // ...and a child's is higher, which is the one place in the game where a
       // build and a voice have to agree: P5 gave one tourist in seven a head
@@ -8829,6 +8886,16 @@ export function createNPCs(game) {
       speak(t) { sayBubble(rec, t); },
       update(dt) { stepHuman(rec, dt); },
     };
+    // ---- THE GAIT, from the figure's own seed (ROADMAP-WOW2 V2.1) -------
+    // `idlePhase` is the one random number every record already carries and
+    // nothing ever changes, so it is the seed: the same person is the same
+    // walker for the life of the chapter and the audit can count them off
+    // it. Only the KINDS that stroll: a gardener, a jogger, a waiter and a
+    // busker have a job that is their walk, and a vendor never leaves the
+    // stall. An ibis is not a person.
+    const strolls = kind === 'tourist' || kind === 'commuter' || kind === 'queue' ||
+                    kind === 'patron' || kind === 'churchgoer';
+    rec.gait = strolls ? npcGaitPick(rec.idlePhase / 6.2832, child) : (child ? 1 : 0);
     return rec;
   }
 
@@ -9406,7 +9473,26 @@ export function createNPCs(game) {
     return d;
   }
 
+  // ---- THE GAIT'S SPEED AND ITS STOPS (ROADMAP-WOW2 V2.1) ------------------
+  // One multiplier and one odometer, in the unhurried states only (see
+  // npcGAIT_STATES). The shuffle's pause is the half of it you actually
+  // notice from the far side of a lawn: somebody who stops every few metres
+  // is old at forty metres, where a shorter stride is just a person further
+  // away. The odometer is jittered a little per stop so two elders on the
+  // same path do not stop in step.
+  function npcGaitSpd(rec, spd, dt) {
+    const G = npcGAIT[rec.gait || 0];
+    if (G === npcGAIT[0] || !npcGAIT_STATES[rec.state]) return spd;
+    if (rec.gaitPause > 0) { rec.gaitPause -= dt; return 0; }
+    if (G.pauseM > 0 && spd > 0.05) {
+      rec.gaitOdo += rec.speed * dt;
+      if (rec.gaitOdo > G.pauseM * rand(0.85, 1.2)) { rec.gaitOdo = 0; rec.gaitPause = npcGAIT_PAUSE; return 0; }
+    }
+    return spd * G.speedK;
+  }
+
   function moveRec(rec, dt, spd) {
+    spd = npcGaitSpd(rec, spd, dt);
     rec.speed = damp(rec.speed, spd, rec.state === 'chase' ? 11 : 6, dt);
     if (rec.speed > 0.02) {
       let nx = rec.group.position.x + rec.moveX * rec.speed * dt;
@@ -9496,7 +9582,10 @@ export function createNPCs(game) {
       // its legs in time with the ground. A silent gait regression on two
       // species is exactly the shape this file keeps finding.
       const bl = rec.bLeg || 1, bh = rec.bH || 1;
-      const stride = 2 * npcLEG_L * bl * bh * Math.sin(0.72 * gAmp);
+      // ...times the GAIT's stride (ROADMAP-WOW2 V2.1): the same strideK
+      // animHuman swings the hip by, so the shuffle's short step is a short
+      // step on the ground and not a long one skated.
+      const stride = 2 * npcLEG_L * bl * bh * Math.sin(0.72 * gAmp * npcGAIT[rec.gait || 0].strideK);
       if (stride > 0.02) rec.walkPhase += (Math.PI * rec.speed / stride) * dt + dt * 0.4;
       else rec.walkPhase += dt * 0.4;
     } else {
@@ -9920,7 +10009,11 @@ export function createNPCs(game) {
 
     // tourists
     if (st === 'lookAt' && rec.stateT > 2.5) setState(rec, 'idle');
-    if (st === 'idle' && npcDwell(rec, rec.stateT, 2.5, 7)) { pickPOI(rec); setState(rec, 'wander'); }
+    // ...and the tired one, once sat, stays sat (V2.1): the dwell is drawn
+    // ONCE on entering the state, so this is one pair of numbers, not a
+    // second timer.
+    if (st === 'idle' && (rec.gait === 3 && !rec.quay ? npcDwell(rec, rec.stateT, 9, 19)
+                                                       : npcDwell(rec, rec.stateT, 2.5, 7))) { pickPOI(rec); setState(rec, 'wander'); }
     if (st === 'wander') {
       const dx = rec.target.x - rec.group.position.x, dz = rec.target.z - rec.group.position.z;
       if (dx * dx + dz * dz < 1.4) setState(rec, 'idle');
@@ -10541,6 +10634,7 @@ export function createNPCs(game) {
 
     let spd = 0;
     rec.tgtArmL = 0; rec.tgtArmR = 0; rec.tgtLean = 0; rec.tgtCrouch = 0;
+    rec.gaitSit = 0;   // re-asked by the idle case below (V2.1)
 
     // --- gardener hauling the offender off the premises --------------------
     if (rec.carryT >= 0) {
@@ -11163,6 +11257,18 @@ export function createNPCs(game) {
         rec.tgtLean = s * 0.03;
         rec.lookX = rec.group.position.x + Math.sin(rec.yaw + s * 0.7) * 5;
         rec.lookZ = rec.group.position.z + Math.cos(rec.yaw + s * 0.7) * 5;
+        // ---- THE TIRED SIT DOWN (ROADMAP-WOW2 V2.1) ----------------------
+        // Where they stopped, a second after stopping, hands on knees, and
+        // thinkHuman keeps them there three times as long as anybody else
+        // idles. Not on the quay — the terrace has chairs for that and a
+        // commuter sat on the promenade is a different story — and not in
+        // the first second, so a person arriving somewhere stops first.
+        if (rec.gait === 3 && !rec.quay && rec.stateT > 1.0 && rec.state === 'idle') {
+          rec.gaitSit = 1;
+          rec.tgtCrouch = npcGAIT_SIT_CR;
+          rec.tgtArmL = npcGAIT_SIT_ARM; rec.tgtArmR = npcGAIT_SIT_ARM;
+          rec.tgtLean = 0.10 + s * 0.02;
+        }
         break;
       }
     }
@@ -11217,20 +11323,30 @@ export function createNPCs(game) {
       rec.hop += rec.hopV * dt;
       if (rec.hop <= 0) { rec.hop = 0; rec.hopV = 0; }
     }
-    const amp = clamp(rec.speed / 1.7, 0, 1.15);
+    // ---- THE GAIT (ROADMAP-WOW2 V2.1). See npcGAIT. `amp` is the swing
+    // everything below rides on, so strideK scales the whole walk — hip,
+    // knee, arm, bob, twist — and moveRec's cadence with it. The rest of the
+    // row is applied where each joint is written.
+    const G = npcGAIT[rec.gait || 0];
+    const amp = clamp(rec.speed / 1.7, 0, 1.15) * G.strideK;
     const s = Math.sin(rec.walkPhase);
     const c = Math.cos(rec.walkPhase);
 
     rec.poseArmL = damp(rec.poseArmL, rec.tgtArmL, 11, dt);
     rec.poseArmR = damp(rec.poseArmR, rec.tgtArmR, 11, dt);
-    rec.poseLean = damp(rec.poseLean, rec.tgtLean, 8, dt);
+    // ...and the shuffle's lean, from the hips, only while actually walking
+    // — a person who stands lists is a different thing from one who walks
+    // bent — and never on top of a chair.
+    rec.poseLean = damp(rec.poseLean, rec.tgtLean + G.lean * clamp(rec.speed / 0.6, 0, 1) * (1 - rec.seatPose), 8, dt);
     rec.poseCrouch = damp(rec.poseCrouch, rec.tgtCrouch, 8, dt);
 
     const maskL = clamp(1 - Math.abs(rec.poseArmL) * 0.8, 0, 1);
     const maskR = clamp(1 - Math.abs(rec.poseArmR) * 0.8, 0, 1);
 
-    // seated diners swing their thighs forward under the table
-    rec.seatPose = damp(rec.seatPose, rec.seated, 9, dt);
+    // seated diners swing their thighs forward under the table — and the
+    // tired sit down on the ground where they stopped (V2.1), on the same
+    // thigh-forward, knee-folded pose, lower (see npcGAIT_SIT_CR).
+    rec.seatPose = damp(rec.seatPose, rec.seated || rec.gaitSit ? 1 : 0, 9, dt);
     const seatK = rec.seatPose * npcSEAT_LEG;
     const hipL = s * amp * 0.72 + seatK;
     const hipR = -s * amp * 0.72 + seatK;
@@ -11252,8 +11368,10 @@ export function createNPCs(game) {
     const swL = c < 0 ? -c : 0;
     const swR = c > 0 ? c : 0;
     const kneeSit = rec.seatPose * 1.42;      // 81 deg: thigh out, shin down
-    const kL = npcKNEE_REST + swL * swL * amp * npcKNEE_SWING + kneeSit;
-    const kR = npcKNEE_REST + swR * swR * amp * npcKNEE_SWING + kneeSit;
+    // ...and the skip lifts the knee further (G.knee, V2.1): a child's
+    // step is most of the way to a hop.
+    const kL = npcKNEE_REST + swL * swL * amp * npcKNEE_SWING * G.knee + kneeSit;
+    const kR = npcKNEE_REST + swR * swR * amp * npcKNEE_SWING * G.knee + kneeSit;
     n.kneeL.rotation.x = kL;
     n.kneeR.rotation.x = kR;
     // ---- THE FOOT PLANT --------------------------------------------------
@@ -11287,8 +11405,9 @@ export function createNPCs(game) {
     // same `mask` the walk swing takes, one line up, for the same reason.
     if (rec.gest > 0) { rec.gest -= dt; rec.gestT = (rec.gestT || 0) + dt; }
     const talk = rec.gest > 0 ? (0.5 + Math.sin(rec.gestT * 7.5) * 0.22) * maskR : 0;
-    n.armL.rotation.x = rec.poseArmL - s * amp * 0.58 * maskL;
-    n.armR.rotation.x = rec.poseArmR + s * amp * 0.58 * maskR - talk;
+    // ...G.arm (V2.1): the skip's arms go wide, the shuffle's hardly swing.
+    n.armL.rotation.x = rec.poseArmL - s * amp * 0.58 * G.arm * maskL;
+    n.armR.rotation.x = rec.poseArmR + s * amp * 0.58 * G.arm * maskR - talk;
     n.armL.rotation.z = 0.09 + rec.poseArmL * 0.06;
     n.armR.rotation.z = -0.09 - rec.poseArmR * 0.06 - talk * 0.7;
     // ---- THE ELBOW (v56) -------------------------------------------------
@@ -11356,6 +11475,13 @@ export function createNPCs(game) {
     const cl = Math.cos(rec.poseLean), sl = Math.sin(rec.poseLean);
     // ...and the torso rides UP with a long-legged build, or a tall-thin man
     // is drawn with his hips six centimetres inside his own waistband.
+    // ...and the SKIP (V2.1): a second bounce inside every step, at twice
+    // the walk's own frequency and nearly its height. |cos| is one dip per
+    // step; |sin 2φ| peaks between the dips, which is where a skipping child
+    // leaves the ground. Zero for the other three rows. On the GROUP, not on
+    // bob: the legs hang off the root, and a torso that hops over planted
+    // feet is a puppet on a string — the whole child leaves the lawn.
+    const skip = G.hop > 0 ? Math.abs(Math.sin(rec.walkPhase * 2)) * G.hop * clamp(amp / 0.6, 0, 1) : 0;
     n.bob.position.y = rec.poseCrouch + breathe + Math.abs(c) * 0.05 * amp + npcHIP_Y - npcHIP_Y * cl
                        + npcLEG_L * (rec.bLeg - 1);
     n.bob.position.x = (1 - amp) * Math.sin(game.state.time * 0.5 + rec.idlePhase) * 0.03;
@@ -11382,7 +11508,7 @@ export function createNPCs(game) {
     n.legR.rotation.y = -twist;
 
     // yOff carries the harbour (negative) — the chair is done with poseCrouch
-    rec.group.position.y = rec.hop + rec.yOff;
+    rec.group.position.y = rec.hop + rec.yOff + skip;
     rec.group.rotation.y = rec.yaw;
 
     // drying off after a swim: same hue, darker, easing back over ~8 seconds
@@ -11852,7 +11978,7 @@ export function createNPCs(game) {
     }
     if (rec.overshoot > 0) { rec.overshoot -= dt; k *= 1.55; }
 
-    rec.speed = damp(rec.speed, spd * k, rec.state === 'chase' ? 10 : 6, dt);
+    rec.speed = damp(rec.speed, npcGaitSpd(rec, spd * k, dt), rec.state === 'chase' ? 10 : 6, dt);
     if (rec.speed > 0.02) {
       let nx = clamp(px + rec.moveX * rec.speed * dt, -npcPA_WALK, npcPA_WALK);
       let nz = clamp(pz + rec.moveZ * rec.speed * dt, -npcPA_WALK, npcPA_WALK);
@@ -11882,7 +12008,10 @@ export function createNPCs(game) {
       // its legs in time with the ground. A silent gait regression on two
       // species is exactly the shape this file keeps finding.
       const bl = rec.bLeg || 1, bh = rec.bH || 1;
-      const stride = 2 * npcLEG_L * bl * bh * Math.sin(0.72 * gAmp);
+      // ...times the GAIT's stride (ROADMAP-WOW2 V2.1): the same strideK
+      // animHuman swings the hip by, so the shuffle's short step is a short
+      // step on the ground and not a long one skated.
+      const stride = 2 * npcLEG_L * bl * bh * Math.sin(0.72 * gAmp * npcGAIT[rec.gait || 0].strideK);
       if (stride > 0.02) rec.walkPhase += (Math.PI * rec.speed / stride) * dt + dt * 0.4;
       else rec.walkPhase += dt * 0.4;
     } else {
@@ -16129,6 +16258,41 @@ export function createNPCs(game) {
             * reset and is the only honest answer. Nothing in src reads it.
             * See qa/d7-beat.js.
             */
+           /**
+            * WHO WALKS HOW (ROADMAP-WOW2 V2.1). The gait is chosen from a
+            * seed at build time and shows only while somebody is walking, so a
+            * still cannot count it. One read of the live cast: how many of
+            * each profile, how many are mid-pause, how many are sat. Read by
+            * qa/wow2-people.js; nothing in src reads it.
+            */
+           peopleAudit: {
+           /**
+            * ROADMAP-WOW2 V2 — the four reads the people pass exposes, in one
+            * object so main.js hands them over on one line (game.peopleAudit).
+            */
+           gait: function (withRows) {
+             const live = game.biome && game.biome.current;
+             const cast = (live === 'sydney' || live === 'quay') ? humans : live === 'pasto' ? paHumans : null;
+             const by = { plain: 0, skip: 0, shuffle: 0, tired: 0 };
+             let paused = 0, sat = 0, walking = 0, skipping = 0;
+             const rows = withRows ? [] : null;
+             if (cast) for (let i = 0; i < cast.length; i++) {
+               const r = cast[i];
+               if (r.kind === 'ibis') continue;
+               const G = npcGAIT[r.gait || 0];
+               by[G.n]++;
+               if (r.gaitPause > 0) paused++;
+               if (r.seatPose > 0.5 && r.gaitSit) sat++;
+               if (r.speed > 0.3) { walking++; if (G.hop > 0) skipping++; }
+               if (rows) rows.push({ i: i, kind: r.kind, gait: G.n, state: r.state, spd: +r.speed.toFixed(2),
+                                     x: +r.group.position.x.toFixed(1), z: +r.group.position.z.toFixed(1),
+                                     pause: +(r.gaitPause || 0).toFixed(2), seat: +(r.seatPose || 0).toFixed(2),
+                                     lean: +(r.poseLean || 0).toFixed(2), y: +r.group.position.y.toFixed(3) });
+             }
+             return { biome: live, n: cast ? cast.length : 0, by: by, walking: walking,
+                      skipping: skipping, paused: paused, sat: sat, rows: rows };
+           },
+           },
            beatAudit: function (reset) {
              const live = game.biome && game.biome.current;
              const rows = [];

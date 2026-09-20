@@ -2311,6 +2311,8 @@ function mainBoot() {
     game.forceBlame = npcs.forceBlame;
     // ...and whether the instanced crowd gestures when it speaks. See D8.
     game.gestAudit = npcs.gestAudit;
+    // ROADMAP-WOW2 V2: gait / gesture / umbrella / company, in one object.
+    game.peopleAudit = npcs.peopleAudit;
   }
 
   // Runtime spawns (props, NPCs) land in whichever biome is currently live.
