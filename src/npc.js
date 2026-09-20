@@ -1361,6 +1361,11 @@ export function createNPCs(game) {
 
   function mkInst(geo, count, round) {
     const m = new THREE_.InstancedMesh(geo, round && npcRoundOn ? instMatRound : instMat, count);
+    // NAMED, so an instrument can build a mask of THE PEOPLE and nothing
+    // else: the two casts are a dozen instanced buffers among a chapter's
+    // hundred, and "instanced, small, casts a shadow" also describes a
+    // market stall (ROADMAP-WOW2 V2, qa/wow2-people.js).
+    m.name = 'npcCast';
     if (round) npcRoundMeshes.push(m);
     m.instanceMatrix.setUsage(THREE_.DynamicDrawUsage);
     m.castShadow = true;
@@ -3693,7 +3698,7 @@ export function createNPCs(game) {
       stW: 0,                             // how much of their stance is live (L7, E4)
       // ---- an idle gesture (ROADMAP-WOW2 V2.2). See npcGESTURE: which one,
       // seconds left in it, the clock to the next, and how many so far.
-      gsK: -1, gsT: 0, gsCd: rand(npcGEST_GAP0[0], npcGEST_GAP0[1]), gsN: 0, gsW: 0,
+      gsK: -1, gsT: 0, gsCd: rand(npcGEST_GAP0[0], npcGEST_GAP0[1]), gsN: 0, gsW: 0, gsRow: null,
       hud: 0,                             // the huddle, 0..1
       look: 0, lookT: rand(4, npcLOC_LOOK_GAP),   // the glance up
       wetWas: false,                      // rising edge of "it has started"
@@ -7892,7 +7897,7 @@ export function createNPCs(game) {
           // ...plus the gesture's turn (V2.2): the wave looks at whoever is
           // being waved at, the wrist looks down. gsW is last frame's weight,
           // which is one frame stale and does not matter at 0.35 s of ease.
-          const gsH = r.gsK >= 0 ? npcGESTURE[r.gsK] : null;
+          const gsH = r.gsK >= 0 ? npcGESTURE[r.gsK] : (r.gsW > 0 ? r.gsRow : null);
           r.fig.head.rotation.y = r.headY - (r.twist || 0) * npcHEAD_HOLD + (gsH ? gsH.hy * r.gsW : 0);
           // ...and the head DIPS a little for something the size of a capybara,
           // which is the whole joke of being looked at by a person.
@@ -8753,10 +8758,28 @@ export function createNPCs(game) {
   // one branch per person per frame.
   let npcGestOn = true, npcGestN = 0;
   let npcUmbOn = true, npcUmbRosterOn = true;   // V2.3, written once a frame in update()
+  // ...and how many of each rig's umbrellas are open. A dry chapter is the
+  // common case and it must cost NOTHING: with none open the buffer is not
+  // written, not uploaded and not drawn (count 0), so the whole term is two
+  // integers on a frame where it is not raining. Measured before this: the
+  // three flags together cost 0.402 ms/tick in Sydney, and 32 setMatrixAt
+  // plus a full instanceMatrix upload every frame was most of it.
+  let npcUmbLive = 0, npcUmbLiveWas = 0, paUmbLive = 0, paUmbLiveWas = 0;
   const npcGestBy = { wrist: 0, stretch: 0, wave: 0, point: 0, shiver: 0, shade: 0 };
   function localGestureStep(r, dt, busy, facing, biome) {
     r.gsBz = busy;   // published for the audit: WHY nobody is gesturing
-    if (!npcGestOn) { r.gsK = -1; r.gsT = 0; r.gsW = 0; return null; }
+    // ...and the cut RELEASES rather than snaps. A flag that teleports an
+    // arm back to the side is a one-frame motion of its own, which is the
+    // thing the A/B is trying to measure: measured in Kyoto, the cut arm's
+    // median moved pixels came out ABOVE the live arm's because of it.
+    if (!npcGestOn) {
+      if (r.gsK < 0 && r.gsW <= 0.001) { r.gsW = 0; return null; }
+      const row = r.gsK >= 0 ? npcGESTURE[r.gsK] : r.gsRow;
+      r.gsRow = row; r.gsK = -1; r.gsT = 0;
+      r.gsW = damp(r.gsW, 0, 14, dt);
+      if (r.gsW <= 0.004) { r.gsW = 0; r.gsRow = null; return null; }
+      return row || null;
+    }
     if (r.gsK >= 0) {
       r.gsT -= dt;
       const row = npcGESTURE[r.gsK];
@@ -9116,7 +9139,7 @@ export function createNPCs(game) {
       gait: 0, gaitOdo: 0, gaitPause: 0, gaitSit: 0,
       // ---- and an idle gesture (V2.2), the locals' own fields. See
       // localGestureStep, which both rigs share.
-      gsK: -1, gsT: 0, gsCd: rand(npcGEST_GAP0[0], npcGEST_GAP0[1]), gsN: 0, gsW: 0,
+      gsK: -1, gsT: 0, gsCd: rand(npcGEST_GAP0[0], npcGEST_GAP0[1]), gsN: 0, gsW: 0, gsRow: null,
       // ---- and whether this is one of the third who carry an umbrella
       // (V2.3), from the seed, plus the locals' own latch and level.
       umbOwn: false, umb: 0, umbUp: false,
@@ -11797,13 +11820,17 @@ export function createNPCs(game) {
     // right arm is the same test the talking arm takes, so a camera, a
     // rake or a 99 wins the hand and the canopy folds. Parked at rung 1
     // (npcUmbRosterOn); the flag cuts both rigs.
-    const uFree = rec.umbOwn && npcUmbRosterOn && npcGAIT_STATES[rec.state] &&
+    // THE DRY CASE IS ONE COMPARE. Nothing here runs while it is neither
+    // raining nor about to: no latch, no damp, no scale write.
+    const uWx = npcWxRain > npcLOC_UMB_OFF || npcWxFrontNear > 0.5;
+    const uFree = rec.umbOwn && npcUmbRosterOn && (uWx || rec.umb > 0.001) && npcGAIT_STATES[rec.state] &&
                   rec.seatPose < 0.1 && rec.carryT < 0 && !rec.heldProp && rec.coneT < 0 && maskR > 0.6;
     if (!uFree) rec.umbUp = false;
     else if (!rec.umbUp && (npcWxRain > npcLOC_UMB_ON || npcWxFrontNear > 0.85)) rec.umbUp = true;
     else if (rec.umbUp && npcWxRain < npcLOC_UMB_OFF && npcWxFrontNear < 0.5) rec.umbUp = false;
-    rec.umb = damp(rec.umb, rec.umbUp ? 1 : 0, npcLOC_UMB_LAM, dt);
+    rec.umb = (rec.umbUp || rec.umb > 0.001) ? damp(rec.umb, rec.umbUp ? 1 : 0, npcLOC_UMB_LAM, dt) : 0;
     if (rec.umb > 0.01) {
+      if (rec.pasto) paUmbLive++; else npcUmbLive++;
       const u = rec.umb;
       // it opens (the locals' own scale gesture) and tips into the gust
       n.umbN.scale.set(0.28 + u * 0.72, 0.45 + u * 0.55, 0.28 + u * 0.72);
@@ -13616,9 +13643,13 @@ export function createNPCs(game) {
       pShoeR.setMatrixAt(i, n.footR.matrixWorld);
       pTool.setMatrixAt(i, n.toolN.matrixWorld);
       pBroom.setMatrixAt(i, n.broomN.matrixWorld);
-      pUmb.setMatrixAt(i, n.umbN.matrixWorld);
     }
-    pUmb.instanceMatrix.needsUpdate = true;
+    if (paUmbLive > 0 || paUmbLiveWas > 0) {
+      for (let i = 0; i < paHumans.length; i++) pUmb.setMatrixAt(i, paHumans[i].nodes.umbN.matrixWorld);
+      pUmb.instanceMatrix.needsUpdate = true;
+    }
+    if (pUmb.count !== (paUmbLive > 0 ? paHumans.length : 0)) pUmb.count = paUmbLive > 0 ? paHumans.length : 0;
+    paUmbLiveWas = paUmbLive;
     pTorso.instanceMatrix.needsUpdate = true;
     pHips.instanceMatrix.needsUpdate = true;
     pHead.instanceMatrix.needsUpdate = true;
@@ -13951,6 +13982,7 @@ export function createNPCs(game) {
   /** Runs ONLY while Pasto is the attached biome; update() is the gate. */
   function paUpdate(dt) {
     if (!paBuiltCast || !paCast.length) return;
+    paUmbLive = 0;              // V2.3, recounted by animHuman below
     refreshCapy();
     paReadCondor();
     for (let k = 0; k < 3; k++) {
@@ -14798,9 +14830,16 @@ export function createNPCs(game) {
       iCam.setMatrixAt(i, n.camN.matrixWorld);
       iTool.setMatrixAt(i, n.toolN.matrixWorld);
       iCone.setMatrixAt(i, n.coneN.matrixWorld);
-      iUmb.setMatrixAt(i, n.umbN.matrixWorld);
     }
-    iUmb.instanceMatrix.needsUpdate = true;
+    // ...and the umbrellas only while somebody has one up (see npcUmbLive).
+    // The frame after the last one closes still writes, so the buffer is
+    // left with everything at scale 0 rather than frozen mid-shower.
+    if (npcUmbLive > 0 || npcUmbLiveWas > 0) {
+      for (let i = 0; i < humans.length; i++) iUmb.setMatrixAt(i, humans[i].nodes.umbN.matrixWorld);
+      iUmb.instanceMatrix.needsUpdate = true;
+    }
+    if (iUmb.count !== (npcUmbLive > 0 ? humans.length : 0)) iUmb.count = npcUmbLive > 0 ? humans.length : 0;
+    npcUmbLiveWas = npcUmbLive;
     iTorso.instanceMatrix.needsUpdate = true;
     iHips.instanceMatrix.needsUpdate = true;
     iHead.instanceMatrix.needsUpdate = true;
@@ -15099,6 +15138,7 @@ export function createNPCs(game) {
       updateBubbles(dt);
       return;
     }
+    npcUmbLive = 0;
     npcBargeSweep(dt, humans);
     localsStep(dt);
     npcExStep(dt);
@@ -16678,6 +16718,7 @@ export function createNPCs(game) {
                if (r.speed > 0.3) { walking++; if (G.hop > 0) skipping++; }
                if (rows) rows.push({ i: i, kind: r.kind, gait: G.n, state: r.state, spd: +r.speed.toFixed(2),
                                      x: +r.group.position.x.toFixed(1), z: +r.group.position.z.toFixed(1),
+                                     yaw: +r.yaw.toFixed(2),
                                      pause: +(r.gaitPause || 0).toFixed(2), seat: +(r.seatPose || 0).toFixed(2),
                                      lean: +(r.poseLean || 0).toFixed(2), y: +r.group.position.y.toFixed(3) });
              }
