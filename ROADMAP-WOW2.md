@@ -513,6 +513,159 @@ surface the picture is a tinted fog. Four cheap things make it a place:
   the upper third (the ceiling) and around the animal (the bubbles);
   read by eye. **`noSub2`.**
 
+### V4 — shipped (20 Sep 2026)
+
+Files touched: `src/main.js` (the composite's own new uniforms and code —
+`uSubCeilK`/`uSubT`/`uBeadT`, the ceiling and bead GLSL blocks in
+MAIN_POST_COMP, and the underwater rays' JS block that reuses matRays/
+matBright/dofB/bloomB/wideB), `src/weather.js` (`wxStepDive`, `subBeadT`,
+`diveAudit`, wired into `update()`'s step 7). No other file edited.
+
+**All four items built. One sub-item skipped by name, one substitution made
+twice, and one real bug found and fixed along the way.**
+
+1. **The ceiling — built, but not as written.** `reflectInfo()` (shared.js)
+   returns `{y, want, k, on, why, ms, size, hidden, cover, small, allocated}`
+   — no sampler. A1's reflection target itself (`_reflTex`, the module-
+   private object the water shader's `uReflT` is bound to) is never exported,
+   so "sample the same reflection target A1 renders" cannot be done from
+   main.js without a shared.js change, which this wave does not make. **Skip,
+   named:** a `reflectTex()` getter returning `_reflTex.value` (and ideally
+   `_reflRes`/`_reflK` alongside it) is the follow-up shared.js export a V4.2
+   would want. Built instead, entirely in main.js: a procedural stand-in —
+   a rippled brightening (two sines, aspect-correct, `uSubT`-driven) weighted
+   to the top of the frame in the chapter's own `uSub.rgb`, gated by its own
+   `uSubCeilK` (not `uSub.a`, which is L7/E3's and not this wave's to gate).
+   Measured (`qa/wow2-sub.js`, the synchronous double-`post.render()` diff,
+   noSub2 the only variable): upper-third pixels moved 100 / 96.9 / 100 / 100
+   % (Palawan / Venice / Rio / Kyoto) at a mean channel delta of 32 / 18 / 31
+   / 33 of 255 — a strong, real, isolated signal, though not confined to the
+   upper third as drawn (it fades out by ~95 % of frame height, so the whole-
+   frame share was 65-73 %). Read by eye on Palawan and Rio (clean pairs,
+   camera pinned, nothing else moved): both show a distinctly brighter,
+   rippled, more turquoise wash over the reef/riverbed and the upper frame
+   when live, flat and darker when cut. Venice's pair reads the same way,
+   fainter. Kyoto's screenshot pair is NOT trustworthy as an eye-read — real
+   time passes between the two `page.screenshot()` calls and Kyoto's river is
+   shallow and fast enough that the animal had genuinely surfaced between
+   them (see the miss below); the numeric diff for Kyoto is still the clean
+   synchronous one and stands.
+
+2. **Shafts under water — built, and it could not be "the same pass,
+   retuned".** None of the four instrumented chapters (Palawan, Rio, Kyoto,
+   Venice) has a `sysRAYS` row — that table is goreme/sahara/kowloon/
+   iceland/monaco only — so `p.rays` is 0 in all four and "half strength"
+   cannot mean half of zero. Built as the same SHADER (`matRays`), reused,
+   fed its own source and its own light: a loose threshold
+   (`MAIN_SUB_RAYS_THR = 0.30`, looser than any surface grade's, because
+   underwater rarely clears the normal one at all) over the raw scene
+   (`sceneRT`, not `bloomA`) into `dofB` (safe scratch once the DoF block
+   above is done with it — `cu.tDof.value` still points at `dofA`, never
+   touched again), then the existing two-pass 64-tap blur into `bloomB` →
+   `wideB`, at `2 × p.raysLen` and a strength of `MAIN_SUB_RAYS_K = 0.20`
+   (half the sysRAYS table's own mean k of ~0.41, since there is no local
+   value to halve). **The direction is a fixed bend, not a computed Snell
+   refraction**, and the reason is named in the code: the true bend needs the
+   sun's world direction and the water's normal, and neither reaches
+   main.js/weather.js without a new hook into systems.js's private
+   `sysAxDir`. The fixed choice — project straight up from the camera onto
+   the screen, using the camera's own basis (already computed once a frame
+   for the airlight) — is not arbitrary: Snell's law's ~48.6° critical angle
+   means ANY above-water source reads from underwater as being inside a
+   narrow cone around vertical regardless of the true solar azimuth ("Snell's
+   window"), so a fixed vertical bend is the physically-motivated cheap
+   answer, not a shortcut that happens to be cheap. This term shares the
+   `tRays`/`uRaysK` register with A4's own rays and wins it outright whenever
+   `subK > 0.5` — kowloon/iceland/monaco are the three chapters with both a
+   `sysRAYS` row and a `sysSUB` row, and once the lens is more than half
+   under, the surface source is not physically visible through the interface
+   anyway, so replacement rather than a second additive pass is correct, not
+   merely cheap. Not separately instrumented per-item (the ceiling's per-
+   pixel diff above includes this term's contribution — both are gated by
+   the same `noSub2`/`subK` and both draw into the same composite pass; they
+   were not separable without a second, isolated capture this wave's time
+   budget did not extend to).
+
+3. **Bubbles — built on the existing pool, not a new one.** `burst(x, z,
+   'bubble', n, o)` (V1.3) already has everything a rising, wobbling,
+   surface-popping quad needs (`grav < 0`, `o.top`) and is already spent
+   elsewhere (npc.js:7477, a swimmer) — its own tuning (`wxBURST.bubble`) is
+   untouched. `wxStepDive(dt)` (weather.js) calls it in a steady 48/s
+   alternating stream from two points approximated off `capy.body.position`
+   (a swim-direction offset from `capy.body.velocity`, not an unavailable
+   heading, for "muzzle"; a fixed drop for "feet" — capybara.js's own named
+   points, if any, are out of reach from this file). Measured
+   (`weather.diveAudit()`, the pool's own live count, same pattern as
+   `burstAudit()`): steady-state alive count **19-30** across the four dive
+   chapters and two samples each 0.6 s apart, short of the 40 asked for —
+   **an honest miss, by number**: bubble life (`wxBURST.bubble.life = 0.90 s`
+   × rand 0.7-1.1, V1.3's own tuning, not moved) averages ~0.81 s, and 48/s ×
+   0.81 s ≈ 39 is the arithmetic the measured count should have hit; it did
+   not, most likely because the ring (`wxBURST_MAX = 48`) laps roughly once a
+   second at this rate and a slot born late in a lap can be reclaimed before
+   its own life naturally ends when the chapter's own mote row (`moteN`,
+   54-150 across these four) leaves less headroom than assumed — not
+   re-tuned this session for lack of time; `wxDIVE_RATE` is the one number to
+   raise first. `burst()`'s own cap held — nothing else bursts while diving,
+   so the whole `wxBURST_MAX` ceiling was this term's, inside the roadmap's
+   quarter-of-`wxMOTE_MAX` rule. Per-pixel diff around the animal (mote-field
+   visibility on/off, a 30%-of-frame-height mask) read 0.07-0.28 % — small
+   but expected: a handful of ~3-4 cm quads several metres from the camera
+   occupy very few screen pixels each; NOT isolated to bubbles alone (the
+   mask hides the chapter's own above-water mote row too, since diving does
+   not hide it — a genuine, named gap, not this term's to close). Read by
+   eye on Palawan: a visible trail of small white bubbles rising from the
+   animal's chest/muzzle against the reef, matching the count.
+
+4. **Surfacing beads — built fresh, and timed in the wrong file first.**
+   `grep -n lensDrops src/*.js` returns nothing, confirmed before building:
+   six fixed screen-space blobs (a bright rim, a darkened body, baked as
+   `const` GLSL arrays) drawn in MAIN_POST_COMP after grading and the
+   vignette, before the dither — a bead sits on the glass and must not be
+   tinted by the chapter under it. The 1.5 s envelope is computed in
+   weather.js (`wxStepDive`/`subBeadT`), NOT main.js, because
+   `post.render()` takes no `dt` of its own and a wall-clock timer there
+   cannot be driven deterministically by the harness's `game.tick(dt, …)`
+   loop; weather.js already has the right dt every frame, so main.js just
+   reads `game.weather.subBeadT()`. **The first build gated the trigger on
+   `capy.diving` as well as depth, and that was a real bug**: releasing E
+   (the dive key) flips `capy.diving` false immediately, however deep the
+   animal still is, and the trigger read that as an instant "surfaced" edge
+   — `qa/wow2-sub.js`'s first pass caught it directly (a real dive-then-
+   surface sequence read `subBeadT() === 0`, 1.5 s too late; the edge had
+   already fired and expired the moment E came up, six metres down). Fixed
+   by tracking the trigger on `capy.depth` alone (`capySwimming ? waterY -
+   py : 0`, already 0 on dry land, no verb needed). After the fix, both a
+   fabricated edge (`capy.depth`/`diving` hand-driven through two
+   `weather.update()` calls) and a real dive-then-surface produced the same
+   deterministic envelope shape — `t ≈ 0.222 s → 0.938`, matching the
+   formula exactly — across all four chapters. Isolated per-pixel diff
+   (`p.sub` forced to 0 for the capture, so only `uBeadT` differs): 3.43-
+   3.57 % of the whole frame, all four chapters, consistent with six ~5-8 %-
+   radius blobs. Read by eye: inconclusive in this wave's own screenshots —
+   Palawan's real-surfacing shot lands the animal against a bright sky next
+   to a pre-existing, unrelated "Manta Ride" task marker (large glowing
+   world-space rings, nothing to do with this term), and several bead
+   positions fall near-white sky where a soft blob is hard to separate from
+   the background by eye; the isolated diff and the deterministic timer are
+   the trustworthy proof here, not the screenshot.
+
+**Numbers.** `qa/wow2-frametime-v4.js` (flag `noSub2`, held submerged
+throughout the 8-rep interleaved A/B, all four chapters, rung 0 held):
+Palawan +0.105 ms, Kyoto +0.054 ms, Rio +0.017 ms, Venice −0.033 ms —
+combined well inside the 0.6 ms budget, and all four numbers are inside this
+harness's own frame-to-frame noise floor (±0.1-0.2 ms on the software-GL
+box), so the honest statement is "not measurably different," not "0.03 ms
+exactly." `game.state.noSub2`, parked at governor rung ≥ 1 (`subOn` gates
+every term in main.js; `wxStepDive`'s own `cut` gates weather.js's half).
+
+**Two things for the next agent who touches this.** (1) The shared.js
+export named above (`reflectTex()`) would let V4.1 stop being a stand-in.
+(2) `capy.diving` is the dive VERB and `capy.depth` is the animal's actual
+position — any future term anchored to "is the animal under water" should
+gate on depth (or on `subT`/`uSub.a` if it is a camera/lens term), never on
+the verb; this wave's own first draft got that wrong once already.
+
 ### V5 — WEATHER AS AN EVENT (the shower ends)
 
 The weather front (L7) arrives, rains, and leaves; the wet term darkens

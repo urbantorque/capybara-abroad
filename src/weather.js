@@ -1351,8 +1351,10 @@ export function createWeather(game) {
 
     // ---- 5. the fields ---------------------------------------------------
     wxStepFields(dt);
-    // ---- 6. the ground mist (G3) -----------------------------------------
+    // ---- 6. the ground mist (G3) -------------------------------------------
     wxMistStep(dt);
+    // ---- 7. bubbles off a diving animal, and the beads that follow (V4) ---
+    wxStepDive(dt);
   }
 
   function wxStepFields(dt) {
@@ -1694,6 +1696,103 @@ export function createWeather(game) {
     moteQuad.instanceMatrix.needsUpdate = true;
   }
 
+  // ---- BUBBLES OFF A DIVING ANIMAL, AND THE BEADS THAT FOLLOW IT OUT ------
+  // (ROADMAP-WOW2 V4.3/V4.4)
+  //
+  // `subT` — how far the LENS is under — is main.js/systems.js's own number
+  // and never reaches this file. What does reach it is `game.capy.depth`
+  // (capybara.js: capySwimming ? waterY - py : 0, metres below the live
+  // water surface), which is arguably the more honest fact for a term
+  // anchored to the ANIMAL rather than the camera — a capybara three metres
+  // down blows bubbles whether or not the boom has pulled the lens under
+  // yet, and (the first build's own mistake) whether or not E is still
+  // held: `capy.diving` is the dive VERB, not the animal's position, and
+  // gating on it as well made the surfacing edge fire the instant the key
+  // came up rather than when the animal actually cleared the surface.
+  //
+  // FORTY ALIVE, NOT FORTY BORN PER CALL. `burst(x, z, 'bubble', n, o)`
+  // already exists (V1.3), already tuned (grav < 0, `o.top` kills a rising
+  // quad at the surface) and already spent by a caller this file does not
+  // own (npc.js:7477, five bubbles off a swimming local) — its numbers are
+  // not this pass's to move. Its life (wxBURST.bubble.life = 0.90 s,
+  // randomised 0.7-1.1) times a steady birth rate sits the pool at a
+  // steady-state count rather than one; qa/wow2-sub.js's diveAudit() reads
+  // the true number off `weather.diveAudit()` rather than the 48/s asked for.
+  // Nothing else bursts while diving (no footfall dust, no drip), so the
+  // whole of the shared wxBURST_MAX = 48 ceiling is this term's to spend,
+  // which is inside the quarter-of-wxMOTE_MAX rule (200) with room over.
+  //
+  // Muzzle and feet are an approximation off `capy.body.position` — this
+  // file may only import from shared.js, so capybara.js's own named points
+  // (if it has any) are out of reach; a swim-direction offset (from
+  // `capy.body.velocity`, not an unavailable heading) and a fixed drop
+  // stand in for anatomy neither file will share.
+  let wxDiveAcc = 0, wxDiveSide = false;
+  const wxDIVE_RATE = 48;      // births/s, tuned against bubble.life's ~0.81 s mean
+  const wxDIVE_MUZZLE_FWD = 0.34, wxDIVE_MUZZLE_UP = 0.06, wxDIVE_FEET_DN = 0.22;
+  // The beads' own 1.5 s envelope. main.js's composite draws them (no
+  // lensDrops machinery exists there either) but post.render() takes no dt
+  // of its own, so the timer lives here, on the same dt every oscillator in
+  // this file already uses, and main.js reads it out through `subBeadT()`.
+  let wxSubBeadPrev = 0, wxSubBeadT = -1;
+  const wxSUB_BEAD_MS = 1.5, wxSUB_BEAD_IN = 0.15;
+  function wxStepDive(dt) {
+    const capy = game.capy;
+    // The trigger is tracked on the TRUE depth, never on the cut flag below —
+    // an A/B toggling noSub2 at a fixed depth must not fabricate a surfacing
+    // edge of its own (the same rule as every lens switch: a cut reads as
+    // zero, not as a fresh event).
+    // PURE DEPTH, NOT THE DIVE VERB. `capy.diving` is E held down; releasing
+    // it does not put the animal at the surface, it just stops it going any
+    // deeper — capy.depth (capybara.js: capySwimming ? waterY - py : 0) is
+    // the actual geometric fact and already reads 0 on dry land, so gating
+    // on `capy.diving` as well only breaks things: the first build of this
+    // fired the surfacing edge (and stopped the bubbles) the INSTANT E came
+    // up, six metres down, because trueDepth was forced to 0 right then
+    // rather than following the real ascent (qa/wow2-sub.js's beadForced
+    // caught it — a real surface after a real dive read beadT 0, 1.5 s too
+    // late for a trigger that had already fired and expired at the key-up).
+    const trueDepth = capy ? (capy.depth || 0) : 0;
+    if (wxSubBeadPrev >= 0.3 && trueDepth < 0.3) wxSubBeadT = 0;
+    wxSubBeadPrev = trueDepth;
+    if (wxSubBeadT >= 0) {
+      wxSubBeadT += dt;
+      if (wxSubBeadT > wxSUB_BEAD_MS) wxSubBeadT = -1;
+    }
+    const cut = !live || !!(game.state && game.state.noSub2) ||
+                (((game.state && game.state.perfRung) | 0) >= 1);
+    if (cut || !capy || !capy.body || trueDepth <= 0.3) { wxDiveAcc = 0; return; }
+    wxDiveAcc += dt * wxDIVE_RATE;
+    if (wxDiveAcc > 6) wxDiveAcc = 6;   // a tab-switch does not owe six seconds of bubbles at once
+    const bp = capy.body.position;
+    const bv = capy.body.velocity;
+    const vlen = bv ? Math.hypot(bv.x, bv.z) : 0;
+    const fx = vlen > 0.2 ? bv.x / vlen : 0, fz = vlen > 0.2 ? bv.z / vlen : 1;
+    const top = wxFloorAt(bp.x, bp.z, null);
+    let guard = 0;
+    while (wxDiveAcc >= 1 && guard++ < 8) {
+      wxDiveAcc -= 1;
+      wxDiveSide = !wxDiveSide;
+      if (wxDiveSide) {
+        burst(bp.x + fx * wxDIVE_MUZZLE_FWD, bp.z + fz * wxDIVE_MUZZLE_FWD, 'bubble', 1,
+              { y: bp.y + wxDIVE_MUZZLE_UP, top: top });
+      } else {
+        burst(bp.x, bp.z, 'bubble', 1, { y: bp.y - wxDIVE_FEET_DN, top: top });
+      }
+    }
+  }
+  /** main.js's composite reads this every frame: 0..1, the surfacing lens
+   *  beads' own eased, already-cut envelope. See wxStepDive. */
+  function subBeadT() {
+    if (!live || (game.state && game.state.noSub2) ||
+        (((game.state && game.state.perfRung) | 0) >= 1)) return 0;
+    if (wxSubBeadT < 0) return 0;
+    const t = wxSubBeadT;
+    let e = t < wxSUB_BEAD_IN ? t / wxSUB_BEAD_IN
+          : 1 - (t - wxSUB_BEAD_IN) / (wxSUB_BEAD_MS - wxSUB_BEAD_IN);
+    return e < 0 ? 0 : (e > 1 ? 1 : e);
+  }
+
   /** One ring, somewhere in the disc, on whatever surface is under that point. */
   function wxRingAt(cx, cz, capy) {
     // Uniform over the AREA — a uniform radius piles two thirds of them into
@@ -1803,6 +1902,16 @@ export function createWeather(game) {
       return { alive: rows.length, born: ringBorn, count: ringMesh.count, max: wxRING_MAX,
                opacity: +ringMesh.material.opacity.toFixed(3), rainT: +rainT.toFixed(3),
                rings: rows };
+    },
+    /** V4's own read-outs: `subBeadT()` for main.js's composite (see
+     *  wxStepDive), `diveAudit()` for the instrument — how many bubbles are
+     *  actually alive against the 48/s asked for, and the pool's shared base. */
+    subBeadT: subBeadT,
+    diveAudit() {
+      let alive = 0;
+      for (let i = 0; i < wxBURST_MAX; i++) if (blife[i] > 0 && bkind[i] === wxBURST.bubble) alive++;
+      return { alive, acc: +wxDiveAcc.toFixed(2), beadT: +subBeadT().toFixed(3),
+               diving: !!(game.capy && game.capy.diving), depth: +((game.capy && game.capy.depth) || 0).toFixed(3) };
     },
     update: update,
   };

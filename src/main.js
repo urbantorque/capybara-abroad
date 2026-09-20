@@ -1109,7 +1109,26 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   // THE RAYS (ROADMAP-WOW A4): the radial-blurred bloom, see MAIN_POST_RAYS.
   'uniform sampler2D tRays;',
   'uniform float uRaysK;',
+  // ---- UNDER THE SURFACE (ROADMAP-WOW2 V4) --------------------------------
+  // uSubCeilK is uSub.a with V4's own cut (noSub2, the governor) already
+  // applied in JS — the base tint above is L7/E3's and is not gated by this
+  // flag, so the ceiling term needs its own strength rather than reading
+  // uSub.a directly. uSubT is a free-running clock (post.render's own,
+  // performance.now()) for the ripple only — nothing that reads it is a
+  // logical trigger, so wall-clock drift here costs nothing. uBeadT is
+  // weather.js's own 1.5 s surfacing envelope (see subBeadT in weather.js),
+  // read in already-cut, already-eased form.
+  'uniform float uSubCeilK;',
+  'uniform float uSubT;',
+  'uniform float uBeadT;',
   'const vec3 MAIN_LUMA = vec3(0.2126, 0.7152, 0.0722);',
+  // Six beads, hand-scattered rather than gridded (a grid reads as a UI
+  // overlay, not glass) in frame-height units the same way MAIN_POST_RAYS'
+  // uLight is: x already carries the aspect multiply at the call site.
+  'const vec2 MAIN_BEAD_P[6] = vec2[6](',
+  '  vec2(0.16, 0.70), vec2(0.30, 0.86), vec2(0.50, 0.62),',
+  '  vec2(0.66, 0.82), vec2(0.80, 0.68), vec2(0.58, 0.92));',
+  'const float MAIN_BEAD_R[6] = float[6](0.070, 0.052, 0.082, 0.058, 0.062, 0.048);',
   MAIN_POST_DEPTH_FN,
   // FOUR OPPOSED PAIRS. Index 2i and 2i+1 are the same axis in opposite
   // directions, and that pairing is the entire algorithm — see below. Two
@@ -1350,6 +1369,25 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   '    vec3 wc = lin * (0.25 + 0.75 * uSub.rgb * 1.6) + uSub.rgb * (0.03 + 0.05 * vUv.y);',
   '    lin = mix(lin, wc, uSub.a * 0.85);',
   '  }',
+  // ---- THE CEILING (ROADMAP-WOW2 V4.1) -----------------------------------
+  // "The ceiling of light every dive shot has." A1's own reflection target
+  // (reflectRender/reflectInfo, shared.js) is the exact picture here — the
+  // sky and the bank, mirrored back down — but its texture (_reflTex) is a
+  // module-private object shared.js never exports a getter for: reflectInfo()
+  // returns only y/want/k/on/why/size/hidden/cover/small/allocated, no
+  // sampler. A `reflectTex()` export is the follow-up this term wants and
+  // does not have (see the V4 report). Until then this is built fresh, here,
+  // entirely from what the composite already owns: a rippled brightening
+  // weighted to the top of the frame, in the chapter's own sysSUB colour, so
+  // it reads as a moving surface rather than a flat gradient. Before the
+  // bloom, like the tint above it — it is light on the way to the lens.
+  '  if (uSubCeilK > 0.001) {',
+  '    float ceilY = smoothstep(0.05, 0.95, vUv.y);',
+  '    float r1 = sin(vUv.x * 26.0 + uSubT * 1.6) * 0.5 + 0.5;',
+  '    float r2 = sin(vUv.y * 19.0 - uSubT * 2.1 + vUv.x * 9.0) * 0.5 + 0.5;',
+  '    float ripple = r1 * 0.6 + r2 * 0.4;',
+  '    lin += uSub.rgb * ceilY * (0.35 + 0.65 * ripple) * uSubCeilK * 0.6;',
+  '  }',
   '  lin += texture(tBloom, vUv).rgb * uBloom;',
   // THE SECOND OCTAVE. See the header: the tight one is the glow ON a light,
   // this is the air AROUND it, and a lamp without it is a white sticker.
@@ -1411,6 +1449,26 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   // the frame look lit rather than the edge look painted.
   '  c = mix(c, vec3(dot(c, MAIN_LUMA)) * vec3(0.94, 0.975, 1.07), vg * uVigTone);',
   '  c = clamp(c * (1.0 - vg), 0.0, 1.0);',
+  // ---- SURFACING: SIX BEADS OF WATER ON THE LENS (ROADMAP-WOW2 V4.4) -----
+  // No lensDrops machinery exists (`grep -n lensDrops src/*.js` is empty) —
+  // six fixed screen-space blobs, built fresh, right here. After grading and
+  // the vignette and before the dither, because a bead sits on the GLASS and
+  // is the one thing in this shader that must not be tinted by the chapter
+  // underneath it. uBeadT is weather.js's own cut 1.5 s envelope (subBeadT).
+  '  if (uBeadT > 0.001) {',
+  '    float asp = uPx.y / uPx.x;',
+  '    vec2 pf = vec2(vUv.x * asp, vUv.y);',
+  '    float dk = 0.0, br = 0.0;',
+  '    for (int bi = 0; bi < 6; bi++) {',
+  '      vec2 bp = MAIN_BEAD_P[bi] * vec2(asp, 1.0);',
+  '      float r = MAIN_BEAD_R[bi];',
+  '      float d = length(pf - bp);',
+  '      dk += (1.0 - smoothstep(r * 0.55, r, d)) * 0.16;',
+  '      float rr = (d - r * 0.82) / (r * 0.22);',
+  '      br += exp(-rr * rr) * 0.55;',
+  '    }',
+  '    c = clamp(c * (1.0 - dk * uBeadT) + vec3(br * uBeadT), 0.0, 1.0);',
+  '  }',
   // One hash, a 255th of a step: invisible on its own, and the difference
   // between a smooth dome and eight visible bands of sky.
   '  float dth = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);',
@@ -1508,6 +1566,23 @@ let mainHoldAt = 0;
 const mainAirR = new THREE.Vector3();
 const mainAirU = new THREE.Vector3();
 const mainAirF = new THREE.Vector3();
+// ...and reused by the underwater rays (ROADMAP-WOW2 V4.2): the same three
+// vectors, recomputed when it needs them, since nothing downstream still
+// wants the airlight's own values by the time it runs. See MAIN_SUB_RAYS_K.
+const mainWorldUp = new THREE.Vector3(0, 1, 0);
+// How strong the underwater shafts are, independent of whatever the surface
+// A4 rays row asks for (kyoto/cali/rio/iceland/venice/palawan/manly/
+// pantanal/cave/antarctic/monaco/hanoi — every sysSUB chapter but the five
+// with a sysRAYS row of their own — have NONE, so "half strength" cannot
+// mean half of zero). Half the sysRAYS table's own mean k (0.30-0.50 across
+// its five rows, mean 0.41), rounded.
+const MAIN_SUB_RAYS_K = 0.20;
+// A LOOSER threshold than the surface bright-pass: underwater has no single
+// light source in most of these frames, only the water's own brightness
+// gradient, and the standard grade thresholds (~0.6-1.2) would clear almost
+// nothing down here.
+const MAIN_SUB_RAYS_THR = 0.30;
+const MAIN_SUB_RAYS_KNEE = 0.55;
 // A 1x1 black texture standing in for the bloom buffer when bloom is off, so
 // the composite shader never samples an unbound sampler.
 const mainPostBlack = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
@@ -1671,6 +1746,8 @@ function mainMakePost(game) {
       uAirLitK: { value: 0 }, uAirLitFar: { value: MAIN_AIRLIT_FAR },
       uSub: { value: new THREE.Vector4(0, 0, 0, 0) },     // (L7, E3)
       tRays: { value: mainPostBlack }, uRaysK: { value: 0 },  // (ROADMAP-WOW A4)
+      // (ROADMAP-WOW2 V4) the ceiling, its ripple clock, and the surfacing beads
+      uSubCeilK: { value: 0 }, uSubT: { value: 0 }, uBeadT: { value: 0 },
       uCamPos: { value: new THREE.Vector3() },
       uRayBL: { value: new THREE.Vector3() },
       uRayDX: { value: new THREE.Vector3() },
@@ -1938,6 +2015,88 @@ function mainMakePost(game) {
       matComp.uniforms.tRays.value = mainPostBlack;
       matComp.uniforms.uRaysK.value = 0;
     }
+
+    // =========================================================================
+    // UNDER THE SURFACE (ROADMAP-WOW2 V4). `game.state.noSub2` cuts every term
+    // below to a JS-side zero (no draw, no branch taken downstream) and the
+    // governor parks the whole block from rung 1, the far-cascade way:
+    // allocated buffers, skipped work.
+    // =========================================================================
+    const subOn = !game.state.noSub2 && ((game.state.perfRung | 0) < 1);
+    const subK = subOn ? (p.sub || 0) : 0;
+    cu.uSubCeilK.value = subK;
+    // The ripple's own clock. Not a logical trigger — nothing reads uSubT to
+    // decide anything, only to animate — so wall-clock rather than a dt this
+    // function is never given costs nothing an A/B could see.
+    cu.uSubT.value = performance.now() * 0.001;
+
+    // ---- SHAFTS UNDER WATER (ROADMAP-WOW2 V4.2). See MAIN_SUB_RAYS_K. -----
+    // A4's own rays (just above) exist only in five sysRAYS chapters, none of
+    // which is one of this term's four instrumented dive chapters — so this
+    // cannot be "the same pass, retuned": it is the same SHADER (matRays),
+    // reused, fed its own source and its own light, and it wins the shared
+    // tRays/uRaysK register whenever it runs.
+    //
+    // THE SOURCE. sceneRT (the raw HDR scene), not bloomA (the surface
+    // bright-pass) — underwater rarely has anything that clears the normal
+    // grade threshold, so this runs its OWN loose threshold (MAIN_SUB_RAYS_K's
+    // block, above) into dofB, safe scratch here: the DoF block above has
+    // already copied whatever it needed out of dofA/dofB by this point, and
+    // dofA is never touched again (it is what cu.tDof.value still points at).
+    //
+    // THE DIRECTION. Snell's law bends any above-water ray toward the normal
+    // by up to the critical angle (~48.6 deg, air-to-water) as it crosses the
+    // surface, so from underwater a source is always inside a narrow cone
+    // around straight up — "Snell's window". The true bend needs the sun's
+    // world direction and the water's normal, and neither reaches this file
+    // (systems.js's sysAxDir is private, and adding a uniform for it is out
+    // of scope for main.js/weather.js alone); the cone argument says a FIXED
+    // bend to vertical reads right regardless of the true solar azimuth, so
+    // that is what this projects: straight up from the camera, onto the
+    // screen, with the camera's own basis (already computed for the airlight
+    // a few dozen lines up, recomputed here since nothing later wants its
+    // old values).
+    if (subK > 0.5) {
+      const subRaysK = MAIN_SUB_RAYS_K * (subK - 0.5) * 2;
+      cam.updateMatrixWorld();
+      const e2 = cam.matrixWorld.elements;
+      mainAirR.set(e2[0], e2[1], e2[2]);
+      mainAirU.set(e2[4], e2[5], e2[6]);
+      mainAirF.set(-e2[8], -e2[9], -e2[10]);
+      const upF = mainWorldUp.dot(mainAirF), upR = mainWorldUp.dot(mainAirR), upU = mainWorldUp.dot(mainAirU);
+      const th2 = Math.tan(THREE.MathUtils.DEG2RAD * 0.5 * cam.fov);
+      const tw2 = th2 * cam.aspect;
+      let vx = 0.5, vy = 0.92;
+      if (upF > 0.02) {
+        vx = 0.5 + 0.5 * (upR / upF) / tw2;
+        vy = 0.5 + 0.5 * (upU / upF) / th2;
+      }
+      vx = Math.min(1.4, Math.max(-0.4, vx));
+      vy = Math.min(1.4, Math.max(-0.4, vy));
+
+      const qb = matBright.uniforms;
+      qb.tDiffuse.value = sceneRT.texture;
+      qb.uThreshold.value = MAIN_SUB_RAYS_THR;
+      qb.uKnee.value = MAIN_SUB_RAYS_KNEE;
+      mainPostDraw(matBright, dofB);
+
+      const ru = matRays.uniforms;
+      const rlen = Math.max(p.raysLen, 0.02) * 2;
+      const s2 = rlen / 64;
+      ru.uLight.value.set(vx, vy);
+      ru.uAspect.value = vw / vh;
+      ru.tDiffuse.value = dofB.texture;   ru.uStep.value = s2;     ru.uDecay.value = 0.94; ru.uMaskR.value = 0;
+      mainPostDraw(matRays, bloomB);
+      ru.tDiffuse.value = bloomB.texture; ru.uStep.value = s2 * 8; ru.uDecay.value = 0.80; ru.uMaskR.value = 0;
+      mainPostDraw(matRays, wideB);
+      matComp.uniforms.tRays.value = wideB.texture;
+      matComp.uniforms.uRaysK.value = subRaysK;
+    }
+
+    // ---- SURFACING BEADS (ROADMAP-WOW2 V4.4). Timed in weather.js, which
+    // has this function's dt and this file does not — see subBeadT there.
+    cu.uBeadT.value = (subOn && game.weather && typeof game.weather.subBeadT === 'function')
+      ? game.weather.subBeadT() : 0;
 
     const c = matComp.uniforms;
     c.tDiffuse.value = sceneRT.texture;
