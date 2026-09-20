@@ -1,0 +1,372 @@
+# ROADMAP-WOW3 — the debts paid, the world remembered, the still frame closed (21 Sep 2026)
+
+L12 closed with a Closed section that named its own limits plainly rather
+than rounding them off: twelve items left open by name, one number (motion
+at rest) that stayed at the coverage its own predecessor measured, a far
+plane that reads from twelve arrival frames and not two, a companion whose
+per-kind landing spot is still a generic walk-off six biome files away from
+whoever owns them. This pass is not a seventh notch on the same six terms —
+it is paying down exactly what L12 wrote down as owed, plus one new
+measure the project has never taken (the world changing while the player is
+elsewhere) and one it has taken once and never closed (the still-pixel
+target).
+
+**Read before proposing anything to this codebase:** ROADMAP-WOW2.md's own
+"Closed" and "Left open, named" sections are the map for this file — every
+item in Part D below is copied from that paragraph, not invented, and gives
+its own line number in ROADMAP-WOW2.md. CONTRACT.md's "THE TWELFTH LIFT"
+entry is the short version; `git log 00f3b72..dfde990` is the twenty-six
+commits behind it. Before building anything, grep for the identifier named
+(`far.js`, `wxDIVE_RATE`, `reflectTex`, `compLeave`, `sysShelfStage`,
+`npcPalAwayBiome`/`palAwayArm`) — several of these are one function away
+from what the item asks for, the way L12's own N3.3 turned out to be.
+
+The laws stand: low-poly flat Lambert for the built world, smooth for what
+breathes (L11), `PALETTE` only, no textures, every new term a
+`game.state.noX` parked at rung 1, no grade/sun/fog/mote/spawn row re-based.
+The three-file discipline L12 ran on (one agent per file set, never two
+live edits to the same file at once, stage by name, `git status` before
+every commit) is kept — it went twenty-six commits without a single lost
+edit or an index collision, which none of the eleven passes before it can
+claim outright. Every visual item is proved by a per-pixel diff inside a
+mask and a screenshot read by eye; every story item by a count the save
+already keeps or one line added to it (no new save field beyond the two
+named in Part X); the still-pixel item by W0's own extended mask
+(`qa/wow2-still-mask.js`), not by wow-still.js's original one.
+
+## What this pass measures
+
+1. **The twelve debts paid or explicitly re-declined.** Each item in Part D
+   either ships with its own before/after number, or is re-examined and
+   written up as correctly not worth doing (the way V3 wrote up seven
+   chapters as correctly skipped) — never silently dropped.
+2. **Motion at rest, to full coverage.** L12's own number: animal
+   chapter-independent, crowd 4/19. This pass runs `qa/wow2-alive.js` and
+   `qa/wow2-people.js` (or their W6-confirmed successors) across all
+   nineteen and reports every one, not a repeat of the same four.
+3. **The still-pixel floor, re-closed.** L11's A3 target (−40%, met in
+   10/19, never explained for the other 9) re-run against W0's extended
+   mask (`qa/wow2-still-mask.js`, which already dropped Hanoi's floor from
+   10.26% to 0.85% of frame by hiding traffic properly) — a number that has
+   been sitting mismeasured for two passes closes or is named precisely why
+   not.
+4. **The place remembers you were gone.** Beyond N3's line (a regular
+   notices; nothing moves): at least one thing in the WORLD itself is
+   different on a long-absence return, per chapter that gets it, proved by
+   a screenshot pair (short-absence vs long-absence arrival) and never by
+   a toast alone.
+5. **A voice for what became visible.** Every V1/V5/V6 term that makes a
+   sound in reality (a footfall's puff, a drip, a keepsake set down, the
+   traveller's walk-off) gets one, proved by `qa/audio2.js`'s own pattern
+   (real keys, real clock, a channel that can be named and counted) rather
+   than a silent visual credited as "done."
+6. **16.7 held, the same discipline.** Every new term a `noX`, the combined
+   A/B (`qa/wow3-frametime-final.js`, the L12 pattern copied forward) run
+   once at the close, live-minus-cut ≤ 0.6 ms total, rung 0 pinned.
+
+## Part D — the debts (cheap, named, mostly one function away)
+
+Twelve items, each copied from ROADMAP-WOW2.md's "Left open, named"
+paragraph (line ~1687 onward) with its own owner file. Build order is
+cheapest-and-most-certain first; each is its own commit.
+
+1. **`reflectTex()`** (src/shared.js) — a read-only getter for A1's private
+   reflection render target, so V4's underwater ceiling
+   (`game.state.noSub2`'s composite term in main.js) can sample the REAL
+   scene reflection instead of the procedural rippled-brightening stand-in
+   it shipped with. One export, one call-site change in main.js. Proved by
+   the same per-pixel ceiling diff V4's own instrument used
+   (`qa/wow2-sub.js`), now against a texture that actually holds the
+   reflected scene rather than a formula.
+2. **`wxDIVE_RATE` raised** (src/weather.js) — V4's bubble stream measured
+   19–30 alive against a 40 target; the ring almost certainly laps before a
+   bubble's own life ends. Raise the rate (or extend bubble life, whichever
+   the numbers say — measure both), re-run `game.weather.diveAudit()` at
+   steady state in the same four chapters V4 dove in.
+3. **Mud and wet prints, put in front of a lens** (src/shared.js's tracks
+   pool + the calling chapters) — V6 wired and wrote these; nobody ever
+   read a screenshot of one. The Pantanal's bank (mud) and Venice's paving
+   at low tide (wet-on-stone) are the roadmap's own named cases. Prove by
+   the same masked-band diff V6's own `qa/wow2-tracks.js` used for sand and
+   snow, extended to these two.
+4. **A truss for Hanoi, a decision for Kowloon** (src/far.js +
+   src/hanoi.js, src/kowloon.js) — V3's own honest miss: "a wedge cannot
+   make a truss," eight end-on wedges merged into one pyramid instead of
+   the Long Biên's trusswork. Build a small bay-loop primitive in far.js
+   (a repeated N-triangle truss unit, instanced or merged, ≤ 200
+   triangles total) and re-test from Hanoi's own arrival lens. Kowloon's
+   far layer is invisible from arrival because the street has zero sky in
+   frame — this is a camera/geometry fact, not a bug; the "decision" is
+   either relocate the layer to where the helicopter ring or a rooftop
+   task sees it (V3's own workaround, already measured at 14.7%) and say
+   plainly the arrival lens will never carry it, or leave it as built and
+   write down why. Do not force a wedge into a street that has no sky.
+5. **Manly's ferry, lowered** (src/manly.js or src/far.js) — clips the top
+   edge of the frame for 6 s of its 120 s loop instead of crossing through
+   it. One position/path adjustment, re-measured on the same 120 s watch
+   V3's own instrument used.
+6. **Sydney's jacaranda gust** (src/weather.js + src/environment.js) — V5
+   folded the purple gust into the existing ground-petal skitter rather
+   than building a second mechanic, because the dapple canopy list only
+   ever covered figs. Extend the dapple canopy registration to include the
+   jacarandas (or build a minimal parallel list just for this one
+   chapter's one tree species) and let V5's existing gust-strip code (built
+   generically, reused already for four other chapters) fire on it in its
+   own PALETTE purple, distinct from the ground-petal skitter it currently
+   borrows.
+7. **The companion's per-kind landing spot** (six chapter files: cave or
+   wherever the pigeon's Campanile-equivalent sits, goreme, manly, quay,
+   kyoto, sydney/environment — check each kind's actual `from` chapter
+   against `compTRAITS`, not the roadmap's illustrative examples, which
+   named real-world places this game does not all have) — the generic
+   walk-off (`compLeave(..., 'home')`) already fires correctly (W6 proved
+   it live for all six kinds); what is missing is a NAMED spot per kind (a
+   ledge, a colony, a doorstep — whatever each chapter's own geometry
+   offers) rather than wherever the animal happened to be standing. One
+   `homeSpot` constant per kind, a short walk-to-it on arrival, proved by a
+   screenshot of each of the six landings.
+8. **N4's real opening** (src/capybara.js's nap pose + src/systems.js) —
+   the shipped opening is a held establishing shot; the roadmap's original
+   ask was the animal visibly asleep, the traveller's bag beside it, a
+   walk-off while the animal wakes through its own existing nap pose. This
+   needs a capybara.js hook no L12 wave owned (a pre-`started` render of
+   the nap pose is the open question — confirm it is even renderable
+   before Begin, the way the W6/Part N agents left it; if it genuinely is
+   not, the fallback the roadmap allows is to delay the true opening until
+   the FIRST frame after Begin, still before "be a menace." fires, and say
+   so).
+9. **The gardener's sit-down at the finale** (src/npc.js) — N4 shipped the
+   stand-down; the roadmap's own ask was a sit-down beside the traveller
+   once `fin` is true. One more state on the gardener's existing behaviour
+   tree (chase → carry → stand-down → sit, gated on `game.state.finaleOn`
+   AND `sysFinDone`), a pose the rig likely already has for the loaf/nap
+   (reuse, don't invent a ninth pose).
+10. **V0's carry-over** (src/shared.js, src/weather.js) — the thin-cylinder
+    un-merge (Quay's mast and rigging, Pasto's cord) and the mote-quad
+    minimum screen footprint through their spin, both named "half a day
+    each" three passes ago and never started. Build both or write down,
+    with the actual triangle/draw-call cost measured, why a fourth pass
+    still didn't get to them — do not carry them to a WOW4 without a
+    reason attached.
+11. **The far plane's numeric sweep, re-run fresh** (qa/ only) — W6
+    confirmed V3's far layers by file-touch history and by eye, not by a
+    fresh `qa/wow2-far-depth.js` run across all nineteen. Run it now,
+    fresh boot per chapter, and put a real number beside the eye-read.
+12. **`qa/rv-geom.js` re-baselined** — named as an open item since L11's own
+    closeout and repeated in L12's; if nothing has touched the geometry
+    this instrument audits since, this is a ten-minute item; if something
+    has, say what moved.
+
+- **Instrument:** each item proves itself with the instrument named in its
+  own line above; no new shared instrument needed for Part D.
+- **Cost:** items 1–3, 5–6, 9–12 are single-function or single-constant
+  changes. Items 4 and 7 are the only ones with new geometry (a truss
+  primitive, six landing spots) and both are named as such.
+
+## Part H — needs a human, not an agent (not built by this pass's agents)
+
+Two numbers from ROADMAP-WOW2's own Closed section that no bot can supply.
+**Left for the player, named here so they are not silently dropped:**
+
+- **A real-GPU frame budget.** Every 16.7 ms figure in twelve lifts so far
+  is headless vsync, not the reference machine's own GPU. One session with
+  the in-game perf overlay (`game.perfAudit()`), all `noX` flags from L11
+  and L12 toggled by hand, on the actual hardware.
+- **The stranger.** T's own playtester was a script, twice now (L12's
+  closeout said so plainly). One person who has never seen the game, three
+  minutes, asked the six verbs afterward.
+
+Nothing in Part D or Part X substitutes for either. An autonomous pass
+cannot build them; it can only keep naming them, which this section does.
+
+## Part X — the fourth notch (new measures)
+
+### X1 — THE PLACE REMEMBERS (the world changes while you are gone)
+
+N3 gave a REGULAR a line on a long absence; nothing in the world itself
+moved. This is the smallest honest version of "the place remembers,"
+picked for being provably different in a screenshot rather than a toast:
+
+- **One visible difference per chapter that has an easy one**, gated on
+  the same ≥20-minute-away test N3's `palAwayArm`/`npcPalAwayBiome`
+  pattern already uses (read it, reuse the exact arm/check shape rather
+  than inventing a second timer): a stall's stock visibly different
+  (the traveller's shop — a few items swapped, PALETTE-only, ≤ 3
+  variants), a seasonal/weather-independent prop moved (a boat retied at a
+  different post, a market stall's awning a different colour from a small
+  fixed set), the animal's OWN prior tracks (V6's pool) long faded and a
+  fresh set from a regular or local walking a path that was empty before.
+  Pick the cheapest one per chapter and do not force a fourth if a chapter
+  has none that reads honestly — name the chapters skipped, the way V3
+  named seven chapters correctly left out of the far plane.
+- **The shelf in earn-order** (src/systems.js, src/shared.js's
+  `sysSAVE_SHAPE`) — N1 shipped one fixed slot per chapter because no save
+  field recorded when a keepsake was taken. Add exactly one field,
+  `keptAt` (an object keyed by chapter, the tick or wall-ms it was
+  collected — additive, like `chapms`, never re-based), and lay the shelf
+  in that order instead. This is the one new save field this pass allows
+  beyond N3.3's still-open item below.
+- **The companion that comes over** (src/npc.js) — N3's own roadmap text
+  said "the next time you stand there, it is there, and it comes over";
+  N3 shipped the homecoming but not this last clause. Once a companion has
+  gone home (`compLeave(..., 'home')` fired), the next time the animal
+  stands within its own `near` radius of the home spot (Part D item 7), it
+  approaches — the SAME approach beat a regular or a companion-on-offer
+  already uses, not a new one.
+
+- **Instrument:** `qa/wow3-remembers.js` — a short-absence (5 min) and
+  long-absence (20 min) arrival pair per chapter that got a visible
+  difference, screenshot both, per-pixel diff, read by eye; the shelf's
+  `keptAt` order checked against three saves collected in different
+  orders; the companion's "comes over" beat proved live for at least two
+  kinds (the pattern W6 used for the homecoming — a forced save, a real
+  reload, a real walk-up).
+- **Cost:** no new geometry beyond what a chapter already owns (a stall's
+  stock swap is a texture-free colour/shape swap on existing merged
+  meshes); one save field. **`game.state.noRemember`.**
+
+### X2 — A VOICE FOR WHAT BECAME VISIBLE
+
+L11 and L12 made things visible that have never made a sound: a footfall's
+puff, an eave's drip, a keepsake set down on the shelf, the traveller's
+walk-off, a companion's homecoming approach.
+
+- **Footfalls** (src/capybara.js's footfall hook, already publishing a
+  ground-kind + position every step for V1.3's mote burst) — a soft
+  contact sound keyed to the SAME ground kind the puff already reads
+  (sand/snow/water/stone), reusing whatever contact-sound machinery the
+  game already has for landings (grep `sfxLand`/a landing sound's own
+  ground-kind switch before building a second one).
+- **The eaves' drip** (src/weather.js) — one `sfx('drip', ...)` per mote
+  spawned, quiet, position-attached if the audio layer supports panned
+  one-shots (check the existing pattern used for the shower's own
+  onset/offset sound before assuming a new channel is needed).
+- **The shelf** (src/systems.js) — one sound the moment a keepsake is laid
+  (`sysShelfStage`'s own per-keepsake placement, N1), reusing whatever
+  sound a prop pickup/set-down already makes elsewhere rather than
+  authoring a new one.
+- **The traveller's walk-off** (src/npc.js) — N2's fifteen glimpse figures
+  already have a footstep gait; if the gait doesn't already drive a
+  footstep sound (check first — the roster likely already has one for
+  ordinary walking locals), wire it for this figure specifically since it
+  is the one the player is now looking directly at.
+- **The companion's approach** (X1's "comes over" beat) — the SAME
+  once-per-kind sound `compTake` already plays on being picked up, reused
+  on arrival rather than a new line.
+
+- **Instrument:** `qa/wow3-heard.js` — real keys, real clock (per the
+  harness note: hand-driven ticks never unlock the AudioContext), one
+  chapter with a footfall on sand, one shower's drip cycle, one shelf
+  placement, one glimpse walk-off, one companion approach — each a named,
+  counted channel (the `qa/audio2.js` pattern: hook the channel, tag the
+  sample with what fired it), not a "did anything play" boolean.
+- **Cost:** reused sample triggers on existing channels wherever possible;
+  no new synthesis unless grep confirms nothing suitable exists.
+  **`game.state.noVoice2`** (a single cut for all five, since each is a
+  one-line trigger and none costs anything to leave live).
+
+### X3 — THE LENS LEARNS TO LOOK
+
+A2 named Sydney's Opera House as "still behind the fig crowns... left as a
+camera item, not a geometry one" across THREE passes now (L11's own
+closeout, repeated unchanged in L12's). This is the one item in this
+roadmap that is a genuine camera-behaviour addition, not a debt:
+
+- **Sydney's arrival**, specifically: on the FIRST arrival in Sydney on a
+  fresh file only (never on every return — the roadmap's own "not a
+  one-shot except where named" rule), a slow ease of the resting lens's
+  own yaw/pitch by a small fixed amount (measured against the actual fig
+  crown's screen-space extent, not guessed) so the shells clear the
+  crowns for the two or three seconds the place card is up, then release
+  to the normal resting pose. This is a camera nudge, not a tree edit —
+  it must not fight the player's own look input (C/drag) if they touch it
+  before the ease finishes; abort cleanly on input, the way T's tutorial
+  beats already abort cleanly on the player's own action.
+- **A glance at what moved.** When V3's far mover (a ferry, a plane, a
+  train) crosses the frustum while the animal is idle and the camera is at
+  rest (not mid-task, not mid-hop — gate hard on `capy.grounded &&
+  !input active for 2s`), ease the lens toward it by a few degrees for
+  its crossing and release after — the smallest version of "the camera
+  noticed," built once and shared by every chapter with a far mover
+  rather than per-chapter.
+- Do NOT build a general cinematic-camera system. Two named cases only,
+  both released cleanly on player input, both provably reversible.
+
+- **Instrument:** `qa/wow3-lens.js` — Sydney's first-arrival ease measured
+  (fig-crown occlusion of the shells, before/after, the same
+  masked-object-visibility pattern used to prove the Opera House problem
+  in the first place); the far-mover glance proved to trigger on a mover
+  crossing and to abort within one frame of a keypress.
+- **Cost:** a camera-position lerp, no new draw calls. **`game.state.noLens2`.**
+
+### X4 — THE STILL FRAME, CLOSED
+
+L11's A3 set −40% as the still-pixel target and met it in 10 of 19
+chapters, with the other 9 traced to the OLD instrument's mask missing
+traffic and herds — which is exactly what W0 built `qa/wow2-still-mask.js`
+to fix, and which has sat unused against the original target ever since.
+
+- No new visual term. Re-run L11's original nineteen-chapter before/after
+  comparison (`qa/wow-still.js`'s floors, already recorded) against the
+  EXTENDED mask, and report, per chapter, whether the −40% target is now
+  met, and for the ones still not met, whether the cause is real shimmer
+  (worth a future fix) or still an instrument artefact (name which).
+- If a chapter's still-pixel floor is genuinely high under the honest
+  mask, this pass does not chase it with a new suppression term (that is
+  exactly the kind of new-term sprawl the roadmap's laws exist to
+  prevent) — it is named for a future pass, with the number attached.
+
+- **Instrument:** the extended mask against L11's original 19-chapter
+  before/after set, one table, no new flag (measurement only).
+
+## Order and ownership
+
+Four waves, matching the file-exclusivity discipline that held clean for
+twenty-six commits in L12: one agent per disjoint file set, one chapter
+per playwright run, commit per verified increment, `git status` right
+before every commit, stage by name.
+
+- **W1 — Part D, items 1–3, 5, 9–12** (shared.js's reflectTex + tracks
+  read-proof, weather.js's dive rate, manly.js, npc.js's gardener
+  sit-down, qa/ only for 11–12). The cheapest, most certain items first.
+- **W2 — Part D, items 4, 6, 7, 8** (far.js + hanoi.js + kowloon.js's
+  truss/decision; weather.js + environment.js's jacaranda; the six
+  companion-kind chapter files' landing spots; capybara.js + systems.js's
+  real opening). The items needing new geometry or a capybara.js hook.
+- **W3 — X1 + X4** (systems.js's shelf earn-order + `keptAt` save field,
+  npc.js's world-changes-per-chapter + the companion's "comes over," the
+  still-mask re-measurement — no new src/ edits for X4, report only).
+- **W4 — X2 + X3** (capybara.js's footfall sound hook (read-only claim
+  on a hook, coordinate with W1/W2 if still live), weather.js's drip
+  sound, systems.js's shelf sound + Sydney's arrival ease + the far-mover
+  glance, npc.js's glimpse footstep + companion approach sound).
+- **W5 — the closeout.** The six numbers, the combined frame-time A/B
+  across every WOW2 AND WOW3 flag together, CONTRACT.md's thirteenth
+  lift, this file's Closed section.
+
+W2 and W4 both touch npc.js and systems.js — sequence W4 after W2 lands,
+the same way L12 sequenced V5 after Part N to avoid a live double-edit.
+
+## Rules for every agent
+
+- Check CONTRACT.md's section list AND ROADMAP-WOW2.md's Closed section
+  before building anything — most of this file's items are one function
+  away from existing code, not new systems.
+- Never re-base a grade, sun, fog, mote or spawn row; never add a save
+  field beyond `keptAt` (X1); never say the why.
+- Every term cuts, parks at rung 1, and is proved inside a mask by a
+  per-pixel diff and a screenshot read by eye.
+- One chapter per playwright run, under four minutes; own session only,
+  never `close-all`; `git status` right before every commit; stage by
+  name; never edit a file another live agent owns.
+- The lens is not deterministic between arrivals — pinned poses for any
+  before/after.
+- Part H is not for an agent. Name it in the closeout; do not attempt it.
+
+## Held (named, not built)
+
+Lightning; motion blur; TAA; textures of any kind; a named protagonist or
+a voice for the animal; cutscenes that take the controls for more than ten
+seconds; a new-game-plus that resets anything; a why said out loud; a
+general cinematic-camera system (X3 is two named cases only); a fourth
+save field beyond `keptAt`.
