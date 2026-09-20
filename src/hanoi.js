@@ -4647,41 +4647,42 @@ function hanBuildScatter(root) {
   put(weed, bladeGeo, PALETTE.hanShutter, false);
 }
 
-// ---- ROADMAP-WOW2 V3, THE FAR PLANE: LONG BIÊN RUNNING OUT -----------------
+// ---- ROADMAP-WOW2 V3, THE FAR PLANE: THE FAR BANK, AND THE TRAIN ----------
 // The bridge is eighty-two metres of lattice from the dyke to z 250, where
 // the way out is, and then the river — a flat sheet to z 335 — and then the
-// dome. Long Biên is a mile and a half long. So the trusses run on: eight
-// more humps at 30 m pitch out to z 500, 9–13 m of lattice each, standing
-// on a deck line at y 3 rather than on the river bed (per-wedge y0), and at
-// the end of them the far bank — Gia Lâm, a low line of roofs and trees at
-// z 520–560 — with its base at -30 on the water. Steel pulled a fifth
-// toward the chapter's haze (85–1050 m, never re-based: 33 % at 400, 43 %
-// at 500). Not in the arrival frame — the lens rests on the lake and the
-// bridge is 53° off its axis — but in every frame from the dyke, the bridge
-// deck and the way out, which is where a bridge running out belongs.
+// dome. What stands past it now is Gia Lâm: three wedges of roofs and trees
+// at z 500–545, 7–12 m high, base at -30 on the water, in steel pulled a
+// fifth toward the chapter's haze (85–1050 m, never re-based: 43 % out
+// there). And the train, the roadmap's own item: three cars, thirty-six
+// triangles, out over the water every ninety seconds, forty-five of them
+// crossing at a Long Biên walking pace — the chapter's own train runs Train
+// Street, not the bridge; this is the one you see from the water.
 //
-// And the train, the roadmap's own item: three cars, thirty-six triangles,
-// out along the far spans every ninety seconds, forty-five of them crossing
-// at a Long Biên walking pace. The chapter's own train runs Train Street,
-// not the bridge; this one is the one you see from the water.
+// A WEDGE CANNOT MAKE A TRUSS, and the first build of this tried. Eight
+// lattice humps on a deck line running out to z 500 measured fine (0.21 %
+// from the river, 7.2 % from the deck) and looked, from the deck — which is
+// the ONE place you stand to see them — like a single grey pyramid: seen
+// end-on down their own axis, eight overlapping wedges are one wedge. A
+// silhouette builder is for things seen ACROSS, and everything else in this
+// pass is. The bridge's own bay loop (hanBuildBridge) is the right shape for
+// lattice running out and costs ~48 triangles a bay, which is 1.5 k for the
+// run — past this pass's budget, and left written down rather than built.
 function hanBuildFar(root) {
   const tone = farTone(PALETTE.hanSteel, PALETTE.hanHaze, 0.20);
-  const wedges = [];
   const bx = hanBRIDGE.x;
-  for (let i = 0; i < 8; i++) {
-    const z = 262 + i * 30;
-    const rise = 9 + (i % 3) * 2;
-    wedges.push({ x: bx, z, w: 30, d: 5, yaw: Math.PI / 2, y0: 3,
-                  profile: [[-1, 0], [-0.55, rise * 0.7], [0, rise], [0.55, rise * 0.7], [1, 0]] });
-  }
-  // the far bank
-  wedges.push({ x: -80, z: 530, w: 260, d: 40, yaw: 0.05,
-                profile: [[-1, 0], [-0.6, 9], [-0.2, 12], [0.2, 8], [0.6, 11], [1, 0]] });
-  wedges.push({ x: 170, z: 545, w: 240, d: 40, yaw: -0.08,
-                profile: [[-1, 0], [-0.5, 10], [0, 7], [0.4, 12], [0.8, 8], [1, 0]] });
   hanFar = farBundle({
     name: 'hanoi',
-    layer: farLayer({ name: 'far-hanoi', color: tone, wedges }),
+    layer: farLayer({
+      name: 'far-hanoi', color: tone,
+      wedges: [
+        { x: -80, z: 530, w: 260, d: 40, yaw: 0.05,
+          profile: [[-1, 0], [-0.6, 9], [-0.2, 12], [0.2, 8], [0.6, 11], [1, 0]] },
+        { x: 170, z: 545, w: 240, d: 40, yaw: -0.08,
+          profile: [[-1, 0], [-0.5, 10], [0, 7], [0.4, 12], [0.8, 8], [1, 0]] },
+        { x: 400, z: 500, w: 220, d: 40, yaw: -0.3,
+          profile: [[-1, 0], [-0.5, 8], [0.1, 11], [0.7, 7], [1, 0]] },
+      ],
+    }),
     mover: farMover({
       kind: 'train', color: farTone(PALETTE.hanSteel, PALETTE.hanHaze, 0.1), scale: 0.9, period: 90, duty: 0.5, phase: 0.6,
       path: [[bx, 3.2, 252], [bx, 3.2, 506]],
