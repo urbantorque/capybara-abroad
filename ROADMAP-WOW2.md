@@ -1498,3 +1498,230 @@ Lightning (a written decision, `systems.js:14637`); motion blur; TAA;
 textures of any kind; a named protagonist or a voice for the animal;
 cutscenes that take the controls for more than ten seconds; a new-game-
 plus that resets anything; a why said out loud.
+
+## Closed (21 Sep 2026) — the six numbers, as measured
+
+Twenty-five commits on `lift-pass` between `00f3b72` and `2121e99`, every
+one gated by `node --check`, `node build.mjs` and a green `npm test`
+(25 checks, 0 failed, throughout). Six waves built against the roadmap
+above; this agent (W6) built nothing new, measured the whole pass
+together for the first time, read a regression sweep of the shared files
+end to end, and closes it out.
+
+**What shipped, one line per part** (each part's own "### — shipped"
+block above has the numbers; this is the pointer, not a repeat).
+
+- **V1 — the animal, alive.** A second clock under the existing six-beat
+  idle table (an ear, a weight shift, a sniff, a head-turn), squash and
+  stretch on the takeoff and the arc, footfalls that puff the ground by
+  material, a coat that darkens and dries, catchlights that slide toward
+  the lens. `noAlive`, `noFootfall`.
+- **V2 — people, alive.** Three gait profiles off the figure's own seed,
+  six idle gestures, umbrellas up in the rain (the roster's own instanced
+  buffer — locals already had them), two locals turning to talk. One
+  real bug fixed in passing (the umbrella's front term was inverted).
+  `noGesture`, `noUmbrella`, `noCompany`.
+- **V3 — the far plane.** A new module (`src/far.js`) gives twelve
+  chapters a silhouette, a mover and night lights, each placed against
+  that chapter's own live fog band rather than the roadmap's flat
+  250–400 m guess. Seven chapters (Pasto, Kyoto, Sahara, Drift, Venice,
+  Goreme, the cave) were correctly left out by design; Antarctica,
+  Kowloon, Sydney and the Quay were found already stale before a line
+  was written. `noFar`.
+- **V4 — under the surface.** A procedural ceiling stand-in (the true
+  reflection sampler is not exported from shared.js — named below), a
+  reused-shader underwater ray with a physically-motivated fixed bend
+  (Snell's window, not a computed refraction), bubbles on the existing
+  mote pool, six surfacing beads with a real bug found and fixed (the
+  trigger read `capy.diving` instead of `capy.depth` and missed a real
+  surfacing by 1.5 s). `noSub2`.
+- **V5 — weather as an event.** A rainbow riding the shared dome's own
+  sun axis (not a second per-chapter table), a wetness-gated puddle mask
+  on Kowloon's road only (every other `reflect:` call site is a real body
+  of water and was correctly left alone), a gust that strips four
+  canopies of their own colour, a 60 s eaves-drip on the same four.
+  `noRainbow`, `noPuddle`, `noStrip`.
+- **V6 — tracks and touches.** A 32-slot decal pool beside the contact
+  pool's own shape, a paw drawn from the footfall's heading, a swim
+  wake. Sand and snow proved by pixel; mud and wet prints are wired and
+  written but were never put in front of a lens (V6's own honest miss,
+  unchanged by this closeout). `noTracks`.
+- **N1 — the shelf in the world.** A stone shelf in Sydney's gardens,
+  one fixed slot per chapter (not earn-order — no save field exists to
+  record when a keepsake was taken), the gardener's line once per new
+  keepsake. `noShelf`.
+- **N2 — the glimpse.** Fifteen of nineteen chapters (the ones with a
+  gated cameo) now show the traveller reading the exit board and walking
+  off; the other four keep their original cameo behaviour. Two
+  pre-existing bugs fixed in the process (a finale crash on all-nineteen-
+  kept, a glimpse state re-asserted visible one frame after being hidden).
+  `noGlimpse`.
+- **N3 — someone waits.** The absence line on a ≥20-minute return, a
+  second gift past tier three, and the companion's homecoming — which
+  was mostly already built (`compLeave('home')` pre-dates this pass) and
+  wanted only the notebook entry and the goodbye sound.
+- **N4 — the morning after.** A ten-second held establishing shot before
+  "be a menace." on a fresh file (the roadmap's own sleeping-pose-and-bag
+  scene needs a capybara.js pose no wave here owns); the fin epilogue as
+  one shared clause in code, not nineteen in text (the roadmap's "eleven
+  chapters missing one" was a guess made before anyone checked — the true
+  count was nineteen of nineteen).
+- **T — the first three minutes.** Eight beats in the gardener's voice,
+  each waiting for the player's own action. Ten of ten bot runs reached
+  beat eight; median 70.8 s wall / 66.5 s game, worst 96.1 s — the
+  180 s cap met with more than half to spare. One real bug found and
+  fixed (the paper's arrow pointed 180° wrong at any target behind the
+  camera).
+- **V0.** Not started. Correctly optional per the roadmap's own text
+  ("they do not block the pass") — named here as a scope choice, not a
+  miss.
+
+**The six numbers, closed.**
+
+1. *Motion at rest.* Re-run, not re-swept: `qa/wow2-alive.js` (sydney,
+   the animal's own idle table — chapter-independent by construction)
+   and `qa/wow2-people.js` (iceland, one of the four chapters V2's own
+   report already covered — sydney, kyoto, sahara, iceland) both ran
+   clean after every later wave's edits, with numbers in the same
+   regime as each wave's own report (people: 31 shivers this run against
+   V2's own 37 in a longer window; alive: excess ratio 0.94 this run,
+   the same order as V1's own report, reproducing V1's own honest
+   finding that "a per-second sum cannot see a 90 ms ear"). **Coverage
+   stands at 4 of 19 for the crowd** (V2's own number, reconfirmed, not
+   extended) **and chapter-independent for the animal's own table**,
+   plus footfalls on Palawan/Antarctica — this closeout did not extend
+   coverage past what V1/V2 already measured; time went to the number
+   nobody had measured at all (6, below) and the regression sweep
+   instead.
+2. *The far plane.* `src/far.js` was touched only inside V3's own two
+   commits — confirmed by `git log -- src/far.js` — so no later wave's
+   edit could have regressed it, and the nineteen re-shot arrival frames
+   (`qa/wow2-arrivals-1.js`/`-2.js`, below) are a fresh visual
+   confirmation on top of that: Rio's three grey islets, Palawan's
+   second karst mass, the Pantanal's tree line, Manly's headland across
+   the top of the frame and Antarctica's shelf-and-reflection all read
+   plainly at the resting lens; Kowloon and Hanoi still show no far
+   layer from arrival, exactly as V3's own report named. **Honest miss:**
+   this closeout did not re-run the numeric 13×9/39×27 depth sweep
+   (`qa/wow2-far-depth.js`) across all nineteen — the file-touch check
+   plus the visual re-confirmation stood in for it, which is a weaker
+   claim than a fresh number and is written down as such.
+3. *Tracks.* Palawan's sand (1953/1950/1715 px at 0/10/20 s, against
+   V6's own 1882/1884/1634) and Kyoto's wake (4577 px against V6's own
+   4956) reconfirmed within run-to-run noise. Antarctica's snow
+   reconfirmed clean on two of three runs (657/659/641 px, flat across
+   20 s as a 90 s life predicts) after one anomalous run read 0 live
+   prints — chased with a standalone diagnostic (`biome:enter` hooked,
+   the walk logged every ten ticks) that found the write-and-age path
+   working correctly and no unexpected chapter-crossing event; the
+   honest conclusion is a one-off tied to the QA patch-finder occasionally
+   landing on an edge-case slope, not a code regression, and it is
+   recorded as exactly that rather than either ignored or written up as
+   a bug with no reproduction. Mud and wet prints remain wired,
+   written, and never independently read by eye (V6's own miss, still
+   open).
+4. *The reason, counted.* Shelf reconfirmed exactly (`qa/wow2-shelf.js`
+   re-run: shelf count 0/7/19 against keep count 0/7/19, unchanged from
+   N1's own report). Glimpse and the absence/kept-gift lines were
+   reviewed in the diff (no interference found from V4/V5's later edits
+   to the same two files) but not re-run live this session. **The
+   companion's homecoming — the one place this closeout changed the
+   number rather than confirmed it:** N3's own report verified only the
+   pigeon live and read the other five kinds "by the code, not the
+   browser." This closeout ran the same save-forced-stow pattern
+   (`qa/wow2-waits-companions.js`) for cat/Goreme, silver gull/Manly,
+   gentoo/Antarctica, heron/Kyoto and ibis/Sydney: all five show the
+   same clean `kind → null, why:'home'` transition on crossing into
+   their own `from` chapter that the pigeon showed. **Six of six
+   companion kinds now independently verified live, not one plus five
+   read.**
+5. *Three minutes.* Closed by T's own report: 10/10 bot runs, median
+   70.8 s wall / 66.5 s game, worst 96.1 s, all under the 180 s cap.
+   **Still open, named plainly:** the stranger playtester was a scripted
+   reader, not an independent human read, by T's own admission — this
+   closeout has no human tester either, and says so rather than papering
+   over it with the bot's own clean number.
+6. *16.7 ms held — the number nobody had measured together.* Every wave
+   tested only its own flags. `qa/wow2-frametime-final.js` ran the full
+   fourteen-flag list (`noAlive`, `noFootfall`, `noTracks`, `noGesture`,
+   `noUmbrella`, `noCompany`, `noFar`, `noSub2`, `noRainbow`, `noPuddle`,
+   `noStrip`, `noShelf`, `noGlimpse`, `noTut` — the complete set,
+   confirmed against `grep -n "game.state.no" src/*.js`) live against
+   fully cut, five interleaved reps of sixty frames, across the same
+   eight chapters L11 used. Governor rung pinned to 0 throughout
+   (`capy3.prefs.v1 = {v:1, pf:1}` — a headless box settles at rung 3 on
+   its own and would park every term in both arms). **Live-minus-cut
+   median: sydney 0.0, kyoto 0.0, pantanal +0.1, monaco 0.0, hanoi −0.2,
+   sahara 0.0, iceland +0.1, goreme 0.0 ms.** Every chapter inside the
+   0.6 ms rule with room to spare, and — unlike several individual
+   waves' own whole-frame attempts, which several reports named as
+   unusable on this headless box — this combined run's own noise floor
+   was tight enough (−0.2 to +0.1 ms) that the tick-only sim-A/B fallback
+   the brief allowed for was not needed. The rule the whole pass was
+   built under held, measured all at once, for the first time.
+
+**The regression sweep.** `node build.mjs` and `npm test` are clean on
+the final commit (25 checks, 0 failed). `src/shared.js` (touched by V6's
+tracks pool, N1/N2's save-shape and CHAPTERS fields, and V5's puddle
+gate, in that order) and `src/systems.js` (touched by T's tutorial
+block, Part N's shelf/glimpse/waits machinery, and V5's rainbow hook, in
+that order) were read end to end against `00f3b72` — 616 and 929 lines
+of diff — looking specifically for a later wave's edit landing inside an
+earlier wave's function, a duplicate declaration, or a comment now
+describing code that moved. None found: a scripted check for duplicate
+top-level `function`/`const`/`let` names across all six touched files
+(`shared.js`, `systems.js`, `npc.js`, `weather.js`, `main.js`,
+`capybara.js`) came back empty, and every later hook (V5's rainbow
+riding sky2's own uniform, the puddle gate's `uPuddleOn`, N3's
+`sysPalAwayCheck` reading the same `p.from` field the companion's own
+homecoming reads) is additive beside the code it sits next to rather
+than inside it. **No bug was found that needed fixing** — the six
+waves' edits to the same three shared files held together cleanly, which
+is itself the honest result of a sweep built to catch exactly the kind
+of thing that did not happen here.
+
+**The nineteen arrival frames, re-read.** `qa/wow2-arrivals-1.js` and
+`-2.js` (fresh boot, `hud.cross`, a raw `page.screenshot`, split across
+two invocations to stay under the four-minute cap) shot all nineteen
+again. Read by eye against V3's own per-chapter list: the far layer
+reads plainly from arrival in Rio, Palawan, the Pantanal, Manly and
+Antarctica; Kowloon and Hanoi still show none, exactly as named before.
+Sydney's Opera House is still behind the fig crowns (A2's own finding
+from L11, unrelated to this pass, still true). Iceland's Esja band and
+Monaco's heights are present in the scene but faint-to-illegible in a
+night/fog arrival lens — not a new miss, but worth naming plainly rather
+than claiming every chapter reads clearly.
+
+**Left open, named.** `reflectTex()` — a getter for A1's private
+reflection target, wanted by V4 so the underwater ceiling can sample the
+real reflection instead of a procedural stand-in; V4's bubble count
+measured 19–30 of a 40 target (the ring likely laps before a bubble's
+own life ends — `wxDIVE_RATE` is the number to raise first); Kowloon and
+Hanoi's far layers, invisible from their own arrival lens by the
+geometry of where each chapter actually rests the camera (a lattice
+truss needs its own bay-loop builder, not a wedge); Manly's ferry
+crossing the frame's top edge rather than through it; the first three
+minutes' stranger playtester, still a script and not a person; the
+companion's per-kind landing spot (the Campanile's ledge and so on) —
+the generic walk-off stands, six biome files away from any wave that
+owns them; Sydney's jacaranda gust folded into the existing petal
+skitter rather than built as a second purple mechanic; N4's opening beat
+as a held establishing shot rather than the sleeping-pose-and-bag scene
+the roadmap first asked for; the gardener's stand-down never becoming a
+sit-down beside the traveller at the finale; V0's cylinder-widen and
+mote-footprint carry-over, not started, correctly optional; V6's mud and
+wet prints, wired and unread by any lens; the far plane's own numeric
+depth sweep, not re-run fresh across all nineteen this closeout, only
+confirmed by file history and by eye.
+
+**Two harness lessons, now for the memory.** (1) A frame-time A/B is
+only as honest as the governor rung it runs at — pin `capy3.prefs.v1 =
+{v:1, pf:1}` before the first frame, or a headless box's own settle to
+rung 3 parks every term in both arms and the delta reads as nothing
+because both arms already are. (2) A save-forced state (`localStorage`
+seeded with `{v:1, tasks:[id], seen:[1], recs:{}, ms:0, stow:{kind,
+from}}`, then a real reload and a real `hud.cross`) is the honest way to
+verify a mechanic gated behind a long, specific setup — the companion's
+homecoming across five more kinds took five reloads and about ninety
+seconds of real wall time apiece, not five new in-world pickup routes
+worked out from scratch.

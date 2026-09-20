@@ -1,3 +1,75 @@
+## THE TWELFTH LIFT — THE ANIMAL AWAKE, THE WORLD REMEMBERING, AND THE WHY MADE VISIBLE (L12 — 20–21 Sep 2026)
+
+Twenty-five commits, ROADMAP-WOW2.md, six waves against six measured
+numbers plus a first three minutes — see that file's "Closed" section
+for the full table and every honest miss; this is the short version.
+
+**The animal stopped being a statue between events.** A second idle
+clock under the existing six-beat table (an ear flick, a weight shift, a
+sniff, a head-turn to whatever is nearest), squash and stretch through
+the whole hop rather than the landing alone, footfalls that puff sand,
+snow or a shallow-water ring by material, a coat that visibly darkens
+and dries. The crowd got three gait profiles off each figure's own seed,
+six idle gestures, umbrellas that go up in the rain, and two locals who
+turn to talk to each other rather than only to the player.
+
+**Every horizon is composed now.** A new module (`src/far.js`) gives
+twelve chapters a silhouette ridge, a mover crossing it and, at night,
+lights — each placed against that chapter's own live fog band rather
+than a flat distance, because a wedge at 300 m is exactly the fog colour
+in one chapter and unfogged in another. Underwater got a lit ceiling,
+underwater rays on a physically-motivated fixed bend (Snell's window,
+not a computed refraction the surrounding code could not yet feed), and
+bubbles on the existing mote pool. A shower now ends with something: a
+rainbow riding the shared dome's own sun axis, puddles that grow and dry
+on Kowloon's road, a gust that strips leaves from four canopies. The
+ground itself keeps a record — a thirty-two print pool beside the
+contact-shadow pool's own shape, a paw drawn from the footfall's
+heading, a wake behind a swim.
+
+**The spine the game already had is visible now, not just structural.**
+A stone shelf in Sydney's gardens fills with every keepsake earned, one
+fixed slot per chapter; the traveller who keeps turning up now stands at
+each chapter's exit board reading it before walking off, in fifteen of
+nineteen chapters; a regular notices a long absence and, past tier
+three, leaves a second gift; a companion carried home goes to its place
+with a line and a sound rather than simply stopping. None of it says
+why. It is still not said.
+
+**A stranger now gets eight minutes of hand-holding on the lawn before
+the game lets go.** Eight beats, one pill at a time in the gardener's
+voice, each waiting for the player's own action rather than a clock: ten
+of ten bot runs reached the last beat, median 71 seconds against a
+three-minute cap. A ten-second held shot now opens a fresh file before
+"be a menace." ever shows.
+
+**The one number no wave had measured.** Every wave tested only its own
+flags. The closeout ran all fourteen `noX` flags together, live against
+fully cut, across the same eight chapters L11 used: live-minus-cut
+median −0.2 to +0.1 ms, governor rung 0 held throughout. The pass's own
+performance rule, met all at once, for the first time — and, unlike
+several individual waves' own attempts, a clean enough number on this
+headless box that the tick-only fallback was not needed.
+
+**A regression sweep that found nothing to fix.** `src/shared.js` was
+touched by three waves in sequence and `src/systems.js` by three others;
+both were read end to end against the pass's own start, hunting for a
+later edit landing inside an earlier one, a duplicate declaration, or a
+comment describing code that moved. None found — the six waves' work
+holds together. The closeout also ran the companion's homecoming live
+for the five kinds no earlier report had independently checked (only
+the pigeon had been); all five behave exactly as the pigeon does.
+
+**Two harness lessons, now in the memory.** A frame-time A/B is only as
+honest as the governor rung it runs at — a headless box settles at rung
+3 on its own, which parks every term in BOTH arms and makes a real
+0.6 ms delta read as nothing; pin `capy3.prefs.v1 = {v:1, pf:1}` before
+the first frame. And a save-forced state — a `localStorage` file seeded
+by hand, then a real reload and a real crossing — is the honest way to
+verify a mechanic gated behind a long setup (a return after twenty
+minutes, a companion carried across a continent) without building five
+new in-world routes to reach it by hand.
+
 ## THE ELEVENTH LIFT — THE THIRD BEAUTY PASS: MIRRORS, GRASS, THE FOREGROUND, AND THE LIVING MADE ROUND (L11 — 19–20 Sep 2026)
 
 Ninety-six commits, ROADMAP-WOW.md, all five parts closed against five
