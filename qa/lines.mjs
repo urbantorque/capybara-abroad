@@ -122,5 +122,33 @@ for (const f of Object.keys(FILE_CHAPTER)) {
     }
   }
 }
+// ---- THE FIRST WALK'S EIGHT LINES (ROADMAP-WOW2, T) ------------------------
+// `sysTUT_LINES` in systems.js is the one pool that is not in npc.js or a
+// chapter file, so it is read here by name: exactly eight, each in the
+// game's lower-case voice (a key name may be a capital: W, A, S, D, Shift,
+// Space, Q, E, Tab, C), each naming the key it teaches, none over the pill's
+// one breath (80 characters), none said twice. qa/l6-tics.mjs reads the same
+// literals for the three-file ceiling, since it scans every file.
+const sysSrc = readFileSync(join(SRC, 'systems.js'), 'utf8');
+const tutBlock = sysSrc.match(/const sysTUT_LINES = \[([\s\S]*?)\n\];/);
+if (!tutBlock) { console.log('BLOCKER  systems.js: sysTUT_LINES not found'); bad++; }
+else {
+  const KEYS = { move: /\bW, A, S, D\b/, run: /\bShift\b/, hop: /\bSpace\b/, wheek: /\bQ\b/, take: /\bE\b/,
+                 paper: /\bTab\b/, look: /\bdrag\b|\bC\b/, door: /\bboard\b/ };
+  const lines = [...tutBlock[1].matchAll(/\{\s*key:\s*'([^']+)',\s*line:\s*'([^']*)'/g)].map((m) => [m[1], m[2]]);
+  if (lines.length !== 8) { console.log('BLOCKER  sysTUT_LINES: ' + lines.length + ' lines, not eight'); bad++; }
+  const seen = new Set();
+  for (const [key, line] of lines) {
+    const re = KEYS[key];
+    if (!re) { console.log('BLOCKER  sysTUT_LINES: unknown beat "' + key + '"'); bad++; continue; }
+    if (!re.test(line)) { console.log('BLOCKER  sysTUT_LINES ' + key + ': does not name its key: ' + line); bad++; }
+    if (/^[A-Z]/.test(line) && !/^(W, A|Shift|Space|Q\.|E |Tab|C )/.test(line)) { console.log('BLOCKER  sysTUT_LINES ' + key + ': starts with a capital that is not a key'); bad++; }
+    if (line.length > 80) { console.log('BLOCKER  sysTUT_LINES ' + key + ': ' + line.length + ' characters, over the breath'); bad++; }
+    if (seen.has(line)) { console.log('BLOCKER  sysTUT_LINES ' + key + ': said twice'); bad++; }
+    seen.add(line);
+  }
+  console.log('the first walk: ' + lines.length + ' lines, each naming its key');
+}
+
 console.log('\n' + bad + ' blockers, ' + warn + ' warnings');
 process.exit(bad ? 1 : 0);

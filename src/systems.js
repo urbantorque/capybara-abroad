@@ -4337,6 +4337,10 @@ const sysSAVE_SHAPE = {
   // unlock it gates at 100 lifetime needs no save key of its own: `owned`
   // already says whether it fired, unambiguously, on restore.
   gifted: 'number',
+  // THE FIRST WALK (ROADMAP-WOW2, T): walked or skipped, 1. Absent on a file
+  // written before it existed, which is fine: that file is carried on, and
+  // the walk never runs on a restore — it is for a file with no history.
+  tut: 'number',
   // THINGS THAT TURN UP (L8, F4). Live drops themselves are NOT saved — the
   // whole pool is ephemeral, rerolled fresh on every arrival, and a save
   // full of stale prop positions would be its own class of bug. The one
@@ -6267,6 +6271,57 @@ const sysLEGEND_TOUCH = [
   // faders, the journal and the way back to the title on one card.
   ['MENU', 'pause  ·  sound  ·  the journey  ·  the title'],
 ];
+// ---- THE FIRST WALK (ROADMAP-WOW2, T) ---------------------------------------
+// Nothing above teaches a key by having the player press it: the legend is
+// read for nine tenths of a second on the title card, and the one-shots in
+// the frame loop (the puff, the slide, the paper) fire on a clock or on a
+// thing the player happened to do. Eight beats in Sydney's gardens, one pill
+// at a time in the gardener's voice, each waiting for the player's OWN action
+// and moving on at sysTUT_BEAT_T if it never comes. Not a mode — the world
+// runs and the animal can wander off. Skipped whole by Esc or by the control
+// fold being opened; never on a file with a tick on it, never on a restore;
+// `tut: 1` on the save the moment it ends or is skipped. See tutTick.
+//
+// The lines name the KEY and the NOUN and nothing else. `key` is the verb
+// the bot performs (qa/wow2-tutorial.js reads the pill, not this table); the
+// line goes through sysSay so a pad reads RT where a keyboard reads Shift.
+const sysTUT_LINES = [
+  { key: 'move',  line: 'the lawn is yours. W, A, S, D.' },
+  { key: 'run',   line: 'hold Shift — she has legs.' },
+  { key: 'hop',   line: 'Space, at the bench.' },
+  { key: 'wheek', line: 'Q. say hello.' },
+  { key: 'take',  line: 'E — that hat is not his.' },
+  { key: 'paper', line: 'Tab. the star is the big one here.' },
+  { key: 'look',  line: 'drag, or C, to look around her.' },
+  { key: 'door',  line: 'the board by the gate. three wheeks, when you have done enough here.' },
+];
+// ...and the one clause about the shop, said with beat five the first time
+// the wallet bumps inside it (the stall stands beside the board — L8 F2).
+const sysTUT_SHOP = 'the traveller’s stall buys things for yuzu.';
+// Sydney's benches, as environment.js plants them (envAddBench, merged into
+// one static mesh and published nowhere), so beat three can put the arrow on
+// the nearest. The seat's collider top is 1.0 m; the animal stands at 1.34.
+const sysTUT_BENCHES = [
+  [26, 14.5], [46.5, 33.5], [-30, -6.5], [-48, -6.5],
+  [56.5, 52.0], [38.0, 60.5], [60.5, 40.0], [20.0, 60.0],
+  [-6.2, 17.2], [9.8, 20.6], [2.8, 32.0],
+];
+const sysTUT_BEAT_T = 20;      // s a beat waits for the player's own action
+// ...except the door, which is a walk and not a press: sixty-five metres
+// from the spawn lawn round the terminal to the wharf, and MEASURED the
+// bot reached 19 m of it in twenty seconds three runs out of four. The
+// total still ends the walk at sysTUT_TOTAL_T.
+const sysTUT_DOOR_T = 45;
+const sysTUT_MIN_T = 1.6;      // s a pill is up before its beat may close
+const sysTUT_START_T = 4.6;    // s after Begin the first pill lands (the place card is 3.6)
+const sysTUT_GAP_T = 0.8;      // s between one pill going and the next rising
+const sysTUT_TOTAL_T = 180;    // s the whole walk may take
+const sysTUT_WALK_M = 4;       // m walked, beat one
+const sysTUT_RUN_T = 1.2;      // s at run speed, beat two (the slide prompt's own trigger)
+const sysTUT_RUN_V = 5.2;      // m/s — capyWALK is 4.2, so this is a run
+const sysTUT_BENCH_R = 1.7;    // m from a bench's centre that counts as on it
+const sysTUT_LOOK_RAD = Math.PI / 3;   // 60 degrees of yaw, beat seven
+const sysTUT_DOOR_M = 12;      // m from the board, beat eight
 /** True on a device driven by a finger rather than a mouse — the same test the
  *  touch layer itself switches on, so the legend and the buttons can never
  *  disagree about which scheme the player has. */
@@ -25085,6 +25140,7 @@ export function createSystems(game) {
     if (pauseShown) return;
     pauseShown = true;
     pausePre = !!pre;
+    if (!pausePre) tutSkip('esc');    // the first walk stands down (ROADMAP-WOW2, T)
     pauseGo.textContent = pausePre ? 'back' : 'resume';
     pauseHead.textContent = pausePre ? 'Settings' : 'Paused';
     // ...and the footer names the button that is actually there: BACK, not
@@ -28969,15 +29025,22 @@ export function createSystems(game) {
     // call the other site makes for the same reason.
     if (k === 'last') sysToastPush(0);
     // 'heard' is a 'say' in roman with a speaker on the end — see game.hud.heard.
-    const el = sysEl('div', 'capyui-toast ' + k + (kind === 'heard' ? ' heard' : ''), String(text));
+    // 'tut' is the first walk's (ROADMAP-WOW2, T): the same roman, signed
+    // pill, held for the whole beat — tutTick takes it down itself.
+    const el = sysEl('div', 'capyui-toast ' + k + (kind === 'heard' ? ' heard' : '') +
+                     (kind === 'tut' ? ' heard tut' : ''), String(text));
     toastWrap.appendChild(el);
     if (kind === 'heard') sysHeardEl = el;     // see sysHeardTick
     // ...unless it has already been pushed off the top by more toasts landing
     // in the same turn, in which case it is on its way out and must not be
     // told to arrive.
     requestAnimationFrame(function () { if (!el.dataset.going) el.classList.add('in'); });
-    const holdMs = sysTOAST_HOLD[k] + (k === 'last' ? 0 : Math.max(0, String(text).length - 40) * 38);
-    sysToastFloorAt = sysWall(); sysToastFloorFor = holdMs * 0.001; sysToastFloorKind = k;
+    const holdMs = kind === 'tut' ? (sysTUT_DOOR_T + 1) * 1000
+                 : sysTOAST_HOLD[k] + (k === 'last' ? 0 : Math.max(0, String(text).length - 40) * 38);
+    // ...and a walk's pill takes a sentence's floor, not its own twenty
+    // seconds: a tick landing under it must not wait the beat out.
+    sysToastFloorAt = sysWall(); sysToastFloorKind = k;
+    sysToastFloorFor = (kind === 'tut' ? sysTOAST_HOLD.say : holdMs) * 0.001;
     setTimeout(function () {
       el.classList.remove('in');
       el.classList.add('out');
@@ -29170,10 +29233,17 @@ export function createSystems(game) {
     setTimeout(function () { if (el2.parentNode) el2.parentNode.removeChild(el2); }, 400);
   }
   function sysToastPush(keep) {
-    let live = 0;
+    let live = 0, tut = 0;
     for (let i = 0; i < toastWrap.children.length; i++) {
-      if (!toastWrap.children[i].dataset.going) live++;
+      const c = toastWrap.children[i];
+      if (c.dataset.going) continue;
+      if (c.classList.contains('tut')) tut++; else live++;
     }
+    // THE FIRST WALK'S PILL IS NOT IN THE STACK (ROADMAP-WOW2, T): it is up
+    // for its beat, tutTick takes it down, and three ticks landing under it
+    // must not push it out. It takes one of the three places while it is up,
+    // so the column never grows past three.
+    if (tut) keep = Math.max(0, keep - 1);
     // A BUBBLE CANNOT PUSH THE WHY OUT (L7, F3). Oldest-first, same as
     // always, but a live `why` pill is skipped on this first pass — the
     // marquee's own answer to a press just made must survive whatever a
@@ -29183,12 +29253,12 @@ export function createSystems(game) {
     // via sysToastOut, before this function ever sees the new one).
     for (let i = 0; live > keep && i < toastWrap.children.length; i++) {
       const old = toastWrap.children[i];
-      if (old.dataset.going || old.classList.contains('why')) continue;
+      if (old.dataset.going || old.classList.contains('why') || old.classList.contains('tut')) continue;
       sysToastEvict(old); live--;
     }
     for (let i = 0; live > keep && i < toastWrap.children.length; i++) {
       const old = toastWrap.children[i];
-      if (old.dataset.going) continue;
+      if (old.dataset.going || old.classList.contains('tut')) continue;
       sysToastEvict(old); live--;
     }
   }
@@ -30292,6 +30362,7 @@ export function createSystems(game) {
   let jrReturnFocus = null;
   function jrShow(depart) {
     jrDepart = !!depart;
+    if (!jrShown && tutOn) tutTabN++;   // beat six's answer (ROADMAP-WOW2, T)
     jrShown = true;
     jrRefresh();
     // `inert` rather than pointer-events alone. A hidden overlay whose buttons
@@ -33209,6 +33280,8 @@ export function createSystems(game) {
         paper: paperEver ? 1 : 0,
         // ...and the puff bar's name (L6, E4).
         puff: puffEver ? 1 : 0,
+        // ...and THE FIRST WALK (ROADMAP-WOW2, T), on the same terms.
+        tut: tutEver ? 1 : 0,
         // ...and THE YUZU (L8, F1): the wallet, and which chapters have
         // already paid their full plate. Additive, no version bump.
         yuzu: jrYuzu, platedAt: jrPlatedAt,
@@ -36635,6 +36708,115 @@ export function createSystems(game) {
   // as a place. One sentence, once per journey, a few seconds after the first
   // place card has gone, saved beside the slide's so it is never said twice.
   let paperEver = false, paperT = 0;
+  // ---- THE FIRST WALK (ROADMAP-WOW2, T). See sysTUT_LINES. ---------------
+  // `tutEver` is on the save: walked or skipped, never again on this file.
+  // `tutArm` is set by startGame — a fresh file, not a restore, nothing
+  // ticked, and the harness has not said noTut — and is the only way in.
+  // `tutBeat` is 1..8 while a pill is up, 0 before the first and between
+  // pills (`tutWait` counts the gap), and the chain is over when `tutDone`.
+  // Everything a beat measures is measured FROM THE BEAT'S START: the walk,
+  // the run, the yaw, the hop, so an action the player took before being
+  // asked does not close a beat they have not read.
+  let tutEver = false, tutArm = false, tutOn = false, tutDone = false, tutSkipped = false;
+  let tutBeat = 0, tutBeatT = 0, tutT = 0, tutWait = 0, tutEl = null, tutAim = null;
+  let tutWalk = 0, tutRunT = 0, tutYaw = 0, tutYawLast = NaN, tutBench = null;
+  let tutWheekN = 0, tutGrabN = 0, tutYuzuN = 0, tutTabN = 0, tutBumpN = 0, tutBumpAt = 0;
+  let tutEndAt = -1, tutPill = '', tutHow = '', tutHitN = 0;
+  let tut0 = { wheek: 0, grab: 0, yuzu: 0, tab: 0, bump: 0 };   // the counts at the beat's start
+  let tutSay = '', tutSayT = 0;   // the shop clause, and how long it has left
+  const sysTUT_SAY_T = 4.0;       // s the clause is up
+  /** The walk is coming or is under way: the slide prompt and the paper's
+   *  own explainer stand aside while this is true. */
+  function tutLive() { return tutArm && !tutDone; }
+  /** Over, one way or the other. `how` is for the audit; the save takes 1. */
+  function tutEnd(how) {
+    if (tutDone) return;
+    tutDone = true; tutOn = false; tutArm = false;
+    tutSkipped = how === 'esc' || how === 'legend';
+    tutHow = how;
+    tutEndAt = tutT;
+    if (tutEl) { sysToastOut(tutEl); tutEl = null; }
+    tutAim = null; tutSay = ''; tutSayT = 0;
+    tutEver = true;
+    saveSoon();
+  }
+  /** Beat `n` begins: the counters it measures from, its arrow, its pill. */
+  function tutBeatStart(n) {
+    if (n > sysTUT_LINES.length) { tutEnd('walked'); return; }
+    tutBeat = n; tutBeatT = 0; tutWait = 0; tutOn = true;
+    tutWalk = 0; tutRunT = 0; tutYaw = 0; tutYawLast = NaN;
+    tut0 = { wheek: tutWheekN, grab: tutGrabN, yuzu: tutYuzuN, tab: tutTabN, bump: tutBumpN };
+    tutAim = null; tutBench = null;
+    if (n === 3) { tutBench = tutNearBench(); tutAim = tutBench; }
+    else if (n === 5) tutAim = tutTakeAim();
+    else if (n === 8) { const wp = wayPoint(); tutAim = wp ? { x: wp.x, z: wp.z, y: wp.y } : null; }
+    // Beat six IS the paper's explainer (see AND WHAT THE PAPER IS): the same
+    // fact at the moment the key is asked for, and the old line never fires.
+    if (n === 6 && !paperEver) { paperEver = true; saveSoon(); }
+    // ...and the paper comes out of its tuck for the beats with an arrow, the
+    // way it does for a tick, so the arrow is on the sheet and not the tab.
+    if (tutAim) { todoAwayHold = sysTUCK_HOLD; todoAwayT = 0; }
+    tutShow(sysTUT_LINES[n - 1].line);
+  }
+  /** The beat is over: the pill goes, the arrow goes back, and after beat
+   *  five with the wallet bumped inside it, the one clause about the shop. */
+  function tutBeatClose(hit) {
+    if (tutEl) { sysToastOut(tutEl); tutEl = null; }
+    tutOn = false; tutWait = 0; tutAim = null;
+    // the riddle's own pop, a shade under the half-octave qa/l7-voices.mjs
+    // counts as a borrowed word — this is Sydney's, in Sydney
+    if (hit) { tutHitN++; sfx('pop', { volume: 0.22, pitch: 1.38 }); }
+    if (tutBeat === 5 && tutBumpN > tut0.bump) tutSay = sysTUT_SHOP;
+    if (tutBeat >= sysTUT_LINES.length) tutEnd('walked');
+  }
+  /** Esc, or the control fold: the player has asked for the whole table. */
+  function tutSkip(how) { if (tutLive()) tutEnd(how); }
+  /** One pill, in the gardener's voice, attributed the way an overheard line
+   *  is (E4, roman). Direct to toastNow: the walk's line is not a remark the
+   *  fresh budget may hold or the queue may let go stale. */
+  function tutShow(text) {
+    if (tutEl) { sysToastOut(tutEl); tutEl = null; }
+    tutPill = '“ ' + sysSay(text) + ' ” — the gardener';
+    tutEl = toastNow(tutPill, 'tut');
+  }
+  /** Where beat three's arrow goes: the nearest bench to the animal now. */
+  function tutNearBench() {
+    const p = game.capy && game.capy.position;
+    if (!p) return null;
+    let best = null, bd = Infinity;
+    for (let i = 0; i < sysTUT_BENCHES.length; i++) {
+      const b = sysTUT_BENCHES[i];
+      const d = (b[0] - p.x) * (b[0] - p.x) + (b[1] - p.z) * (b[1] - p.z);
+      if (d < bd) { bd = d; best = b; }
+    }
+    return best ? { x: best[0], z: best[1], y: 1.0 } : null;
+  }
+  /** Beat five's arrow: the tourist with the hat, or the nearest yuzu. */
+  function tutTakeAim() {
+    let pt = null;
+    try {
+      pt = hintNpc(function (r) { return r.heldProp && r.heldProp.type === 'hat' && r.kind !== 'busker'; }) ||
+           hintProp('yuzu') || hintProp('yuzugold') ||
+           (sysHINTS[sysDROP_ID] && sysHINTS[sysDROP_ID].where());
+    } catch (e) { pt = null; }
+    return pt ? { x: pt.x, z: pt.z, y: pt.y } : null;
+  }
+  // The two answers that arrive as events rather than as state.
+  game.events.on('capy:wheek', function () { if (tutOn) tutWheekN++; });
+  game.events.on('capy:grab', function () { if (tutOn) tutGrabN++; });
+  // ...and the control fold: opened by H, ?, the pause card's button or the
+  // summary itself, it is the player asking for the whole table at once.
+  jrKeys.addEventListener('toggle', function () { if (jrKeys.open) tutSkip('legend'); });
+  /** Read-only, for the bot (qa/wow2-tutorial.js). */
+  game.tutAudit = function () {
+    return { beat: tutBeat, done: tutDone, skipped: tutSkipped, how: tutHow, hits: tutHitN,
+             on: tutOn, armed: tutArm,
+             t: +tutT.toFixed(1), endAt: tutEndAt < 0 ? null : +tutEndAt.toFixed(1),
+             pill: tutEl && tutEl.parentNode && !tutEl.dataset.going ? tutPill : '',
+             aim: tutAim ? { x: tutAim.x, z: tutAim.z } : null, ever: tutEver,
+             walk: +tutWalk.toFixed(1), run: +tutRunT.toFixed(2), yaw: +(tutYaw * 180 / Math.PI).toFixed(0),
+             wheeks: tutWheekN, grabs: tutGrabN, yuzu: tutYuzuN, tabs: tutTabN, bumps: tutBumpN };
+  };
   // THE NUDGE. Banked seconds since anything was ticked, and whether this
   // chapter has already had its one. Deliberately NOT on the save: it is about
   // the last few minutes, and a journey resumed tomorrow is not stalled.
@@ -36941,6 +37123,7 @@ export function createSystems(game) {
       slipEver = !!jrFile.slip;
       paperEver = !!jrFile.paper;
       puffEver = !!jrFile.puff;
+      tutEver = !!jrFile.tut;
       // ...and THE YUZU (L8, F1): the `ms`-style number-or-zero guard, and
       // the full-plate ledger read back the same way `pal`/`pho` are above.
       // LIFT9, C4 bonus finding: this was the one writer of jrYuzu with no
@@ -37011,6 +37194,11 @@ export function createSystems(game) {
     // THE FIRST MINUTE (L4, E3): a file with nothing on it. See sysFreshT.
     sysFresh = doneCount === 0 && findCount() === 0;
     sysFreshT = 0;
+    // THE FIRST WALK (ROADMAP-WOW2, T): a fresh file, begun and not carried
+    // on, with nothing ticked, in Sydney. `noTut` is the harness's cut.
+    tutArm = !restore && !tutEver && doneCount === 0 && !game.state.noTut &&
+             (where || 'sydney') === 'sydney';
+    tutT = 0;
     titleEl.classList.add('gone');
     todoEl.classList.add('show');
 
@@ -44187,6 +44375,7 @@ export function createSystems(game) {
       if (game.state.qaYuzuLog.length > 20000) game.state.qaYuzuLog.shift();
     }
     if (walletEl) {
+      if (tutOn) { tutBumpN++; tutBumpAt = tutT; }   // beat five's clause (ROADMAP-WOW2, T)
       // THE COUNT (the pickup rework): three or more counts UP over a beat
       // rather than jumping — the wallet's own small pleasure — and the bump
       // lands with the number. One or two still snaps, or a streak of plain
@@ -44237,6 +44426,7 @@ export function createSystems(game) {
    *  call, one flag around it — nothing else about the credit changes. */
   let yuzuGroundCtx = false;
   function yuzuAddGround(n, why, x, y, z) {
+    if (tutOn && n > 0) tutYuzuN++;    // beat five's other answer (ROADMAP-WOW2, T)
     yuzuGroundCtx = true;
     try { yuzuAdd(n, why, x, y, z); } finally { yuzuGroundCtx = false; }
   }
@@ -48374,6 +48564,15 @@ export function createSystems(game) {
         try { pt = h.where(); } catch (e) { pt = null; }
         if (pt) { hintHas = true; hintX = pt.x; hintZ = pt.z; hintY = pt.y; }
       }
+      // ---- THE FIRST WALK BORROWS THE ARROW (ROADMAP-WOW2, T) ------------
+      // Beats three and eight point it at the bench and at the board for the
+      // length of the beat; the top row's own target comes back the frame
+      // the beat closes. The same three numbers, so the beacon, the metres
+      // and the chart's ring all follow without a second writer.
+      if (tutAim && started && todoTopId) {
+        hintHas = true; hintX = tutAim.x; hintZ = tutAim.z;
+        hintY = (typeof tutAim.y === 'number') ? tutAim.y : NaN;
+      }
       // the clue can depend on what is in the mouth, so refresh its wording too
       //
       // ---- ...BUT NOT OVER THE RECORD BOARD (v51) ------------------------
@@ -48420,7 +48619,7 @@ export function createSystems(game) {
       }
     }
     const topRec = taskRec[todoTopId];
-    if (topRec && hintHas && !mounted && riddleShown) {
+    if (topRec && hintHas && !mounted && (riddleShown || tutAim)) {   // the walk shows it (T)
       const hx = hintX - p.x, hz = hintZ - p.z;
       const hd = Math.sqrt(hx * hx + hz * hz);
       // ---- THE ONE CAMERA TIP (L6, E1 / play #1). See sysCAM_TIP_T. --------
@@ -48447,8 +48646,20 @@ export function createSystems(game) {
       // exact by construction and costs two transforms a frame.
       // Both are taken at the CAPYBARA's height so this stays a ground bearing —
       // a beacon at the foot of the volcano must not point downwards.
+      // ...AND ONE METRE ALONG THE BEARING, NOT THE TARGET ITSELF (ROADMAP-
+      // WOW2, T). MEASURED by the first walk's bot: with the wharf 65 m
+      // BEHIND the animal — and so behind the camera, which sits nine metres
+      // back — the arrow read +50° for a true −143°, and the bot ran the
+      // wrong way for twenty seconds. A point behind the camera projects
+      // with w < 0 and comes out mirrored through the centre of the screen:
+      // exactly 180° wrong, and worst for the one target a player has most
+      // reason to turn round for. The bearing is all the arrow shows, so a
+      // point one metre from the animal along it — always in front of the
+      // lens, since the animal is — gives the same direction without the
+      // mirror. (qa/_tut-dir2.js: the DOM arrow equals the projection.)
+      const hun = hd > 1e-3 ? 1 / hd : 0;
       sysAimA.set(p.x, p.y, p.z).project(camera);
-      sysAimB.set(hintX, p.y, hintZ).project(camera);
+      sysAimB.set(p.x + hx * hun, p.y, p.z + hz * hun).project(camera);
       // NDC y is up, and CSS rotate() is clockwise from up, so this is direct.
       const deg = Math.atan2(sysAimB.x - sysAimA.x, sysAimB.y - sysAimA.y) * 180 / Math.PI;
       const near = hd < sysHINT_NEAR;
@@ -49308,7 +49519,7 @@ export function createSystems(game) {
         if (mapT >= 1 / sysMAP_HZ) {
           mapT = 0;
           const cg = capy && capy.group;
-          mapGoal.ok = hintHas && !mounted && riddleShown;
+          mapGoal.ok = hintHas && !mounted && (riddleShown || !!tutAim);
           mapGoal.x = hintX; mapGoal.z = hintZ;
           // The readout, off the same two numbers the pin is drawn from, so
           // the chip and the chart can never disagree. Twelve times a second,
@@ -49424,7 +49635,11 @@ export function createSystems(game) {
         saveSoon();
         toast('that is the slide. every hill in the game will take it.');
         sfx('chime', { volume: 0.42, pitch: 1.44 });
-      } else if (!slidSaid && capy.grounded && !capy.carriedBy && !capy.rideBody &&
+      // ...and the 1.2 s at a run is THE FIRST WALK's second beat now
+      // (ROADMAP-WOW2, T): while the walk is coming or under way the run is
+      // answered by beat three, and this line waits for the next run after
+      // it. Nothing else about it moves.
+      } else if (!slidSaid && !tutLive() && capy.grounded && !capy.carriedBy && !capy.rideBody &&
                  !mounted && Math.sqrt(v.x * v.x + v.z * v.z) > 5.2) {
         slidT += dt;
         if (slidT > 1.2) {
@@ -49442,7 +49657,12 @@ export function createSystems(game) {
     // asked about: the star, the arrow, and the key that moves the arrow.
     // The default pill, the one the slide lesson uses, and kept to one
     // breath: a toast holds for under three seconds.
-    if (started && !paperEver && !transBusy && !jrShown && !ledShown && !albShown &&
+    // ...and ON A FRESH FILE IT IS BEAT SIX OF THE FIRST WALK (ROADMAP-WOW2,
+    // T): the walk says the same three facts at the moment Tab is asked for,
+    // and sets `paperEver` there, so this fires only on a file the walk did
+    // not run on — a restore that was never taught, or a walk skipped before
+    // its sixth beat — and never twice.
+    if (started && !paperEver && !tutLive() && !transBusy && !jrShown && !ledShown && !albShown &&
         !pauseShown && !game.state.paused && !hudBare) {
       paperT += dt;
       // ...and in a pause in the crowd's talk (L7, E5 / writing W4): the one
@@ -49456,6 +49676,79 @@ export function createSystems(game) {
         toast(sysIsTouch()
           ? 'top left is the paper. the star is the big thing here; tap a row to aim at it.'
           : 'top left is the paper. the star is the big thing here; F moves the arrow.');
+      }
+    }
+
+    // ---- THE FIRST WALK (ROADMAP-WOW2, T) --------------------------------
+    // Eight beats, one pill at a time, each waiting for the player's own
+    // action and moving on at sysTUT_BEAT_T. See sysTUT_LINES for the lines
+    // and the state block by `tutEver` for the counters; the events (the
+    // wheek, the grab, Tab, the wallet) arrive through the hooks named there.
+    // The world is not paused and nothing here takes a key away: a player
+    // who ignores every pill has lost nothing but the pills.
+    if (tutLive() && started) {
+      if (game.state.noTut) tutEnd('cut');          // the harness, after Begin
+      else if (!inSyd) tutEnd('left');              // the walk is the gardens'
+      else if (tutT > sysTUT_TOTAL_T) tutEnd('time');
+    }
+    if (tutLive() && started && !game.state.paused && !transBusy) {
+      tutT += dt;
+      if (!tutOn) {
+        // Before the first pill, and in the gap between two: the place card
+        // goes at 3.6 s and "be a menace." with it, and the walk starts
+        // after both. The gap lets one pill leave before the next rises.
+        if (tutBeat === 0 && tutT >= sysTUT_START_T) tutBeatStart(1);
+        else if (tutBeat > 0) {
+          tutWait += dt;
+          if (tutSayT > 0) {
+            // the shop clause has the floor for its four seconds
+            tutSayT -= dt;
+            if (tutSayT <= 0) { if (tutEl) { sysToastOut(tutEl); tutEl = null; } tutWait = 0; }
+          } else if (tutWait >= sysTUT_GAP_T) {
+            if (tutSay) { tutShow(tutSay); tutSay = ''; tutSayT = sysTUT_SAY_T; }
+            else tutBeatStart(tutBeat + 1);
+          }
+        }
+      } else {
+        // ...and the beat's clock stops while the gardener has the animal
+        // under his arm (MEASURED: he caught the bot at beat eight and
+        // carried it forty metres the wrong way; a beat that waits for the
+        // player's own action cannot count the seconds they have no say in)
+        if (!capy.carriedBy) tutBeatT += dt;
+        let hit = false;
+        switch (tutBeat) {
+          case 1: tutWalk += sp * dt; hit = tutWalk >= sysTUT_WALK_M; break;
+          case 2:
+            if (capy.grounded && !capy.carriedBy && !capy.rideBody && !mounted && sp > sysTUT_RUN_V) tutRunT += dt;
+            hit = tutRunT >= sysTUT_RUN_T; break;
+          case 3:
+            hit = !!(tutBench && capy.grounded && p.y > 0.9 &&
+                     Math.hypot(p.x - tutBench.x, p.z - tutBench.z) < sysTUT_BENCH_R);
+            break;
+          case 4: hit = tutWheekN > tut0.wheek || !!(taskRec.wheek && taskRec.wheek.done); break;
+          case 5:
+            hit = tutGrabN > tut0.grab || tutYuzuN > tut0.yuzu ||
+                  !!(taskRec['steal-hat'] && taskRec['steal-hat'].done);
+            // ...and the arrow follows the hat while the tourist walks: on
+            // the hint tick's own quarter-second, not every frame
+            if (hintT === sysHINT_TICK) { const a = tutTakeAim(); if (a) tutAim = a; }
+            break;
+          case 6: hit = tutTabN > tut0.tab; break;
+          case 7: {
+            const y = input.camYaw;
+            if (tutYawLast === tutYawLast) tutYaw += Math.abs(sysWrapPi(y - tutYawLast));
+            tutYawLast = y;
+            hit = tutYaw >= sysTUT_LOOK_RAD;
+            break;
+          }
+          case 8: {
+            const wp = wayPoint();
+            hit = !!(wp && Math.hypot(wp.x - p.x, wp.z - p.z) < sysTUT_DOOR_M);
+            break;
+          }
+        }
+        if (hit && tutBeatT >= sysTUT_MIN_T) tutBeatClose(true);
+        else if (tutBeatT >= (tutBeat === 8 ? sysTUT_DOOR_T : sysTUT_BEAT_T)) tutBeatClose(false);
       }
     }
 
