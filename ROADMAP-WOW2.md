@@ -932,6 +932,130 @@ count) and the tutorial's flag; every line in `npcLINES`'s pools or a
 `CHAPTERS` field, checked by `qa/lines.mjs` and `qa/l6-tics.mjs` (no
 phrase in more than three files).
 
+### N1 — shipped (20 Sep 2026)
+
+A low stone shelf stands in Sydney's gardens from the first frame
+(`environment.js`, `envSHELF_X/Z` = 35.6/27.4 — 5.8 m off the finale's own
+horseshoe centre, clear of both the 2.6 m ring and the 1.8 m "stopped in
+the middle" test). `systems.js`'s `sysShelfStage` lays every currently-
+held keepsake on it, ONE FIXED SLOT PER CHAPTER in `CHAPTERS` order — the
+journal shelf's own convention (THE SHELF — `keep`, v18), not the earn
+order the item asked for: `keepHeld` carries no timestamp, and this pass
+may not add a save field to give it one. Runs on all three Sydney-arrival
+doors (`startGame`'s non-restore branch, `biome:enter`, `sysEndPointHome`).
+The gardener speaks `CHAPTERS[n].kept` (nineteen new lines, one clause
+each, the gardener's own take) once per new keepsake, queued and staggered
+(`npc.js` `npcShelfStep`), proved never twice by a harness counter. The
+place card gains "the shelf has N things on it. it still has not said
+why." on a Sydney return.
+
+**Measured** (`qa/wow2-shelf.js`, three forced saves at 0/7/19 keeps via
+real `completeTask` calls, not a faked `keepHeld`): shelf count equals
+keep count at all three; the gardener-line counter matches the count of
+genuinely new keepsakes and does not grow on a re-visit with nothing new.
+
+### N2 — shipped (20 Sep 2026)
+
+The fifteen gated cameos (`addTraveller`'s own `gateChap`) now stand at
+their chapter's own exit board on approach within 25 m, back to the
+approach, reading it — one of fifteen new third-person lines — and walk
+off out of frame within 6 m or after a 90 s hold (`npc.js`
+`npcGlimpseStep`, off `game.exitBoard()`). The four originals (Quay,
+Marrakech, Cappadocia, Hanoi) are untouched. `travSeen` is the pass's
+first new save field, chapter-keyed, on the `travMet` distance-count
+pattern, bridged `npc.js` <-> `systems.js` the way `compSave` already
+bridges the companion. Past ten glimpses the stall gains "you again.";
+past all fifteen — not nineteen, a correction to this section's own
+premise above; only fifteen chapters carry `gateChap` — the finale
+traveller gets one line that acknowledges the chase.
+
+**Two bugs found and fixed in the process, both pre-existing:**
+`addTraveller`'s shop-stall code called `rec.lines.concat()`
+unconditionally, and the finale's own traveller (`npcTravFin`) is built
+with a FUNCTION for `lines`, not an array — every genuine "all nineteen
+kept" finale threw a `TypeError` inside the `finale:staged` handler before
+this fix, found by `qa/wow2-shelf.js`'s forced 19-keep pass. And the
+glimpse's own `'done'` (hidden) state was undone one frame later by
+`localsStep`'s own `gateChap` visibility check, which sets `visible = true`
+again on every frame `chapDoneHere` is true — re-asserted every frame now.
+
+**Measured live** (`qa/wow2-glimpse*.js`, deterministic `game.tick`
+walks): a Kyoto approach crosses `'stand'` at 24.99 m, `'leave'` at
+6.08 m, `'done'` (hidden, confirmed) shortly after; `travSeen` reads
+`{kyoto:1}` after the approach and stays `{}` for Rio, never approached.
+
+### N3 — shipped (20 Sep 2026)
+
+All nineteen chapters already had a regular (`npcPAL`) — the earlier
+"the two regulars" note above is about a different distinction (cast-vs-
+local lookup), not a count. **3.1 the absence:** a return after >= 20
+minutes of journey time elsewhere at tier >= 2 arms one of four `{call}`-
+templated lines (`npc.js` `palAwayArm`) through the tier greeting's own
+one-line channel; `systems.js`'s `sysChapLeftAt` is session-only, since
+`jrChapMs` is an accumulated total and this pass may not add a save field
+for a last-visit clock. **3.2 the kept gift:** past tier three, >= 3 rows
+done elsewhere since the last one re-arms the chapter's own gift prop
+drop (`palKeptArm` reuses `npcPalGive`), gated so it cannot fire twice
+running. **3.3 the companion's homecoming — REALITY CHECK:** "does not
+follow again, goes home" was already built (`compLeave`'s own `'home'`
+reason) before this pass touched it; what was missing was the notebook
+and the goodbye's own sound, both added (`jrChapHome`, a session-only
+fact feeding `nbFacts`' new `home` key; six new `{if:'home'}` notebook
+lines — venice/pigeon, goreme/cat, manly/silver gull, antarctic/gentoo,
+kyoto/heron, sydney/ibis). **Not built:** a per-kind landing spot (the
+Campanile's ledge and so on) — needs a landmark authored in six biome
+files this wave does not own; the existing generic walk-off stands.
+
+**Measured** (`qa/wow2-waits.js`): 5-minutes-away does not arm the
+absence line, 21-minutes-away does; the kept gift arms once at tier 3
+with three rows done and does not re-arm immediately after with nothing
+new; the pigeon's full round trip — save-forced `stow`, Venice arrival,
+`compWhy: 'home'`, `kind` cleared after the walk-off — run live end to
+end. The other five kinds share the identical code path, parameterised
+only by kind/biome, and were checked by reading rather than by five more
+browser passes, given the time this combined session had left.
+
+### N4 — shipped (20 Sep 2026)
+
+**4.1 the opening, ten seconds:** armed on the identical fresh-file gate
+Part T's own `tutArm` uses; delays "be a menace." behind a ten-second held
+establishing shot (`game.frameShot`, the same request every marquee/board
+shot already makes), skippable by any key or click. **Honest scope cut:**
+the roadmap's own first choice — the animal asleep, the traveller's bag
+beside it, carried off while the animal wakes — needs a pose outside
+`capybara.js` (owned by no wave here) and a scripted NPC departure judged
+too large a new surface for npc.js's existing AI machinery in the time
+this pass had left; the held shot is the buildable version, not the one
+asked for. **4.2 the morning after:** the shelf's all-nineteen was
+already true the moment N1 shipped (no new code — confirmed by a forced-
+`fin` save reading `shelf:19, keep:19`); the board's "again" line gains a
+shared fin epilogue (`sysFIN_AGAIN_TAIL`) once `sysFinDone` — a correction
+to this section's own "eleven chapters missing one": all nineteen were
+missing one, and nineteen bespoke variants was more writing than the
+remaining time allowed, so this is one clause appended in code rather
+than nineteen duplicated in text (and so it cannot trip `qa/l6-tics.mjs`'s
+three-file ceiling — it exists once). **Not built:** the gardener's
+stand-down becoming a sit-down beside the traveller — `npc.js`'s pose
+pipeline resets every record's crouch to zero ahead of its per-state
+switch, so a safe version needs a real case in that switch rather than a
+bolt-on, and this pass judged that too large a change to make safely with
+the time it had left.
+
+**Measured** (`qa/wow2-morning.js`): the opening arms on a fresh file
+(`t: 10`) and clears on a keypress (`t: null`); a restored file (one real
+task on it) never arms (`armed: false`); the fin-file shelf reads 19/19;
+the again line's fin tail is read straight off the live place card's DOM
+and off a screenshot (`qa/wow2-morning-fin.png`) on a real return
+crossing.
+
+**Budget, all of Part N:** no new draw calls or triangles beyond the
+shelf's own handful of static boxes (built once, at boot) and the
+fifteen travellers' existing figures repositioned in place; no per-frame
+term dense enough under the L11 rule to warrant its own `noX` cut flag —
+a scoping call, made and written down, not an oversight. New save field:
+`travSeen` only (N2); `kept` (N1) is a `CHAPTERS` content field, not a
+save key.
+
 ## Part T — the first three minutes
 
 Today a stranger presses Begin and gets four task rows, "be a menace.",
