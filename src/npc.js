@@ -1302,6 +1302,17 @@ export function createNPCs(game) {
     { k: "sph", r: 0.036, y: 0.13 },
     { w: 0.015, h: 0.13, d: 0.015, x: 0.035, y: 0.19, rz: -0.28 },
   ]);
+  // ---- THE ROSTER'S UMBRELLA (ROADMAP-WOW2 V2.3) --------------------------
+  // The locals' canopy and shaft (npcMakeUmbrella) as ONE part list in one
+  // buffer, instanced per rig — a cone and a stick, flat-shaded like every
+  // other part here. The instance colour is the canopy's; the shaft carries
+  // its own multiplier the way the shoe does. Drawn at scale 0 until it
+  // rains on somebody (see animHuman), so a dry chapter pays one draw call
+  // of nothing.
+  const gUmb = npcMakeGeo([
+    { k: 'cone', r: 0.44, h: 0.30, seg: 8, y: 0.30 },
+    { k: 'cyl', rt: 0.022, rb: 0.022, h: 0.78, seg: 5, c: npcSRGB(0.22) },
+  ]);
   const gIbisBody = npcMakeGeo([
     { k: 'sph', r: 0.16 },
     { w: 0.10, h: 0.07, d: 0.24, y: 0.02, z: -0.20 },
@@ -1382,6 +1393,7 @@ export function createNPCs(game) {
   const iCam   = mkInst(gCam, HUMANS);
   const iTool  = mkInst(gTool, HUMANS);
   const iCone  = mkInst(gCone, HUMANS);
+  const iUmb   = mkInst(gUmb, HUMANS);      // V2.3: one draw for the whole cast
   const iIbisB = mkInst(gIbisBody, IBIS, true);
   const iIbisN = mkInst(gIbisNeck, IBIS, true);
   const iIbisLA = mkInst(gIbisLeg, IBIS, true);
@@ -3162,6 +3174,10 @@ export function createNPCs(game) {
   // their own ear like a waiter. At -2.55 the hand lands at (0.30, 1.82, 0.33),
   // which is up, slightly forward, and under the canopy.
   const npcLOC_UMB_ARM  = 2.55;
+  const npcUMB_ARM_R    = 2.83;   // ...and the roster's, whose arm is 0.56 m (V2.3)
+  const npcLOC_BREATH_R   = 12;   // m from the animal a breath is worth drawing (V2.3)
+  const npcLOC_BREATH_GAP = 4;    // s between puffs, jittered per person
+  let npcBreathN = 0;             // puffs since the last audit reset
   const npcLOC_HUD_LAM  = 1.5;    // the huddle, which is a slow decision
   const npcLOC_LOOK_LAM = 4.0;
   const npcLOC_LOOK_DUR = 1.6;    // s a glance upward lasts
@@ -3184,12 +3200,16 @@ export function createNPCs(game) {
   // update() rather than inside localsStep, because localsStep returns early
   // when a chapter has no locals and the Sydney cast below still needs them.
   let npcWxRain = 0, npcWxGustS = 0, npcWxGustX = 0, npcWxGustZ = 0;
-  let npcWxMotes = 0, npcWxCold = 0, npcWxFront = -1;
+  let npcWxMotes = 0, npcWxCold = 0, npcWxFront = -1, npcWxFrontNear = 0;
   function npcWxRead() {
     const WX = game.weather;
     if (!WX) { npcWxRain = 0; npcWxGustS = 0; npcWxGustX = 0; npcWxGustZ = 0;
                npcWxMotes = 0; npcWxCold = 0; npcWxFront = -1; return; }
     npcWxFront = WX.front ? WX.front() : -1;
+    // How close the front is to crossing, 0 far out .. 1 at the line — the
+    // umbrella's anticipation (L7, F4), for both rigs. See the note where
+    // localsStep reads it.
+    npcWxFrontNear = npcWxFront > -1 ? clamp(1 - Math.abs(npcWxFront) * 3, 0, 1) : 0;
     npcWxRain = WX.drizzle();
     const gu = WX.gust();
     npcWxGustX = gu.x; npcWxGustZ = gu.z;
@@ -7052,7 +7072,7 @@ export function createNPCs(game) {
     // the whole time (measured in Kyoto: 14 of 14 at umb 1.00, rain 0.00).
     // 1 - |front| * 3 is 1 at the line and 0 a sixth of a cycle either side
     // of it, which is what the comment above always said it was.
-    const wxFrontNear = npcWxFront > -1 ? clamp(1 - Math.abs(npcWxFront) * 3, 0, 1) : 0;
+    const wxFrontNear = npcWxFrontNear;
     // Read ONCE for the whole population, for the same reason the weather is:
     // it is the same number for all of them and asking systems.js a hundred
     // and ten times a frame for one float is the cost that only shows up in
@@ -7414,7 +7434,9 @@ export function createNPCs(game) {
         // ...and AHEAD OF IT (L7, F4): the front within its last sixth of
         // approach puts the umbrella up before the first drop, same as the
         // roadmap's "locals put umbrellas up ahead of it."
-        if (!r.umbUp && (wxRain > npcLOC_UMB_ON || wxFrontNear > 0.85)) r.umbUp = true;
+        // ...and game.state.noUmbrella cuts it (V2.3), for the A/B.
+        if (!npcUmbOn) r.umbUp = false;
+        else if (!r.umbUp && (wxRain > npcLOC_UMB_ON || wxFrontNear > 0.85)) r.umbUp = true;
         else if (r.umbUp && wxRain < npcLOC_UMB_OFF && wxFrontNear < 0.5) r.umbUp = false;
         r.umb = damp(r.umb, r.umbUp ? 1 : 0, npcLOC_UMB_LAM, dt);
         if (r.umb > 0.01) {
@@ -7429,6 +7451,28 @@ export function createNPCs(game) {
           g2.rotation.x = clamp(wxGustZ * 0.045, -0.34, 0.34);
         } else if (r.umbG && r.umbG.visible) {
           r.umbG.visible = false;
+        }
+        // ---- THE BREATH (ROADMAP-WOW2 V2.3). In the two cold chapters, a
+        // puff off each head within npcLOC_BREATH_R of the animal every ~4 s,
+        // on the mote pool's burst buffer (weather.js, W1's V1.3: the
+        // quarter rule and the rung are its). 'bubble' is the kind — foam
+        // white, rising slowly, dying at a ceiling — because a breath is a
+        // thing that rises and fades, not a thing thrown up and dropped; a
+        // 'breath' row of its own (size 0.06, up 0.3, no gravity) is the one
+        // hook this file would ask weather.js for. In front of the face, and
+        // under the same flag as the umbrella: it is the same weather.
+        if (npcUmbOn && npcGEST_COLD[live] && d2 < npcLOC_BREATH_R * npcLOC_BREATH_R) {
+          r.breathT = (r.breathT || rand(0.5, 4)) - dt;
+          if (r.breathT <= 0) {
+            r.breathT = npcLOC_BREATH_GAP * rand(0.8, 1.25);
+            const WX = game.weather;
+            if (WX && typeof WX.burst === 'function') {
+              const fx = Math.sin(r.yaw), fz = Math.cos(r.yaw);
+              const hy = r.y + 1.52 * (r.fig.group.scale.y || 1);
+              WX.burst(r.x + fx * 0.24, r.z + fz * 0.24, 'bubble', 5, { y: hy, top: hy + 0.45 });
+              npcBreathN++;
+            }
+          }
         }
         r.hud = damp(r.hud, wxCold * (1 - r.umb * 0.5), npcLOC_HUD_LAM, dt);
         // THE GLANCE UP. Only where there is something to glance at, and on a
@@ -8708,6 +8752,7 @@ export function createNPCs(game) {
   // both end whatever is running and start nothing; the cut cost is this
   // one branch per person per frame.
   let npcGestOn = true, npcGestN = 0;
+  let npcUmbOn = true, npcUmbRosterOn = true;   // V2.3, written once a frame in update()
   const npcGestBy = { wrist: 0, stretch: 0, wave: 0, point: 0, shiver: 0, shade: 0 };
   function localGestureStep(r, dt, busy, facing, biome) {
     r.gsBz = busy;   // published for the audit: WHY nobody is gesturing
@@ -8923,6 +8968,7 @@ export function createNPCs(game) {
     const camN = new THREE_.Object3D();
     const toolN = new THREE_.Object3D();
     const coneN = new THREE_.Object3D();   // the 99, only while somebody has one
+    const umbN = new THREE_.Object3D();    // the umbrella (V2.3), scale 0 until it rains
     const legL = new THREE_.Object3D();
     const legR = new THREE_.Object3D();
     const holdN = new THREE_.Object3D();   // guitar / waiter's tray, carried on the chest
@@ -8964,6 +9010,12 @@ export function createNPCs(game) {
     bob.add(holdN);
     holdN.position.set(0.02, 1.02, 0.20);
     holdN.scale.setScalar(0);
+    // ON THE ROOT, not the arm, for the locals' own reason (npcMakeUmbrella):
+    // a canopy welded to a swinging hand goes through the skull. Over the
+    // head and to the holding side; the arm comes up to meet it.
+    root.add(umbN);
+    umbN.position.set(0.27, 1.80, 0.17);
+    umbN.scale.setScalar(0);
 
     head.position.set(0, npcPERSON.HEAD_Y, 0);
     armL.position.set(-npcPERSON.SHOULDER.x, npcPERSON.SHOULDER.y, 0);
@@ -9050,7 +9102,7 @@ export function createNPCs(game) {
       target: new THREE_.Vector3(),
       heldProp: null,
       idx,
-      nodes: { bob, head, hatN, armL, armR, handR, camN, toolN, coneN, legL, legR, holdN,
+      nodes: { bob, head, hatN, armL, armR, handR, camN, toolN, coneN, umbN, legL, legR, holdN,
                eyeN, browL, browR,
                hipsN, kneeL, kneeR, footL, footR, elbowL, elbowR },
       // the face pack npcFace() takes, and the two clocks that drive it
@@ -9065,6 +9117,9 @@ export function createNPCs(game) {
       // ---- and an idle gesture (V2.2), the locals' own fields. See
       // localGestureStep, which both rigs share.
       gsK: -1, gsT: 0, gsCd: rand(npcGEST_GAP0[0], npcGEST_GAP0[1]), gsN: 0, gsW: 0,
+      // ---- and whether this is one of the third who carry an umbrella
+      // (V2.3), from the seed, plus the locals' own latch and level.
+      umbOwn: false, umb: 0, umbUp: false,
       // ---- A VOICE OF THEIR OWN (F2). See the same field on addLocal ------
       // ...and a child's is higher, which is the one place in the game where a
       // build and a voice have to agree: P5 gave one tourist in seven a head
@@ -9140,6 +9195,13 @@ export function createNPCs(game) {
     const strolls = kind === 'tourist' || kind === 'commuter' || kind === 'queue' ||
                     kind === 'patron' || kind === 'churchgoer';
     rec.gait = strolls ? npcGaitPick(rec.idlePhase / 6.2832, child) : (child ? 1 : 0);
+    // ...and a third of them brought an umbrella (V2.3): a second hash of
+    // the same seed, so it is independent of the gait. Not the children —
+    // a child's umbrella is a different, larger joke than this file has
+    // room for — and not the kinds with something in their hands already.
+    rec.umbOwn = !child && kind !== 'gardener' && kind !== 'jogger' && kind !== 'waiter' &&
+                 kind !== 'busker' && kind !== 'vendor' && kind !== 'farmer' &&
+                 (Math.sin(rec.idlePhase * 13.7) * 0.5 + 0.5) < 0.34;
     return rec;
   }
 
@@ -9208,6 +9270,8 @@ export function createNPCs(game) {
     iCam.setColorAt(rec.idx, npcColor.setHex(cCam));
     iTool.setColorAt(rec.idx, npcColor.setHex(PALETTE.wood));
     iCone.setColorAt(rec.idx, npcColor.setHex(PALETTE.cloth6));
+    // the umbrella's canopy (V2.3): one of the locals' five, from the seed
+    iUmb.setColorAt(rec.idx, npcColor.setHex(npcUMB_COL[Math.floor(rec.idlePhase * 3.1) % npcUMB_COL.length]));
   }
 
   function addBody(rec, x, z) { return addBodyAt(rec, x, 0.85, z, 0.26, 0.8, 0.22); }
@@ -9576,6 +9640,7 @@ export function createNPCs(game) {
   iCam.instanceColor.needsUpdate = true;
   iTool.instanceColor.needsUpdate = true;
   iCone.instanceColor.needsUpdate = true;
+  iUmb.instanceColor.needsUpdate = true;
   iIbisB.instanceColor.needsUpdate = true;
   iIbisN.instanceColor.needsUpdate = true;
   iIbisLA.instanceColor.needsUpdate = true;
@@ -11721,7 +11786,43 @@ export function createNPCs(game) {
     // drizzles on them, and somebody caught in a shower with no umbrella
     // hunches and pulls their arms in exactly the way somebody cold does. Same
     // pose, reachable trigger.
-    const brace = Math.max(npcWxCold, npcWxRain * 0.85);
+    // ---- THE UMBRELLA, ON THIS RIG (ROADMAP-WOW2 V2.3) --------------------
+    // The note below this used to say why the roster had none: a per-person
+    // prop on an instanced cast is a whole new buffer and a write in
+    // pushInstances. It is — one buffer (iUmb / pUmb), one draw call per
+    // rig, one setMatrixAt per person — and a third of the cast own one
+    // (umbOwn, from the seed). The locals' latch and hysteresis, on the
+    // same rain and front terms (npcLOC_UMB_ON/OFF), and only while the
+    // person is STANDING OR STROLLING with that hand free: the mask on the
+    // right arm is the same test the talking arm takes, so a camera, a
+    // rake or a 99 wins the hand and the canopy folds. Parked at rung 1
+    // (npcUmbRosterOn); the flag cuts both rigs.
+    const uFree = rec.umbOwn && npcUmbRosterOn && npcGAIT_STATES[rec.state] &&
+                  rec.seatPose < 0.1 && rec.carryT < 0 && !rec.heldProp && rec.coneT < 0 && maskR > 0.6;
+    if (!uFree) rec.umbUp = false;
+    else if (!rec.umbUp && (npcWxRain > npcLOC_UMB_ON || npcWxFrontNear > 0.85)) rec.umbUp = true;
+    else if (rec.umbUp && npcWxRain < npcLOC_UMB_OFF && npcWxFrontNear < 0.5) rec.umbUp = false;
+    rec.umb = damp(rec.umb, rec.umbUp ? 1 : 0, npcLOC_UMB_LAM, dt);
+    if (rec.umb > 0.01) {
+      const u = rec.umb;
+      // it opens (the locals' own scale gesture) and tips into the gust
+      n.umbN.scale.set(0.28 + u * 0.72, 0.45 + u * 0.55, 0.28 + u * 0.72);
+      n.umbN.rotation.z = clamp(-npcWxGustX * 0.045, -0.34, 0.34);
+      n.umbN.rotation.x = clamp(npcWxGustZ * 0.045, -0.34, 0.34);
+      // the hand up under the canopy: this rig's arm is 0.56 m from the
+      // shoulder at (0.34, 1.18) to the hand, so -2.83 rad puts the hand at
+      // (0.34, 1.71, 0.17) — on the shaft, which is at z 0.17. The elbow's
+      // rest bend is taken out by the same weight, as the locals' is under
+      // the mask, so the hand lands where that was measured.
+      n.armR.rotation.x -= npcUMB_ARM_R * u * maskR;
+      n.armR.rotation.z -= 0.20 * u * maskR;
+      n.elbowR.rotation.x *= (1 - u);
+    } else if (n.umbN.scale.x !== 0) {
+      n.umbN.scale.setScalar(0);
+    }
+
+    // ...and somebody under an umbrella hunches less (V2.3)
+    const brace = Math.max(npcWxCold, npcWxRain * 0.85) * (1 - rec.umb * 0.6);
     if (brace > 0.01) {
       const fold = brace * maskL * 0.34;
       const foldR = brace * maskR * 0.34;
@@ -11926,6 +12027,7 @@ export function createNPCs(game) {
   let paCursor = 0;
   let paLlamaMade = 0, paDogMade = 0;
   let pTorso = null, pHips = null, pHead = null, pHair = null, pArmL = null, pArmR = null;
+  let pUmb = null;                          // V2.3: the Pasto cast's umbrellas
   let pEyes = null, pBrow = null;
   let pLegL = null, pLegR = null, pHat = null, pTool = null, pBroom = null;
   // the joints (v56) — same six buffers Sydney gets, on Pasto's own count
@@ -13119,6 +13221,7 @@ export function createNPCs(game) {
     pBrow.setColorAt(rec.idx * 2 + 1, npcColor.setHex(cHr));
     pTool.setColorAt(rec.idx, npcColor.setHex(cTool));
     pBroom.setColorAt(rec.idx, npcColor.setHex(cTool));
+    pUmb.setColorAt(rec.idx, npcColor.setHex(npcUMB_COL[Math.floor(rec.idlePhase * 3.1) % npcUMB_COL.length]));
     paColorDirty = true;
   }
 
@@ -13268,6 +13371,7 @@ export function createNPCs(game) {
     pBrow = mkInst(gBrow, PA_H * 2);
     pTool = mkInst(gTool, PA_H);
     pBroom = mkInst(gBroom, PA_H);
+    pUmb = mkInst(gUmb, PA_H);              // V2.3
     pLlamaB = mkInst(gLlamaBody, PA_LL, true);
     pLlamaN = mkInst(gLlamaNeck, PA_LL, true);
     pLlamaL = mkInst(gLlamaLeg, PA_LL * 4, true);
@@ -13486,6 +13590,7 @@ export function createNPCs(game) {
     pBrow.instanceColor.needsUpdate = true;
     pTool.instanceColor.needsUpdate = true;
     pBroom.instanceColor.needsUpdate = true;
+    pUmb.instanceColor.needsUpdate = true;
   }
 
   function paPush() {
@@ -13511,7 +13616,9 @@ export function createNPCs(game) {
       pShoeR.setMatrixAt(i, n.footR.matrixWorld);
       pTool.setMatrixAt(i, n.toolN.matrixWorld);
       pBroom.setMatrixAt(i, n.broomN.matrixWorld);
+      pUmb.setMatrixAt(i, n.umbN.matrixWorld);
     }
+    pUmb.instanceMatrix.needsUpdate = true;
     pTorso.instanceMatrix.needsUpdate = true;
     pHips.instanceMatrix.needsUpdate = true;
     pHead.instanceMatrix.needsUpdate = true;
@@ -14633,7 +14740,7 @@ export function createNPCs(game) {
   // Sydney's cast and Pasto's are the two instanced rigs npc.js owns; a
   // local is a group of its own meshes and systems.js fades those per mesh.
   const npcLENS_SYD = [iTorso, iHips, iHead, iHair, iArmL, iArmR, iFarmL, iFarmR, iLegL, iLegR,
-                       iShinL, iShinR, iShoeL, iShoeR, iHat, iEyes, iMouth, iCam, iTool, iCone];
+                       iShinL, iShinR, iShoeL, iShoeR, iHat, iEyes, iMouth, iCam, iTool, iCone, iUmb];
   let npcLensPas = null;
   function npcLensSet(m, i, k) {
     if (!m || !m.geometry || i < 0 || i >= m.instanceMatrix.count) return;
@@ -14658,7 +14765,7 @@ export function createNPCs(game) {
     i = paHumans.indexOf(rec);
     if (i >= 0 && pTorso) {
       if (!npcLensPas) npcLensPas = [pTorso, pHips, pHead, pHair, pArmL, pArmR, pFarmL, pFarmR, pLegL, pLegR,
-                                     pShinL, pShinR, pShoeL, pShoeR, pHat, pEyes, pTool, pBroom];
+                                     pShinL, pShinR, pShoeL, pShoeR, pHat, pEyes, pTool, pBroom, pUmb];
       for (let j = 0; j < npcLensPas.length; j++) npcLensSet(npcLensPas[j], i, k);
       npcLensSet(pBrow, i * 2, k); npcLensSet(pBrow, i * 2 + 1, k);
       return true;
@@ -14691,7 +14798,9 @@ export function createNPCs(game) {
       iCam.setMatrixAt(i, n.camN.matrixWorld);
       iTool.setMatrixAt(i, n.toolN.matrixWorld);
       iCone.setMatrixAt(i, n.coneN.matrixWorld);
+      iUmb.setMatrixAt(i, n.umbN.matrixWorld);
     }
+    iUmb.instanceMatrix.needsUpdate = true;
     iTorso.instanceMatrix.needsUpdate = true;
     iHips.instanceMatrix.needsUpdate = true;
     iHead.instanceMatrix.needsUpdate = true;
@@ -14928,6 +15037,11 @@ export function createNPCs(game) {
     npcWxRead();
     // the gesture's flag and its parking rung (V2.2), read once a frame
     npcGestOn = !game.state.noGesture && ((game.state.perfRung | 0) < 1);
+    // ...and the umbrella's (V2.3). The flag cuts both rigs' umbrellas; the
+    // rung parks only the roster's new instanced one — the locals' has
+    // been live under the governor since the presence pass and stays so.
+    npcUmbOn = !game.state.noUmbrella;
+    npcUmbRosterOn = npcUmbOn && ((game.state.perfRung | 0) < 1);
     // round or flat, live (G5): the animals' instances swap material on the edge
     if (npcRoundOn === !!game.state.noRound) {
       npcRoundOn = !game.state.noRound;
@@ -16612,6 +16726,36 @@ export function createNPCs(game) {
             * WHO HAS COMPANY (V2.4): pairs fired since the last reset and the
             * last two dozen of them, with the distance and where.
             */
+           /**
+            * WHO IS UNDER AN UMBRELLA (V2.3), on both rigs, with the two terms
+            * the latch reads — so a shower that measured as zero and a latch
+            * that never opened are told apart.
+            */
+           umbrella: function (reset) {
+             const live = game.biome && game.biome.current;
+             const cast = (live === 'sydney' || live === 'quay') ? humans : live === 'pasto' ? paHumans : null;
+             let ln = 0, lup = 0, rn = 0, rown = 0, rup = 0;
+             const rows = [];
+             for (let i = 0; i < locals.length; i++) {
+               const r = locals[i];
+               if (r.biome !== live || !r.fig) continue;
+               ln++;
+               if (r.umb > 0.5) { lup++; rows.push({ kind: 'local', x: +r.x.toFixed(1), z: +r.z.toFixed(1), y: +r.y.toFixed(2), umb: +r.umb.toFixed(2) }); }
+             }
+             if (cast) for (let i = 0; i < cast.length; i++) {
+               const r = cast[i];
+               if (r.kind === 'ibis') continue;
+               rn++;
+               if (r.umbOwn) rown++;
+               if (r.umb > 0.5) { rup++; rows.push({ kind: r.kind, x: +r.group.position.x.toFixed(1), z: +r.group.position.z.toFixed(1), y: +r.group.position.y.toFixed(2), umb: +r.umb.toFixed(2), state: r.state, yaw: +r.yaw.toFixed(2) }); }
+             }
+             const out = { biome: live, on: npcUmbOn, rosterOn: npcUmbRosterOn, rain: +npcWxRain.toFixed(3),
+                           frontNear: +npcWxFrontNear.toFixed(2), front: +npcWxFront.toFixed(2),
+                           locals: { n: ln, up: lup }, roster: { n: rn, own: rown, up: rup }, rows: rows,
+                           breaths: npcBreathN };
+             if (reset) npcBreathN = 0;
+             return out;
+           },
            company: function (reset) {
              const out = { biome: game.biome && game.biome.current, on: !game.state.noCompany,
                            pairs: locCoN, rows: locCoRows.slice() };
