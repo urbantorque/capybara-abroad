@@ -281,6 +281,19 @@ const envJAC_SPOTS = [[30, 20], [40.5, 26], [47, 45], [26.5, 49], [54, 36], [21,
                       // the junctions of the eastern walks
                       [58.5, 50.5], [51.5, 55], [40, 57.5], [62, 44], [24, 56],
                       [-27, 40], [-34, 55]];
+// THE JACARANDA CANOPY LIST (ROADMAP-WOW3 D6): a second, PARALLEL list, not
+// folded into envDAPPLE_FIGS above — that one is already at grain()'s own
+// eight-circle ground-shading cap, and adding jacarandas there would mean
+// dropping figs, not this item's ask. This list is read only for canopy
+// REGISTRATION (weather.js's gust strip), never for ground shading, so there
+// is no circle budget to respect: all fifteen spots are kept rather than a
+// spawn-nearest eight. Exported because weather.js is this same wave's file
+// too, so it can import this directly rather than the scene-walk V5 used to
+// find envDAPPLE_FIGS (V5 did not own this file; wxStripFind in weather.js
+// is that older, generic path and still serves the other three chapters).
+// r 4.4 matches the jacaranda's own built crown radius (three canopy blobs,
+// offset 1.2*s, each 2.8-3.6*s across — envBuildTrees' jacCan loop below).
+export const envDAPPLE_JAC = envJAC_SPOTS.map(([x, z]) => ({ x, z, r: 4.4 }));
 
 // Fallen jacaranda blossom on the spawn lawn: cx, cz, radius.
 const envBLOSSOM = [

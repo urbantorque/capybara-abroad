@@ -1,5 +1,10 @@
 import * as THREE from 'three';
 import { PALETTE, mat, rand, clamp, damp, calmOn, waterYAt } from './shared.js';
+// ROADMAP-WOW3 D6: this wave owns environment.js too, so the jacaranda gust
+// below reads its canopy list by a direct import rather than the scene-walk
+// wxStripFind below still uses for the other three chapters (V5, who built
+// that scan, did not own environment.js at the time).
+import { envDAPPLE_JAC } from './environment.js';
 
 // ===========================================================================
 // THE GLOBAL ENVIRONMENT — a biome's mood is FIXED, and it breathes anyway.
@@ -196,16 +201,19 @@ function wxSkitter(kind) { return wxSKIT[kind] ? { kind: kind } : null; }
 // finds the ground the same way), so reading them back costs one scene walk,
 // cached until the next `biome:enter`.
 //
-// THE HONEST MISS: Sydney's jacarandas are NOT in the dapple system — only
-// its figs are (envDAPPLE_FIGS) — so there is no baked position to find for
-// them, and the purple gust the roadmap asked for stays with the ground
-// petals the skitter above already throws (wxSKIT.jacaranda IS a gust
-// reaction on those same trees, just petals already down rather than leaves
-// coming off). The figs get the airborne leaf instead, in their own green.
+// THE HONEST MISS, CLOSED (ROADMAP-WOW3 D6): Sydney's jacarandas were NOT in
+// the dapple system — only its figs are (envDAPPLE_FIGS) — so V5 had no
+// baked position to find for them and folded the purple gust the roadmap
+// asked for into the ground petals the skitter above already throws
+// (wxSKIT.jacaranda). This wave owns environment.js too, so a minimal
+// PARALLEL list (envDAPPLE_JAC, imported above) now feeds a second, small
+// strip function below (wxStepJacStrip) that fires the trees' own purple
+// (PALETTE.petalPurple) as an airborne leaf — distinct from the figs' green
+// here AND from the ground-petal skitter, which still runs unchanged.
 // Kyoto's eaves, Hanoi's shophouses and Kowloon's signs are architecture, not
 // a canopy, and carry no equivalent baked list at all, so V5.4 (the drip)
-// rides the same four canopy chapters V5.3 does rather than the roadmap's
-// named buildings. See the V5 shipped note for the full accounting.
+// still rides the same four canopy chapters V5.3 does rather than the
+// roadmap's named buildings. See the V5 shipped note for the full accounting.
 const wxSTRIP = {
   sydney:   { col: PALETTE.leafB,     h: 4.9 },  // the figs (envDAPPLE_FIGS); see envBuildLorikeets' own 4.9 m crown centre
   kyoto:    { col: PALETTE.momiji,    h: 5.0 },  // the sando's maples (kyoSANDO_MAPLES; h 4.2-6.0 per tree)
@@ -835,6 +843,7 @@ export function createWeather(game) {
   let wxStripCd = 0;     // s until the gust may strip another canopy
   let wxDripLeft = 0;    // s of "a shower just happened here" left to drip in
   let wxDripDue = 0;     // s until the next drop
+  let wxJacCd = 0;       // s until the gust may strip another jacaranda (D6)
 
   // ---- THE FRONT (L7, F4) --------------------------------------------------
   // A single scalar, -1..1, the front's position along the chapter's wind:
@@ -1195,7 +1204,7 @@ export function createWeather(game) {
     // maples the moment the crossing lands. The canopy cache goes with it —
     // wxStripFind re-derives it from the new chapter's own scene on first
     // use, cheaply (it is cached again the instant it is found).
-    wxStripCd = 0; wxDripLeft = 0; wxDripDue = 0;
+    wxStripCd = 0; wxDripLeft = 0; wxDripDue = 0; wxJacCd = 0;
     wxStripCells = null; wxStripCellsFor = null;
     wxFieldTo(row);
     wxMistTo(name);
@@ -1515,6 +1524,8 @@ export function createWeather(game) {
 
     // ---- the strip and the drip (V5.3/V5.4). See the block above wxSTRIP.
     wxStepStrip(dt);
+    // ---- the jacaranda gust (ROADMAP-WOW3 D6). See wxStepJacStrip above.
+    wxStepJacStrip(dt);
 
     // ---- the skitter (Part B). See the block above wxSKIT. ---------------
     // Horizontally it is the motes' box — it follows the lens and wraps, so
@@ -1664,6 +1675,40 @@ export function createWeather(game) {
         wxDripDue = rand(0.85, 1.15);
       }
     }
+  }
+
+  /**
+   * THE JACARANDA GUST (ROADMAP-WOW3 D6). Sydney only. Same shape as the
+   * gust half of wxStepStrip above (nearest canopy, same peak/threshold
+   * test, same burst pattern) but reading envDAPPLE_JAC directly instead of
+   * a grain-baked list, and its own cooldown (wxJacCd) so it does not share
+   * — or fight over — wxStripCd with the figs' green gust; both can fire in
+   * the same peak, from different trees, which is correct: a real gust
+   * strips whatever canopy it is under, not one species city-wide.
+   */
+  function wxStepJacStrip(dt) {
+    if (name !== 'sydney') return;
+    const cut = (game.state && game.state.noStrip) || (((game.state && game.state.perfRung) | 0) >= 1);
+    if (cut) return;
+    const capy = game.capy, cp = capy && capy.position;
+    if (!cp) return;
+    wxJacCd -= dt;
+    if (wxJacCd > 0) return;
+    const peak = row.gust.base + row.gust.swing;
+    const gm = Math.hypot(wxGust.x, wxGust.z);
+    if (!(peak > 0.05 && gm > peak * 0.84)) { wxJacCd = 0.4; return; }
+    let best = null, bd = 22 * 22;
+    for (let i = 0; i < envDAPPLE_JAC.length; i++) {
+      const c = envDAPPLE_JAC[i], dx = c.x - cp.x, dz = c.z - cp.z, d = dx * dx + dz * dz;
+      if (d < bd) { bd = d; best = c; }
+    }
+    if (!best) { wxJacCd = 0.6; return; }
+    const a = rand(0, 6.28318);
+    const bx = best.x + Math.cos(a) * best.r, bz = best.z + Math.sin(a) * best.r;
+    const fy = wxFloorAt(bx, bz, capy);
+    burst(bx, bz, 'leaf', Math.round(rand(10, 16)),
+          { color: PALETTE.petalPurple, y: fy + 3.6 * rand(0.7, 1.0), floor: fy });
+    wxJacCd = rand(2.6, 4.4);
   }
 
   /**
