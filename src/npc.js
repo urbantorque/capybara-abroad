@@ -3507,6 +3507,7 @@ export function createNPCs(game) {
   function npcGlimpseStep(dt) {
     const live = game.biome && game.biome.current;
     if (!live || !game.state || !game.state.started || game.state.paused) return;
+    if (game.state.noGlimpse || (game.state.perfRung | 0) >= 1) return;
     const capy = game.capy && game.capy.position;
     if (!capy) return;
     for (let i = 0; i < locals.length; i++) {
@@ -5392,6 +5393,7 @@ export function createNPCs(game) {
   /** Called once a frame from the main step, below. */
   function npcShelfStep(dt) {
     if (!npcShelfQ.length) return;
+    if (game.state && (game.state.noShelf || (game.state.perfRung | 0) >= 1)) return;
     if (!game.biome || game.biome.current !== 'sydney') return;
     npcShelfCd -= dt;
     if (npcShelfCd > 0) return;
