@@ -4341,6 +4341,13 @@ const sysSAVE_SHAPE = {
   // written before it existed, which is fine: that file is carried on, and
   // the walk never runs on a restore — it is for a file with no history.
   tut: 'number',
+  // THE GLIMPSE (ROADMAP-WOW2, N2): biome -> 1, which chapter boards the
+  // traveller has been seen at. Additive, no version bump; a file written
+  // before it existed simply has none, which is the correct history for a
+  // journey that could not have been counted yet. See npc.js's
+  // travSeenSave/travSeenLoad, the same bridge shape compSave/
+  // compRestoreFrom already use for the companion.
+  travSeen: 'object',
   // THINGS THAT TURN UP (L8, F4). Live drops themselves are NOT saved — the
   // whole pool is ephemeral, rerolled fresh on every arrival, and a save
   // full of stale prop positions would be its own class of bug. The one
@@ -29618,7 +29625,7 @@ export function createSystems(game) {
    */
   function sysEndPointHome() {
     const bm = game.biome;
-    if (bm && bm.current === 'sydney') { sysFinaleCheck(); return; }
+    if (bm && bm.current === 'sydney') { sysShelfStage(); sysFinaleCheck(); return; }
     sysEndHomeSaid = true;
     musSwell(1);
     sfx('chime', { volume: 0.6, pitch: 1.3, force: true });
@@ -29887,7 +29894,8 @@ export function createSystems(game) {
                 inc: jrChapInc[n] || 0, scn: jrChapScene[n] || 0, pho: jrChapPho[n] || 0,
                 fed: jrChapFed[n] || 0, pas: jrChapPerch[n] || 0, ln: Math.round(jrChapLine[n] || 0),
                 err: jrChapErr[n] || 0, tier: jrChapPal[n] || 0,
-                wow: 0, keep: chapComplete(n) ? 1 : 0, enough: chapEnough(n) ? 1 : 0, met: 0, par: 0 };
+                wow: 0, keep: chapComplete(n) ? 1 : 0, enough: chapEnough(n) ? 1 : 0, met: 0, par: 0,
+                home: jrChapHome[n] || 0 };
     const w = wowOfChapter(n);
     if (w && taskRec[w.id] && taskRec[w.id].done) f.wow = 1;
     if (rec) for (let i = 0; i < rec.ids.length; i++) {
@@ -33282,6 +33290,8 @@ export function createSystems(game) {
         puff: puffEver ? 1 : 0,
         // ...and THE FIRST WALK (ROADMAP-WOW2, T), on the same terms.
         tut: tutEver ? 1 : 0,
+        // ...and THE GLIMPSE (N2), on exactly the same terms.
+        travSeen: (typeof game.travSeenSave === 'function') ? game.travSeenSave() : undefined,
         // ...and THE YUZU (L8, F1): the wallet, and which chapters have
         // already paid their full plate. Additive, no version bump.
         yuzu: jrYuzu, platedAt: jrPlatedAt,
@@ -35494,6 +35504,12 @@ export function createSystems(game) {
   // catch-all state came to reset the timer it was waiting on.
   const sysPAL_MAX = 5;                       // tiers. npc.js authors five lines.
   const jrChapPal = Object.create(null);      // chapter -> the regular’s tier
+  // THE COMPANION'S HOMECOMING (ROADMAP-WOW2, N3.3): chapter -> 1, once it
+  // has come home there this session. Deliberately NOT a save field (the
+  // three this pass may add are travSeen, kept and tut) — a companion that
+  // came home earlier in a session that has since been reloaded reads as
+  // one that has not, which is the honest limit of a fact with no field.
+  const jrChapHome = Object.create(null);
   game.events.on('pal:warm', function () {
     const cn = todoChapter();
     if (cn <= 0 || (jrChapPal[cn] || 0) >= sysPAL_MAX) return;
@@ -35548,6 +35564,60 @@ export function createSystems(game) {
     try { if (typeof game.palArm === 'function') game.palArm(sysAgainLine && t === 1 ? 2 : t); }
     catch (e) { /* an older npc.js has no regulars */ }
   });
+
+  // ===========================================================================
+  // SOMEONE WAITS (ROADMAP-WOW2, N3.1/N3.2)
+  // ===========================================================================
+  // The regulars know your name at tier three and give a gift once (B8). No
+  // one notices you were gone, and nobody puts anything out a second time.
+  // Both doors below are armed here (this file owns `jrChapMs`/`jrTotalMs`
+  // and now the two clocks these add) and spent in npc.js's npcPalStep,
+  // through `game.palAwayArm`/`game.palKeptArm` — the same "one number here,
+  // one person there" split B15 already drew for the tier itself.
+  //
+  // SESSION-ONLY, LIKE `npcTravMet`. `jrChapMs` is an ACCUMULATED total, not
+  // a last-visit timestamp (the WOW2-PARTN-BRIEF's own warning), so "time
+  // since I was last in this chapter" needs a clock this pass adds — and it
+  // is deliberately NOT one of the three save fields this pass may add: a
+  // session that starts by loading a file already has nowhere it was "just
+  // in", so the absence line simply cannot fire on the first return of a
+  // new session, which is the correct history and not a bug to work around.
+  const sysChapLeftAt = Object.create(null);   // chapter -> jrTotalMs() at the moment it was left
+  const sysChapRowsAt = Object.create(null);   // chapter -> row count when the kept gift last fired
+  const sysPAL_AWAY_MS = 20 * 60 * 1000;       // 20 minutes of journey time elsewhere
+  const sysPAL_KEPT_TIER = 3;                  // == npc.js's npcPAL_GIFT_T
+  const sysPAL_KEPT_ROWS = 3;                  // rows done elsewhere since the last one
+  // QA-only, same shape as qaForceChapTick above: a state assertion, not a
+  // live-earn, for qa/wow2-waits.js — a real 20-minute wait is not something
+  // a four-minute run-code window can afford.
+  game.state.qaChapLeftSet = function (n, ms) { sysChapLeftAt[n] = ms; };
+  game.state.qaJrTotalMs = jrTotalMs;
+  game.state.qaChapRowsSet = function (n, v) { sysChapRowsAt[n] = v; };
+  /** Called from the biome:enter handler above, with the same payload. */
+  function sysPalAwayCheck(p) {
+    const toN = chapterOf((p && p.name) || 'sydney');
+    const fromN = p && p.from ? chapterOf(p.from) : 0;
+    if (fromN > 0) sysChapLeftAt[fromN] = jrTotalMs();
+    if (toN <= 0) return;
+    const tier = jrChapPal[toN] || 0;
+    if (tier < 1) return;
+    const leftAt = sysChapLeftAt[toN];
+    if (leftAt !== undefined) {
+      const awayMs = jrTotalMs() - leftAt;
+      if (tier >= 2 && awayMs >= sysPAL_AWAY_MS && typeof game.palAwayArm === 'function') {
+        try { game.palAwayArm(chapterDef(toN).biome, awayMs); } catch (e) { /* an older npc.js has no regulars */ }
+      }
+    }
+    if (tier >= sysPAL_KEPT_TIER) {
+      const rec = chapRec[toN];
+      const rowsNow = rec ? rec.ids.length : 0;
+      const rowsAt = sysChapRowsAt[toN] || 0;
+      if (rowsNow - rowsAt >= sysPAL_KEPT_ROWS && typeof game.palKeptArm === 'function') {
+        sysChapRowsAt[toN] = rowsNow;
+        try { game.palKeptArm(chapterDef(toN).biome); } catch (e) { /* an older npc.js has no regulars */ }
+      }
+    }
+  }
   /** THE HARNESS’S WINDOW ON THE NUMBER. npc.js’s palAudit is the window on
    *  the person; neither can see the other half, which is the point. */
   /** The best tier reached anywhere, and how many places are at least `t`.
@@ -36129,6 +36199,76 @@ export function createSystems(game) {
       try { ph.spawnKeep(chapterDef(k).biome, sp.x + Math.cos(a) * r, sp.z + Math.sin(a) * r); }
       catch (e) { /* ditto */ }
     }
+  }
+
+  // ======================================================================
+  // THE SHELF IN THE WORLD (ROADMAP-WOW2, N1)
+  // ======================================================================
+  // The ledger and the journal's shelf list the keepsakes; the finale lays
+  // them on the lawn. Between those two, a keepsake has always been a save
+  // field and nothing else — sysKeepsRestore above puts an EARNED one back
+  // in the world you happen to be standing in, and sysFinaleStage (below)
+  // lays every one of them out, but only once every last chapter is done.
+  // There was no point in the game where "the things you have kept" was a
+  // PICTURE, growing.
+  //
+  // So: a low stone shelf stands in Sydney's gardens from the first frame
+  // (environment.js, envSHELF_X/Z) — empty. This is the same shelf physical
+  // object the finale's own horseshoe later empties onto the lawn: nothing
+  // here fights sysFinaleStage, it simply runs first, every time the animal
+  // stands in Sydney, and the finale (gated on sysFinaleAll) overrides
+  // wherever it likes the moment the game is actually finished.
+  //
+  // ONE SLOT PER CHAPTER, IN CHAPTER ORDER — not the order actually earned.
+  // The journal's own shelf (THE SHELF — `keep`, v18) already made this
+  // choice ("ONE SLOT PER CHAPTER... the unearned ones drawn greyscale") and
+  // it is the only choice available here too: the roadmap asks for "the
+  // order earned" but nothing on the save file records WHEN a keepsake was
+  // taken, only THAT it was (keepHeld is a projection, not a log), and the
+  // rules for this pass forbid a new save field beyond travSeen/kept/tut.
+  // A per-chapter fixed slot is also the more honest physical object: an
+  // earned-order shelf would shuffle every item sideways each time a new one
+  // arrived, which is furniture, not a shelf.
+  const sysSHELF_X = 35.6, sysSHELF_Z = 27.4, sysSHELF_LEN = 4.6;   // == environment.js's envSHELF_*
+  const sysSHELF_SURF = 0.84;
+  function sysShelfSlot(k) {
+    const n = chapMax > 1 ? chapMax - 1 : 1;
+    const t = (k - 1) / n;
+    return { x: sysSHELF_X, y: sysSHELF_SURF, z: sysSHELF_Z - sysSHELF_LEN * 0.5 + t * sysSHELF_LEN };
+  }
+  const sysShelfSpoken = Object.create(null);   // chapter -> the gardener has already said its line (session)
+  let sysShelfCount = 0;                        // for the place card's sentence
+  /**
+   * Called on every arrival in Sydney (both doors in — see the two call
+   * sites below, the same pair sysFinaleCheck itself is called from).
+   * Idempotent and cheap: physStageKeep no-ops a body already asleep at the
+   * position given.
+   */
+  function sysShelfStage() {
+    const ph = game.physics;
+    if (!ph || typeof ph.stageKeep !== 'function') return;
+    let n = 0;
+    const grew = [];
+    for (let k = 1; k <= chapMax; k++) {
+      if (!keepHeld(k)) continue;
+      n++;
+      const sp = sysShelfSlot(k);
+      try { ph.stageKeep(chapterDef(k).biome, sp.x, sp.z, sp.y); } catch (e) { /* one shelf slot is not worth the sentence */ }
+      if (!sysShelfSpoken[k]) { sysShelfSpoken[k] = true; grew.push(k); }
+    }
+    sysShelfCount = n;
+    // ...AND THE GARDENER NOTICES (N1). Once per keepsake, ever — never
+    // twice — so a first Sydney visit after finishing several chapters
+    // elsewhere queues each of them rather than only the newest.
+    if (grew.length) {
+      try { game.events.emit('shelf:grew', { ks: grew }); } catch (e) { /* a line is not worth the shelf */ }
+    }
+  }
+  /** The place card's one extra sentence on a Sydney return. See N1. */
+  function sysShelfLine() {
+    if (!sysShelfCount) return '';
+    return 'the shelf has ' + sysShelfCount + (sysShelfCount === 1 ? ' thing' : ' things') +
+           ' on it. it still has not said why.';
   }
 
   // ======================================================================
@@ -37124,6 +37264,14 @@ export function createSystems(game) {
       paperEver = !!jrFile.paper;
       puffEver = !!jrFile.puff;
       tutEver = !!jrFile.tut;
+      // ...and THE GLIMPSE (N2): a chapter-keyed set, checked field by
+      // field the way `owned`'s allowlist is, since a bogus key here would
+      // otherwise sit in npc.js's set for ever.
+      if (typeof game.travSeenLoad === 'function' && jrFile.travSeen && typeof jrFile.travSeen === 'object') {
+        const tsIn = {};
+        for (const k in jrFile.travSeen) if (jrFile.travSeen[k]) tsIn[k] = 1;
+        game.travSeenLoad(tsIn);
+      }
       // ...and THE YUZU (L8, F1): the `ms`-style number-or-zero guard, and
       // the full-plate ledger read back the same way `pal`/`pho` are above.
       // LIFT9, C4 bonus finding: this was the one writer of jrYuzu with no
@@ -37275,6 +37423,7 @@ export function createSystems(game) {
       // emits no biome:enter — so this is the second and only other door THE
       // LAWN can be reached through. A restored file with all nineteen chapters
       // done that opens straight into Sydney comes in exactly here.
+      sysShelfStage();
       sysFinaleCheck();
       // ---- ...AND IT IS THE ONE CHAPTER THAT NEVER SAID ITS NAME (F1) ----
       //
@@ -40120,7 +40269,8 @@ export function createSystems(game) {
           // ...and the return's line beats the rumour (L7, E6): what the
           // place has heard about you is true anywhere; that it has SEEN you
           // is true here. `sysAgainLine` was read at the top of the crossing.
-          showPlace(title, sub || '', stowHeadline() || sysAgainLine || notoHeadline(chapterOf(name)));
+          showPlace(title, sub || '',
+            stowHeadline() || sysAgainLine || (name === 'sydney' ? sysShelfLine() : '') || notoHeadline(chapterOf(name)));
           sysAgainLine = '';
         }, sysFADE_CARD_LAG);
         // and the art goes with the white, once it has finished leaving
@@ -40921,6 +41071,14 @@ export function createSystems(game) {
   // wiring
   // =========================================================================
   game.completeTask = completeTask;
+  // Read-only, for the harness: which task ids belong to a chapter, and
+  // where the shelf currently stands. See qa/wow2-shelf.js (N1).
+  game.tasksInChapter = tasksInChapter;
+  game.shelfAudit = function () {
+    const slots = [];
+    for (let k = 1; k <= chapMax; k++) slots.push(sysShelfSlot(k));
+    return { shelf: sysShelfCount, keep: keepCount(), slots: slots };
+  };
   /**
    * HAS THIS ONE BEEN DONE. Read-only, and it exists because the people
    * standing in the chapters need it: a line that is only true after you have
@@ -42933,6 +43091,34 @@ export function createSystems(game) {
     // chapter you never left) reads as one too.
     if (to === compFrom) {
       compObj.visible = true;
+      // ===== N3.3: THE COMPANION'S HOMECOMING (ROADMAP-WOW2) ===============
+      // REALITY CHECK: this branch already existed and already does most of
+      // it — compLeave('home') is a real, distinct reason (compWhy), so "it
+      // does not follow again; it goes to its place" was true before this
+      // pass touched anything. What was missing: the notebook never heard
+      // about it, and it left in total silence. Both fixed here, cheaply,
+      // because the branch itself was already doing the hard part.
+      //
+      // NOT BUILT: a per-kind landing spot (the Campanile's ledge, the
+      // colony, a doorstep). compLeave's own walk-off is generic — away
+      // from wherever it currently stands — and a real per-kind spot would
+      // need a landmark coordinate authored in each of six BIOME FILES this
+      // wave does not own (venice.js, goreme.js, manly.js, antarctic.js,
+      // kyoto.js, npc.js's own Sydney ibis flock). Left for whichever wave
+      // next owns those files; the generic walk-off is the honest fallback.
+      const homeN = chapterOf(to);
+      if (homeN > 0 && !jrChapHome[homeN]) {
+        jrChapHome[homeN] = 1;
+        saveSoon();   // session-only fact, but nbWrite below still wants a flush
+      }
+      // the companion's own sound, once, so the goodbye is heard and not
+      // only seen — the same voice/pitch its climb already uses
+      if (compTr && compTr.voice) {
+        compSfx.volume = 0.30 + Math.random() * 0.08;
+        compSfx.pitch = compTr.pitch * (0.94 + Math.random() * 0.08);
+        sfx(compTr.voice, compSfx);
+      }
+      nbWrite(homeN);   // the page is rewritten now, so `home` is on it today
       compLeave(game.capy, 'home');
       return;
     }
@@ -46722,7 +46908,12 @@ export function createSystems(game) {
     // arrangement has to be made again the next time you walk in. See THE LAWN.
     // ...and every OTHER arrival, on a journey that is finished but has not
     // been closed, is a chance to say where the last of it is. See sysEndSayHome.
-    if (name === 'sydney') sysFinaleCheck(); else { sysFinStaged = false; game.state.finaleOn = false; sysEndSayHome(); }
+    if (name === 'sydney') { sysShelfStage(); sysFinaleCheck(); } else { sysFinStaged = false; game.state.finaleOn = false; sysEndSayHome(); }
+    // ===== N3: SOMEONE WAITS (ROADMAP-WOW2) ===============================
+    // `p.from` names the chapter just left — carried on `biome:enter` since
+    // F3 (see THE COMPANION's own note on the same field, above) and read
+    // here for the first time by anything that is not that mechanic.
+    sysPalAwayCheck(p);
     // Every biome is authored in the SAME coordinates, so a breadcrumb dropped
     // on the Corso is a point inside a basilica once Venice is attached. The
     // trail belongs to the world it was walked in and to no other.

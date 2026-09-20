@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matOwn, matRound, TASKS, rand, randInt, clamp, damp, lerp, waterYAt } from './shared.js';
+import { PALETTE, mat, matOwn, matRound, TASKS, rand, randInt, clamp, damp, lerp, waterYAt,
+         chapterDef } from './shared.js';
 
 // ===========================================================================
 // AGENT D — NPC AI.  Sydneysiders: tourists, gardeners, joggers, bin chickens.
@@ -3448,6 +3449,122 @@ export function createNPCs(game) {
   // joke of the character and is what the closing lines assume.
   function npcTravKnown() { return npcTravCount() >= 2; }
 
+  // =========================================================================
+  // THE GLIMPSE (ROADMAP-WOW2, N2)
+  // =========================================================================
+  // The fifteen gated cameos (addTraveller's own `gateChap`, one per chapter
+  // that is not one of the four originals — Quay, Marrakech, Cappadocia,
+  // Hanoi, which stay exactly as they were: the traveller does not leave
+  // when you are stood in front of them) now play one small scene at their
+  // own chapter's exit board: read it, back to you, and leave the moment you
+  // are close. `game.exitBoard()` (systems.js) already tracks the live
+  // board's world position for the harness; this is its second reader.
+  //
+  // A SEPARATE SET FROM npcTravMet. That one is "stood within 3.2 m, ever"
+  // and stays exactly what F2/S1's shop logic already depends on; this one
+  // is "came within 25 m of the board", the distance the roadmap actually
+  // asks travSeen to count. Session-scoped exactly as npcTravMet is NOT —
+  // travSeen is one of the three fields this pass is allowed to add to the
+  // save (sysSAVE_SHAPE, systems.js); the bridge is travSeenSave/Load below,
+  // the same shape compSave/compRestoreFrom already use for the companion.
+  const npcTravSeen = Object.create(null);
+  function npcTravSeenCount() { let n = 0; for (const k in npcTravSeen) n++; return n; }
+  if (game.state) {
+    game.travSeenSave = function () { const o = {}; for (const k in npcTravSeen) o[k] = 1; return o; };
+    game.travSeenLoad = function (o) { if (!o) return; for (const k in o) if (o[k]) npcTravSeen[k] = 1; };
+  }
+  const npcTRAV_GLIMPSE_R = 25;      // m: the approach that turns them to the board
+  const npcTRAV_GLIMPSE_LEAVE_R = 6; // m: the approach that sends them off
+  const npcTRAV_GLIMPSE_HOLD = 90;   // s at the board before they leave anyway
+  const npcTRAV_GLIMPSE_SPD = 1.5;   // m/s, walking off out of frame
+  const npcTRAV_GLIMPSE_WALK = 3.0;  // s of it before they are gone
+  // Nineteen the game does everything in; fifteen of them have a board worth
+  // reading a second time. Third person, what THEY were looking at — never
+  // you, and never why.
+  const npcTRAV_GLIMPSE = {
+    sydney:    'the traveller reads the board with a thumb on the corner, like it might change.',
+    pasto:     'the traveller studies the board a long moment, glances up at the volcano, and studies it again.',
+    kyoto:     'the traveller reads the board with the bridge’s noise going on behind them.',
+    cali:      'the traveller reads the board in time with the music two streets over, without quite meaning to.',
+    rio:       'the traveller reads the board with the bateria still audible down the hill.',
+    iceland:   'the traveller reads the board holding their collar shut against the wind.',
+    drift:     'the traveller reads the board with both feet planted, like the ground might not stay.',
+    venice:    'the traveller reads the board with one eye on the tide line behind it.',
+    kowloon:   'the traveller cranes back at the scaffolding once, then goes back to the board.',
+    palawan:   'the traveller reads the board with sand still on their boots.',
+    manly:     'the traveller reads the board with the ferry horn going, and does not turn for it.',
+    pantanal:  'the traveller reads the board like they already know most of it.',
+    cave:      'the traveller reads the board by the same light everyone else down here is using.',
+    antarctic: 'the traveller reads the board with their breath going up in front of it.',
+    monaco:    'the traveller reads the board like the number on it is the only number that matters here.',
+  };
+  /**
+   * Called once a frame from the main step, below, for every biome — it
+   * early-returns unless the live chapter's traveller has `gateChap` (the
+   * four originals carry none and are untouched) and the board for that
+   * same chapter is the one actually planted.
+   */
+  function npcGlimpseStep(dt) {
+    const live = game.biome && game.biome.current;
+    if (!live || !game.state || !game.state.started || game.state.paused) return;
+    const capy = game.capy && game.capy.position;
+    if (!capy) return;
+    for (let i = 0; i < locals.length; i++) {
+      const r = locals[i];
+      if (!r || !r.trav || !r.gateChap || r.biome !== live || !r.group) continue;
+      if (!r.gSt) r.gSt = '';
+      if (r.gSt === '') {
+        const board = (typeof game.exitBoard === 'function') ? game.exitBoard() : null;
+        if (!board || board.biome !== live) continue;
+        const bdx = capy.x - board.x, bdz = capy.z - board.z;
+        if (bdx * bdx + bdz * bdz >= npcTRAV_GLIMPSE_R * npcTRAV_GLIMPSE_R) continue;
+        r.gBX = board.x + Math.sin(board.yaw) * 1.1;
+        r.gBZ = board.z + Math.cos(board.yaw) * 1.1;
+        r.gBY = board.y; r.gBYaw = board.yaw;
+        r.gSt = 'stand'; r.gHold = npcTRAV_GLIMPSE_HOLD;
+        r.group.position.set(r.gBX, r.gBY, r.gBZ);
+        r.group.rotation.y = board.yaw + Math.PI;   // facing the board — back to the approach
+        if (!npcTravSeen[live]) {
+          npcTravSeen[live] = 1;
+          try { game.events.emit('npc:travSeen', { biome: live, n: npcTravSeenCount() }); } catch (e) { /* a listener */ }
+        }
+        const line = npcTRAV_GLIMPSE[live];
+        if (line && typeof r.speak === 'function') { r.lastLine = line; r.speak(line); }
+      } else if (r.gSt === 'stand') {
+        r.group.position.set(r.gBX, r.gBY, r.gBZ);
+        r.group.rotation.y = r.gBYaw + Math.PI;
+        r.gHold -= dt;
+        const cdx = capy.x - r.gBX, cdz = capy.z - r.gBZ;
+        const close = cdx * cdx + cdz * cdz < npcTRAV_GLIMPSE_LEAVE_R * npcTRAV_GLIMPSE_LEAVE_R;
+        if (close || r.gHold <= 0) {
+          r.gSt = 'leave'; r.gT = 0;
+          // away from the door, into the chapter and out of the approach lane
+          r.gGoX = -Math.sin(r.gBYaw); r.gGoZ = -Math.cos(r.gBYaw);
+        }
+      } else if (r.gSt === 'leave') {
+        r.gT += dt;
+        r.group.position.x += r.gGoX * npcTRAV_GLIMPSE_SPD * dt;
+        r.group.position.z += r.gGoZ * npcTRAV_GLIMPSE_SPD * dt;
+        r.group.rotation.y = Math.atan2(r.gGoX, r.gGoZ);
+        if (r.gT >= npcTRAV_GLIMPSE_WALK) r.gSt = 'done';
+      } else if (r.gSt === 'done') {
+        // REALITY CHECK: localsStep's own gateChap visibility check runs
+        // EVERY frame, ahead of this one, and sets `r.group.visible = true`
+        // again the instant `game.chapDoneHere` is true — which it is, by
+        // definition, for every record this function ever touches. A single
+        // `visible = false` on the leave->done edge was therefore undone one
+        // frame later; MEASURED live (qa/wow2-glimpse-leave2.js): visible
+        // stayed true all the way through 'done'. Re-asserted every frame
+        // instead, the same way the gate check itself does.
+        r.group.visible = false;
+      }
+      // 'done': left for the rest of this visit. A fresh biome:enter rebuilds
+      // the record (every chapter but Sydney tears its cast down and back up
+      // per crossing — see boardPlant's own "rebuilt per entry" note), which
+      // is what lets the scene play again on a later return.
+    }
+  }
+
   const npcTRAV_FIG = { shirt: PALETTE.cloth4, legs: PALETTE.khaki,
                         hair: PALETTE.hair2, skin: PALETTE.skin2,
                         hat: PALETTE.sail };
@@ -3491,7 +3608,23 @@ export function createNPCs(game) {
       npcMakeStall(rec, shopAngle, shopDist);
       // S5, appended rather than replacing (see npcTRAV_STALL_LINE's own
       // note): one more thing they sometimes say, never the only thing.
-      if (rec.lines) rec.lines = rec.lines.concat(npcTRAV_STALL_LINE);
+      // ---- REALITY CHECK (ROADMAP-WOW2, N1/N2) ---------------------------
+      // MEASURED: `rec.lines` is a plain array for every real cameo, but the
+      // finale's own figure (npcTravFin, npcTravellerHome) is built with
+      // `lines: npcTravFinLines` — a FUNCTION, resolved later by
+      // localResolve — and `Array.prototype.concat` does not exist on one.
+      // Every genuine "all nineteen kept" finale threw here
+      // (TypeError: rec.lines.concat is not a function, inside the
+      // finale:staged handler) and was never caught because nothing had
+      // reached that state through this path before. `Array.isArray` guards
+      // it; a function-shaped pool simply keeps the stall silent, which is
+      // no loss — the finale figure never had a stall to begin with.
+      if (Array.isArray(rec.lines)) rec.lines = rec.lines.concat(npcTRAV_STALL_LINE);
+      // N2: past ten glimpses, the stall has one more thing to say — appended,
+      // never a replacement, so the original stays in the same bag.
+      if (Array.isArray(rec.lines)) {
+        rec.lines = rec.lines.concat({ t: 'you again.', when: function () { return npcTravSeenCount() >= 10; } });
+      }
       if (game.world) {
         const face = (o.face || 0) + shopAngle;
         const sx = (o.x || 0) + shopDist * Math.sin(face);
@@ -5172,6 +5305,13 @@ export function createNPCs(game) {
       when: function () { return !npcTravKnown(); } },
     { t: 'Do not mind me. I am just working out how you got here.',
       when: function () { return !npcTravKnown(); } },
+    // ---- N2: THE ONE THAT ACKNOWLEDGES THE CHASE ------------------------
+    // Fifteen boards, fifteen times they turned round before you reached
+    // them — and the notebook's own voice has never once let on that they
+    // knew you were coming. This is the only line in the game that does,
+    // and it still does not say why.
+    { t: 'Fifteen boards. I never once had time to finish reading.',
+      when: function () { return npcTravSeenCount() >= 15; } },
   ];
   // ---- ...AND THE NAMES (L6, F4 / writing B) ------------------------------
   // The regulars' names for you, read off the file through game.palNames
@@ -5234,6 +5374,45 @@ export function createNPCs(game) {
     });
   }
   game.events.on('finale:staged', npcTravellerHome);
+
+  // ===== THE SHELF, AND THE GARDENER'S TAKE ON IT (ROADMAP-WOW2, N1) =====
+  // systems.js (sysShelfStage) lays each new keepsake on the shelf the
+  // moment the animal next stands in Sydney and emits 'shelf:grew' with
+  // whichever chapter numbers are new since the last time it looked. Said
+  // here and not there because a line needs a mouth, and only this module
+  // owns one. Queued and staggered rather than said in one breath: a Sydney
+  // return after several chapters away is heard one at a time.
+  const npcShelfQ = [];
+  let npcShelfCd = 0;
+  game.events.on('shelf:grew', function (ev) {
+    const ks = ev && ev.ks;
+    if (!ks) return;
+    for (let i = 0; i < ks.length; i++) npcShelfQ.push(ks[i]);
+  });
+  /** Called once a frame from the main step, below. */
+  function npcShelfStep(dt) {
+    if (!npcShelfQ.length) return;
+    if (!game.biome || game.biome.current !== 'sydney') return;
+    npcShelfCd -= dt;
+    if (npcShelfCd > 0) return;
+    const k = npcShelfQ.shift();
+    const def = chapterDef(k);
+    const line = def && def.kept;
+    if (line) {
+      let g = null;
+      for (let i = 0; i < locals.length; i++) {
+        const r = locals[i];
+        if (r && r.kind === 'gardener' && r.group && r.group.visible && typeof r.speak === 'function') { g = r; break; }
+      }
+      if (g) {
+        g.lastLine = line; g.speak(line);
+        // a harness counter only, so qa/wow2-shelf.js can prove "once, never
+        // twice" without scraping the DOM for a bubble that may have closed
+        try { game.state.shelfSpokenN = (game.state.shelfSpokenN || 0) + 1; } catch (e) { /* optional */ }
+      }
+    }
+    npcShelfCd = 4.0;   // time to read the last one before the next arrives
+  }
 
   /**
    * ARM THE CHAIN FROM WHOEVER IS NEAREST TO (x, z), in the two chapters that
@@ -15111,6 +15290,9 @@ export function createNPCs(game) {
     // armed tier line is looking for one person in seventeen chapters and
     // Sydney is not one of them.
     npcPalStep(dt);
+    // ...and the gardener's queue (N1), above the gate for the same reason:
+    // it is looking for one person in one chapter, and Sydney is never off.
+    npcShelfStep(dt);
 
     // --- biome gate ------------------------------------------------------
     // In Pasto every Sydneysider is detached from the scene and the physics
@@ -15132,6 +15314,7 @@ export function createNPCs(game) {
       // voice rather than making a dog gasp.
       if (paLive()) npcBargeSweep(dt, paCast);
       localsStep(dt);
+      npcGlimpseStep(dt);   // N2: after localsStep, so it wins the frame's position
       localsChat(dt);
       localsCompany(dt);
       npcExStep(dt);
@@ -15141,6 +15324,7 @@ export function createNPCs(game) {
     npcUmbLive = 0;
     npcBargeSweep(dt, humans);
     localsStep(dt);
+    npcGlimpseStep(dt);   // N2: after localsStep, so it wins the frame's position
     npcExStep(dt);
 
     // ---- AND THE BIN CHICKENS WILL FOLLOW YOU (see THE HERD in systems.js) --
@@ -15932,6 +16116,27 @@ export function createNPCs(game) {
   let npcPalGiftP = null;                 // O2: the last one, while it is still lying there
   let npcPalSaid = 0;                     // E5: lines the regular's own mouth has said this session
   let npcPalLast = '';                    // ...and the last one, for the harness
+  // ---- N3: SOMEONE WAITS (ROADMAP-WOW2) -----------------------------------
+  // Two doors systems.js opens, both single-shot and cleared the instant the
+  // step below checks them (armed on ONE biome:enter, spent on the first
+  // frame of THIS chapter's own npcPalStep, never left lying around for a
+  // later chapter to trip over).
+  let npcPalAwayBiome = '';    // "arm the absence line" — see palAwayArm
+  let npcPalKeptBiome = '';    // "the second gift is owed" — see palKeptArm
+  // Third person is the notebook's law, not the regular's own mouth — every
+  // tier line in npcPAL already talks TO you, and this is one more of those.
+  // `{call}` is the same substitution the CHAPTERS nb entries already use.
+  const npcPAL_AWAY_LINES = [
+    '{call}. i had started to wonder.',
+    'you again, {call} — that took a while.',
+    '{call}. back, are you. i was starting to think that was it.',
+    'there you are. {call} very nearly missed a tier for that.',
+  ];
+  /** systems.js calls this on a long-enough-away return (N3.1). */
+  function palAwayArm(biome, awayMs) { npcPalAwayBiome = biome; }
+  /** ...and this past tier three, with enough done elsewhere (N3.2). */
+  function palKeptArm(biome) { npcPalKeptBiome = biome; }
+  if (game.state) { game.palAwayArm = palAwayArm; game.palKeptArm = palKeptArm; }
   // ---- ONE RECORD SHAPE, SEEN FROM HERE (L4, E5) ---------------------------
   // The four seams between a local and a member of the steering cast, each
   // one a function so the step below reads the same for both. A local has
@@ -16396,6 +16601,20 @@ export function createNPCs(game) {
     const idle = rec ? (rec.biome ? !!(rec.fig && !rec.own && rec.sat <= 0)
                                   : !!(rec.group.visible && !npcPAL_BUSY_ST[rec.state] && rec.carryT < 0))
                      : false;
+    // ---- N3.1: THE ABSENCE (ROADMAP-WOW2) --------------------------------
+    // systems.js arms this on a `biome:enter` after a long-enough gap
+    // (sysPAL_AWAY_MS) at tier >= 2; consumed through the same armed-line
+    // channel the tier greeting and the standing-order thank-you already
+    // share (npcPalArm's own note on one mouth, one line) — so it never
+    // talks over either, and is dropped rather than queued if it does not
+    // get a turn before something else arms the line.
+    if (npcPalAwayBiome && npcPalAwayBiome === npcPalFor && !npcPalLine) {
+      const row = npcPAL[npcPalFor];
+      const call = (row && row.call) || 'you';
+      const pick = npcPAL_AWAY_LINES[randInt(0, npcPAL_AWAY_LINES.length - 1)].replace(/\{call\}/g, call);
+      npcPalLine = pick; npcPalT = npcPAL_WAIT; npcPalKeep = npcPAL_KEEP;
+      npcPalAwayBiome = '';   // spent — cleared only once it has actually armed
+    }
     // ---- THE CAST REGULAR'S FAM, ON THE LOCALS' OWN LAW (E5) -------------
     // localsStep grows `fam` by THE CALM inside a person's circle and fades
     // it outside, and it walks `locals` only — a roster record has never had
@@ -16447,6 +16666,19 @@ export function createNPCs(game) {
         npcPalGiftT = npcPAL_GIFT_CD * rand(0.9, 1.25);
         npcPalGive(rec);
       }
+    }
+    // ---- N3.2: KEPT SOMETHING FOR YOU (ROADMAP-WOW2) ----------------------
+    // The same drop — this chapter's own `gift` prop, at their feet — but a
+    // different reason: systems.js arms it on a RETURN, past tier three,
+    // with three rows done elsewhere since the last one (sysPAL_KEPT_ROWS).
+    // Spent the moment they are free to do it, same as the ambient version;
+    // resets npcPalGiftT too, so the two channels never both fire back to
+    // back ("never twice in a row" is the ambient cooldown itself).
+    if (npcPalKeptBiome && npcPalKeptBiome === npcPalFor && rec && idle &&
+        !npcPalGiftOut(rec) && cp && d2 < npcPAL_GIFT_R * npcPAL_GIFT_R) {
+      npcPalKeptBiome = '';
+      npcPalGiftT = npcPAL_GIFT_CD * rand(0.9, 1.25);
+      npcPalGive(rec);
     }
     // ---- ...AND THE STANDING ORDER, ON THE SAME TERMS (item 4) -----------
     // After the gift and not before it, so a chapter's first tier-three

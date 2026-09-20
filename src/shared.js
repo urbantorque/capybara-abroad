@@ -3747,6 +3747,7 @@ export const CHAPTERS = [
     arrive: '',           far: 400,  tall: false, pal: 0, door: 10,
     hint: 'the gardens, unsupervised',                open: 'be a menace.', way: 'the ferry wharf at the Quay',
     keep: 'a tourist’s hat',
+    kept: 'the gardener turns it over once and puts it down like it might still be somebody’s.',
     marquee: { x: 0, z: 2.5, up: 11, say: 'the Opera House steps' },
     // ---- THE FIRST CHAPTER HAD NO SHAPE EITHER (F4) --------------------
     // Nineteen rows — the longest list in the game — offered four at a time in
@@ -3771,12 +3772,14 @@ export const CHAPTERS = [
          { if: 'wow', t: 'It had apparently been on the Opera House steps. In front of people. On purpose.' },
          { if: 'pho>=3', t: 'It was photographed {pho} times that I saw. It faces the camera. I do not know how it knows to.' },
          { if: 'tier>=3', t: 'A waiter has it down as {call}. I left it there.' },
+         { if: 'home', t: 'The ibis that used to ride along is back on the bins. It came straight over.' },
          'I start in the morning. West, everybody says.'],
     note: 'Nobody in these gardens had ever had to think about a rodent this size. Several of them do now.' },
   { n: 2, biome: 'pasto',   name: 'Pasto, Nariño',   sub: '2 527 metres up, and no better behaved',
     arrive: 'to-pasto',   far: 900,  tall: true,  pal: 1,
     hint: '2 527 m up, and a condor',                 open: 'two thousand five hundred metres up, and nobody told them.', way: 'the crater on Galeras',
     keep: 'a condor’s flight feather', win: 3,
+    kept: 'the gardener holds it up to the light and says nothing, for once.',
     marquee: { x: -40, z: -70, up: 26, say: 'the sky over the volcano' },
     again: 'the bird is still up. the broom is still out. neither has forgotten.',
     left: 'The bird was still up there when you went. It is up there now.',
@@ -3821,6 +3824,7 @@ export const CHAPTERS = [
     far: 1600, tall: false, pal: 2,
     hint: 'a boat, and Manly somewhere north',        open: 'find the wheel.', way: 'up the Corso at Manly',
     keep: 'an unpunched ferry ticket', win: 3,
+    kept: 'the gardener says it is worth exactly what it always was — nothing, and the whole trip.',
     marquee: { x: 6.6, z: 6, up: 4, say: 'the ferry at the wharf' },
     again: 'the man who drives her saw you on the wharf. he has gone to stand by the wheel.',
     left: 'The ferry was back on the timetable an hour after you stepped off her. The wharf pretended nothing had happened.',
@@ -3843,6 +3847,7 @@ export const CHAPTERS = [
     arrive: 'to-kyoto',   far: 700,  tall: false, pal: 4,
     hint: 'ten thousand gates and a lot of tea',      open: 'four hundred years of arrangement, and you.', way: 'the bridge at Uji',
     keep: 'a tea whisk, slightly chewed',
+    kept: 'the gardener wipes it down and does not ask.',
     marquee: { x: 4, z: 128, up: 3, say: 'the river, off the shrine bay' },
     again: 'everything has been put back. very carefully. they know.',
     left: 'Four hundred years of arrangement, and you gave it the one afternoon.',
@@ -3852,6 +3857,7 @@ export const CHAPTERS = [
          { if: 'tier>=3', t: 'The step-sweeper calls it {call}, and sweeps around it.' },
          { if: 'err', t: 'It ran an errand. In Kyoto. For the sweeper.' },
          { if: 'inc>=3', t: 'Everything here is arranged very carefully, and {inc} things are now arranged differently.' },
+         { if: 'home', t: 'The heron that used to ride along is back at the Uji, standing in the shallows like it never left.' },
          'I bought a fan. I do not know why I am telling the notebook that.'],
     note: 'Ten thousand gates, and for one afternoon the loudest thing in Kyoto was you.',
     acts: [
@@ -3862,6 +3868,7 @@ export const CHAPTERS = [
     arrive: 'to-cali',    far: 1000, tall: false, pal: 5,
     hint: 'the salsa capital of the world',           open: 'listen first.', way: 'the bridge over the Río Cali',
     keep: 'a stick of sugarcane',
+    kept: 'the gardener says it will not keep, and puts it on the shelf anyway.',
     marquee: { x: 30, z: 40, up: 3, say: 'the party bus' },
     again: 'the beat never stopped. it did move over slightly when you walked in.',
     left: 'The beat was still going when you left. It did not need you to stay.',
@@ -3881,6 +3888,7 @@ export const CHAPTERS = [
     arrive: 'to-rio',     far: 1400, tall: false, pal: 6,
     hint: 'a bateria, and it is not waiting for you', open: 'follow the drums.', way: 'the rock at Arpoador',
     keep: 'a tile off Selarón’s steps',
+    kept: 'the gardener matches the colour against everything else on the shelf and gives up.',
     // D4.0: was the avenue at (-47.8, 46) — "the drums are already on it" —
     // which is where samba-parade happens, and samba-parade is a mini now. The
     // rock at Arpoador is where the sea breeze lifts off the headland and where
@@ -3905,6 +3913,7 @@ export const CHAPTERS = [
     arrive: 'to-iceland', far: 1200, tall: true,  pal: 7,
     hint: 'dark, and the ground does not hold',       open: 'it gets dark again this month. only just, and not for long.', way: 'the end of the pier',
     keep: 'a piece of the glacier',
+    kept: 'the gardener finds it gone by morning and puts the puddle back exactly where it stood.',
     marquee: { x: -40, z: -10, up: 60, say: 'the hot pool' },
     // ---- ONE SEASON, NOT TWO ----------------------------------------------
     // The chapter used to be the midnight sun — 'half past eleven, and the sun
@@ -3935,6 +3944,7 @@ export const CHAPTERS = [
     arrive: 'to-sahara',  far: 1600, tall: true,  pal: 8,
     hint: 'a maze, and then no maze at all',          open: 'a thousand people in this square and every one of them is working.', way: 'the fire at the desert camp',
     keep: 'an orange off the cart',
+    kept: 'the gardener says it will not keep either, and eats it before it has to.',
     marquee: { x: 275, z: 55, up: 4, say: 'the jetpack at the top of the staked track, on the big dune' },
     again: 'the square knows the face now. the orange man has moved the cart.',
     left: 'The square was still learning your face. You did not give it the second evening.',
@@ -3955,6 +3965,7 @@ export const CHAPTERS = [
     arrive: 'to-drift',   far: 1500, tall: true,  pal: 9,
     hint: 'no ground to speak of, and a wind',        open: 'nobody is entirely sure how you got up here, you included.', way: 'the lantern plinth, once it is lit',
     keep: 'a seed-head, still trying to leave',
+    kept: 'the gardener weighs it down with a stone. it tries anyway.',
     marquee: { x: 36, z: -190, up: 8, say: 'the plinth at the top' },
     again: 'the wind is where you left it. the fisherman looked up, which is new.',
     left: 'There was no floor, and you went and found one somewhere else.',
@@ -3973,6 +3984,7 @@ export const CHAPTERS = [
     arrive: 'to-venice',  far: 900,  tall: false, pal: 10,
     hint: 'the floor is negotiable',                  open: 'the ground here is a negotiation with the sea, and the sea is early.', way: 'the two columns on the Molo',
     keep: 'a pigeon feather from the Piazza',
+    kept: 'the gardener says the birds here have never once given him one.',
     marquee: { x: -4, z: -35, up: 7, say: 'St Mark’s Square' },
     again: 'the water has been in and out twice since. the paving remembers you.',
     left: 'The water was coming in. You did not wait for it.',
@@ -3981,6 +3993,7 @@ export const CHAPTERS = [
          { if: 'inc>=1', t: 'Something went in a canal. Nobody is saying what.' },
          { if: 'tier>=3', t: 'The gondolier calls it {call}. That is what it costs him, apparently.' },
          { if: 'keep', t: 'It has a pigeon feather from the Piazza. There were plenty.' },
+         { if: 'home', t: 'The pigeon it used to carry is back on the Campanile’s ledge. It came down the moment it landed.' },
          'My shoes have not dried.'],
     note: 'The water came up over the paving and everybody carried on doing what they were doing.',
     acts: [
@@ -3991,6 +4004,7 @@ export const CHAPTERS = [
     arrive: 'to-kowloon', far: 1300, tall: true,  pal: 11,
     hint: 'a wall of light, and a way up it',         open: 'seven million people on a piece of rock, and they all went upwards.', way: 'the end of the Star Ferry pier',
     keep: 'a length of scaffold bamboo',
+    kept: 'the gardener says it would hold a building up and props a rose with it instead.',
     // up 34 and not 45: `symphony`'s own hint target is a roof at 34.6 m, and a
     // point eleven metres over it is eleven metres of empty sky — measured, in
     // qa/MF-kowloon.png, which framed black. The subject is the roof you have
@@ -4014,6 +4028,7 @@ export const CHAPTERS = [
     arrive: 'to-palawan', far: 1100, tall: true,  pal: 12,
     hint: 'twelve chapters of paddling. enough.',     open: 'you have been paddling about on the top of the water for eleven chapters.', way: 'the end of the bamboo jetty',
     keep: 'a pearl out of the giant clam',
+    kept: 'the gardener turns it in his fingers and says it is the roundest thing on the shelf.',
     // D4.0: was (0, -70) — the hidden lagoon, reached through a submerged
     // lintel, for a moment that actually fired anywhere under water. The
     // cleaning station over the drop-off is where the manta laps, and
@@ -4038,6 +4053,7 @@ export const CHAPTERS = [
     arrive: 'to-cappadocia', far: 2200, tall: true, pal: 13,
     hint: 'no steering. only up and down.',           open: 'the wind goes a different way at every height. that is the whole game.', way: 'the landing plain, once you have flown',
     keep: 'a scrap of balloon envelope',
+    kept: 'the gardener holds it up and says it still smells of somewhere higher up.',
     marquee: { x: 0, z: -40, up: 12, say: 'the launch field' },
     again: 'eighty envelopes filling, and the tea maker has put out a second glass.',
     left: 'Eighty balloons go up at dawn. You were on a different plan.',
@@ -4053,6 +4069,7 @@ export const CHAPTERS = [
          { if: 'wow&travUp', t: 'Eighty balloons went up at dawn and I was in one of them, next to it, holding a rope that was tied to nothing.' },
          { if: 'tier>=3', t: 'The tea maker calls it {call}. It is the tea now, he says.' },
          { if: 'inc>=1', t: 'Something happened at the dovecote. The whole cliff went up.' },
+         { if: 'home', t: 'The cat that rode along came home to the same doorway and did not look surprised.' },
          'No steering. You choose a height, the man said. It chose one.'],
     note: 'You could not steer, and it turned out that was never the problem.',
     acts: [
@@ -4064,6 +4081,7 @@ export const CHAPTERS = [
     arrive: 'to-manly',   far: 1500, tall: false, pal: 14,
     hint: 'the sea has a shape here',                 open: 'this is the side of the peninsula that faces the whole Pacific.', way: 'between the red and yellow flags',
     keep: 'a Norfolk pine cone',
+    kept: 'the gardener says these grow here too, and puts it with the others anyway.',
     marquee: { x: 0, z: -23.8, up: 1, say: 'out the back, past the break' },
     again: 'the gulls have reconvened. the lifeguard has moved the flags a little.',
     left: 'The big set came through at four, as it does. The lifeguard wrote the wave down and nothing else.',
@@ -4072,6 +4090,7 @@ export const CHAPTERS = [
          { if: 'tier>=3', t: 'The lifeguard calls it {call}. It has never once been between them.' },
          { if: 'pas', t: 'Something rode in on its back. Through surf.' },
          { if: 'inc>=1', t: 'The gulls have been informed, and they are still discussing it.' },
+         { if: 'home', t: 'The gull that used to ride along is back mugging chips off strangers. It knew exactly where it left off.' },
          'Sand in the notebook. Sand in everything.'],
     note: 'The sea here has a shape, and it took you a while to stop arguing with it.',
     acts: [
@@ -4083,6 +4102,7 @@ export const CHAPTERS = [
     arrive: 'to-pantanal', far: 1300, tall: false, pal: 15,
     hint: 'you are not the strangest thing here',     open: 'you are, as far as anybody here is concerned, from round here.', way: 'the last bridge on the Transpantaneira',
     keep: 'nothing. it was yours already.',
+    kept: 'the gardener says an empty space on a shelf is still a space, and leaves it be.',
     marquee: { x: -34, z: -53, up: 2, say: 'the river crossing' },
     // ...and no picture of it, which is the whole exception. Eighteen cards
     // hold up a drawn object; this one holds up the sentence and nothing
@@ -4110,6 +4130,7 @@ export const CHAPTERS = [
     arrive: 'to-cave',    far: 800,  tall: false, pal: 16,
     hint: 'no light in here but yours',               open: 'nine kilometres of it, and no light that you did not bring.', way: 'the slot of daylight at the far end',
     keep: 'a cave pearl', win: 2,
+    kept: 'the gardener holds it to the light and it does nothing, being used to none at all.',
     marquee: { x: 4, z: -48, up: 40, say: 'the hole in the roof' },
     again: 'the dark is the same dark. the rope man has got a longer rope out.',
     left: 'Nine kilometres of dark, and you lit a little of the front of it.',
@@ -4129,6 +4150,7 @@ export const CHAPTERS = [
     arrive: 'to-antarctic', far: 2000, tall: true, pal: 17,
     hint: 'too cold to walk. take the boat.',         open: 'the orange boat at the end of the jetty. that is the chapter.', way: 'the head of the station jetty',
     keep: 'the station’s enamel mug', win: 3,
+    kept: 'the gardener says it is the only thing on the shelf that has ever been that cold.',
     marquee: { x: 14.3, z: -169.5, up: 2, say: 'the channel, where the blows are' },
     again: 'the base has counted you in. that is two things it has counted this winter.',
     left: 'The whales came up in the channel at the usual time. The base logged four blows and nothing else.',
@@ -4137,6 +4159,7 @@ export const CHAPTERS = [
          { if: 'tier>=3', t: 'The base bar calls it {call}. It has never once come at six.' },
          { if: 'par', t: 'Four rocks, eleven hundred metres apart, and a time the base does not believe.' },
          { if: 'keep', t: 'It has the station’s enamel mug. The station has fewer mugs.' },
+         { if: 'home', t: 'The gentoo that rode along is back with the colony. It walked straight in among them.' },
          'I have never been so cold. It has fur. I have a notebook.'],
     note: 'Nothing on this continent had any opinion about you whatsoever.',
     acts: [
@@ -4149,6 +4172,7 @@ export const CHAPTERS = [
     hint: 'the first place that minds you being here', open: 'somewhere in this town is the first person who will mind.',
     way: 'the steps of the Casino',
     keep: 'a mother-of-pearl plaque', win: 3,
+    kept: 'the gardener buffs it once with his sleeve. it is the smartest thing he owns.',
     marquee: { x: 14, z: -96, up: 4, say: 'the red car on the grid, in front of the stand' },
     again: 'the doorman recognised you. that is not the same as letting you in.',
     left: 'The doorman logged it, the deckhand denied it, and the grid was swept before the next car was on it.',
@@ -4169,6 +4193,7 @@ export const CHAPTERS = [
     hint: 'the road is not going to stop',            open: 'seven million people and six million of them are on a moped.',
     way: 'the head of the Long Biên bridge',
     keep: 'a plastic stool, slightly cracked', win: 3,
+    kept: 'the gardener says it is the ugliest thing on the shelf and gives it the best light.',
     marquee: { x: 6.0, z: 15.5, up: 3, say: 'the pho stall’s scooter, on Hang Ngang' },
     again: 'the tea lady kept the stool. the road kept nothing.',
     left: 'Six lanes, two hundred and forty riders, and not one of them had to touch a brake on your account.',

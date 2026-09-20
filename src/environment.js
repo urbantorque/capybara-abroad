@@ -3405,6 +3405,36 @@ export function createEnvironment(game) {
     envPoolDone(game, bBody);
   }
 
+  // ===================================================== THE SHELF (ROADMAP-WOW2, N1)
+  // A low stone shelf on the picnic lawn, standing empty from the first frame
+  // — the why, shown rather than said. systems.js's sysShelfStage lays every
+  // keepsake the file holds on it, one slot per chapter in CHAPTERS order
+  // (the same convention the journal's own shelf already keeps, THE SHELF —
+  // `keep`, v18: "ONE SLOT PER CHAPTER, always all of them"), the moment the
+  // animal next stands in Sydney. `envSHELF_X/Z/SURF` are duplicated in
+  // systems.js rather than imported, the same way `sysFIN_X/Z` duplicates
+  // this file's own `picnic` bounds — a fixed authored point, not a shared
+  // module.
+  //
+  // OFF THE HORSESHOE ITSELF, ON PURPOSE. The ending's ring (systems.js,
+  // sysFIN_X/Z = 30, 26) stands the nineteen at a 2.6 m radius round that
+  // same picnic lawn, and the "stopped in the middle" test that closes the
+  // game asks only for the 1.8 m at its centre — so the shelf stands 5.8 m
+  // off centre, on the horseshoe's closed side, clear of both.
+  const envSHELF_X = 35.6, envSHELF_Z = 27.4, envSHELF_LEN = 4.6;
+  const envSHELF_SURF = 0.84;   // m — the top face. See sysSHELF_SURF.
+  {
+    const hz = envSHELF_LEN * 0.5;
+    // the plinth, and the darker slab that is the surface itself
+    Gm.box(envSHELF_X, 0.40, envSHELF_Z, 0.62, 0.80, envSHELF_LEN, PALETTE.sandstone);
+    Gm.box(envSHELF_X, 0.82, envSHELF_Z, 0.70, 0.04, envSHELF_LEN + 0.08, PALETTE.sandstoneDark);
+    // two low piers, echoing the boundary's own piers a few metres north
+    Gm.box(envSHELF_X, 0.43, envSHELF_Z - hz - 0.07, 0.74, 0.86, 0.14, PALETTE.stone);
+    Gm.box(envSHELF_X, 0.43, envSHELF_Z + hz + 0.07, 0.74, 0.86, 0.14, PALETTE.stone);
+    envStaticBox(game, envSHELF_X, 0.41, envSHELF_Z, 0.37, 0.41, hz + 0.12);
+    envNavC.push(envSHELF_X, envSHELF_Z, 1.1);
+  }
+
   const garden = new THREE.Mesh(Gm.build(), matVC);
   garden.castShadow = true;
   garden.receiveShadow = true;
