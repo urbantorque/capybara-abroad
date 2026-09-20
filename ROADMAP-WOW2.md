@@ -700,6 +700,115 @@ the most beautiful minute of weather and today it is only drier.
   puddles' mirror diff, the A1 instrument's mask), motes counted on the
   gust; read by eye. **`noRainbow`, `noPuddle`, `noStrip`.**
 
+### V5 — shipped (20 Sep 2026)
+
+Reality check first, and it moved two of the four items before a line was
+written. `sysSKY2` (A5's cloud band and sun disc) is five chapters —
+sahara, pantanal, palawan, cali, goreme — and only two of those are on
+this section's own rainbow list; Kyoto, Hanoi and Manly have no sysSKY2
+row at all. The rainbow does not need one: every dome through
+`skyDomeLit` already carries the live sun axis in `uSky2Sun.xyz` every
+frame (sky2SunTick's own fallback writes `dir` even at disc strength 0),
+so it rides that instead of a second per-chapter table. And the dapple
+canopy lists (`kyoSANDO_MAPLES`, `panDAPPLE`, `manDAPPLE_PINES`,
+`envDAPPLE_FIGS`) that the strip/drip need for positions live in four
+files (kyoto.js, pantanal.js, manly.js, environment.js) this wave does
+not own — reached instead by walking the live scene for
+`material.userData.grainDapple`, the exact baked cells `grain()` already
+leaves for `qa/wow-dapple.js` to find. Sydney's jacarandas turned out NOT
+to be in that system (only its figs are), so the purple gust the section
+asked for was already spoken for by the skitter's own ground petals
+(Part B) — see the honest miss below rather than a second, competing
+gust reaction on the same eight trees.
+
+1. **The rainbow — shipped, Kyoto/Hanoi/Cali/Pantanal/Manly.** A ring 42
+   degrees off the antisolar point in the shared dome's own fragment
+   (`shared.js`'s `skyDomeLit` hook, `_RAINBOW_OUT`/`_RAINBOW_PARS`,
+   `rainbowTick`), seven PALETTE-mixed stops (red/orange/yellow/green/
+   blue/indigo/violet, orange and indigo genuine 50/50 mixes — no hex
+   outside PALETTE), gated in `systems.js` on `rainT` sitting under 0.3
+   (read as a LEVEL — the tail of a shower, not a one-frame edge; a level
+   is what `qa/wow2-shower.js`'s trap-35 hold can force and sample
+   without racing a single frame) with the sun above 8 degrees, damped in
+   over ~6s and out over ~40s. Verified two ways: in a forced shower
+   (Kyoto, Pantanal) the resting third-person camera never happened to
+   face the antisolar sky, so the in-scene diff read 0 — confirmed
+   geometrically honest with a maths-only probe (no ray in the visible
+   frustum sat within several degrees of the ring in either framing) and
+   then confirmed VISUALLY with an own camera aimed straight at it
+   (Pantanal, sun 30° up): an isolated per-pixel diff (`rainbowTick`
+   toggled directly, no tick between frames) of 1.26% of the frame, mean
+   magnitude 11.5, peaking at 40.7 near the horizon — exactly the ~12°
+   elevation a rainbow sits at under a 30° sun. The mechanic is real; a
+   player will see it precisely as often as a rainbow is ever actually in
+   frame, which is honestly not most of the time. `noRainbow`.
+2. **Puddles — shipped, Kowloon only.** `grain()`'s `reflect` option
+   takes an opt-in `wet: true` (`shared.js`): the reflection weight is
+   multiplied by the shared wetness-above-baseline term (`uGrainWet`,
+   already bound to every non-water grained surface) and a fresh
+   low-frequency `grNoise` threshold — the ground's own baked `gn` is a
+   `color_fragment` local and out of scope by `opaque_fragment`, so this
+   is a new, cheap sample at a puddle's own size rather than a reuse.
+   Cut through a new runtime uniform, `uPuddleOn` (`puddleSet`, the exact
+   `dappleSet` pattern), wired from `game.state.noPuddle` in `systems.js`
+   — off, Kowloon's road reverts to exactly its pre-V5 always-on `k`.
+   Applied to `kowloon.js`'s road (a one-line hook plus a corrected
+   comment: the file's own paragraph used to argue that no gate was fine
+   because the road is "always wet" by design — now true only of its
+   baseline, not of the shower). **Every other `reflect:` call site in
+   the game — Venice, Hanoi's lake, Kyoto's pond, the Quay, Iceland, the
+   cave, Rio, Cali, Monaco, the Pantanal's baía — is an actual body of
+   water (one of them tide-gated, none of them rain-gated) and was left
+   untouched**; gating a lake by rainT would dry it between showers,
+   which a lake does not do. Verified with a colour-keyed road mask and
+   `puddleSet` toggled directly: 95.3% of the road's own pixels moved,
+   mean magnitude 18.4; the "on" screenshot reads as a near-flat wet
+   street, the "off" one as Mong Kok's pink sign and the bus doubled
+   edge-to-edge across the whole carriageway. `noPuddle`.
+3. **The gust strips the trees — shipped, Sydney/Kyoto/Manly/Pantanal,
+   in each chapter's own crown colour.** `weather.js` finds the live
+   chapter's dapple cells by scene walk (see above), caches them per
+   `biome:enter`, and on a gust near the chapter's own peak throws
+   12–20 `leaf` motes (the existing `wxBURST.leaf` kind — already tuned,
+   already flagged as this pass's own hook in its doc comment) from the
+   nearest canopy's edge: Sydney's figs in `PALETTE.leafB`, Kyoto's
+   sando maples in `PALETTE.momiji`, Manly's promenade pines in
+   `PALETTE.manPine`, the Pantanal's fazenda mango and nearest capoes in
+   `PALETTE.panCanopy`. **Honest miss:** Sydney's jacarandas are not
+   reachable this way — only its figs carry a baked dapple list — so the
+   purple gust the roadmap named did not ship as a second mechanic; the
+   skitter's own ground petals (Part B, already purple, already a gust
+   reaction on those same eight trees) cover the beat instead. `noStrip`.
+4. **Drip after rain — shipped, the same four chapters, not the roadmap's
+   named buildings.** For 60s after `rainT` last exceeded 0.05, the
+   canopy nearest the animal within 12m drops a `drip` mote about once a
+   second. Kyoto's eaves, Hanoi's shophouses and Kowloon's signs — the
+   roadmap's own list — are architecture, not a canopy, and carry no
+   equivalent of `grainDapple`'s baked positions in any file this wave
+   owns; rather than fabricate positions or add a cross-file hook to
+   three more chapter files, V5.4 rides the same four canopy chapters
+   V5.3 does. Flag shared with V5.3 (`noStrip`) rather than a fifth flag,
+   since both read the same cell and the same cache.
+
+**Verified live** (`qa/wow2-shower.js`, one forced shower per chapter,
+`odds: 1, hold: 14`): Kyoto's `weather.burstAudit()` born count climbed
+65→93 across the trace with `alive` spiking to 14–16, sampled with the
+animal held still so a footfall's own dust could never be counted as a
+leaf; Kowloon's puddle mask moved 95.3%; the rainbow's own isolated
+diff (own-camera, Pantanal) was 1.26% at mean 11.5. `npm test` 25/25
+throughout.
+
+**Budget:** `qa/wow2-frametime-v5.js`, five chapters (sydney, kyoto,
+pantanal, manly, kowloon), all three flags interleaved together: delta
+-0.1..+0.1 ms (inside this harness's own noise floor), rung 0 held —
+well under the 0.6 ms rule. `leaf`/`drip` share `wxBURST_MAX`/
+`wxMOTE_MAX` with every other burst caller in the game (footfalls,
+bubbles); at most one canopy event is live per chapter at a time, so
+this pass never approaches the quarter-of-the-pool ceiling.
+
+Commits: `06cbb58` (the three terms — shared.js, systems.js, weather.js,
+kowloon.js's one-line hook), `fad598d` (the instruments).
+
 ### V6 — TRACKS AND TOUCHES (the world remembers where you went)
 
 The grass lies down where the animal walked (L11) and stands back up.
