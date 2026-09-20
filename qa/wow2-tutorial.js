@@ -78,7 +78,7 @@ async page => {
   const trace = []
   let stuckAt = null, stuckT = 0
   /** a player who has not moved in a second and a half hops and sidesteps */
-  let unstuckN = 0
+  let unstuckN = 0, dryKeys = []
   async function unstick(L) {
     // sliding along a wall at a metre a second counts as stuck too
     // (MEASURED: the seawall at z 13 held the bot for twenty seconds)
@@ -93,7 +93,7 @@ async page => {
       stuckAt = null
     }
   }
-  const tEnd = T0 + 200000
+  const tEnd = T0 + 240000
   while (Date.now() < tEnd) {
     const L = await look()
     if (L.err && !out.err) out.err = String(L.err).slice(0, 200)
@@ -173,13 +173,16 @@ async page => {
       if (L.swim) {
         // in the harbour (a player would see it): back out onto the paving,
         // then along the wall on the arrow's side until the next gap
-        const back = keysFor(L.deg).map(k => ({ KeyW: 'KeyS', KeyS: 'KeyW', KeyA: 'KeyD', KeyD: 'KeyA' })[k])
-        await setKeys(back.concat(['ShiftLeft'])); await page.waitForTimeout(1500)
+        // back the way it came in (MEASURED: reversing the ARROW swam it
+        // east along the harbour, away from the wharf and still in the water)
+        const back = (dryKeys.length ? dryKeys : keysFor(L.deg)).map(k => ({ KeyW: 'KeyS', KeyS: 'KeyW', KeyA: 'KeyD', KeyD: 'KeyA' })[k])
+        await setKeys(back.concat(['ShiftLeft'])); await page.waitForTimeout(1800)
         const L2 = await look()
         const side = (L2.deg !== null && Math.sin(L2.deg * Math.PI / 180) < 0) ? 'KeyA' : 'KeyD'
         await setKeys([side, 'ShiftLeft']); await page.waitForTimeout(3500)
         stuckAt = null
       } else {
+        dryKeys = keysFor(L.deg)
         await setKeys(keysFor(L.deg).concat(['ShiftLeft']))
         await unstick(L)
       }
@@ -192,6 +195,10 @@ async page => {
   await setKeys([])
   if (!out.counters) { const L = await look(); out.counters = L.au }
   out.totalS = +((Date.now() - T0) / 1000).toFixed(1)
+  // ...and the GAME's own clock for the same span: a headless browser
+  // sharing a machine runs rAF slow, and the roadmap's 180 s is a player's
+  // three minutes of game, not of a contended CPU. Both are reported.
+  out.gameS = out.counters ? out.counters.endAt : null
   out.trace = trace
   await page.evaluate((o) => fetch('/shot?name=wow2-tut-run-' + Date.now() + '.json', { method: 'POST', body: btoa(unescape(encodeURIComponent(JSON.stringify(o, null, 1)))) }), out)
 }

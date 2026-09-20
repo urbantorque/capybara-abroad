@@ -20,18 +20,29 @@ for (const f of files) {
   const missed = o.beats.filter((b) => b.hit === false && !/stall/.test(b.pill)).map((b) => b.beat);
   rows.push({
     file: f, started: !!o.started, how: o.endHow, t: o.beat8At != null ? o.beat8At : o.endAt,
+    game: o.gameS != null ? o.gameS : (o.counters ? o.counters.endAt : null),
     hits: o.hits, missed, err: o.err || null,
     counters: o.counters ? { wheeks: o.counters.wheeks, grabs: o.counters.grabs, yuzu: o.counters.yuzu, tabs: o.counters.tabs, bumps: o.counters.bumps } : null,
   });
 }
 const done = rows.filter((r) => r.how === 'walked' && typeof r.t === 'number').map((r) => r.t).sort((a, b) => a - b);
+// THE GAME'S OWN CLOCK, beside the bot's wall clock. A headless browser
+// that is sharing the machine runs rAF slow — measured 60 s of game in
+// 206 s of wall on a run that overlapped another session — and the
+// roadmap's 180 s is three minutes of the player's game, not of a
+// contended CPU. Both are printed; the wall clock is the honest headline
+// on a quiet machine and the game clock is what the walk itself took.
+const doneG = rows.filter((r) => r.how === 'walked' && typeof r.game === 'number').map((r) => r.game).sort((a, b) => a - b);
 const median = done.length ? done[Math.floor(done.length / 2)] : null;
 const worst = done.length ? done[done.length - 1] : null;
-console.log('run  ended    beat8 s  hits  missed beats');
+const medianG = doneG.length ? doneG[Math.floor(doneG.length / 2)] : null;
+const worstG = doneG.length ? doneG[doneG.length - 1] : null;
+console.log('run  ended    wall s  game s  hits  missed beats');
 rows.forEach((r, i) => console.log(String(i + 1).padStart(3) + '  ' + String(r.how).padEnd(8) + ' ' +
-  String(r.t).padStart(6) + '   ' + r.hits + '/8   ' + (r.missed.length ? r.missed.join(',') : '-') + (r.err ? '   ERR ' + r.err : '')));
+  String(r.t).padStart(6) + '  ' + String(r.game).padStart(6) + '   ' + r.hits + '/8   ' + (r.missed.length ? r.missed.join(',') : '-') + (r.err ? '   ERR ' + r.err : '')));
 console.log('\nruns ' + rows.length + ', walked to beat 8: ' + done.length + ', median ' + median + ' s, worst ' + worst +
   ' s (target <= 180)');
-const out = { runs: rows, median, worst, n: rows.length, walked: done.length, target: 180 };
+console.log('game clock: median ' + medianG + ' s, worst ' + worstG + ' s');
+const out = { runs: rows, median, worst, medianGame: medianG, worstGame: worstG, n: rows.length, walked: done.length, target: 180 };
 writeFileSync(join(QA, 'wow2-tutorial.json.png'), JSON.stringify(out, null, 1));
 process.exit(rows.length && worst !== null && worst <= 180 && done.length === rows.length ? 0 : 1);

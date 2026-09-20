@@ -103,6 +103,91 @@ happening, and feet that touch the world.
 - **Cost:** CPU only, one rig; ≤ 6 mote quads per step from a pool that
   exists. **`game.state.noAlive`** (idle), **`noFootfall`**.
 
+### V1 — shipped (20 Sep 2026)
+
+Commits `4f81611` (V1.1) and `495dce4` (V1.2–V1.4); V1.5 with V6.
+Flags `noAlive` (V1.1, V1.2, V1.4, V1.5) and `noFootfall` (V1.3); both
+park at `perfRung >= 1`.
+
+**Reality check first — the rig had more than the card said.** The idle
+repertoire is not new: `capyIDLE_BASE` (`capybara.js:1819–1841`) is a
+SIX-beat weighted table — shake, look-around, shiver on `weather.mood().cold`,
+chew on a full mouth, deep breath on low stamina, and THE LOOK BACK over the
+shoulder at a resting lens — on a 6–17 s clock that collapses toward 4 s
+with urgency, plus a two-ear flick with a blink every 2.2–5.5 s
+(`:8472`), a sniff on its own 5–11 s clock that speeds to 1.6–3.4 s near
+something worth smelling (`:8530`), the gaze (`:3012`), and THE REGARD.
+What was missing was the SMALL motion between those beats, and a no-repeat
+rule. So V1.1 is a second clock UNDER the table, not a replacement: one ear
+(90 ms), the hips 3 cm onto one side with the far hind foot a centimetre
+up, the existing sniff fired, and a head turn to the nearest local, person
+or loose prop within 8 m — which is a different question from the gaze's
+"who has NOTICED me", and the reason a standing animal ignored a crowd.
+Never the same beat twice running; first at 2–4.5 s of stillness, then
+4–9 s.
+
+- **The clock must HOLD under a table beat, not reset.** With the rest
+  lens open the look-back is drawn every 4–6 s and runs 2.4 s, so a clock
+  that reset under it measured two small beats in thirty seconds.
+- **"Suppressed in the loaf" was wrong, and the card wrote it.** The loaf
+  lands at 6.5 s of rest and the nap at 26 s; a 60 s rest is 53 s of loaf.
+  Gated off there, the whole feature was one beat and then a statue for as
+  long as anybody read the map. A sitting capybara flicks, sniffs and
+  turns; only the weight shift is a standing thing, and that one alone
+  comes off the table in the loaf. The nap takes all four.
+- **Measured (`qa/wow2-alive.js`, own camera at 3 m, hide-and-diff mask,
+  127 k px).** Per-beat peak pixels over the breath's own floor: shift
+  5–27 k, sniff 1–24 k, turn 3 k, and the 90 ms ear under the 100 ms
+  sample. The floor is 5–10 k px per 100 ms in BOTH arms — the breath
+  scales the whole squash node and a blink is a face — which is why the
+  headline "moved pixels per second" ratio is 0.9–1.1 and says nothing:
+  **a per-second sum cannot see a 90 ms ear.** The honest number is the
+  per-beat excess, and the contact sheet (`qa/wow2-alive-sheet.png`) read
+  by eye: the turn reads plainly, the shift is about 20 px of hip at 3 m,
+  the one-ear flick is a blur on a still.
+- **V1.2.** The takeoff already had a crouch-to-stretch pop (D2) — on the
+  squash node's Y ALONE, so a running hop stretched upward. Added: 6 %
+  along the velocity split between the node's forward and up by the
+  velocity's own shares, held 120 ms and decayed over the arc (sqZ 1.049
+  live vs 1.022 cut at 200 ms of a running hop); the landing pop sized by
+  impact instead of a flat −0.34 (−0.24 at a kerb, −0.45 off a 7.7 m/s
+  hop, −0.50 cap; min sqY 0.825 vs 0.850); a 3 % bob on the stroke (swing
+  0.060 over a 0.47 s period, measured in the harbour).
+- **V1.3.** `weather.burst(x, z, kind, n, o)` on the mote field's own
+  quads — 48 of 200 above the live row, the quarter rule, kinds as data
+  (dust, snow, leaf, drip, bubble) — plus `weather.ringHere(x, z, o)` on
+  the D5 contact rings. **Both exported on `game.weather` for V4/V5.** The
+  footfall keys on `capySurfMat`, which the step VOICE has read since L4
+  and the picture never did: 4.1 bursts a footfall on Palawan's sand, 3.1
+  on Antarctica's snow (the Drift row of 170 leaves 30 slots), 0 cut;
+  2079 and 1062 px in the frame with the burst slots off the mesh's count.
+- **V1.4 was half shipped.** `capyWetLevel`/`capyWetDark` and the
+  six-material swap exist, with hysteresis at 0.42/0.28 — and the coat was
+  dark for **5.8 s** after the harbour, because the level falls at ⅛ a
+  second and the sound, the slip and the shake all read the same number.
+  So the picture got its own: `capyWetVis`, 25 s, cut to 0.55 and 8 s by
+  the shake, with the three dark twins' colours LERPED from the dry ones
+  each frame (the material swap then happens under the lerp, where the two
+  are one colour, so there is nothing to strobe). Dark for **24 s live vs
+  5 s cut**; 12 belly drips in the first 6.5 s, 0 cut. **No
+  `PALETTE.capyWet` was added** — the twins' existing colours are the wet
+  targets, and a fourth brown would have been a fourth brown.
+- **V1.5.** The catchlight beads slide across the eye toward the lens by
+  15 % of the rest position while THE REGARD is up: 0.053 and 0.019 of
+  slide at regard 0.28, 0 cut. Read by eye at 1.7 m: the near eye's white
+  bead sits on the front-upper shoulder of the eye in the cut frame and on
+  the lens side of it live.
+- **Traps for the other waves.** (1) A headless GL settles at governor
+  rung 3 on its own, which parks every rung-parked term in the game —
+  pin rung 0 with `localStorage['capy3.prefs.v1'] = {v:1, pf:1}` in an
+  init script, and `v: 1` is not optional (`sysPrefsRead` drops the whole
+  file without it). (2) The first render after a run of render-less
+  `game.tick(dt, false)` calls draws a different animal shadow from the
+  second — a same-same diff measured a 50 k px trapezoid. Render twice,
+  then grab. (3) A probe that drives `input.x/z` directly never wakes the
+  animal: `capy.wake(s)` is the keyboard's door and 26 s of rest is a nap
+  that takes every beat.
+
 ### V2 — PEOPLE, ALIVE (gait, gesture, weather, company)
 
 npc.js has knee/elbow gait, six resting stances, work/reach/rock beats, a
@@ -403,6 +488,67 @@ ground's fragment:
 - **Cost:** one uniform pool written from the gait, a few instructions
   in the ground fragment that already runs `grain()`. **`noTracks`.**
 
+### V6 — shipped (20 Sep 2026)
+
+Flag `noTracks`; parked at `perfRung >= 1`; the prints are KEPT through a
+park and a cut, so the term coming back shows the trail it had.
+
+- **The pool** is the contact pool's shape a second time (`shared.js`,
+  beside `_contactP`): 32 × `vec4` (x, z, heading, y) plus a strength
+  each, `tracksWrite / tracksTick / tracksClear / tracksAudit` exported.
+  Two floats keep it cheap: `uTrkOn` (a coherent branch for every chapter
+  with nothing on the ground) and `uTrkC`, the live prints' own disc, so a
+  fragment outside it skips the loop on one dot product.
+- **The paw** is drawn in the print's own frame from the heading: an
+  ellipse for the pad and four toes ahead of it, found by folding the side
+  distance onto the nearer of two toe columns. Read by eye on Antarctica's
+  snow (`qa/wow2-tracks-antarctic-near.png`): a pad and four toe dots per
+  print, in a line across the field.
+- **Written by the gait's footfalls**, keyed on the same `capySurfMat` the
+  step voice reads: sand, snow, mud (a 'grass' footfall at pitch ≤ 0.70 —
+  the Pantanal's wet bank and its rafts), and 'wet' for 12 s after the
+  water on stone, timber, gravel or metal (Venice, Kyoto, the Quay).
+- **The herd's hook, for W3:** `game.tracksWrite(x, z, heading, kind, y)`
+  is published from capybara.js — kinds sand/snow/mud/wet, false for
+  anything else, a no-op under `noTracks`, aged and gated by this module's
+  own frame. npc.js was not touched.
+- **Measured (`qa/wow2-tracks.js`, 8 m walked, plan lens on the trail,
+  the flag flipped between two renders of one pinned frame):** Palawan
+  sand 1882 / 1884 / 1634 px at 0 / 10 / 20 s; Antarctica snow 573 / 569 /
+  571. The swim wake on Kyoto's pond 4956 px live vs cut, 12 quads.
+- **The card's 20 s in sand is 30 s in the file, and the measurement is
+  why.** A print at quarter strength on sand is a 4 % darkening; a bright
+  beach at 230 puts that at nine of the diff's 255. With a 20 s life the
+  twenty-second frame measured **37 px against 1888 at nought** — the
+  target says the trail is visible AT twenty seconds, so the life is 30
+  and the strength holds full for the first two thirds. Snow is the card's
+  90.
+- **Three instruments lied before they were right.** (1) The gate is
+  published from the TICK, not the render, so a flag flipped between two
+  renders changed nothing: 0 px with twenty prints on the ground. One
+  1/60000 s tick after each flip refreshes it. (2) At 1/600 that same tick
+  moved the chapter's mote field — 170 drifting snow quads in Antarctica —
+  into the difference (771 px at 0 s, 90 at 10 s, off the same thirteen
+  prints). (3) `noTracks` stopped the wake being FED and left the twelve
+  quads already up ageing on screen: the A/B read 15 px off a wake that
+  was plainly there in both arms. A cut means not drawn.
+- **The wake was built twice.** The ferry's pattern at the ferry's size —
+  0.16 spreading to 0.66, one every 0.16 s — read by eye as a line of
+  paving slabs behind the animal, because an InstancedMesh has one opacity
+  for the pool and every quad arrived and left at full size. Smaller,
+  denser, and the last third of each life spent shrinking to nothing,
+  which is the only per-quad fade there is.
+- **Frame time (`qa/wow2-frametime-w1.js`, five chapters, WALKING, all
+  three flags together, rung 0 pinned):** live-minus-cut median −0.5 ms,
+  range −2.8 to +0.5. The script also runs a SHAM arm — the identical A/B
+  on a flag nothing in src has heard of — and that floor is −0.9 to
+  +2.6 ms, so every real delta here is inside the harness's own noise and
+  the ≤ 0.6 ms bar is met with nothing to spare in the measurement.
+- **Not built: mud and wet prints are written but unseen.** The kinds are
+  wired and a Pantanal or Venice walk writes them; neither was put in
+  front of a lens, because one chapter per run at four minutes ran the
+  session out. The pixel proof stands for sand and snow only.
+
 ### V0 — the smoothness carry-over (small, named, optional)
 
 L11's A3 left two real items: thin cylinders (Quay's mast and rigging,
@@ -638,14 +784,46 @@ beat's start and each moving on if it never comes. The table is
 page, `localStorage` cleared before `goto`; the bot reads ONLY the live pill
 text and steers by the paper's own arrow and the chart's metres):
 
-TABLE-GOES-HERE
+| run | ended | wall s | game s | beats hit | timed out |
+|---|---|---|---|---|---|
+| 1 | walked | 89.1 | 79.6 | 7/8 | 8 |
+| 2 | walked | 53.4 | 46.5 | 8/8 | — |
+| 3 | walked | 84.4 | 80.1 | 7/8 | 8 |
+| 4 | walked | 60.8 | 57.7 | 8/8 | — |
+| 5 | walked | 70.8 | 66.5 | 8/8 | — |
+| 6 | walked | 41.6 | 38.2 | 8/8 | — |
+| 7 | walked | 64.8 | 56.1 | 8/8 | — |
+| 8 | walked | 86.5 | 73.5 | 8/8 | — |
+| 9 | walked | 63.9 | 58.6 | 8/8 | — |
+| 10 | walked | 96.1 | 88.8 | 7/8 | 8 |
+
+**Ten of ten reached beat eight. Median 70.8 s, worst 96.1 s** against the
+roadmap's 180 — the whole walk, all eight pills, in a minute and a quarter.
+Seven runs closed all eight beats on the bot's own action; three timed the
+door out at 45 s and the walk ended there anyway, which is the beat
+behaving as designed. The game's own clock is printed beside the wall clock
+because a headless browser sharing a machine runs rAF slow: three earlier
+runs that overlapped another session measured 60 s of game in 206 s of
+wall, and those were thrown away and re-run serially rather than reported.
 
 **Also measured.** A restore with one task done: 0 tutorial pills in 40 s of
 walking, running and wheeking (`armed` false, `ever` false), the old paper
 line once. Esc at beat three: `done` + `skipped` on the frame, 0 live pills
 0.65 s later, `tut: 1` on disk, and three pills total for the whole session.
-Frame time, `noTut` live vs cut (between-page, `qa/wow2-frametime-t.js`):
-FRAMETIME-GOES-HERE
+Frame time (`qa/wow2-frametime-t.js`): the walk cannot be interleaved the
+way a shader flag can — it arms once at Begin — so this is three fresh-file
+arms back to back, bucketed by governor rung. On the one rung two arms
+shared, walk LIVE vs walk OVER: **19.6 vs 19.5 ms median (rung 3, n = 540 /
+600)**, +0.1 ms; a second pass at rung 2 read −1.0 ms on a 60-frame bucket.
+The sign is not stable, which is the honest reading: the walk's cost is
+below this headless machine's ±1 ms noise floor. The first cut of this
+instrument printed a 3.2 ms "delta" that was entirely the governor — arm A
+settled at rung 3 and arm B at rung 0 — and is why the buckets are there.
+Eight beat screenshots read by eye (`qa/wow2-tut-beat<N>.png`): the pill is
+the paper-white lozenge at the foot of the frame, roman, signed, legible
+over lawn, over sandstone, over the harbour and under two bubbles and an
+incident line; it takes one of the stack's three places and is never pushed
+out by a tick landing under it.
 
 **The stranger** (`qa/wow2-stranger.md`, `qa/wow2-stranger.js`): a second
 agent was not available to this wave, so the stranger is a SCRIPTED one and

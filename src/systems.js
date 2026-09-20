@@ -48656,7 +48656,7 @@ export function createSystems(game) {
       // reason to turn round for. The bearing is all the arrow shows, so a
       // point one metre from the animal along it — always in front of the
       // lens, since the animal is — gives the same direction without the
-      // mirror. (qa/_tut-dir2.js: the DOM arrow equals the projection.)
+      // mirror. (qa/wow2-tut-arrow.js: the DOM arrow equals the projection.)
       const hun = hd > 1e-3 ? 1 / hd : 0;
       sysAimA.set(p.x, p.y, p.z).project(camera);
       sysAimB.set(p.x + hx * hun, p.y, p.z + hz * hun).project(camera);
@@ -49691,7 +49691,7 @@ export function createSystems(game) {
       else if (!inSyd) tutEnd('left');              // the walk is the gardens'
       else if (tutT > sysTUT_TOTAL_T) tutEnd('time');
     }
-    if (tutLive() && started && !game.state.paused && !transBusy) {
+    if (tutLive() && started && capy && !game.state.paused && !transBusy) {
       tutT += dt;
       if (!tutOn) {
         // Before the first pill, and in the gap between two: the place card
