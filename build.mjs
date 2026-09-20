@@ -17,6 +17,7 @@ const ROOT = dirname(fileURLToPath(import.meta.url));
 // Dependency order matters: shared first, main last.
 const ORDER = [
   'src/shared.js',
+  'src/far.js',
   'src/environment.js',
   'src/pasto.js',
   'src/quay.js',

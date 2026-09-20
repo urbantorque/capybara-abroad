@@ -18,7 +18,7 @@
     "There are no dependencies and there is no bundler. The two libraries the",
     "game is built on are checked in under vendor/ (see vendor/README.md for",
     "versions, checksums and licences); build.mjs inlines them, along with the",
-    "twenty-seven source modules, into one self-contained HTML file.",
+    "twenty-eight source modules, into one self-contained HTML file.",
     "",
     "`npm start` serves the unbundled source for development. `npm run build`",
     "produces dist/untitled-capybara-game.html, which needs no server and no",

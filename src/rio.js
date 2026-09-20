@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger, mergeWearBand, makeMover, warnOnce } from './shared.js';
 import { npcPERSON } from './npc.js';
+import { farLayer, farMover, farBundle, farTone } from './far.js';
 
 // ===========================================================================
 // CHAPTER 6 — RIO DE JANEIRO
@@ -210,6 +211,7 @@ let rioLocBonde = null;
 let rioGame = null;
 let rioBuilt = false;
 let rioRoot = null;
+let rioFar = null;      // Dois Irmãos, the Gávea and the approach (far.js)
 let rioTime = 0;
 
 let rioSeaMesh = null, rioSeaAttr = null, rioRipT = 0;
@@ -2001,6 +2003,65 @@ function rioCablePoint(t, out) {
   }
   return rioSpanPoint(rioURCA.x, uY, rioURCA.z,
                       rioSUGAR.x, gY, rioSUGAR.z, (t - 0.5) / 0.5, out);
+}
+
+// ---- ROADMAP-WOW2 V3, THE FAR PLANE: DOIS IRMÃOS AND THE GÁVEA -----------
+// The chapter has the Loaf and Corcovado, both inside 130 m. Looking WEST
+// along the sand — which is where the arrival lens looks — the beach ended
+// at the ground mesh and then the dome. What ends Ipanema in fact is Dois
+// Irmãos, the two peaks straight down the beach, with the flat block of
+// Pedra da Gávea behind them to the right and the Vidigal shoulder low
+// between. Here at 340–480 m, where the chapter's own haze (150–900 m,
+// rioHaze, never re-based) reads at 27–44 %, in the forest's dark pulled a
+// quarter toward that haze. Bases at -30: the ground mesh stops at x -200.
+//
+// And the approach: this city's airport is on the water in the middle of
+// it, and a plane low over the sea coming in from the south-west is as much
+// the view from the sand as the mountains are. Eighteen triangles, a hundred
+// seconds a loop, on the path sixty of them, low (24 m down to 8 — at this
+// scale that IS the approach) so it stays under the top of a frame that
+// rests pitched 21° down at the sand; measured, it skimmed the top edge at
+// 34 m and crossed clean at 13. Nothing else in the chapter moves
+// past 110 m (the frigatebirds, the cable car and the bondes are all mid).
+function rioBuildFar(root) {
+  const tone = farTone(PALETTE.rioForestDk, PALETTE.rioHaze, 0.25);
+  rioFar = farBundle({
+    name: 'rio',
+    layer: farLayer({
+      name: 'far-rio', color: tone,
+      wedges: [
+        // Vidigal's shoulder, low, in front
+        { x: -300, z: 30, w: 130, d: 50, yaw: 0.25,
+          profile: [[-1, 0], [-0.5, 22], [0, 28], [0.5, 20], [1, 0]] },
+        // Dois Irmãos — the two, the seaward one the taller
+        { x: -336, z: -34, w: 96, d: 56, yaw: 0.35,
+          profile: [[-1, 0], [-0.45, 40], [-0.1, 72], [0.3, 46], [1, 0]] },
+        { x: -382, z: -62, w: 90, d: 52, yaw: 0.35,
+          profile: [[-1, 0], [-0.3, 44], [0.15, 62], [0.6, 30], [1, 0]] },
+        // Pedra da Gávea — the table
+        { x: -470, z: 24, w: 130, d: 80, yaw: 0.15,
+          profile: [[-1, 0], [-0.55, 60], [-0.3, 94], [0.3, 92], [0.6, 56], [1, 0]] },
+        // and the Tijuca ridge running back inland behind it all
+        { x: -420, z: 130, w: 200, d: 70, yaw: -0.4,
+          profile: [[-1, 0], [-0.5, 50], [0, 66], [0.5, 44], [1, 0]] },
+        // the Cagarras, straight out to sea — the lens does not always rest
+        // looking west (the arrival pose is not deterministic; one run looks
+        // down the sand, the next out over the water), and the sea's horizon
+        // was bare either way. Three islets at 430–470 m, 33 % haze.
+        { x: -40, z: -440, w: 60, d: 30, yaw: 0.2,
+          profile: [[-1, 0], [-0.3, 18], [0.2, 30], [1, 0]] },
+        { x: 30, z: -470, w: 70, d: 34, yaw: -0.15,
+          profile: [[-1, 0], [-0.4, 22], [0.1, 36], [0.5, 24], [1, 0]] },
+        { x: 95, z: -430, w: 36, d: 24, yaw: 0.3,
+          profile: [[-1, 0], [0, 16], [1, 0]] },
+      ],
+    }),
+    mover: farMover({
+      kind: 'plane', color: PALETTE.rioGraniteFar, scale: 0.7, period: 100, duty: 0.6, phase: 0.2,
+      path: [[-480, 24, -300], [-120, 13, -250], [260, 8, -220]],
+    }),
+  });
+  root.add(rioFar.group);
 }
 
 // ============================================================== CORCOVADO ====
@@ -4897,6 +4958,7 @@ export function createRio(game) {
       if (!rioBuilt) return;
       if (!game.biome.isActive('rio')) return;
       rioTime += dt;
+      if (rioFar) rioFar.update(game, dt);
       rioUpdateFlyover(game, dt);
       rioUpdateFragataRide(game);
 
@@ -5008,6 +5070,7 @@ function rioBuild(game) {
   rioBuildWaves(rioRoot);
   rioBuildSugarloaf(game, rioRoot);
   rioBuildCorcovado(game, rioRoot);
+  rioBuildFar(rioRoot);
   rioBuildLapa(game, rioRoot);
   rioBuildBonde(game, rioRoot);
   rioBuildSelaron(game, rioRoot);

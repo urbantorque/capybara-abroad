@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, dampAngle, lerp, grain, swayMesh, leafMesh, makeMerger, mergeWearBand, warnOnce, skyDomeLit } from './shared.js';
+import { farLayer, farBundle, farTone } from './far.js';
 
 // ===========================================================================
 // AGENT A — ENVIRONMENT.  Sydney as low-poly stage dressing.
@@ -41,6 +42,7 @@ let envCloudData = null;
 let envTime = 0;
 let envRippleT = 0;
 let envAsleep = false;   // true once Sydney's update has parked itself for Pasto
+let envFar = null;       // the North Shore (far.js), ticked while Sydney is live
 // 0..1, how long the animal has been on the Opera House podium. The grade layer
 // reads it through api.stageGlow(). Zeroed on the way out — see envUpdate.
 let envStageT = 0;
@@ -2377,6 +2379,53 @@ function envFerryStep(game, dt) {
   game.events.emit('ferry:departed', {});
 }
 
+// ---- ROADMAP-WOW2 V3, THE FAR PLANE: THE NORTH SHORE ----------------------
+// The far shore that closes the harbour is a 2.4 m strip at z -126 (the block
+// in createEnvironment), so from the lawn the horizon past the bridge was the
+// dome. This is what stands behind it: the North Shore, a low bush ridge from
+// Kirribilli out east past Bradleys Head, and to the west the Balmain side of
+// the water, which is what the arrival lens (looking WNW over the promenade)
+// actually has in frame.
+//
+// PLACED FOR SYDNEY'S FOG, NOT AT 300 M. This chapter keeps the game's base
+// haze, 90–230 m (sysDAY_FOG, never re-based), so a wedge at 300 m is the
+// fog colour exactly and invisible. The North Shore stands at z -155..-162,
+// which from the lawn is 175–190 m straight ahead (40–60 % fog) and runs into
+// the haze toward the frame's left; the Balmain wedges at 165–200 m read at
+// 55–75 %. Faint on purpose: that is what a shore across water looks like
+// here. Bases at -30 so nothing floats over the horizon colour where the
+// harbour mesh ends. Six wedges, one draw; no mover — the harbour already
+// has eleven sails and ferries crossing z -46..-130 (envTRAF) and the
+// seaplane's circuit, and the sails cross the arrival frame on their own.
+function envBuildFar(root) {
+  const tone = farTone(PALETTE.headScrubDk, PALETTE.fog, 0.30);
+  envFar = farBundle({
+    name: 'sydney',
+    layer: farLayer({
+      name: 'far-sydney', color: tone,
+      wedges: [
+        // the North Shore, east to west, overlapping so no seam shows
+        { x: 120, z: -158, w: 130, d: 44, yaw: 0.06,
+          profile: [[-1, 0], [-0.5, 9], [-0.1, 13], [0.35, 10], [0.7, 12], [1, 0]] },
+        { x: 20, z: -162, w: 140, d: 48, yaw: -0.04,
+          profile: [[-1, 0], [-0.6, 11], [-0.2, 16], [0.2, 12], [0.6, 14], [1, 0]] },
+        { x: -80, z: -155, w: 120, d: 44, yaw: 0.08,
+          profile: [[-1, 0], [-0.55, 10], [0, 14], [0.5, 9], [1, 0]] },
+        // Balmain and the water's west end, what the arrival lens looks at:
+        // three ridges running roughly north-south along the far bank, so
+        // seen end-on from the lawn they overlap into one hilly shore
+        { x: -165, z: 30, w: 120, d: 34, yaw: 1.45,
+          profile: [[-1, 0], [-0.6, 8], [-0.2, 12], [0.2, 9], [0.6, 11], [1, 0]] },
+        { x: -172, z: -60, w: 130, d: 36, yaw: 1.30,
+          profile: [[-1, 0], [-0.55, 10], [-0.15, 15], [0.25, 11], [0.65, 14], [1, 0]] },
+        { x: -160, z: -130, w: 110, d: 40, yaw: 0.90,
+          profile: [[-1, 0], [-0.5, 9], [0, 13], [0.5, 10], [1, 0]] },
+      ],
+    }),
+  });
+  root.add(envFar.group);
+}
+
 // ===========================================================================
 export function createEnvironment(game) {
   envInitGeos();
@@ -3604,6 +3653,7 @@ export function createEnvironment(game) {
   bridge.receiveShadow = false;
   bridge.frustumCulled = false;
   root.add(bridge);
+  envBuildFar(root);
 
   // The flock goes in LAST, after every other envRR() consumer in the build,
   // so adding it cannot walk the shared seed and move a single palm or a
@@ -3701,6 +3751,7 @@ export function createEnvironment(game) {
       return;
     }
     envAsleep = false;
+    if (envFar) envFar.update(game, dt);
     {
       const capy = game.capy;
       const on = !!(capy && capy.position && envInZone('operaStage', capy.position.x, capy.position.z) &&
