@@ -691,6 +691,71 @@ function npcGaitPick(u, child) {
 const npcGAIT_STATES = { wander: 1, idle: 1, lookAt: 1, queue: 1, calm: 1,
                          walk: 1, drift: 1, stand: 1 };
 
+// ===========================================================================
+// SIX IDLE GESTURES (ROADMAP-WOW2 V2.2). A standing person, between beats,
+// was a stance and a breath. These are two-second things a person does with
+// nobody watching, on a slow jittered clock, on the arm and head nodes both
+// rigs already have — the same additive stack the stance, the photo and the
+// pat go through, weighted UNDER everything that is an action, so a beat, a
+// flinch, an umbrella or a walk simply wins.
+//
+// The numbers are in the LOCALS' rig frame, which the roster shares:
+// negative shoulder x is forward and up, positive z on the left arm is toward
+// the centre line and negative on the right, the elbow bends forward only
+// (negative). `hx`/`hy` are the head's pitch (positive = down) and yaw.
+//
+//   wrist    the right forearm comes across and the head drops to it.
+//   stretch  both arms over the head, a lean back, and down.
+//   wave     the right arm up and swinging side to side at somebody who is
+//            not in the frame. `wob` is the swing; the head turns to them.
+//   point    the right arm out level at THE ANIMAL — only while it is doing
+//            something (game.state.chaos > 0) and only from a person already
+//            facing it, so the arm and the eyes agree.
+//   shiver   arms folded in and a 70 rad/s jitter on the shoulders. The two
+//            cold chapters only (npcGEST_COLD).
+//   shade    a hand flat over the eyes. The 'brow' stance's own numbers, as
+//            a two-second beat, in the three brightest chapters by the mood
+//            table's cloudK (npcGEST_SUN).
+//
+// `game.state.noGesture` cuts it (nothing starts, anything running ends) and
+// governor rung >= 1 parks it the same way. Cost: six additions on nodes
+// that are written every frame anyway; no draw, no node.
+const npcGESTURE = [
+  { n: 'wrist',   aLx: 0,     aLz: 0,    aRx: -1.25, aRz: -0.25, eL: 0,     eR: -1.55, hx: 0.42,  hy: -0.25, wob: 0,    lean: 0,     jit: 0,     dur: 2.0 },
+  { n: 'stretch', aLx: -2.85, aLz: 0.18, aRx: -2.85, aRz: -0.18, eL: -0.15, eR: -0.15, hx: -0.25, hy: 0,     wob: 0,    lean: -0.07, jit: 0,     dur: 2.4 },
+  { n: 'wave',    aLx: 0,     aLz: 0,    aRx: -2.55, aRz: -0.30, eL: 0,     eR: -0.45, hx: 0,     hy: 0.55,  wob: 0.30, lean: 0,     jit: 0,     dur: 2.2 },
+  { n: 'point',   aLx: 0,     aLz: 0,    aRx: -1.45, aRz: 0.05,  eL: 0,     eR: 0,     hx: 0.12,  hy: 0,     wob: 0,    lean: 0.03,  jit: 0,     dur: 1.8 },
+  { n: 'shiver',  aLx: -0.45, aLz: 0.40, aRx: -0.45, aRz: -0.40, eL: -1.7,  eR: -1.7,  hx: 0.22,  hy: 0,     wob: 0,    lean: 0.04,  jit: 0.028, dur: 2.2 },
+  { n: 'shade',   aLx: 0.10,  aLz: 0.02, aRx: -2.10, aRz: -0.30, eL: 0,     eR: -2.00, hx: -0.08, hy: 0.15,  wob: 0,    lean: 0,     jit: 0,     dur: 2.2 },
+];
+const npcGEST_COLD = { iceland: 1, antarctic: 1 };
+// The three brightest by the mood table: Kiln Noon 0.22, Harbour Glare
+// 0.42, Hard Noon 0.48 (weather.js cloudK, midday locks). Palawan's
+// Bleached Noon is 0.50 and fourth; Manly is a golden westerly, not a glare.
+const npcGEST_SUN  = { sahara: 1, quay: 1, rio: 1 };
+const npcGEST_GAP0 = [4, 18];     // s before a person's first gesture
+const npcGEST_GAP  = [12, 30];    // s between them, jittered per person
+const npcGEST_EASE = 0.35;        // s in and out
+const npcGEST_CHAOS = 0.05;       // chaos above which the point is allowed
+const npcGEST_BUSY  = 0.25;       // the busy sum above which nothing starts
+// the roster states a gesture may start in: standing, not doing a job
+const npcGEST_STATES = { idle: 1, lookAt: 1, calm: 1, stand: 1, stall: 1, queue: 1 };
+/** Which gesture, or -1 for none this time. `sun`/`cold` are the chapter's. */
+function npcGestPick(sun, cold, chaos, facing) {
+  // six draws, weighted so that the chapter-specific ones come up often
+  // enough to be SEEN in the chapter that has them
+  const k = Math.random();
+  if (cold && k < 0.30) return 4;
+  if (sun && k < 0.30) return 5;
+  if (chaos && facing && k < 0.45) return 3;
+  const r = Math.random();
+  return r < 0.36 ? 0 : r < 0.68 ? 1 : 2;
+}
+/** 0..1 envelope over a gesture of `dur` with `t` seconds left. */
+function npcGestEnv(t, dur) {
+  return clamp(Math.min(dur - t, t) / npcGEST_EASE, 0, 1);
+}
+
 const npcSKINS = [PALETTE.skin1, PALETTE.skin2, PALETTE.skin3, PALETTE.skin4];
 const npcHAIRS = [PALETTE.hair1, PALETTE.hair2, PALETTE.hair3, PALETTE.hair4, PALETTE.hair5];
 const npcCLOTH = [PALETTE.cloth1, PALETTE.cloth2, PALETTE.cloth3, PALETTE.cloth4,
@@ -3606,6 +3671,9 @@ export function createNPCs(game) {
       // ---- what the weather has done to them (see ...AND THEY NOTICE) ----
       umb: 0, umbG: null, umbUp: false,   // the umbrella: level, mesh, latch
       stW: 0,                             // how much of their stance is live (L7, E4)
+      // ---- an idle gesture (ROADMAP-WOW2 V2.2). See npcGESTURE: which one,
+      // seconds left in it, the clock to the next, and how many so far.
+      gsK: -1, gsT: 0, gsCd: rand(npcGEST_GAP0[0], npcGEST_GAP0[1]), gsN: 0, gsW: 0,
       hud: 0,                             // the huddle, 0..1
       look: 0, lookT: rand(4, npcLOC_LOOK_GAP),   // the glance up
       wetWas: false,                      // rising edge of "it has started"
@@ -6976,7 +7044,15 @@ export function createNPCs(game) {
     // How close the front is to crossing, 0 far out .. 1 at the line — the
     // umbrella's own anticipation (L7, F4): a local who waits for the first
     // drop is one photograph too late for a scene about a front arriving.
-    const wxFrontNear = npcWxFront > -1 ? clamp(-npcWxFront * 3, 0, 1) : 0;
+    // ---- ...AND IT WAS UPSIDE DOWN (ROADMAP-WOW2 V2.3). The front runs
+    // -1 (far) .. 0 (the line) .. +1 (gone), and `-front * 3` is 3 when it
+    // is FAR and 0 at the line — so every local in every rainy chapter held
+    // an umbrella up, in dry weather, for the first two fifths of every
+    // six-to-nine-minute cycle, and the gesture pool below read them as busy
+    // the whole time (measured in Kyoto: 14 of 14 at umb 1.00, rain 0.00).
+    // 1 - |front| * 3 is 1 at the line and 0 a sixth of a cycle either side
+    // of it, which is what the comment above always said it was.
+    const wxFrontNear = npcWxFront > -1 ? clamp(1 - Math.abs(npcWxFront) * 3, 0, 1) : 0;
     // Read ONCE for the whole population, for the same reason the weather is:
     // it is the same number for all of them and asking systems.js a hundred
     // and ten times a frame for one float is the cost that only shows up in
@@ -7769,7 +7845,11 @@ export function createNPCs(game) {
           // out, on the roster's own reasoning — a head is aimed at a thing in
           // the world, but the neck does come along a little.
           r.headY = damp(r.headY || 0, lead, 7, dt);
-          r.fig.head.rotation.y = r.headY - (r.twist || 0) * npcHEAD_HOLD;
+          // ...plus the gesture's turn (V2.2): the wave looks at whoever is
+          // being waved at, the wrist looks down. gsW is last frame's weight,
+          // which is one frame stale and does not matter at 0.35 s of ease.
+          const gsH = r.gsK >= 0 ? npcGESTURE[r.gsK] : null;
+          r.fig.head.rotation.y = r.headY - (r.twist || 0) * npcHEAD_HOLD + (gsH ? gsH.hy * r.gsW : 0);
           // ...and the head DIPS a little for something the size of a capybara,
           // which is the whole joke of being looked at by a person.
           // ...and the head goes BACK during a flinch, which is the opposite of
@@ -7793,7 +7873,8 @@ export function createNPCs(game) {
             ? Math.sin(Math.min(1, r.beatP) * Math.PI) * npcTOOL_LOOK : 0;
           r.fig.head.rotation.x = damp(r.fig.head.rotation.x,
                                        dip - f * npcLOC_FL_HEAD
-                                       - r.look * 0.62 + r.hud * 0.22 + hand,
+                                       - r.look * 0.62 + r.hud * 0.22 + hand
+                                       + (gsH ? gsH.hx * r.gsW : 0),
                                        f > 0.02 ? 14 : 5, dt);
           // arms: a slow shift of weight, and one of them comes up while they
           // are actually talking — and BOTH come up, fast, on a flinch.
@@ -7876,24 +7957,49 @@ export function createNPCs(game) {
           const tLx = sway - guard - fold * 0.42 + beatL - snap + pat;
           const tRx = -sway - talk * (1 - hold) - guard - hold * npcLOC_UMB_ARM - fold * 0.42 + beat - snapR + pat;
           const st = r.fig.stance;
+          // `busy` is the same sum for the stance and the gesture: everything
+          // that is an ACTION, 0..1. Computed whether or not there is a
+          // stance, because the gesture needs it either way.
+          const busy = clamp(f * 3 + guard * 2 + hold * 2 + fold * 2 + talk * 1.5 + snapK + giftK + patK
+                             + (r.beatP >= 0 ? 1 : 0) + r.mv + satK, 0, 1);
+          // ---- THE IDLE GESTURE (ROADMAP-WOW2 V2.2). See npcGESTURE. ------
+          // Started only when nothing else is happening; weighted by
+          // (1 - busy) once running, so anything that starts mid-gesture
+          // takes the arm off it. The chapter says which of the six are in
+          // the pool, and the point wants chaos AND a person already facing
+          // the animal (`watch`), so the arm agrees with the eyes.
+          // ...on its own busy sum, which is the stance's WITHOUT the huddle:
+          // the shiver is the huddle with a jitter on it, and a cold chapter
+          // whose people are all huddled is exactly where it has to be able
+          // to start. localGestureStep reads r.hud itself and picks only the
+          // shiver while somebody is huddled.
+          const gBusy = clamp(f * 3 + guard * 2 + hold * 2 + talk * 1.5 + snapK + giftK + patK
+                              + (r.beatP >= 0 ? 1 : 0) + r.mv + satK, 0, 1);
+          const gs = localGestureStep(r, dt, gBusy, watch, r.biome);
+          const gW = r.gsW;
+          const gLx = gs ? gs.aLx * gW : 0, gRx = gs ? gs.aRx * gW : 0;
           let sAL = 0, sAR = 0;
           if (st) {
-            const busy = clamp(f * 3 + guard * 2 + hold * 2 + fold * 2 + talk * 1.5 + snapK + giftK + patK
-                               + (r.beatP >= 0 ? 1 : 0) + r.mv + satK, 0, 1);
             r.stW = damp(r.stW, 1 - busy, 6, dt);
-            sAL = r.stW * clamp(1 - Math.abs(tLx) * 0.8, 0, 1);
-            sAR = r.stW * clamp(1 - Math.abs(tRx) * 0.8, 0, 1);
+            sAL = r.stW * clamp(1 - Math.abs(tLx) * 0.8, 0, 1) * (1 - gW);
+            sAR = r.stW * clamp(1 - Math.abs(tRx) * 0.8, 0, 1) * (1 - gW);
           }
+          // the wave's swing, on the raised arm's z, and the shiver's jitter
+          // on the shoulders
+          const gWob = gs && gs.wob ? Math.sin(r.t * 12) * gs.wob * gW : 0;
+          if (gs && gs.jit) r.fig.torso.rotation.z += Math.sin(r.t * 70) * gs.jit * gW;
           r.fig.armL.rotation.x = damp(r.fig.armL.rotation.x,
-                                       tLx + (st ? st.aLx * sAL : 0),
+                                       tLx + (st ? st.aLx * sAL : 0) + gLx,
                                        r.beatP >= 0 ? npcBEAT_LAM : armL, dt);
           r.fig.armR.rotation.x = damp(r.fig.armR.rotation.x,
-                                       tRx + (st ? st.aRx * sAR : 0), r.beatP >= 0 ? npcBEAT_LAM : armR, dt);
+                                       tRx + (st ? st.aRx * sAR : 0) + gRx, r.beatP >= 0 ? npcBEAT_LAM : armR, dt);
           r.fig.armR.rotation.z = damp(r.fig.armR.rotation.z,
                                        -talk * 0.7 * (1 - hold) - f * 0.4
-                                       - hold * 0.20 - fold * 0.34 + (st ? st.aRz * sAR : 0), armR, dt);
+                                       - hold * 0.20 - fold * 0.34 + (st ? st.aRz * sAR : 0)
+                                       + (gs ? gs.aRz * gW : 0) + gWob, armR, dt);
           r.fig.armL.rotation.z = damp(r.fig.armL.rotation.z,
-                                       f * 0.4 + fold * 0.34 + (st ? st.aLz * sAL : 0), armL, dt);
+                                       f * 0.4 + fold * 0.34 + (st ? st.aLz * sAL : 0)
+                                       + (gs ? gs.aLz * gW : 0), armL, dt);
           // ---- THE ELBOW (v56) -------------------------------------------
           // Read off the shoulder angle that was just written rather than from
           // the pose stack, because that stack is fourteen additive terms
@@ -7915,8 +8021,12 @@ export function createNPCs(game) {
           // ...and the stance's own elbow, by the same damped weight the
           // shoulder took it at (L7, E4): folded arms are the elbow, not
           // the shoulder, and a rest bend under a folded forearm is a kink.
-          r.fig.elbowL.rotation.x = st ? -npcELBOW_REST * mkL * (1 - sAL) + st.eL * sAL : -npcELBOW_REST * mkL;
-          r.fig.elbowR.rotation.x = st ? -npcELBOW_REST * mkR * (1 - sAR) + st.eR * sAR : -npcELBOW_REST * mkR;
+          // ...and the gesture's (V2.2), by its own weight: the wrist and the
+          // shiver are the elbow, the stretch is its absence.
+          r.fig.elbowL.rotation.x = (st ? -npcELBOW_REST * mkL * (1 - sAL) + st.eL * sAL : -npcELBOW_REST * mkL) * (1 - gW)
+                                    + (gs ? gs.eL * gW : 0);
+          r.fig.elbowR.rotation.x = (st ? -npcELBOW_REST * mkR * (1 - sAR) + st.eR * sAR : -npcELBOW_REST * mkR) * (1 - gW)
+                                    + (gs ? gs.eR * gW : 0);
           // ---- THE FACE (v54) ---------------------------------------------
           // Every input here already existed and none of it was drawn above
           // the neck: the flinch spring, the guard that goes up when the
@@ -8497,6 +8607,44 @@ export function createNPCs(game) {
     return (dx * dx + dz * dz) > npcTOOL_R * npcTOOL_R;
   }
 
+  // ---- THE IDLE GESTURE'S CLOCK (ROADMAP-WOW2 V2.2). See npcGESTURE. ------
+  // Returns the row running on this person, or null, and writes r.gsW — the
+  // weight the arm stack multiplies the row by: the ease envelope times
+  // (1 - busy), so a flinch or a beat that lands mid-gesture takes the arm
+  // back over ~0.15 s rather than at once. `noGesture` and a governor rung
+  // both end whatever is running and start nothing; the cut cost is this
+  // one branch per person per frame.
+  let npcGestOn = true, npcGestN = 0;
+  const npcGestBy = { wrist: 0, stretch: 0, wave: 0, point: 0, shiver: 0, shade: 0 };
+  function localGestureStep(r, dt, busy, facing, biome) {
+    r.gsBz = busy;   // published for the audit: WHY nobody is gesturing
+    if (!npcGestOn) { r.gsK = -1; r.gsT = 0; r.gsW = 0; return null; }
+    if (r.gsK >= 0) {
+      r.gsT -= dt;
+      const row = npcGESTURE[r.gsK];
+      if (r.gsT <= 0) { r.gsK = -1; r.gsT = 0; r.gsW = 0; r.gsCd = rand(npcGEST_GAP[0], npcGEST_GAP[1]); return null; }
+      r.gsW = damp(r.gsW, npcGestEnv(r.gsT, row.dur) * (1 - busy), 14, dt);
+      return row;
+    }
+    r.gsW = 0;
+    r.gsCd -= dt;
+    if (r.gsCd > 0 || busy > npcGEST_BUSY) return null;
+    // ...and not while sat on the floor (B11)
+    if (r.sat > 0) { r.gsCd = 2; return null; }
+    const b = biome;
+    // ...and somebody huddled (the locals' r.hud; the roster has no huddle)
+    // shivers or does nothing: a stretch out of a huddle is two poses on
+    // one shoulder.
+    const huddled = (r.hud || 0) > 0.3;
+    if (huddled && !npcGEST_COLD[b]) { r.gsCd = 3; return null; }
+    const k = huddled ? 4
+      : npcGestPick(!!npcGEST_SUN[b], !!npcGEST_COLD[b],
+                    (game.state.chaos || 0) > npcGEST_CHAOS, !!facing);
+    r.gsK = k; r.gsT = npcGESTURE[k].dur; r.gsN++;
+    npcGestN++; npcGestBy[npcGESTURE[k].n]++;
+    return npcGESTURE[k];
+  }
+
   function localBeatStep(r, dt, busy, calm) {
     const b = r.beat;
     if (!b) return 0;
@@ -8821,6 +8969,9 @@ export function createNPCs(game) {
       // ---- THE GAIT (ROADMAP-WOW2 V2.1). See npcGAIT. Written below, from
       // the figure's own seed, once the record's clocks exist to seed it.
       gait: 0, gaitOdo: 0, gaitPause: 0, gaitSit: 0,
+      // ---- and an idle gesture (V2.2), the locals' own fields. See
+      // localGestureStep, which both rigs share.
+      gsK: -1, gsT: 0, gsCd: rand(npcGEST_GAP0[0], npcGEST_GAP0[1]), gsN: 0, gsW: 0,
       // ---- A VOICE OF THEIR OWN (F2). See the same field on addLocal ------
       // ...and a child's is higher, which is the one place in the game where a
       // build and a voice have to agree: P5 gave one tourist in seven a head
@@ -11429,6 +11580,35 @@ export function createNPCs(game) {
     n.elbowL.rotation.x = -(npcELBOW_REST + fwdL * amp * npcELBOW_SWING) * maskL;
     n.elbowR.rotation.x = -(npcELBOW_REST + fwdR * amp * npcELBOW_SWING) * maskR;
 
+    // ---- THE IDLE GESTURE, ON THIS RIG (ROADMAP-WOW2 V2.2) ---------------
+    // The locals' six rows and the locals' own clock (localGestureStep),
+    // on the roster's nodes. `gBusy` is this rig's version of the locals'
+    // sum: anything the state machine has asked the arms, the legs or the
+    // chair for. Added AFTER the pose and the swing, before the brace, like
+    // the talking arm — and weighted by the pose masks, so the gardener's
+    // rake and the waiter's tray keep the geometry they were measured with.
+    const gBusy = clamp(rec.speed * 4 + Math.abs(rec.poseArmL) * 3 + Math.abs(rec.poseArmR) * 3
+                        + (rec.gest > 0 ? 1 : 0) + rec.alarm * 3 + rec.flail + rec.stumble + rec.seatPose
+                        + (rec.carryT >= 0 ? 1 : 0) + (rec.heldProp ? 1 : 0) + (rec.coneT >= 0 ? 1 : 0)
+                        + Math.abs(rec.poseCrouch) * 4 + (npcGEST_STATES[rec.state] ? 0 : 1), 0, 1);
+    const gFace = capyOk && distToCapy(rec) < 22 && facingCapy(rec) > 0.6;
+    const gs = localGestureStep(rec, dt, gBusy, gFace, game.biome && game.biome.current);
+    let gLean = 0, gRoll = 0;
+    if (gs) {
+      const gW = rec.gsW;
+      const gWob = gs.wob ? Math.sin(game.state.time * 12 + rec.idlePhase) * gs.wob * gW : 0;
+      n.armL.rotation.x += gs.aLx * gW * maskL;
+      n.armR.rotation.x += gs.aRx * gW * maskR;
+      n.armL.rotation.z += gs.aLz * gW * maskL;
+      n.armR.rotation.z += (gs.aRz * gW + gWob) * maskR;
+      // the elbow: the row's own bend replaces the rest bend by the weight
+      n.elbowL.rotation.x = n.elbowL.rotation.x * (1 - gW) + gs.eL * gW * maskL;
+      n.elbowR.rotation.x = n.elbowR.rotation.x * (1 - gW) + gs.eR * gW * maskR;
+      // the lean and the shiver go on bob, which is written below
+      gLean = gs.lean * gW;
+      gRoll = gs.jit ? Math.sin(game.state.time * 70 + rec.idlePhase) * gs.jit * gW : 0;
+    }
+
     // ---- ...AND THIS CAST FEELS THE WEATHER TOO, WITHIN LIMITS -----------
     // Sydney's and Pasto's people are a richer rig than a local — a real state
     // machine, a nav mesh, an errand — but they are drawn as INSTANCED boxes,
@@ -11486,8 +11666,8 @@ export function createNPCs(game) {
                        + npcLEG_L * (rec.bLeg - 1);
     n.bob.position.x = (1 - amp) * Math.sin(game.state.time * 0.5 + rec.idlePhase) * 0.03;
     n.bob.position.z = -npcHIP_Y * sl;
-    n.bob.rotation.x = rec.poseLean;
-    n.bob.rotation.z = s * amp * 0.05 + rec.stumble * Math.sin(rec.stateT * 21) * 0.22;
+    n.bob.rotation.x = rec.poseLean + gLean;
+    n.bob.rotation.z = s * amp * 0.05 + rec.stumble * Math.sin(rec.stateT * 21) * 0.22 + gRoll;
     // ---- THE TWIST (v56) -------------------------------------------------
     // `bob` had lean and it had sway and it had NO rotation.y, which is the
     // one channel a walk actually needs: shoulders going one way while the
@@ -11524,13 +11704,15 @@ export function createNPCs(game) {
     // in the world and does not swing with the chest it is standing on. Not
     // ALL of it: the neck does come along a little, and taking the whole twist
     // out makes the head look bolted to the horizon.
-    n.head.rotation.y = rec.headYaw - twist * npcHEAD_HOLD;
+    // ...plus the gesture's own turn (V2.2): the wave looks at whoever is
+    // being waved at, the wrist looks down at the wrist.
+    n.head.rotation.y = rec.headYaw - twist * npcHEAD_HOLD + (gs ? gs.hy * rec.gsW : 0);
     // rec.lookUp (0..1) is the Pasto cast craning at a condor; it is undefined
     // for every Sydneysider, so this is a no-op on the old crowd.
     const pitchTgt = rec.lookUp > 0.01 ? -1.0 * rec.lookUp
       : (rec.state === 'work' ? 0.2 : (rec.dejectStage === 0 && rec.dejected > 0 ? 0.55 : 0));
     rec.headPitch = damp(rec.headPitch, pitchTgt - rec.poseLean * 0.8, 7, dt);
-    n.head.rotation.x = rec.headPitch;
+    n.head.rotation.x = rec.headPitch + (gs ? gs.hx * rec.gsW : 0);
 
     // ---- THE FACE (v54) --------------------------------------------------
     // Both crowds come through here, so this is the only place either of them
@@ -14651,6 +14833,8 @@ export function createNPCs(game) {
   function update(dt) {
     if (dt > 0.08) dt = 0.08;
     npcWxRead();
+    // the gesture's flag and its parking rung (V2.2), read once a frame
+    npcGestOn = !game.state.noGesture && ((game.state.perfRung | 0) < 1);
     // round or flat, live (G5): the animals' instances swap material on the edge
     if (npcRoundOn === !!game.state.noRound) {
       npcRoundOn = !game.state.noRound;
@@ -16291,6 +16475,44 @@ export function createNPCs(game) {
              }
              return { biome: live, n: cast ? cast.length : 0, by: by, walking: walking,
                       skipping: skipping, paused: paused, sat: sat, rows: rows };
+           },
+           /**
+            * WHO IS GESTURING (V2.2). A gesture is two seconds on a 12-30 s
+            * clock, so at any instant nearly nobody is mid-gesture and a
+            * still cannot tell "no pool" from "nobody happens to be". `started`
+            * is the count since the last reset; `running` is right now, with
+            * the positions so an instrument can pin a lens on one.
+            */
+           gesture: function (reset) {
+             const live = game.biome && game.biome.current;
+             const cast = (live === 'sydney' || live === 'quay') ? humans : live === 'pasto' ? paHumans : null;
+             const rows = [], idle = [];
+             let standing = 0;
+             const look = function (r, x, z, kind, y) {
+               if (r.gsK >= 0) rows.push({ kind: kind, g: npcGESTURE[r.gsK].n, t: +r.gsT.toFixed(2),
+                                           w: +r.gsW.toFixed(2), x: +x.toFixed(1), z: +z.toFixed(1), y: +y.toFixed(2),
+                                           yaw: +(r.yaw || 0).toFixed(2) });
+               // ...and the busy sum, so an instrument can see WHY a square is
+               // not gesturing (an umbrella up is busy 1 for the whole shower)
+               idle.push({ kind: kind, bz: +(r.gsBz === undefined ? -1 : r.gsBz).toFixed(2), cd: +(r.gsCd || 0).toFixed(1),
+                           x: +x.toFixed(1), z: +z.toFixed(1) });
+             };
+             for (let i = 0; i < locals.length; i++) {
+               const r = locals[i];
+               if (r.biome !== live || !r.fig) continue;
+               standing++;
+               look(r, r.x, r.z, 'local', r.y);
+             }
+             if (cast) for (let i = 0; i < cast.length; i++) {
+               const r = cast[i];
+               if (r.kind === 'ibis') continue;
+               if (r.speed < 0.15) standing++;
+               look(r, r.group.position.x, r.group.position.z, r.kind, r.group.position.y);
+             }
+             const out = { biome: live, on: npcGestOn, standing: standing, running: rows.length,
+                           started: npcGestN, by: Object.assign({}, npcGestBy), rows: rows, idle: idle };
+             if (reset) { npcGestN = 0; for (const k in npcGestBy) npcGestBy[k] = 0; }
+             return out;
            },
            },
            beatAudit: function (reset) {
