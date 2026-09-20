@@ -224,6 +224,91 @@ and nobody talks to anyone but you.
   umbrellas one instanced draw per rainy chapter. **`noGesture`,
   `noUmbrella`.**
 
+### V2 — shipped (20 Sep 2026)
+
+Four items, four commits, all four built. `src/npc.js` only, plus one
+line in `main.js` handing over the audits.
+
+- **V2.1 the gaits** (`npcGAIT`, four rows). Chosen once from the
+  figure's own `idlePhase`, strolling kinds only, a child always the
+  skip. `strideK` scales the swing AND the stride the cadence is derived
+  from, so a short step is short on the ground; the skip's second bounce
+  is `|sin 2φ|` on the GROUP (a torso hopping over planted feet is a
+  puppet); the shuffle leans 0.14 rad while moving and stops 1.5 s every
+  ~6 m; the tired sit where they stopped and stay 9–19 s.
+  **Sydney's 32: 23 plain / 2 skip / 4 shuffle / 3 tired**, 1–2 mid-pause
+  and 1 sat at any second; a second boot read 22/1/4/5.
+  Pictures: `qa/wow2-gait-{tired,skip,shuffle}.png` — sat on the path
+  with the hands on the knees, a child 5 cm off the ground mid-hop, a
+  shuffler mid-pause leaning forward.
+- **V2.2 the six gestures** (`npcGESTURE`, `noGesture`). One clock for
+  both rigs: 4–18 s to the first, 12–30 s after, started only under a
+  busy sum of 0.25 and weighted by (1 − busy) once running. The three
+  bright chapters are the three lowest `cloudK` midday rows —
+  **sahara 0.22, quay 0.42, rio 0.48** (palawan's 0.50 is fourth,
+  manly is a golden westerly) — and the shiver is the only row a huddled
+  person may start, because a stretch out of a huddle is two poses on
+  one shoulder. **Kyoto: 12–13 gestures in 20 s across 14 standing
+  locals; Iceland: 37 shivers and Marrakech 5 shades in a window.**
+  Pictures: `qa/wow2-gest-{wave,stretch,shiver}.png`.
+- **V2.3 the weather** (`noUmbrella`). **Stale, in half:** the LOCALS
+  have raised umbrellas since the presence pass (`npcMakeUmbrella`, the
+  0.30/0.16 latch) in all fifteen chapters that have them — not built
+  twice. The roster had none, and the file's own note said why (a
+  per-person prop on an instanced cast is a new buffer and a write in
+  `pushInstances`). It is one buffer and one draw: `gUmb`, `iUmb`/`pUmb`,
+  an `umbN` node, a third of the strolling kinds from the seed, only
+  while that hand is free. **Sydney: 7 of 32 own one, 5–7 up at a
+  sampled rainT of 0.505** under the forced shower. The breath is W1's
+  `game.weather.burst()` — five `bubble` quads per puff, every ~4 s from
+  each local head within 12 m, **Iceland 10 in 20 s from two heads, 21
+  and 53 over longer windows**.
+- **V2.4 company** (`noCompany`, a flag the roadmap did not name).
+  **The radius is 5 m, not 3, and that was measured:** nearest
+  neighbours in the live chapter are Marrakech 2.25, the Pantanal 2.83,
+  Cali 4.20, Rio 4.73 and nothing else under 5 — at three metres this
+  beat exists in two chapters of nineteen. **Marrakech 1–2 pairs per
+  60 s, Rio 1 at 4.61 m**, never with the animal inside either's `near`.
+
+**Two findings worth the next agent's time.**
+1. **The umbrella's front anticipation was upside down.** `wxFrontNear`
+   was `-front * 3`, which is 1 when the front is FAR: every local in
+   every rainy chapter stood under an umbrella in dry weather for the
+   first two fifths of every six-to-nine-minute cycle (Kyoto, measured:
+   14 of 14 at `umb` 1.00, rain 0.00). It is `1 - |front| * 3` now.
+2. **The roster is not reachable from the page.** Its groups are never
+   added to the scene and `game.npcs` is main.js's spawn array, so a
+   crowd mask built the obvious way is 0 px — which reads exactly like
+   "nobody moved". `game.peopleAudit.gait(true).rows` is the way in.
+
+**Measured** (`qa/wow2-people.js`, one chapter per run; `qa/wow2-
+frametime-v2.js`). Kyoto, crowd still: **live 1196 px vs cut 319 px of
+its own 8177 px mask**, 12 interleaved pairs each. Sydney: 11007 vs 9203
+of 97699 px — 17 of 32 are always walking there, the quiet gate has to
+be dropped and the number is worth less for it. **Honest miss:** the
+frame-time A/B cannot resolve these terms. The headless whole-frame
+median moves ±1.5 ms between the arms of a flag that gates one probe
+every 1.5 s; the tick-only sim A/B has a ±0.5 ms floor and every term
+sits under it (Kyoto −0.001, Sydney +0.098, Iceland +0.243 ms/tick).
+The one reliable number: the three flags cost **0.402 ms/tick in
+Sydney** before the dry-case shortcut — nothing now runs while it is
+neither raining nor about to, and with no umbrella open the buffer is
+not written, uploaded or drawn (`count = 0`).
+
+**Budget.** +1 instanced draw per rig, only while somebody has an
+umbrella up (36 tris each, 32 and 13 instances); 0 new triangles
+otherwise; 6 node writes per running gesture; the stride was already
+per-frame. **Offered, not wired:** `npcPERSON.gait(u, child)` and
+`npcPERSON.GAIT` for the merged Marrakech and Rio crowds — those are
+`sahara.js`/`rio.js`, not this wave's files, so they still walk the one
+walk. **Hook wanted in weather.js:** a `breath` row in `wxBURST`
+(size 0.06, up 0.3, grav 0, life 1.2) — `bubble` is the closest fit and
+at 2.6 m reads as a faint speckle rather than a plume.
+**Names added:** `game.peopleAudit` (`.gait`, `.gesture`, `.umbrella`,
+`.company`), `game.state.noCompany`, and the name `'npcCast'` on every
+mesh the two casts instance, so an instrument can mask the people and
+not a market stall.
+
 ### V3 — THE FAR PLANE (every horizon composed, and something moving in it)
 
 L11's Part D gave six chapters a middle plane. The far share of the

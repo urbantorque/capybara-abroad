@@ -23,7 +23,7 @@ async page => {
   //     of the hold. A screenshot goes with it, to be read by eye.
   //  5. COMPANY over 60 s of deterministic time, with the nearest-neighbour
   //     distances that say whether the chapter has any pairs to have it.
-  const CHAP = 'sydney'
+  const CHAP = 'iceland'
   const errs = []
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
@@ -173,6 +173,10 @@ async page => {
       await new Promise(res => setTimeout(res, 380))
     }
     g.state.noGesture = false
+    // RENDER, THEN READ, with nothing awaited between: the drawing buffer is
+    // cleared on the next frame and a toDataURL after an await comes back a
+    // blank white page (Iceland's crowd shot, first run).
+    g.renderer.setRenderTarget(null); g.renderer.render(g.scene, cam)
     const shot = g.renderer.domElement.toDataURL('image/png')
     await fetch('/shot?name=wow2-people-' + g.biome.current + '-crowd', { method: 'POST', body: shot.split(',')[1] })
     const med = a => { const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1] }
