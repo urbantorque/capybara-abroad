@@ -1867,6 +1867,48 @@ let capyIdleEar = 0;                // 0..1 ears flattened
 let capyIdleChew = 0;               // 0..1 jaw, on top of the wheek's
 let capyChewT = 0;                  // s of real chewing left — see THE GRAZE in props.js
 let capyIdleBreath = 0;             // 0..1 slower, deeper breathing
+// ---- THE SMALL CLOCK (ROADMAP-WOW2, V1.1) -----------------------------------
+// The table above is the animal doing SOMETHING: a shake, a look over the
+// shoulder, a shiver. Between its beats — six to seventeen seconds apart, on
+// purpose — the body is a breath and a two-ear flick, and measured on the
+// motion sheet that is a statue with a pulse. A standing animal's small
+// motion is not a performance, it is weight and attention: the hips settle
+// onto one side, one ear answers a fly, the nose works, the head turns to
+// whoever is nearest and comes back. Four beats on their own, faster clock,
+// under the big table rather than in it, so nothing shipped is re-tuned:
+//
+//   0 flick     ONE ear (the timer above flicks both, with a blink)
+//   1 shift     the body 3 cm onto one side; the far hind foot off the floor
+//   2 sniff     the nose beat that already exists, fired
+//   3 turn      the head to the nearest local, prop or person within
+//               capyALIVE_R — the gaze up top only looks at somebody who has
+//               NOTICED it, so a standing animal ignored the whole crowd —
+//               held, and let go
+//
+// Never the same one twice running, never inside the first two seconds of
+// standing still, never in the loaf or the nap (both have their own body),
+// and never while the big table has a beat running. `game.state.noAlive`
+// cuts it; the governor parks it at rung 1 like every other new term.
+const capyALIVE_STILL = 2.0;        // s standing before the first small beat
+const capyALIVE_MIN   = 4.0;        // s between beats...
+const capyALIVE_MAX   = 9.0;        // ...at most
+const capyALIVE_SPAN  = [0.09, 1.60, 0.34, 1.80];   // s each beat takes
+const capyALIVE_R     = 8.0;        // m — how far the head turn looks
+const capyALIVE_SHIFT = 0.03;       // m of hip, sideways
+const capyALIVE_LIFT  = 0.010;      // m the far foot comes off the floor
+const capyALIVE_TURN  = 0.50;       // rad — a head turn, under the neck's limit
+let capyAliveT = 0;                 // s standing still
+let capyAliveNext = 3;              // s at which the next small beat is due
+let capyAliveAct = -1;              // -1 none, else an index into capyALIVE_SPAN
+let capyAliveLast = -1;             // the one before, so it is not drawn twice
+let capyAliveP = 0;                 // 0..1 through the beat
+let capyAliveEar = 0;               // 0..1 the one-ear flick, decaying
+let capyAliveEarSide = 1;           // which ear
+let capyAliveShift = 0;             // m, damped, on the squash node's x
+let capyAliveShiftSide = 1;
+let capyAliveLift = 0;              // m, damped, on the far hind leg
+let capyAliveYaw = 0, capyAlivePitch = 0;      // the head turn, damped
+let capyAliveWantY = 0, capyAliveWantP = 0;    // ...and where it is going
 let capyBreathPh = 0;               // the breath's own phase, so its RATE may change
 let capyHeadPitch = 0;
 let capyJawOpen = 0;
@@ -3147,6 +3189,68 @@ function capyGazeResolve(game, capy, hx, hy, hz, yaw) {
   // +x is DOWN on this rig (see the dig pose), so a target above the head is a
   // negative pitch.
   capyGazeWantP = clamp(-Math.atan2(ty - hy, flat), -capyGAZE_PITCH, capyGAZE_PITCH);
+}
+
+/**
+ * WHAT THE SMALL CLOCK'S HEAD TURN LOOKS AT (see capyALIVE_R).
+ *
+ * The gaze above answers "who has noticed me"; this answers "who is nearest",
+ * heat or no heat, out to capyALIVE_R — a person at a stall, a bottle on the
+ * lawn, somebody talking. Same two registers, same live-biome gate, same
+ * cone, and the same head-local clamp; resolved ONCE at the start of the beat
+ * rather than tracked, because a look is a look and a track is the gaze's
+ * job. Writes capyAliveWantY / capyAliveWantP; returns false when there is
+ * nothing near enough, and the beat becomes a small glance to one side.
+ */
+function capyAliveResolve(game, capy, hx, hy, hz, yaw) {
+  capyAliveWantY = 0; capyAliveWantP = 0;
+  let best = capyALIVE_R * capyALIVE_R, tx = 0, ty = 0, tz = 0, found = false;
+  const npcs = game.npcs;
+  if (npcs) {
+    for (let i = 0; i < npcs.length; i++) {
+      const n = npcs[i];
+      if (!n || !n.group) continue;
+      const g = n.group.position;
+      const dx = g.x - hx, dz = g.z - hz, d2 = dx * dx + dz * dz;
+      if (d2 >= best) continue;
+      best = d2; tx = g.x; ty = g.y + capyGAZE_EYE_H; tz = g.z; found = true;
+    }
+  }
+  const loc = game.locals;
+  const live = game.biome && game.biome.current;
+  if (loc) {
+    for (let i = 0; i < loc.length; i++) {
+      const L = loc[i];
+      if (!L || L.biome !== live) continue;
+      const g = L.group ? L.group.position : L;
+      const gx = g.x, gy = g.y || 0, gz = g.z;
+      if (!(gx === gx && gz === gz)) continue;
+      const dx = gx - hx, dz = gz - hz, d2 = dx * dx + dz * dz;
+      if (d2 >= best) continue;
+      best = d2; tx = gx; ty = gy + capyGAZE_EYE_H; tz = gz; found = true;
+    }
+  }
+  // ...and a loose thing — a yuzu, a bottle — the grab path's own question at
+  // the turn's range rather than the grab's.
+  const ph = game.physics;
+  if (ph && typeof ph.nearestGrabbable === 'function') {
+    const p = ph.nearestGrabbable(capy.position, capyALIVE_R);
+    const src = p && (p.body || p.mesh);
+    const pos = src && src.position;
+    if (pos) {
+      const dx = pos.x - hx, dz = pos.z - hz, d2 = dx * dx + dz * dz;
+      if (d2 < best) { best = d2; tx = pos.x; ty = pos.y; tz = pos.z; found = true; }
+    }
+  }
+  if (!found) return false;
+  const dx = tx - hx, dz = tz - hz;
+  const flat = Math.sqrt(dx * dx + dz * dz);
+  if (flat < 0.35) return false;
+  const local = capyWrapAngle(Math.atan2(dx, dz) - yaw);
+  if (local > capyGAZE_CONE || local < -capyGAZE_CONE) return false;
+  capyAliveWantY = clamp(local, -capyALIVE_TURN, capyALIVE_TURN);
+  capyAliveWantP = clamp(-Math.atan2(ty - hy, flat), -capyGAZE_PITCH, capyGAZE_PITCH);
+  return true;
 }
 
 /**
@@ -5066,6 +5170,14 @@ export function createCapybara(game) {
       earL.rotation.z = lerp(earL.rotation.z, -0.18 - ear, w);
       earR.rotation.z = lerp(earR.rotation.z, 0.18 + ear, w);
       if (mode === 0 && w <= 0) capyPhotoBaseY = null;
+    },
+    /** The small clock (WOW2 V1.1), for qa/wow2-alive.js and nothing else:
+     *  which beat is running, which ran last, how long it has stood. */
+    aliveAudit: function () {
+      return { act: capyAliveAct, last: capyAliveLast, p: +capyAliveP.toFixed(3),
+               still: +capyAliveT.toFixed(2), next: +capyAliveNext.toFixed(2),
+               shift: +capyAliveShift.toFixed(4), yaw: +capyAliveYaw.toFixed(3),
+               ear: +capyAliveEar.toFixed(3), tableAct: capyIdleAct };
     },
     update: capyUpdate,
   };
@@ -7957,6 +8069,13 @@ export function createCapybara(game) {
       // of it. Fronts do not move: they are already out in front, which is
       // where a loafing capybara puts them.
       legs[i].position.z = legZ[i] + (i < 2 ? 0 : capyLOAF_TUCK_Z * capyLoaf);
+      // THE WEIGHT SHIFT (WOW2 V1.1): the body goes 3 cm onto one side on the
+      // squash node and the feet stay where they were planted — the legs
+      // take the shift straight back off — and the far hind foot comes a
+      // centimetre off the floor, which is what the weight leaving it does.
+      legs[i].position.x = legX[i] - capyAliveShift;
+      legs[i].position.y = 0.32 + ((i === 2 && capyAliveShiftSide < 0) || (i === 3 && capyAliveShiftSide > 0)
+                                   ? capyAliveLift : 0);
       // THE ANKLE, and it is not optional now that the foot has toes cut into
       // it. A leg folded to 1.14 rad with the foot rigid to it is an animal
       // standing on its heel with its toes in the air. The foot takes the
@@ -7983,6 +8102,7 @@ export function createCapybara(game) {
     } else capyLungeW = 0;
     if (capyLungeW > 0) legs[0].rotation.x = lerp(legs[0].rotation.x, capyLUNGE_LEG, capyLungeW);
     capySquash.position.z = capyLUNGE_Z * capyLungeW;
+    capySquash.position.x = capyAliveShift;              // the weight shift (WOW2 V1.1)
 
     // squash & stretch spring — stiff and under-damped, so a wheek is a sharp
     // pop with an elastic overshoot instead of a gentle swell.
@@ -8117,6 +8237,76 @@ export function createCapybara(game) {
         if (capyIdleP >= 1) { capyIdleP = 0; capyIdleAct = -1; }
       }
     } else { capyIdleAct = -1; capyIdleT = 0; }
+    // ---- THE SMALL CLOCK (ROADMAP-WOW2, V1.1): see capyALIVE_STILL --------
+    // Under the same gate as the table, plus its own two: not while the
+    // table has a beat, not asleep. Cut by noAlive and parked by the
+    // governor the way the mist is (weather.js's wxMistStep).
+    //
+    // NOT GATED OFF BY THE LOAF, against the card's first draft. The loaf
+    // arrives at capyLOAF_T (6.5 s) and the clock's first beat at two-and-a-
+    // bit, so "suppressed in the loaf" left one beat and then a statue for
+    // as long as the player read the map — measured: a 60 s rest is 53 s of
+    // loaf. A sitting capybara flicks an ear, works its nose and turns its
+    // head exactly as a standing one does; the one beat that is a STANDING
+    // thing — the weight onto one side, a foot off the floor — is the one
+    // the loaf takes off the table (below). The nap has its own body and
+    // takes all four.
+    const aliveOn = idleOk && capyNap < 0.5 &&
+                    !(game.state && (game.state.noAlive || (game.state.perfRung | 0) >= 1));
+    if (aliveOn && capyIdleAct >= 0) {
+      // THE TABLE HAS THE BODY: the clock HOLDS rather than resets. With the
+      // rest lens open the look-back is drawn every four to six seconds and
+      // runs 2.4 s, and a clock that went back to zero under it measured two
+      // beats in thirty seconds. A beat of this clock caught by the table's
+      // is let go; the count toward the next one keeps.
+      if (capyAliveAct >= 0) { capyAliveAct = -1; capyAliveP = 0; }
+    } else if (aliveOn) {
+      if (capyAliveAct < 0) {
+        capyAliveT += dt;
+        if (capyAliveT >= capyAliveNext) {
+          capyAliveT = 0; capyAliveP = 0;
+          capyAliveNext = rand(capyALIVE_MIN, capyALIVE_MAX);
+          // Draw, and never the last one again. The turn is only on the
+          // table when the gaze does not already have the head.
+          let a;
+          do { a = Math.floor(Math.random() * 4); } while (a === capyAliveLast);
+          if (a === 3 && (capyGazeWantY !== 0 || capyGazeWantP !== 0 || capy.heldProp)) a = capyAliveLast === 1 ? 0 : 1;
+          if (a === 1 && capyLoaf > 0.5) a = capyAliveLast === 0 ? 2 : 0;   // sat down: no feet to shift
+          capyAliveLast = a; capyAliveAct = a;
+          if (a === 0) {
+            capyAliveEar = 1;
+            capyAliveEarSide = Math.random() < 0.5 ? 1 : -1;
+          } else if (a === 1) {
+            capyAliveShiftSide = Math.random() < 0.5 ? 1 : -1;
+          } else if (a === 2) {
+            capySniff = 1;
+          } else {
+            // the turn's target, resolved once; nothing near is a glance
+            if (!capyAliveResolve(game, capy, capyRenderPos.x, capyRenderPos.y + 0.16,
+                                  capyRenderPos.z, capyYaw)) {
+              capyAliveWantY = (Math.random() < 0.5 ? 1 : -1) * 0.28;
+              capyAliveWantP = 0;
+            }
+          }
+        }
+      } else {
+        capyAliveP += dt / capyALIVE_SPAN[capyAliveAct];
+        if (capyAliveP >= 1) { capyAliveP = 0; capyAliveAct = -1; }
+      }
+    } else if (capyAliveT > 0 || capyAliveAct >= 0) {
+      // the first beat after coming to rest is due at two seconds and a bit,
+      // the rest on the four-to-nine clock
+      capyAliveAct = -1; capyAliveT = 0; capyAliveNext = capyALIVE_STILL + rand(0, 2.5);
+    }
+    // The shift and the turn ride a raised-cosine plateau (the look-back's
+    // shape); the one-ear flick decays on its own like the two-ear one.
+    const aliveEnv = capyAliveAct >= 0 ? Math.min(1, (0.5 - 0.5 * Math.cos(capyAliveP * Math.PI * 2)) * 1.35) : 0;
+    capyAliveEar = damp(capyAliveEar, 0, 11, dt);
+    capyAliveShift = damp(capyAliveShift,
+      capyAliveAct === 1 ? aliveEnv * capyALIVE_SHIFT * capyAliveShiftSide : 0, 6, dt);
+    capyAliveLift = damp(capyAliveLift, capyAliveAct === 1 ? aliveEnv * capyALIVE_LIFT : 0, 6, dt);
+    capyAliveYaw = damp(capyAliveYaw, capyAliveAct === 3 ? aliveEnv * capyAliveWantY : 0, 7, dt);
+    capyAlivePitch = damp(capyAlivePitch, capyAliveAct === 3 ? aliveEnv * capyAliveWantP : 0, 7, dt);
     // A raised-cosine envelope on every beat, so each one starts and ends at
     // exactly zero and none of them can pop against the pose it is added to.
     // The shake-dry rides the SAME envelope on the SAME channel — it is the one
@@ -8425,7 +8615,8 @@ export function createCapybara(game) {
     head.rotation.x = capyHeadPitch + capyGazePitch + capyIdlePitch + capyHeadNod +
                       capyNap * capyNAP_HEAD +
                       capyINHALE_HEAD * capyInhaleW + capyLandDip - capyAIR_HEAD_K * capyAirPitch +
-                      capyRegardPitch + capyWallDip;    // ...and the wall's nose-dip (L7, E5)
+                      capyRegardPitch + capyWallDip +   // ...and the wall's nose-dip (L7, E5)
+                      capyAlivePitch;                    // ...and the small clock's turn (WOW2 V1.1)
     head.rotation.z = clamp(-capyYawRate * 0.05, -0.2, 0.2);
     // the look-around (see the idle beat) plus whatever is worth looking at.
     // Nothing else writes the head's yaw, and the mouth anchor is derived from
@@ -8435,7 +8626,8 @@ export function createCapybara(game) {
     // ...and the head LEADS a turn while the tail trails it (L3, E2): an S
     // through the spine from two nodes, on the yaw rate the roll already reads
     // ...and the regard (L6, E2), the fourth term: see capyREGARD_IN
-    head.rotation.y = capyIdleYaw + capyGazeYaw + capyRegardYaw + clamp(capyYawRate * 0.08, -0.26, 0.26);
+    head.rotation.y = capyIdleYaw + capyGazeYaw + capyRegardYaw + capyAliveYaw +
+                      clamp(capyYawRate * 0.08, -0.26, 0.26);
 
     if (capyWheekHold > 0) { capyWheekHold -= dt; capyJawOpen = 1; }
     // snaps open, drifts shut
@@ -8516,8 +8708,13 @@ export function createCapybara(game) {
     // ...and they go down and out asleep (N4), which is the one part of this
     // pose that reads at playing distance: a capybara's ears are the only thing
     // on it that points, and asleep they stop pointing.
-    earL.rotation.z = -0.18 - flick - earDown - capyNap * capyNAP_EAR + turn * 0.35;
-    earR.rotation.z = 0.18 + flick + earDown + capyNap * capyNAP_EAR + turn * 0.35;
+    // ...and ONE ear on the small clock (WOW2 V1.1): sharper and shorter
+    // than the pair's, on whichever side the beat drew.
+    const flick1 = Math.sin(t * 46) * capyAliveEar * 0.55;
+    earL.rotation.z = -0.18 - flick - earDown - capyNap * capyNAP_EAR + turn * 0.35 -
+                      (capyAliveEarSide > 0 ? flick1 : 0);
+    earR.rotation.z = 0.18 + flick + earDown + capyNap * capyNAP_EAR + turn * 0.35 +
+                      (capyAliveEarSide < 0 ? flick1 : 0);
 
     // ---- THE NOSE (v54) --------------------------------------------------
     // A capybara standing still was completely inert above the neck except for
@@ -8704,6 +8901,7 @@ export function createCapybara(game) {
     capyMouthLocal.set(0, -0.055, 0.50).multiplyScalar(capyHeadLens)
       .applyEuler(head.rotation).add(head.position);
     capyMouthLocal.z += capySquash.position.z;
+    capyMouthLocal.x += capySquash.position.x;
     mouthAnchor.position.copy(capyMouthLocal);
     mouthAnchor.quaternion.copy(head.quaternion);
 
