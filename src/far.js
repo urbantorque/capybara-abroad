@@ -122,6 +122,78 @@ export function farLayer(spec) {
   return m;
 }
 
+/**
+ * A BAY-LOOP TRUSS (ROADMAP-WOW3 D4). `farLayer`'s wedge is a silhouette
+ * profile — solid, full-width, and built for something seen ACROSS. Seen
+ * END-ON, down its own axis (the one place a bridge deck ever puts the
+ * lens), a run of wedges compounds into one solid shape: Hanoi's own first
+ * attempt at this measured fine and looked, from the deck, like a single
+ * grey pyramid (see hanBuildFar's own note). A real truss reads end-on
+ * BECAUSE it is mostly negative space — thin members with air between them
+ * — so this builds N repeating bays of THIN QUADS (a member is one quad: a
+ * start point, an end point, and a fixed vertical `thick`, not a box), which
+ * from any oblique angle shows daylight between the diagonals instead of one
+ * filled mass. ~12 triangles a bay (2 side chords + 2×2 diagonals, doubled
+ * left/right of the deck centreline), so the whole run stays inside a couple
+ * hundred triangles even out to 15-20 bays. spec:
+ *   x, z0, z1   the run, at a fixed x, along +z (the deck's own axis)
+ *   yaw         the run's bearing off +z, for a deck that is not axis-aligned
+ *   y0          deck height at z0 (the run may also fall/rise — `y1`)
+ *   y1          deck height at z1, default y0 (a level run)
+ *   halfW       half the deck width — chord separation either side, default 4.4
+ *   bayLen      metres per bay, default 8 (the near bridge's own rhythm)
+ *   rise        peak height of a bay's diagonal above the chord, metres,
+ *               default 8.6 (matches hanBuildQuarter's near-bridge lattice:
+ *               3.2 + |sin| * 5.4 tops out there); may be a function of t
+ *               (0..1 along the run) for a rise that itself varies
+ *   thick       member thickness, metres, default 0.30
+ *   color       hex (use farTone)
+ *   name        'far-<chapter>-truss'
+ */
+export function farTruss(spec) {
+  const P = [], I = [];
+  const x = spec.x || 0, yaw = spec.yaw || 0, cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const z0 = spec.z0 || 0, z1 = spec.z1 === undefined ? z0 + 80 : spec.z1;
+  const L = z1 - z0;
+  const y0 = spec.y0 === undefined ? 0 : spec.y0;
+  const y1 = spec.y1 === undefined ? y0 : spec.y1;
+  const halfW = spec.halfW === undefined ? 4.4 : spec.halfW;
+  const bayLen = spec.bayLen || 8;
+  const thick = spec.thick === undefined ? 0.30 : spec.thick;
+  const riseFn = typeof spec.rise === 'function' ? spec.rise : (() => spec.rise === undefined ? 8.6 : spec.rise);
+  const bays = Math.max(1, Math.round(L / bayLen));
+  // world point at t (0..1 along the run), s (-1 left / +1 right), height h
+  // above the deck at that t.
+  const world = (t, s, h) => {
+    const zz = z0 + t * L, yy = y0 + (y1 - y0) * t;
+    return [x + s * halfW * cy, yy + h, zz + s * halfW * sy];
+  };
+  const member = (a, b) => {
+    farQuad(P, I, a, b, [b[0], b[1] + thick, b[2]], [a[0], a[1] + thick, a[2]]);
+  };
+  for (let i = 0; i < bays; i++) {
+    const t0 = i / bays, t1 = (i + 1) / bays, tm = (i + 0.5) / bays;
+    const rise = riseFn(tm);
+    for (const s of [-1, 1]) {
+      const a0 = world(t0, s, 0), a1 = world(t1, s, 0), peak = world(tm, s, rise);
+      member(a0, a1);       // bottom chord, this bay
+      member(a0, peak);     // rising diagonal
+      member(peak, a1);     // falling diagonal
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  g.setIndex(I);
+  g.computeVertexNormals();
+  g.computeBoundingSphere();
+  const m = new THREE.Mesh(g, mat(spec.color === undefined ? PALETTE.stoneDark : spec.color, { side: THREE.DoubleSide }));
+  m.name = spec.name || 'far-truss';
+  m.castShadow = false; m.receiveShadow = false;
+  m.matrixAutoUpdate = false;
+  m.userData.farTris = I.length / 3;
+  return m;
+}
+
 // ---- the mover's shapes ----------------------------------------------------
 // A box is twelve triangles; everything below is boxes and single quads,
 // counted in the comment beside it. Local space: +z is forward.
@@ -304,10 +376,15 @@ export function farLights(spec) {
 }
 
 /**
- * The per-chapter bundle. `farBundle({ name, layer, mover, lights })` adds
- * whatever it is given to one group the chapter parents under its root, and
- * returns { group, update(game, dt), audit() }.
+ * The per-chapter bundle. `farBundle({ name, layer, mover, lights, truss })`
+ * adds whatever it is given to one group the chapter parents under its root,
+ * and returns { group, update(game, dt), audit() }.
  *
+ *   truss   (ROADMAP-WOW3 D4) an optional second static mesh — `farTruss`'s
+ *           output — for a chapter whose far plane needs a silhouette AND a
+ *           lattice (Hanoi: Gia Lâm's ridge is a `layer`, the bridge's own
+ *           continuing ironwork is a `truss`). Static like `layer`: no
+ *           per-frame cost, counted into the same tris/calls audit.
  *   update  hides the group on game.state.noFar (the cut: nothing is
  *           drawn, nothing is ticked); parks the mover and the lights at
  *           perfRung ≥ 1; ticks the mover; publishes itself as game.far so
@@ -320,12 +397,14 @@ export function farBundle(spec) {
   const group = new THREE.Group();
   group.name = 'far-' + (spec.name || 'chapter');
   const layer = spec.layer || null, mover = spec.mover || null, lights = spec.lights || null;
+  const truss = spec.truss || null;
   if (layer) group.add(layer);
+  if (truss) group.add(truss);
   if (mover) group.add(mover.mesh);
   if (lights) group.add(lights);
   let parked = false;
   const handle = {
-    group, layer, mover, lights,
+    group, layer, mover, lights, truss,
     update(game, dt) {
       const st = game.state || {};
       const cut = !!st.noFar;
@@ -341,12 +420,13 @@ export function farBundle(spec) {
       game.far = handle;
     },
     audit() {
-      const tris = (layer ? layer.userData.farTris : 0) + (mover ? mover.mesh.userData.farTris : 0) + (lights ? lights.userData.farTris : 0);
+      const tris = (layer ? layer.userData.farTris : 0) + (truss ? truss.userData.farTris : 0) + (mover ? mover.mesh.userData.farTris : 0) + (lights ? lights.userData.farTris : 0);
       const mp = mover && mover.mesh.visible ? mover.mesh.getWorldPosition(farV) : null;
       return {
         name: group.name, tris,
-        calls: (layer ? 1 : 0) + (mover ? (Array.isArray(mover.mesh.material) ? 2 : 1) : 0) + (lights ? 1 : 0),
+        calls: (layer ? 1 : 0) + (truss ? 1 : 0) + (mover ? (Array.isArray(mover.mesh.material) ? 2 : 1) : 0) + (lights ? 1 : 0),
         wedges: layer ? layer.geometry.index.count / 3 : 0,
+        trussTris: truss ? truss.userData.farTris : 0,
         mover: mp ? [+mp.x.toFixed(1), +mp.y.toFixed(1), +mp.z.toFixed(1)] : null,
         moverPeriod: mover ? mover.period : 0,
         lights: lights ? lights.count : 0,

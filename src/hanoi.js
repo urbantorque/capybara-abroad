@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh, makeMerger, hangThing } from './shared.js';
-import { farLayer, farMover, farBundle, farTone } from './far.js';
+import { farLayer, farMover, farBundle, farTone, farTruss } from './far.js';
 
 // ===========================================================================
 // CHAPTER 19 — HANOI
@@ -4664,9 +4664,19 @@ function hanBuildScatter(root) {
 // the ONE place you stand to see them — like a single grey pyramid: seen
 // end-on down their own axis, eight overlapping wedges are one wedge. A
 // silhouette builder is for things seen ACROSS, and everything else in this
-// pass is. The bridge's own bay loop (hanBuildBridge) is the right shape for
-// lattice running out and costs ~48 triangles a bay, which is 1.5 k for the
-// run — past this pass's budget, and left written down rather than built.
+// pass is. The bridge's own bay loop (the near lattice below, at line
+// ~3747, K.box per member) is the right SHAPE for lattice running out, at
+// ~48 triangles a bay in that full-detail near-field builder — 1.5 k for the
+// whole run, past this pass's budget.
+//
+// ROADMAP-WOW3 D4: `farTruss` (far.js) is that same bay-loop idea rebuilt as
+// a FAR-plane primitive — flat quads, not boxes, ~12 triangles a bay — so
+// the run from the deck's own end (z 250) out to where Gia Lâm's ridge
+// begins (z ~460, short of the wedges' own z 500) fits in budget. Because a
+// truss is mostly the air BETWEEN its members, it does not compound into one
+// wedge end-on the way the abandoned build did: what the deck lens sees is a
+// diminishing row of Xs with daylight between them, the way the near bridge
+// itself reads from fifty metres back.
 function hanBuildFar(root) {
   const tone = farTone(PALETTE.hanSteel, PALETTE.hanHaze, 0.20);
   const bx = hanBRIDGE.x;
@@ -4682,6 +4692,16 @@ function hanBuildFar(root) {
         { x: 400, z: 500, w: 220, d: 40, yaw: -0.3,
           profile: [[-1, 0], [-0.5, 8], [0.1, 11], [0.7, 7], [1, 0]] },
       ],
+    }),
+    // D4: the deck's own ironwork, continuing where hanBuildQuarter's near
+    // lattice stops (hanBRIDGE.z1 = 250) toward Gia Lâm. y 4.7 at the near
+    // end matches the near lattice's own deck height there (hanGROUND +
+    // hanDYKE.h - 1*1.5); it tapers to 2.6 approaching the far shore, the
+    // way a hundred-year iron span actually settles toward its piers.
+    truss: farTruss({
+      name: 'far-hanoi-truss', color: tone,
+      x: bx, z0: hanBRIDGE.z1, z1: 460, y0: 4.7, y1: 2.6,
+      halfW: 4.4, bayLen: 15, rise: t => 3.6 + Math.abs(Math.sin(t * Math.PI * 5)) * 5.0,
     }),
     mover: farMover({
       kind: 'train', color: farTone(PALETTE.hanSteel, PALETTE.hanHaze, 0.1), scale: 0.9, period: 90, duty: 0.5, phase: 0.6,

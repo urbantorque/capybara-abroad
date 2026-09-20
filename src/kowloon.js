@@ -3704,7 +3704,19 @@ function hkBuildFar(root) {
   });
   root.add(hkFar.group);
 }
-
+// ROADMAP-WOW3 D4, THE DECISION, RE-CONFIRMED: left as built. Relocating
+// Lion Rock to where the street's own geometry has sky in frame is not
+// available — every street here runs under a sign canopy or between
+// buildings tall enough to close the top of the frame from the frontage the
+// arrival lens rests on (sky share 0.000, measured twice: at rest and
+// turned 126° up the street, `qa/wow2-far-kowloon-look-on.png`). Moving the
+// ridge itself nearer would mean re-basing where the chapter's own geometry
+// says the mountain sits relative to the towers — not on the table. It is
+// not orphaned, though: the helicopter's own furthest ring over the harbour
+// (this chapter's marquee, X2) already sees it at 14.7% of frame, mean Δ 63
+// (`qa/wow2-far-from-kowloon-air.json.png`, V3), re-run fresh this wave
+// (`qa/wow3-d4-kowloon-air.js`, same camera) — 14.68%, same tris (88),
+// nothing drifted. A wedge was not forced into a street with no sky.
 /**
  * THE FAR SHORE, and the whole reason this chapter has a marquee.
  *
