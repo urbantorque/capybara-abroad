@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matSelf, matRound, matEmit, TASKS, rand, randInt, clamp, damp, lerp, waterYAt, reachRim } from './shared.js';
+import { PALETTE, mat, matSelf, matRound, matEmit, TASKS, rand, randInt, clamp, damp, lerp, waterYAt, reachRim,
+         tracksWrite, tracksTick, tracksClear, tracksAudit } from './shared.js';
 
 // ===========================================================================
 // AGENT B — THE CAPYBARA
@@ -1761,6 +1762,25 @@ let capyWheekRing = 0, capyWheekX = 0, capyWheekY = 0, capyWheekZ = 0;
 // how hard it was, so a five-metre drop and a forty-metre one do not draw
 // the same circle.
 let capyLandRing = 0, capyLandK = 0, capyLandX = 0, capyLandY = 0, capyLandZ = 0;
+// ---- THE SWIM WAKE (ROADMAP-WOW2, V6) ----------------------------------
+// A swimming capybara left the harbour exactly as it found it except for
+// three rings a third of a second apart (capySpawnRings, the stroke's own).
+// The ferry has had a wake since v1 — a ring buffer of foam quads dropped
+// astern, spreading and fading (quay.js, quayUpdateWake) — and it is the
+// right shape for this: TWO arms, dropped alternately to port and starboard
+// so it reads as a V rather than a smear, laid flat on the live water
+// surface and aligned with the heading they were dropped on. Twelve quads,
+// one instanced draw, drawn only while there is something in it.
+const capyWAKE_N = 12;
+const capyWAKE_GAP = 0.10;     // s between drops at speed
+const capyWAKE_FADE = 0.55;    // 1/s — about two seconds of life
+const capyWAKE_SIDE = 0.26;    // m to port or starboard of the centreline
+const capyWAKE_BACK = 0.42;    // m astern of the animal
+const capyWakeX = new Float32Array(capyWAKE_N);
+const capyWakeZ = new Float32Array(capyWAKE_N);
+const capyWakeYw = new Float32Array(capyWAKE_N);
+const capyWakeL = new Float32Array(capyWAKE_N);
+let capyWakeHead = 0, capyWakeDue = 0, capyWakeAny = false;
 const capyRingLife = new Float32Array(capyRING_COUNT);
 const capyRingX = new Float32Array(capyRING_COUNT);
 const capyRingY = new Float32Array(capyRING_COUNT);
@@ -3077,17 +3097,32 @@ function capySurfacePitch(game, env, x, z, y) {
  */
 const capyFOOT_FWD = 0.28, capyFOOT_SIDE = 0.15;
 const capyFOOT_MIN_V = 1.0;           // m/s — under this a step raises nothing
+const capyTRACK_WET_T = 12;           // s out of the water a paw still prints wet on stone
+const capyTRACK_MUD_P = 0.70;         // a 'grass' footfall this soft or softer is mud
 let capyFootX = 0, capyFootZ = 0;     // the last footfall's own position
 let capyStepN = 0;                    // footfalls, counted up for ever (the audit's)
-function capyFootfallFx(game, px, pz, speed, overWater) {
+function capyFootfallFx(game, px, py, pz, speed, overWater) {
   capyStepN++;
   const side = capyStepPhase % 2 === 0 ? 1 : -1;
   const fs = Math.sin(capyYaw), fc = Math.cos(capyYaw);
   capyFootX = px + fs * capyFOOT_FWD + fc * side * capyFOOT_SIDE;
   capyFootZ = pz + fc * capyFOOT_FWD - fs * side * capyFOOT_SIDE;
+  const m = capySurfMat;
+  // ---- ...AND THE PRINT (ROADMAP-WOW2, V6): see tracksWrite in shared.js.
+  // Every footfall, at any speed: a print is not a puff. The kind is the
+  // material's, and a paw just out of the water leaves the wet term's own
+  // darkening on stone for capyTRACK_WET_T (Venice's paving, Kyoto's lane,
+  // the Quay's apron). Mud is the soft ground the sound calls grass under
+  // capyTRACK_MUD_P (the Pantanal's wet bank, its rafts).
+  if (!(game.state && game.state.noTracks)) {
+    const kind = m === 'sand' ? 'sand' : m === 'snow' ? 'snow'
+               : (m === 'grass' && capySfxOpts.pitch <= capyTRACK_MUD_P) ? 'mud'
+               : (capySwimAgo < capyTRACK_WET_T && (m === 'stone' || m === 'timber' || m === 'gravel' || m === 'metal')) ? 'wet'
+               : null;
+    if (kind) tracksWrite(capyFootX, capyFootZ, capyYaw, kind, py - capyFOOT_Y);
+  }
   const wx = game.weather;
   if (!wx || (game.state && game.state.noFootfall) || speed < capyFOOT_MIN_V) return;
-  const m = capySurfMat;
   const n = 2 + Math.round(clamp((speed - capyFOOT_MIN_V) / (capyRUN - capyFOOT_MIN_V), 0, 1) * 4);
   if (overWater && typeof wx.ringHere === 'function') wx.ringHere(capyFootX, capyFootZ);
   else if (typeof wx.burst !== 'function') return;
@@ -3642,15 +3677,37 @@ export function createCapybara(game) {
   // face that reads from where the game is played. matEmit is cached by
   // colour, not in capyFurMats (the coat must not paint it) and not in
   // wetParts (a wet eye is shinier, not darker).
-  capyAddPart(eyeL, capyGeoBead, mCatch, 0.135, 0.452, 0.597, 0.30, 0.30, 0.30)
-    .userData.coat = { flat: true };
+  const catchL = capyAddPart(eyeL, capyGeoBead, mCatch, 0.135, 0.452, 0.597, 0.30, 0.30, 0.30);
+  catchL.userData.coat = { flat: true };
   const eyeSockR = new THREE.Group();
   eyeSockR.position.set(-0.128, 0.128, 0.265);
   eyeSockR.rotation.y = -0.62;
   head.add(eyeSockR);
   const eyeR = capyAddPart(eyeSockR, capyGeoLive, mEye, 0, 0, 0.056, 0.046, 0.050, 0.042);
-  capyAddPart(eyeR, capyGeoBead, mCatch, -0.135, 0.452, 0.597, 0.30, 0.30, 0.30)
-    .userData.coat = { flat: true };
+  const catchR = capyAddPart(eyeR, capyGeoBead, mCatch, -0.135, 0.452, 0.597, 0.30, 0.30, 0.30);
+  catchR.userData.coat = { flat: true };
+  // ---- ...AND THE BEADS FOLLOW THE LENS (ROADMAP-WOW2, V1.5) --------------
+  // THE REGARD turns the head to a resting lens; the catchlight stayed where
+  // it was authored, on the eye's upper front, so the animal looked at the
+  // camera with its head and past it with its eyes. A catchlight IS the lens
+  // seen in the eye, so while the regard is up each bead slides across the
+  // eye toward the lens by capyCATCH_K of its own radius - the eye-local
+  // direction to the camera, read off last frame's matrixWorld (a frame of
+  // lag on a resting animal is nothing), at the rest position's own length
+  // so the bead stays ON the sphere. Two worldToLocal calls a frame while
+  // the regard is up, zero when it is not. Under noAlive: the rest position.
+  const capyCATCH_K = 0.15;
+  const catchRestL = catchL.position.clone(), catchRestR = catchR.position.clone();
+  const catchTmp = new THREE.Vector3();
+  function capyCatchAim(bead, rest, eye, camPos, k) {
+    if (k <= 0.001) { if (!bead.position.equals(rest)) bead.position.copy(rest); return; }
+    catchTmp.copy(camPos);
+    eye.worldToLocal(catchTmp);
+    const L = catchTmp.length();
+    if (L < 1e-4) return;
+    catchTmp.multiplyScalar(rest.length() / L);
+    bead.position.lerpVectors(rest, catchTmp, k);
+  }
 
   // THE CHEEK (R3). One small mass under and behind each eye, and it does two
   // things a bigger change could not. It gives the eye a LOWER EDGE to sit on —
@@ -4467,6 +4524,95 @@ export function createCapybara(game) {
   capyRingMesh.instanceMatrix.needsUpdate = true;
   scene.add(capyRingMesh);
 
+  // --- fx: the swim wake, one InstancedMesh (V6) — see capyWAKE_N -------
+  // A plane, laid flat by the -PI/2 about x, the heading in the second slot
+  // (the ferry's own order); transparent and never writing depth, so it
+  // composites over the water rather than cutting into it.
+  const capyWakeMesh = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(1, 1),
+    mat(PALETTE.seaFoam, { transparent: true, opacity: 0.42, depthWrite: false }),
+    capyWAKE_N);
+  capyWakeMesh.frustumCulled = false;
+  capyWakeMesh.castShadow = false; capyWakeMesh.receiveShadow = false;
+  capyWakeMesh.renderOrder = 5;
+  capyWakeMesh.count = 0;
+  for (let i = 0; i < capyWAKE_N; i++) {
+    capyWakeL[i] = 0;
+    capyRingP.set(0, -999, 0); capyRingS.set(0.0001, 0.0001, 0.0001);
+    capyRingQ.set(0, 0, 0, 1);
+    capyRingM4.compose(capyRingP, capyRingQ, capyRingS);
+    capyWakeMesh.setMatrixAt(i, capyRingM4);
+  }
+  capyWakeMesh.instanceMatrix.needsUpdate = true;
+  scene.add(capyWakeMesh);
+  const capyWakeE = new THREE.Euler();
+
+  /** Drop one, and age the lot. Called every frame from update(); a compare
+   *  when the pool is empty and the animal is not swimming. */
+  function capyWakeStep(dt, env, swimming, speed, x, z) {
+    const cut = !!(game.state && (game.state.noTracks || (game.state.perfRung | 0) >= 1));
+    if (swimming && speed > 0.6 && !cut) {
+      capyWakeDue -= dt;
+      if (capyWakeDue <= 0) {
+        capyWakeDue = capyWAKE_GAP;
+        const i = capyWakeHead;
+        capyWakeHead = (capyWakeHead + 1) % capyWAKE_N;
+        const side = (i % 2 ? 1 : -1) * capyWAKE_SIDE;
+        capyWakeX[i] = x - Math.sin(capyYaw) * capyWAKE_BACK + Math.cos(capyYaw) * side;
+        capyWakeZ[i] = z - Math.cos(capyYaw) * capyWAKE_BACK - Math.sin(capyYaw) * side;
+        capyWakeYw[i] = capyYaw;
+        capyWakeL[i] = 1;
+        capyWakeAny = true;
+      }
+    }
+    // CUT MEANS NOT DRAWN, NOT MERELY NOT FED. Without this the flag stopped
+    // new quads and left the twelve already up ageing on screen, so the A/B
+    // read fifteen pixels off a wake that was plainly there in both arms.
+    // The lives are kept, so the term coming back shows the wake it had.
+    if (cut) { if (capyWakeMesh.count) capyWakeMesh.count = 0; return; }
+    if (!capyWakeAny) { if (capyWakeMesh.count) capyWakeMesh.count = 0; return; }
+    capyWakeAny = false;
+    for (let i = 0; i < capyWAKE_N; i++) {
+      if (capyWakeL[i] <= 0) {
+        capyRingP.set(0, -999, 0); capyRingS.set(0.0001, 0.0001, 0.0001);
+        capyRingQ.set(0, 0, 0, 1);
+        capyRingM4.compose(capyRingP, capyRingQ, capyRingS);
+        capyWakeMesh.setMatrixAt(i, capyRingM4);
+        continue;
+      }
+      capyWakeL[i] -= dt * capyWAKE_FADE;
+      if (capyWakeL[i] <= 0) { capyWakeL[i] = 0; continue; }
+      capyWakeAny = true;
+      const age = 1 - capyWakeL[i];
+      // spreads as it goes, the way the ferry's does, and a good deal
+      // smaller: a capybara is not a Manly ferry
+      // SMALLER, AND IT GOES OUT BY SHRINKING. Read by eye off the pond in
+      // Kyoto, the first build (0.16 growing to 0.66, one every 0.16 s) was
+      // a line of paving slabs behind the animal rather than a wake: twelve
+      // hard-edged quads, each one arriving at full size and leaving at full
+      // size because an InstancedMesh has one opacity for the pool. So they
+      // start smaller, spread less, and the last third of the life is spent
+      // shrinking to nothing, which is the only per-quad fade there is.
+      const sx = (0.13 + age * 0.42) * (capyWakeL[i] > 0.35 ? 1 : capyWakeL[i] / 0.35);
+      const sz = sx * 1.7;
+      // ON THE LIVE SURFACE, not the still level — the swell owns the
+      // height and a wake pinned to a datum spends its life inside the sea
+      // (quay.js's own finding, the same call).
+      capyRingP.set(capyWakeX[i], capyWaterY(env, capyWakeX[i], capyWakeZ[i]) + 0.05, capyWakeZ[i]);
+      capyWakeE.set(-Math.PI / 2, capyWakeYw[i], 0);
+      capyRingQ.setFromEuler(capyWakeE);
+      capyRingS.set(sx, sz, 1);
+      capyRingM4.compose(capyRingP, capyRingQ, capyRingS);
+      capyWakeMesh.setMatrixAt(i, capyRingM4);
+    }
+    capyWakeMesh.count = capyWakeAny ? capyWAKE_N : 0;
+    capyWakeMesh.instanceMatrix.needsUpdate = true;
+    // ...and a floor under the pool's opacity: Kyoto's pond is nearly black
+    // and a 0.16 foam over it is not there (2696 px in a lens looking down
+    // on the arms, against 29119 for the first, far too big build).
+    capyWakeMesh.material.opacity = 0.26 + clamp(speed / capyRUN, 0, 1) * 0.30;
+  }
+
   // every mesh casts, regardless of module construction order
   capyRoot.traverse(function (n) { if (n.isMesh) n.castShadow = true; });
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(capyRoot);
@@ -5227,7 +5373,12 @@ export function createCapybara(game) {
                stepPhase: capyStepPhase, stepN: capyStepN, footX: capyFootX, footZ: capyFootZ, surfMat: capySurfMat,
                // ---- WOW2, V1.4: the coat's look against the level ----
                wetLevel: capyWetLevel, wetVis: capyWetVis, wetDark: capyWetDark, swimAgo: capySwimAgo,
-               furR: capyWetLerp[0].m.color.r };
+               furR: capyWetLerp[0].m.color.r,
+               // ---- WOW2, V1.5: the regard and the beads' slide off rest ----
+               tracks: tracksAudit(), wakeCount: capyWakeMesh.count,
+               regard: +capyRegard.toFixed(3),
+               catchL: +catchL.position.distanceTo(catchRestL).toFixed(4),
+               catchR: +catchR.position.distanceTo(catchRestR).toFixed(4) };
     },
     // ---- THE POSE FOR THE CAMERA (L4, F1a) ---------------------------------
     // systems.js calls this once a frame while the camera is out and the
@@ -5281,6 +5432,17 @@ export function createCapybara(game) {
     update: capyUpdate,
   };
   game.capy = capy;
+  // ---- THE TRACKS POOL, FOR EVERYTHING ELSE THAT WALKS (WOW2 V6) ---------
+  // The pool lives in shared.js and the animal's gait is its first writer;
+  // the herd's followers (npc.js, W3's file) are the second, and a herd
+  // across the Pantanal's bank should leave a path. This is the one door:
+  // `game.tracksWrite(x, z, heading, kind, y)`, kinds sand/snow/mud/wet,
+  // false for anything else, a no-op under `noTracks`. Aged and gated by
+  // this module's own frame, so a caller has nothing to keep.
+  game.tracksWrite = function (x, z, heading, kind, y) {
+    if (game.state && game.state.noTracks) return false;
+    return tracksWrite(x, z, heading, kind, y);
+  };
 
   // ears snap on the beat the gardener shouts
   /**
@@ -5345,6 +5507,8 @@ export function createCapybara(game) {
   // cling is the newest of them: leave Hong Kong halfway up a scaffold and,
   // without this, the animal arrives in Venice still holding on to nothing.
   game.events.on('biome:enter', function () {
+    tracksClear();                                  // ...and the prints (V6)
+    capyWetVis = 0; capyWetVisRate = 1 / capyWETVIS_T;   // ...and the coat (V1.4)
     capyClinging = false; capyClingCool = 0; capyClingT = 0;
     capy.climbing = false;
     capyHaulT = 0; capyStallT = 0; capyStepUsed = 0;
@@ -5737,6 +5901,12 @@ export function createCapybara(game) {
     if (dt <= 0) dt = 1 / 60;
     // G5's A/B, on the edge and before the helm's early return
     if (capyRoundOn === !!game.state.noRound) capyRoundApply(!game.state.noRound);
+    // ---- THE TRACKS AGE (V6) ------------------------------------------
+    // Before the helm's early return, so a trail left on the apron fades
+    // while the animal drives the ferry rather than freezing for the trip.
+    // Parked at rung 1 the way every other new term is; the prints are kept
+    // through a park, so the gate coming back shows the trail it had.
+    tracksTick(dt, !!(game.state && (game.state.noTracks || (game.state.perfRung | 0) >= 1)));
     const input = game.input;
     const env = capyWater(game);
     const t = game.state.time;
@@ -7417,6 +7587,8 @@ export function createCapybara(game) {
       capyWetLevel = 1;
       capyWakeT -= dt;
       if (capyWakeT <= 0 && groundSpeed > 0.6) { capyWakeT = 0.32; capySpawnRings(px, pz, waterY); }
+      // ...and the trailing arms (V6): see capyWAKE_N
+      capyWakeStep(dt, env, true, groundSpeed, px, pz);
       if (capySwimTime > 0.7 && !capySwamOnce) { capySwamOnce = true; game.completeTask('swim'); }
     } else {
       // ...and THIS is what capyWET_FAST was always for: a shake gets most of
@@ -7424,6 +7596,8 @@ export function createCapybara(game) {
       // what a coat does after that rather than instead of it.
       const wetK = capyShakeP >= 0 ? capyWET_FAST : 1;
       capyWetLevel = clamp(capyWetLevel - capyWET_DECAY * wetK * dt, 0, 1);
+      // the wake ashore is the one left behind, fading (V6)
+      capyWakeStep(dt, env, false, 0, px, pz);
     }
     // ---- ...AND STANDING IN THE RAIN IS ALSO BEING WET --------------------
     // The whole dry/wet material pair, the shake, the darkened fur and the
@@ -8012,7 +8186,7 @@ export function createCapybara(game) {
           // stand cannot reach this block at all. The foot is the diagonal
           // pair's front foot, alternating sides with the phase. Cut by
           // `game.state.noFootfall`; weather.js parks it at rung 1.
-          capyFootfallFx(game, px, pz, gaitSpeed, overWater);
+          capyFootfallFx(game, px, body.position.y, pz, gaitSpeed, overWater);
           // ...and at a run it kicks up whatever it is running on
           if (gaitSpeed > capyWALK * 1.05 && capyStepPhase % 2 === 0) {
             capyDigPayload.position = capyPosition;
@@ -8464,6 +8638,13 @@ export function createCapybara(game) {
       const beat5 = capyIdleAct === 5 ? Math.min(1, idleEnv * 1.35) : 0;
       capyRegardYaw = clamp(loc, -capyIDLE_BACK_YAW, capyIDLE_BACK_YAW) * capyRegard * (1 - beat5);
       capyRegardPitch = capyIDLE_BACK_PITCH * capyRegard * (1 - beat5);
+      // ...and the beads (V1.5): see capyCATCH_K
+      const catchK = (game.state && game.state.noAlive) ? 0 : capyCATCH_K * capyRegard;
+      const camP = game.camera && game.camera.position;
+      if (camP) {
+        capyCatchAim(catchL, catchRestL, eyeL, camP, catchK);
+        capyCatchAim(catchR, catchRestR, eyeR, camP, catchK);
+      }
     }
     capyIdleCrouch = damp(capyIdleCrouch, capyIdleAct === 2 ? idleEnv * 0.045 : 0, 8, dt);
     capyIdleEar = damp(capyIdleEar, capyIdleAct === 2 ? idleEnv : 0, 8, dt);

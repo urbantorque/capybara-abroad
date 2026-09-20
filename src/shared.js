@@ -5248,6 +5248,160 @@ export function contactTick(list, n) {
 }
 
 // ---------------------------------------------------------------------------
+// TRACKS — THE WORLD REMEMBERS WHERE YOU WENT (ROADMAP-WOW2, V6).
+//
+// The grass lies down where the animal walked (L11) and stands back up.
+// Nothing else did: a walk across Palawan's beach, Antarctica's snowfield or
+// the Pantanal's bank left the ground exactly as it found it, and a capybara
+// climbing out of a canal onto Venice's paving left it dry.
+//
+// THE CONTACT POOL'S OWN SHAPE, A SECOND TIME. Not decals — the block above
+// says why, and every reason (z-fighting on a heightfield, sorting against
+// the motes, a second family of flat blobs) holds twice over for thirty-two
+// of them. So: a fixed-size uniform pool read by the fragment of every
+// surface that already opts into contact (the grounds of every chapter do),
+// thirty-two slots of (x, z, heading, y) and a strength each, written by the
+// gait's footfalls (capybara.js) and by anything else that walks
+// (`game.tracksWrite` for the herd, W3's), aged here, and drawn as a PAW —
+// a pad and four toes in the print's own frame, from the heading — as a
+// darkening of the diffuse, exactly the way a contact patch is.
+//
+// TWO NUMBERS KEEP IT CHEAP. `uTrkOn` is one float, so an empty pool (every
+// chapter with no sand, snow, mud or wet stone under the animal) costs a
+// coherent branch; and `uTrkC` is the live prints' centre and radius, so a
+// fragment ten metres from the nearest print skips the loop on one dot
+// product. Inside that disc it is 32 iterations of two dots, a sin/cos and
+// two smoothsteps — the contact loop's cost and a bit, on a disc a few
+// metres across.
+//
+// The kinds are how long a print lives and how deep it reads, and nothing
+// else: sand 20 s, snow 90 s, mud 30 s, and 'wet' — the wet term's own
+// darkening in a paw, 12 s, for stone just after the water.
+const _TRACK_N = 32;
+const _TRACK_KIND = {
+  // SAND IS 30, NOT THE CARD'S 20, AND THE NUMBER IS THE MEASUREMENT'S. The
+  // target is a trail still readable in the frame at twenty seconds, and a
+  // 20 s life puts a twenty-second-old print inside the fade at a 7 %
+  // darkening — 37 pixels over the diff's threshold in a whole frame against
+  // 1888 at nought. At 30 the hold ends at 19.5 s, so the twenty-second
+  // frame is the last one that still plainly reads, and the trail is gone by
+  // the time a player has walked a chapter's width away.
+  sand: { life: 30, depth: 0.55 },
+  snow: { life: 90, depth: 0.70 },
+  mud:  { life: 30, depth: 0.62 },
+  wet:  { life: 12, depth: 0.60 },
+};
+// xz = the print's centre, z = the heading it was made on, w = its height.
+const _trackP = { value: [] };
+// 0..1 the print's strength this frame (its depth, faded by its age).
+const _trackK = { value: [] };
+const _trackOn = { value: 0 };
+// (cx, cz, r^2, 0) — the disc the live prints are inside, for the gate.
+const _trackC = { value: new THREE.Vector4(0, 0, 0, 0) };
+const _trackAge = new Float32Array(_TRACK_N);
+const _trackLife = new Float32Array(_TRACK_N);
+const _trackDepth = new Float32Array(_TRACK_N);
+let _trackHead = 0, _trackBorn = 0;
+for (let i = 0; i < _TRACK_N; i++) {
+  _trackP.value.push(new THREE.Vector4(0, 0, 0, -9999));
+  _trackK.value.push(0);
+  _trackLife[i] = 0;
+}
+// How dark a full-strength print takes the diffuse. Under the contact's
+// 0.32: a print is a shallow thing and a ring of them must not read as holes.
+const _trackMAX = 0.30;
+// The paw, in metres, in the print's own frame (forward = the heading).
+const _trackPAD_F = 0.030, _trackPAD_S = 0.040;   // the pad's half-axes
+const _trackTOE_F = 0.050;                        // the toes' row, ahead of the pad
+const _trackTOE_R = 0.016;                        // a toe's radius
+/** How many slots the pool has. */
+export function tracksSlots() { return _TRACK_N; }
+/**
+ * Write one print. `heading` is the walker's yaw (the animal's own
+ * convention: forward = (sin, cos)); `y` the ground under the foot; `kind`
+ * one of _TRACK_KIND's names. The oldest slot is taken when the pool is
+ * full, which on a 32-slot pool at a walk is the print six metres back.
+ * Returns false for an unknown kind.
+ */
+export function tracksWrite(x, z, heading, kind, y) {
+  const k = _TRACK_KIND[kind];
+  if (!k) return false;
+  const i = _trackHead;
+  _trackHead = (_trackHead + 1) % _TRACK_N;
+  _trackP.value[i].set(x, z, heading, typeof y === 'number' && y === y ? y : 0);
+  _trackAge[i] = 0;
+  _trackLife[i] = k.life;
+  _trackDepth[i] = k.depth;
+  _trackK.value[i] = k.depth;
+  _trackBorn++;
+  return true;
+}
+/**
+ * Age the pool and publish the gate. Once a frame, by whoever owns the
+ * walker (capybara.js). `cut` (game.state.noTracks, or the governor's rung)
+ * turns the term off at the one float without forgetting the prints, so an
+ * A/B can flip it and see the same trail.
+ */
+export function tracksTick(dt, cut) {
+  let live = 0, sx = 0, sz = 0;
+  const P = _trackP.value, K = _trackK.value;
+  for (let i = 0; i < _TRACK_N; i++) {
+    if (_trackLife[i] <= 0) { K[i] = 0; continue; }
+    _trackAge[i] += dt;
+    const u = 1 - _trackAge[i] / _trackLife[i];
+    if (u <= 0) { _trackLife[i] = 0; K[i] = 0; continue; }
+    // HELD, THEN GONE, and the shape of this is measured rather than
+    // chosen: a print at quarter strength on sand is a 4 % darkening, the
+    // per-pixel diff's own threshold is 8 of 255, and a bright beach at
+    // 230 puts that 4 % at nine units — so a square law (full at birth,
+    // a quarter at half life) measured 1043 px at 0 s and ONE at 10 s off
+    // the same twenty prints. A print in sand does not bleach; it holds
+    // its edge and then something fills it in. Full for the first half of
+    // the life, linear to nothing over the second.
+    // ...and the hold is the last THIRD rather than the last half, which is
+    // also measured: half-and-half put a twenty-second-old sand print at a
+    // 6 % darkening, and 6 % of a bright beach is nine of the diff's 255 —
+    // one pixel over the threshold in the whole frame against 1957 at ten
+    // seconds. A print does not get shallower; the sand fills it in at the
+    // end. Full for the first two thirds, linear to nothing over the last.
+    K[i] = _trackDepth[i] * (u > 0.35 ? 1 : u / 0.35);
+    live++; sx += P[i].x; sz += P[i].y;
+  }
+  if (!live || cut) { _trackOn.value = 0; return live; }
+  const cx = sx / live, cz = sz / live;
+  let r2 = 0;
+  for (let i = 0; i < _TRACK_N; i++) {
+    if (_trackLife[i] <= 0) continue;
+    const dx = P[i].x - cx, dz = P[i].y - cz;
+    const d2 = dx * dx + dz * dz;
+    if (d2 > r2) r2 = d2;
+  }
+  const r = Math.sqrt(r2) + 0.20;
+  _trackC.value.set(cx, cz, r * r, 0);
+  _trackOn.value = 1;
+  return live;
+}
+/** Forget every print. A chapter change, for the rings' own reason: a trail
+ *  across Palawan's beach must not finish fading on an Antarctic snowfield —
+ *  and the two are the same 32 world positions to this pool. */
+export function tracksClear() {
+  for (let i = 0; i < _TRACK_N; i++) { _trackLife[i] = 0; _trackK.value[i] = 0; }
+  _trackOn.value = 0;
+}
+/** For the harness: what the pool holds. */
+export function tracksAudit() {
+  let live = 0, oldest = 0;
+  for (let i = 0; i < _TRACK_N; i++) {
+    if (_trackLife[i] <= 0) continue;
+    live++;
+    if (_trackAge[i] > oldest) oldest = _trackAge[i];
+  }
+  return { live, born: _trackBorn, on: _trackOn.value, max: _TRACK_N,
+           centre: [+_trackC.value.x.toFixed(2), +_trackC.value.y.toFixed(2)],
+           radius: +Math.sqrt(_trackC.value.z).toFixed(2), oldest: +oldest.toFixed(1) };
+}
+
+// ---------------------------------------------------------------------------
 // SWAY — NINETEEN WORLDS OF PALMS AND CLOTH, AND NOT ONE OF THEM MOVED.
 //
 // `wxMOOD` in weather.js is nineteen hand-set rows of real wind — a base speed,
@@ -6316,6 +6470,12 @@ export function grain(m, opts) {
       shader.uniforms.uCtcP = _contactP;
       shader.uniforms.uCtcK = _contactK;
       shader.uniforms.uCtcOn = _contactOn;
+      // THE TRACKS (V6) ride the contact opt-in: a surface that takes a
+      // contact patch is a surface something stands on.
+      shader.uniforms.uTrkP = _trackP;
+      shader.uniforms.uTrkK = _trackK;
+      shader.uniforms.uTrkOn = _trackOn;
+      shader.uniforms.uTrkC = _trackC;
     }
     // The cloud, for the surfaces the rim does not reach — a sea, a glow
     // quad, the shared prop material. Same objects, different GLSL names;
@@ -6385,6 +6545,10 @@ export function grain(m, opts) {
         cont > 0 ? 'uniform vec4 uCtcP[' + _CONTACT_N + '];' : '',
         cont > 0 ? 'uniform float uCtcK[' + _CONTACT_N + '];' : '',
         cont > 0 ? 'uniform float uCtcOn;' : '',
+        cont > 0 ? 'uniform vec4 uTrkP[' + _TRACK_N + '];' : '',
+        cont > 0 ? 'uniform float uTrkK[' + _TRACK_N + '];' : '',
+        cont > 0 ? 'uniform float uTrkOn;' : '',
+        cont > 0 ? 'uniform vec4 uTrkC;' : '',
         // The cloud's own helpers, under their own names (rm*), on the
         // materials the rim does not reach. See the block above cloudTick.
         !rimHere ? 'uniform vec4 uGrCloudP;' : '',
@@ -6916,6 +7080,38 @@ export function grain(m, opts) {
           '      cOcc = max(cOcc, cf * uCtcK[ci]);',
           '    }',
           '    diffuseColor.rgb *= 1.0 - cOcc * ' + (cont * _contactMAX).toFixed(4) + ';',
+          '  }',
+          // ---- THE TRACKS (V6). See the block above _TRACK_N. ----------
+          // After the contact, on the same albedo, for the same reason. The
+          // disc gate first: outside it the whole loop is skipped on one dot.
+          '  if (uTrkOn > 0.5) {',
+          '    vec2 tq = vGrainW.xz - uTrkC.xy;',
+          '    if (dot(tq, tq) < uTrkC.z) {',
+          '      float tOcc = 0.0;',
+          '      for (int ti = 0; ti < ' + _TRACK_N + '; ti++) {',
+          '        vec4 tp = uTrkP[ti];',
+          '        vec2 td = vGrainW.xz - tp.xy;',
+          // the print's own frame: forward is (sin, cos) of the heading,
+          // side is (cos, -sin); f runs along the paw, sd across it
+          '        vec2 tF = vec2(sin(tp.z), cos(tp.z));',
+          '        float f = td.x * tF.x + td.y * tF.y;',
+          '        float sd = td.x * tF.y - td.y * tF.x;',
+          // the pad: an ellipse a little behind the print's centre
+          '        vec2 pe = vec2((f + 0.012) / ' + _trackPAD_F.toFixed(3) + ', sd / ' + _trackPAD_S.toFixed(3) + ');',
+          '        float paw = 1.0 - smoothstep(0.75, 1.15, length(pe));',
+          // the toes: four in a row ahead of it, found by folding the side
+          // distance onto the nearer of the two toe columns
+          '        float sa = abs(sd);',
+          '        float ts = min(abs(sa - 0.015), abs(sa - 0.044));',
+          '        float toe = 1.0 - smoothstep(0.7, 1.25, length(vec2(f - ' + _trackTOE_F.toFixed(3) + ', ts)) / ' + _trackTOE_R.toFixed(3) + ');',
+          '        paw = max(paw, toe);',
+          // the height gate, the contact's own numbers: a print on a bridge
+          // is not on the road under it
+          '        paw *= 1.0 - smoothstep(' + _contactRISE0.toFixed(3) + ', ' + _contactRISE1.toFixed(3) + ', abs(vGrainW.y - tp.w));',
+          '        tOcc = max(tOcc, paw * uTrkK[ti]);',
+          '      }',
+          '      diffuseColor.rgb *= 1.0 - tOcc * ' + _trackMAX.toFixed(4) + ';',
+          '    }',
           '  }',
         ].join('\n') : '',
         // ---- THE CLOUD, where there is no rim to carry it -------------------
