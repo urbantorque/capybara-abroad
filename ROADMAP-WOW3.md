@@ -163,6 +163,120 @@ cheapest-and-most-certain first; each is its own commit.
   changes. Items 4 and 7 are the only ones with new geometry (a truss
   primitive, six landing spots) and both are named as such.
 
+### W1 — shipped (21 Sep 2026)
+
+Items 1, 2, 3, 5, 9, 10, 11, 12 — shared.js's `reflectTex()` and the
+tracks read-proof, weather.js's dive-rate investigation and mote
+footprint, manly.js's ferry, npc.js's gardener sit-down, qa/ for the
+far-plane and geometry re-baselines. Commits `c688914` `10f8ad9`
+`19402a9` `c1b5c60` `8a11938` `71c492e`.
+
+- **1, `reflectTex()` — built.** shared.js exports the reflection
+  target's own `{ value }` object (the same one every water's `uReflT`
+  already points at); main.js's V4 ceiling term samples it
+  (`tReflC`/`uReflCeilOn`) when it holds a picture and falls back to the
+  original rippled formula when it does not (no water in the chapter, or
+  the target has never rendered). Caught one shader bug of its own along
+  the way: this composite pass is GLSL 300 (WebGL2) and wants `texture()`,
+  not `texture2D()` — the first version threw a compile error on every
+  frame with `uSubCeilK > 0`. Verified in Kyoto (a `sysREFLECT` chapter):
+  `reflectInfo().on` true, the new branch renders with zero console
+  errors. Palawan (no water in `sysREFLECT`) exercises the null-fallback
+  path. `reflectRender` itself refuses to draw while the eye is under the
+  water plane — exactly what a dive does — so what the ceiling samples
+  during a real dive is the LAST picture from just before the eye went
+  under, not a live one; still the real scene, not a formula.
+- **2, `wxDIVE_RATE` — found already correct, not raised.** Simulated the
+  exact recurrence outside the game: at rate 48/s and life ~0.81 s mean
+  the design target is ~38-39 alive with no early kills from the ring
+  buffer, and a bubble only travels ~0.3 m in its own natural life so the
+  surface top-cut only bites below ~0.2-0.3 m of clearance — the V4/W6
+  chapters were all measured 1.6-8 m deep. Pool contention from npc.js
+  ruled out by grep: its only other `burst('bubble', …)` call is gated
+  `npcGEST_COLD = { iceland, antarctic }` and never fires in Palawan,
+  Rio, Kyoto or Venice. Live proof: `qa/wow3-d2-dive-math.js` (fixed deep
+  spot, deterministic dt) settles at 38-40 within a second; a REAL dive
+  in all four chapters (`qa/wow3-d2-dive-profile.js`) reads 36-44 alive
+  at genuine peak depth in every one. Kyoto and Venice's ponds are
+  shallow and the animal swims back toward the surface within a couple of
+  seconds of diving — the original low readings were very likely taken
+  off-peak in that trajectory, not a flaw in the tuning. No code change.
+- **3, mud and wet-on-stone — both real.** Wet-on-stone (Venice) proved
+  cleanly: swim, walk onto paving inside the 12 s window, 4/4 prints,
+  `qa/wow3-d3-wet-eye.png` shows four dark paw marks on pale stone and the
+  `noTracks` diff shows the same cluster. Mud (the Pantanal's bank) fires
+  — the pool reached its own ceiling, 32/32 live, 105 born, at a point
+  whose `surfacePitch()` matches `capyFootfallFx`'s own gate exactly (0.6
+  and 0.68, both ≤ 0.70) — but every eye-read attempt at that spot landed
+  either on the animal's own body or too close/dark to read the decal
+  clearly against grass's grain, unlike stone's flat pale surface. Proved
+  by the per-pixel diff and the code path, not by a clean screenshot —
+  named honestly rather than rounded up. No src/ change; no bug found in
+  the pool.
+- **5, Manly's ferry — built.** Brought the path in from z -500/-530 to
+  -290/-300 (manly.js, the `farMover` spec only — far.js untouched). A
+  grid sweep against the arrival lens (`qa/w1-ferry-sweep`, not kept —
+  see the two committed instruments below) found the z window (-340 to
+  -260) that clears the top edge on the North Head side without dipping
+  behind either Head's own far-layer geometry. Measured before: NDC y
+  0.86-0.88 at the worst point. After: 0.50-0.55 on the same pin, 0.37 on
+  an independent second session's pin, zero occlusion at either path end.
+  `qa/wow3-d5-ferry-shot2.png` shows it mid-frame under the tree line.
+- **9, the gardener's sit-down — built.** `sysFinDone` is unreachable from
+  npc.js without a systems.js edit (out of this wave's file list), so
+  this gates on `finaleOn` alone — already the flag that means the shelf
+  is laid out and the traveller figure is standing on the ring, the
+  simplification the roadmap names as acceptable. New state
+  `'gardenerSit'`, `npcGardenerSitSpot()` reading the traveller's own
+  position, `npcSEAT_CROUCH` reused rather than a new pose. Found and
+  fixed one collision along the way: `npcGather` (the five-person crowd
+  recruiter, also on `finale:staged`) didn't exclude gardeners, and
+  `'gather'` is a state `thinkHuman` never re-tasks anyone out of — a
+  gardener recruited there would never reach the sit-down code. Added to
+  the same exclusion as patron/waiter. Verified live: both roster
+  gardeners reach `'gardenerSit'`, settle 1+ m apart beside the
+  traveller, keep speaking.
+- **10, V0's carry-over — one built, one still blocked.** The mote-quad
+  minimum footprint is built: every mote tumbles on three axes with a
+  uniform scale and goes edge-on to a hairline once a cycle regardless of
+  size; `wxFootK()` inflates the scale (capped 2.4x) inside ~13° of
+  edge-on, wired into both the main field and the bursts. Verified live:
+  sampled the instanced mesh's real matrix scale across 5.5 s in Sydney —
+  boosted values (0.11-0.26) sit well above the unboosted ceiling
+  (~0.07), confirming it engages continuously, no visible regression at
+  normal distance. The thin-cylinder un-merge (Quay's mast, Pasto's cord)
+  is still blocked — ROADMAP-WOW.md's own 19 Sep reality check already
+  found the actual blocker (the mast is baked into the ferry hull's
+  merged mesh; the fix needs an un-merged `Mesh` or new per-vertex-
+  attribute plumbing, either way a `quay.js`/`pasto.js` edit), and both
+  files are this wave's explicit Do-Not-Touch list. A fourth pass in a
+  row this has been named and not attempted; still one function away,
+  just not this agent's function to write.
+- **11, the far plane's numeric sweep — re-run, clean.** All nineteen
+  chapters, fresh boot each (`qa/wow2-far-depth.js`, unmodified — the
+  file itself is the instrument, per-chapter copies were not kept), zero
+  console errors across the board. Manly's own reading now shows the
+  ferry mover at z -295.5 (confirming item 5 landed) with NDC y 0.23.
+- **12, `qa/rv-geom.js` — re-baselined, and it was very stale.** The
+  committed baseline (`qa/RV-GEOM.png`) predated the whole of ROADMAP-
+  WOW2 apparently — a fresh run found 58 changed / 95 added / 69 removed
+  geometry rows across every one of the nineteen chapters plus the root
+  scene, batch count 1992→2029, total vertices 2 665 393→2 721 606. None
+  of that is this wave's own doing (my edits touch a mover's runtime
+  *position*, an instance matrix *scale*, and NPC state — none of which
+  write to a mesh's local vertex buffer, which is all this hash reads);
+  it is the accumulated drift of every WOW2 pass since whenever this was
+  last captured. Re-baselined now (`qa/RV-GEOM.png` overwritten with the
+  fresh run) — it will go stale again the moment W2's far.js truss/
+  Kowloon work lands, which is expected and for W2 or W5 to re-run, not a
+  fault of this baseline.
+
+**Miss, named plainly:** item 10's un-merge is the one item of the eight
+not built, for a file-ownership reason stated above, not a difficulty
+one. Item 3's mud is real but not eye-provable at the render angles this
+agent found; a different chapter or a taller/less-oblique camera might
+read it more clearly for whoever revisits it.
+
 ## Part H — needs a human, not an agent (not built by this pass's agents)
 
 Two numbers from ROADMAP-WOW2's own Closed section that no bot can supply.
