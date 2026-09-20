@@ -8159,6 +8159,99 @@ export function createNPCs(game) {
   // =======================================================================
   let locChatT = rand(3, 8);
   let locChatRec = null, locChatWhen = 0;
+
+  // =======================================================================
+  // COMPANY (ROADMAP-WOW2 V2.4). localsChat above is a word across a square:
+  // one pair per 11-28 s, at up to thirteen metres, with a bubble each. It
+  // is the right thing for a greeting and the wrong thing for the two
+  // people who stand three metres apart all day — they do not greet each
+  // other every quarter of an hour, they mutter. This is the mutter: any
+  // two locals within npcLOC_CO_R turn to each other for a couple of
+  // seconds and babble (sfxBabble, L6 F5 — syllables in their own voices,
+  // no bubble, so the words are not asked for and not given), the second
+  // answering the first. Once per PAIR per npcLOC_CO_GAP, several pairs
+  // may run at once, and never while the animal is inside either's `near`:
+  // a person the capybara is standing in front of is talking to the
+  // capybara, and two people talking over its head is a different scene.
+  //
+  // `chatYaw`/`chatT` is the turn — the same pair localsChat and the chain
+  // look use, so it ranks where they rank (above the watch, below the
+  // flinch). `gest` is the talking arm, the same field sayBubble writes.
+  // The scan is one probe from a random start every npcLOC_CO_SCAN, never
+  // a sweep: it runs in the chapter with a hundred and ten people.
+  // game.state.noCompany cuts it; rung >= 1 parks it.
+  // =======================================================================
+  // ---- AND THE RADIUS IS FIVE METRES, WHICH WAS MEASURED (the same way
+  // localsChat's thirteen was). The roadmap said three. The nearest
+  // neighbour of every local with a figure, read off the live chapter:
+  //   under 3 m    Marrakech 2.25 (one pair) · the Pantanal 2.83 — and
+  //                nowhere else. Rio's closest pair is 4.73 m, Cali's 4.20.
+  //   under 5 m    those four.
+  // Three metres is a beat that exists in two chapters; five is the same
+  // beat in four, and 4.7 m is still a mutter and not a call. The anchors
+  // are the chapter files' and are not this pass's to move.
+  const npcLOC_CO_R    = 5.0;    // m — within this they are company
+  const npcLOC_CO_GAP  = 40;     // s per pair
+  const npcLOC_CO_LOOK = 2.4;    // s they face each other
+  const npcLOC_CO_SCAN = 1.5;    // s between probes
+  const npcLOC_CO_VOL  = 0.20;   // under a spoken line (0.26)
+  let locCoT = rand(2, 5), locCoN = 0;
+  const locCoPairs = {};         // 'i:j' -> game time it last fired
+  const locCoRows = [];          // the audit's ring of recent pairs
+  let locCoReply = null, locCoWhen = 0;
+  function localsCompany(dt) {
+    const on = !game.state.noCompany && ((game.state.perfRung | 0) < 1);
+    if (locCoReply) {
+      locCoWhen -= dt;
+      if (locCoWhen <= 0) {
+        const b = locCoReply; locCoReply = null;
+        if (on && b.biome === (game.biome && game.biome.current) && b.fl > -0.02) {
+          npcSayOpt.line = 'mm hm.'; npcSayOpt.q = false; npcSayOpt.low = !!b.authority; npcSayOpt.slow = false;
+          sfx('babble', b, npcLOC_CO_VOL, 1, randInt(2, 3), npcSayOpt);
+          b.gest = 1.2;
+        }
+      }
+    }
+    locCoT -= dt;
+    if (locCoT > 0 || !on) return;
+    locCoT = npcLOC_CO_SCAN;
+    const n = locals.length;
+    if (n < 2) return;
+    const live = game.biome && game.biome.current;
+    const now = game.state.time || 0;
+    const cp = game.capy && game.capy.position;
+    const cOk = !!cp, cx = cOk ? cp.x : 0, cz = cOk ? cp.z : 0;
+    const s0 = randInt(0, n - 1);
+    for (let k = 0; k < n; k++) {
+      const ia = (s0 + k) % n, a = locals[ia];
+      if (!a || a.biome !== live || !a.fig || a.chatT > 0 || a.fl < -0.02 || a.moving > 0 || a.sat > 0 || a.gest > 0) continue;
+      // ...not with the animal in front of them
+      const adx = a.x - cx, adz = a.z - cz;
+      if (cOk && adx * adx + adz * adz < a.near * a.near) continue;
+      for (let j = 1; j < n; j++) {
+        const ib = (ia + j) % n, b = locals[ib];
+        if (!b || b === a || b.biome !== live || !b.fig || b.chatT > 0 || b.fl < -0.02 || b.moving > 0 || b.sat > 0 || b.gest > 0) continue;
+        const dx = a.x - b.x, dz = a.z - b.z, d2 = dx * dx + dz * dz;
+        if (d2 > npcLOC_CO_R * npcLOC_CO_R || d2 < 0.04) continue;
+        const bdx = b.x - cx, bdz = b.z - cz;
+        if (cOk && bdx * bdx + bdz * bdz < b.near * b.near) continue;
+        const key = ia < ib ? ia + ':' + ib : ib + ':' + ia;
+        if (locCoPairs[key] !== undefined && now - locCoPairs[key] < npcLOC_CO_GAP) continue;
+        locCoPairs[key] = now;
+        a.chatYaw = Math.atan2(b.x - a.x, b.z - a.z); a.chatT = npcLOC_CO_LOOK;
+        b.chatYaw = Math.atan2(a.x - b.x, a.z - b.z); b.chatT = npcLOC_CO_LOOK;
+        npcSayOpt.line = 'so then, well.'; npcSayOpt.q = Math.random() < 0.4; npcSayOpt.low = !!a.authority; npcSayOpt.slow = false;
+        sfx('babble', a, npcLOC_CO_VOL, 1, randInt(3, 5), npcSayOpt);
+        a.gest = 1.4;
+        locCoReply = b; locCoWhen = rand(1.1, 1.7);
+        locCoN++;
+        locCoRows.push({ t: +now.toFixed(1), a: ia, b: ib, d: +Math.sqrt(d2).toFixed(2), x: +a.x.toFixed(1), z: +a.z.toFixed(1) });
+        if (locCoRows.length > 24) locCoRows.shift();
+        return;
+      }
+    }
+  }
+
   function localsChat(dt) {
     if (locChatRec) {
       locChatWhen -= dt;
@@ -14887,6 +14980,7 @@ export function createNPCs(game) {
       if (paLive()) npcBargeSweep(dt, paCast);
       localsStep(dt);
       localsChat(dt);
+      localsCompany(dt);
       npcExStep(dt);
       updateBubbles(dt);
       return;
@@ -16512,6 +16606,16 @@ export function createNPCs(game) {
              const out = { biome: live, on: npcGestOn, standing: standing, running: rows.length,
                            started: npcGestN, by: Object.assign({}, npcGestBy), rows: rows, idle: idle };
              if (reset) { npcGestN = 0; for (const k in npcGestBy) npcGestBy[k] = 0; }
+             return out;
+           },
+           /**
+            * WHO HAS COMPANY (V2.4): pairs fired since the last reset and the
+            * last two dozen of them, with the distance and where.
+            */
+           company: function (reset) {
+             const out = { biome: game.biome && game.biome.current, on: !game.state.noCompany,
+                           pairs: locCoN, rows: locCoRows.slice() };
+             if (reset) { locCoN = 0; locCoRows.length = 0; }
              return out;
            },
            },

@@ -4,7 +4,7 @@ async page => {
   const errs = []
   page.on('pageerror', e => errs.push('pageerror: ' + String(e.message || e)))
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()) })
-  await page.addInitScript(() => { try { localStorage.clear() } catch (e) {} })
+  await page.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('capy3.prefs.v1', JSON.stringify({ v: 1, pf: 1 })) } catch (e) {} })   // pinned to 'pretty': rung 0 held
   await page.setViewportSize({ width: 1280, height: 760 })
   await page.goto('http://localhost:5188/')
   await page.waitForTimeout(5200)
