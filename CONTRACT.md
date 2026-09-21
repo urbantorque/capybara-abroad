@@ -1,3 +1,78 @@
+## THE THIRTEENTH LIFT — THE DEBTS PAID, THE WORLD REMEMBERED, AND THE STILL FRAME CLOSED (L13 — 21 Sep 2026)
+
+Twenty commits, ROADMAP-WOW3.md, four waves against twelve named debts
+plus a fourth notch of new measures (X1-X4) and this closeout's own three
+numbers — see that file's "Closed" section for the full table and every
+honest miss; this is the short version.
+
+**Twelve debts, all twelve closed or re-declined with a number.** The
+underwater ceiling now samples the real mirror instead of a formula
+(`reflectTex()`); the dive-bubble rate was re-declined as already correct
+after the actual recurrence math was checked; mud and wet paw prints are
+both real, one eye-proved and one proved only by the pool and the code
+path; Hanoi got an actual truss (168 triangles that read as one because
+they are mostly the air between their members) and Kowloon's far layer
+was left as built, on a camera fact rather than forced into a street
+with no sky; Manly's ferry now crosses the frame instead of clipping its
+top edge; Sydney's jacaranda gust is its own purple burst, not borrowed
+from the fig canopy's green one; six companions now have a named home
+spot, not just wherever the animal happened to be standing; the opening
+got its nap pose and the traveller's bag, though not yet the traveller's
+own visible walk-off; the gardener sits down at the finale, and a real
+scheduling bug that would have kept a recruited gardener from ever
+reaching that state was found and fixed along the way; the mote-quad's
+minimum screen footprint is built, though two thin-cylinder un-merges
+stay blocked on file ownership a fourth pass running.
+
+**The world changes while the player is elsewhere, provably.** A stone
+shelf now fills in the order keepsakes were actually earned, not chapter
+order (`keptAt`, this pass's one new save field). Three chapters
+(quay, kyoto, venice) repaint something real on a genuine ~25-minute
+absence, verified against a real short-absence control that does not
+trigger it. A companion sent home now comes back to the player on its
+own the next time the animal stands near its own place — proved live for
+all six kinds by this closeout, up from two.
+
+**A voice for five things that used to move in silence, and a still
+frame finally measured honestly.** Footfalls, the eaves' drip and a
+companion's approach turned out to already have a sound; the shelf's own
+chime and a departing traveller's footsteps did not, and building the
+first surfaced two real playback bugs (an `AudioContext` not yet resumed,
+a voice ceiling dropping a once-a-session payoff) now fixed. Separately,
+L11's own -40% still-pixel target — met in only 10 of 19 chapters and
+blamed on the measuring instrument ever since — was re-run against the
+instrument that actually fixes the blame (W0's extended mask): six of
+the nine recovered outright, three did not, and this pass named which of
+those three is real shimmer and which is still unclear rather than
+rounding either up.
+
+**The two numbers no single wave had run.** Motion-at-rest crowd
+coverage went from 4 of 19 chapters to all 19, using the exact same
+instrument WOW2 left unfinished so the numbers stay comparable — two
+chapters (quay, monaco) came back with a genuinely empty motion mask,
+named as an instrument limit rather than silently dropped. And the
+frame-time budget was finally checked across EVERY flag from both this
+pass and the one before it, together, for the first time: −0.15 ms
+live-minus-cut in aggregate (live reads faster than fully cut — pure
+noise), governor rung 0 held throughout, comfortably inside budget.
+
+**A regression sweep that found nothing to fix.** `src/systems.js` was
+touched by all four waves this pass; every identifier any wave's own
+report named was checked for a collision and found declared exactly
+once. `node build.mjs` and `npm test` stayed green (25/0) on the final
+commit. No bug needed a fix this pass — every open item is a measurement
+gap or a deliberate file-ownership deferral, named as such.
+
+**Two harness lessons, now in the memory.** A chapter's own `ensureBuilt()`
+runs exactly once per session — every return afterward reattaches the
+same standing objects, so a flag read at build time cannot see anything
+armed later; check the object directly instead of trusting a fresh
+build to see it. And a module's own internal calls to a dispatcher it
+also exports (`sfx()`, here) do not route through that same export from
+the *inside* — a harness that monkey-patches the public door sees
+nothing the file does to itself, which is exactly how two real playback
+bugs went unnoticed until a counter was added inside the file itself.
+
 ## THE TWELFTH LIFT — THE ANIMAL AWAKE, THE WORLD REMEMBERING, AND THE WHY MADE VISIBLE (L12 — 20–21 Sep 2026)
 
 Twenty-five commits, ROADMAP-WOW2.md, six waves against six measured

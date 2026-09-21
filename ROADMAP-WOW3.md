@@ -882,3 +882,182 @@ a voice for the animal; cutscenes that take the controls for more than ten
 seconds; a new-game-plus that resets anything; a why said out loud; a
 general cinematic-camera system (X3 is two named cases only); a fourth
 save field beyond `keptAt`.
+
+## Closed
+
+Twenty commits (`0624f4b..50cfb00`, `git log dfde990..HEAD`), four waves
+plus this closeout, against the six numbers Part D/X1-X4 and this file's
+own "What this pass measures" set out. Every wave's own "### shipped"
+block (W1-W4, above) is the full record; this section synthesizes and
+adds the three numbers no wave measured together.
+
+**The twelve debts (Part D), all twelve closed or re-declined with a
+number, none silently dropped.** 1 `reflectTex()` built — the underwater
+ceiling now samples the real mirror, not a formula. 2 `wxDIVE_RATE`
+re-declined — the rate/life math was already correct; four low readings
+in the WOW2 record traced to off-peak dive trajectories, not the tuning.
+3 mud and wet-on-stone both real — wet-on-stone eye-proved on Venice
+paving, mud proved by the pool ceiling and the exact footfall-gate match
+but never by a clean screenshot against grass's own grain. 4 a truss for
+Hanoi built (168 triangles, a bay-loop primitive that reads as a truss
+because it is mostly the air between its members), Kowloon's far layer
+left as built and not relocated — the street frontage has zero sky in
+frame, a camera fact, and the helicopter ring already carries Lion Rock.
+5 Manly's ferry brought in from z -500/-530 to -290/-300 — NDC y 0.86-0.88
+at the worst point down to 0.50-0.55. 6 Sydney's jacaranda gust built, a
+parallel canopy list, purple and airborne, categorically distinct from
+the ground-petal skitter it used to share. 7 the companion's per-kind
+landing spot built (`compHOME`, six coordinates) — numerically correct
+for all six, eye-confirmed strong for one (the heron's shallows), a
+fitting general area without a single landmark in frame for the other
+four (cat included, see below). 8 N4's real opening — the nap pose and
+the traveller's bag both built and verified live; the traveller's own
+visible walk-off still not, blocked on npc.js file ownership within the
+wave that had the hook. 9 the gardener's sit-down built, and a real bug
+fixed along the way (`npcGather` recruiting a gardener into a state
+`thinkHuman` never re-tasks out of, which would have made the sit-down
+unreachable for a recruited gardener). 10 V0's carry-over — the mote-quad
+minimum footprint built and verified continuously engaging; the
+thin-cylinder un-merge (Quay's mast, Pasto's cord) still blocked, a
+fourth pass in a row, on the same `quay.js`/`pasto.js` file-ownership
+reason as ROADMAP-WOW.md's own 19 Sep finding, not a difficulty one. 11
+the far plane's numeric sweep re-run clean across all nineteen, zero
+console errors. 12 `qa/rv-geom.js` re-baselined after finding the old
+baseline predated the whole of ROADMAP-WOW2 (58 changed/95 added/69
+removed rows) — none of it this pass's own doing, all of it prior drift.
+
+**Motion at rest, to full coverage — the one number no wave touched
+until this closeout.** W1-W4 all worked Part D/X1-X4 and none extended
+`qa/wow2-people.js` past the 4/19 crowd coverage WOW2 left at. This
+closeout copied the instrument per chapter (`qa/wow3-people-<chap>.js`,
+the CHAP constant swapped only, everything else identical so the numbers
+stay comparable to WOW2's own four) and ran it across all fifteen
+remaining chapters: **4/19 -> 19/19.** Seventeen of nineteen came back
+with a real, nonzero crowd mask and a live/cut gesture delta (medians
+from 6 px to over 2000 px depending on how crowded the chapter's own
+densest group is; the gesture-on-vs-off delta ranges from -1.22% to
++10.73% of the mask, noisy in both directions the way a twelve-pair
+sample of a twenty-person gesture pool should read). **Two honest
+misses:** quay and monaco both came back with `maskPx: 0` — the hide-
+and-diff found a viewing pose (quay's own pin search even reported
+`seen: true`) but zero pixels moved between the hidden and shown
+renders, the same failure shape `qa/wow2-people.js`'s own comments
+already describe for Sydney and Marrakech in the WOW2 record (a mask of
+zero pixels reads exactly like "nobody moved" whether or not anybody
+did). Not chased with a new pin heuristic this pass — named precisely,
+for whoever revisits it, with the two chapter names attached rather than
+folded into the seventeen real reads.
+
+**The still-pixel floor — already closed by W3's own X4 work, confirmed
+here, not re-run.** Six of the nine mask-blamed chapters now meet the
+original L11 -40% target under the extended mask: sydney -73%, pasto
+-65%, cali -41%, kowloon -100%, goreme -92%, cave -75%. Three do not:
+manly +208%, antarctic +295%, hanoi +36%. Hanoi's gap reads as real
+remaining traffic (a recycled train/lane the "moved > 1cm" instance test
+does not catch as newly spawned). Manly and antarctic are the honest
+miss of the whole pass: under the same live session, the extended mask
+(hiding a strict superset of what the old mask hid) produced a LARGER
+diff than the old mask did, which should not happen if the excess were
+purely masked motion — measured and named, not explained, not chased
+with a new suppression term.
+
+**The place remembers.** X1a: the shelf now lays out in earn order
+(`keptAt`, the one new save field this pass allows), verified against
+three saves with the order scrambled three different ways, matching
+every time. X1b: the world itself now differs on a long-absence return
+in three chapters (quay, kyoto, venice — a stall's roof/stripe repaint),
+verified live short-vs-long-absence with a real ~25-minute gate; sixteen
+chapters correctly left out, not forgotten, since the mechanism
+(`npcMakeStall`'s shared stall) works anywhere and three is what got
+checked live in the time W3 had. X1c: the companion that comes over,
+**now 6/6 kinds live-verified, up from 2/6.** W3 proved pigeon and heron
+end to end; this closeout ran the identical forced-stow/cross/teleport
+pattern (`qa/wow3-x1c-comes-over-b.js`) for the remaining four — cat
+(goreme), silver gull (manly), gentoo (antarctic), ibis (sydney) — and
+all four settled into `follow` within a few metres of their own
+`compHOME` after the same beat. One real timing gap found and named,
+not treated as a bug: the 4.2s post-crossing wait W3 tuned for pigeon
+and heron's own (shorter) walk-home distance was not long enough to
+catch cat/gull/gentoo's own `compLeave` actually clearing (`kind: null`)
+before the teleport landed — all three were still mid-walk (`state:
+"go"`) at that read. The end state still proves the beat: all four
+kinds' settled position sits within `compHOME_NEAR` of their own
+`compHOME`, in `follow` state, matching the teleport point rather than
+their pre-leave position. Only ibis (sydney, no crossing needed) caught
+the clean clear-then-repick sequence pigeon/heron's own report describes.
+
+**A voice for what became visible.** Footfalls, the eaves' drip and the
+companion's approach were all found already built by W4 (the drip stays
+a shared ambient voice, not per-mote positioned, named and not chased).
+The shelf chime and the glimpse's walk-off footstep were genuinely
+built, and building the shelf chime surfaced two real bugs already fixed
+by W4 (a restore-time `AudioContext` not yet resumed, and the same tick's
+own voice-ceiling dropping it a second way) — both fixed with a
+`setTimeout` defer and `force: true`. This closeout did not re-soak any
+of the five live a second time; W4's own report stands.
+
+**The combined number, WOW2 and WOW3 together — the number nobody had
+run.** `qa/wow3-frametime-final.js`: all fourteen WOW2 flags plus the
+three WOW3 flags this pass actually added (`noRemember`, `noLens2`,
+`noVoice2` — `noFar`/`noStrip`/`noSub2` are reused existing WOW2 flags,
+confirmed via `grep -oE "game\.state\.no[A-Za-z0-9]+" src/*.js | sort -u`
+against every wave's own report before trusting the list), live vs fully
+cut, 5 reps of 60 frames, the same 8 chapters WOW2's own W6 used,
+governor rung pinned to 0. **`deltaMedMs = -0.15`** (live measuring
+*faster* than fully cut in the aggregate median — noise, not a real
+negative cost), comfortably inside the 0.6ms budget; per-chapter deltas
+ranged -1.0ms (hanoi) to +0.4ms (sahara), rung 0 held in every row. The
+whole-frame number was usable this time — no fallback to the tick-only
+sim needed.
+
+**A regression sweep that found nothing to fix.** `src/systems.js` was
+touched by all four waves this pass (167 lines net across W1's item 9,
+W2's items 7/8, W3's X1a/b/c, W4's X2.3/X3.2); `src/npc.js`, `src/
+weather.js` and `src/capybara.js` by two or three each. `node --check`
+clean on every touched file. Every named identifier called out across
+every wave's own shipped block — `reflectTex`, `wxDIVE_RATE`, `compHOME`,
+`compLeave`, `sysShelfStage`, `sysWorldAwayCheck`, `compWentHome`,
+`jrKeptAt`, `sysOpeningPlay`, `capyForceNap`, `npcGardenerSitSpot`,
+`farTruss`, `farBundle`, `envDAPPLE_JAC`, `wxStepJacStrip`, `sfxAudit`,
+`farGlanceAudit`, `sysFarGlanced`, `worldAwayArm`, `compHOME_NEAR`,
+`npcSwapStall` — declared exactly once, no collisions, no later wave's
+edit found sitting inside an earlier one's function. `node build.mjs` +
+`npm test`: 25 checks, 0 failed, on the final commit. **No genuine
+regression found; no separate bug-fix commit this pass** — every miss
+named above is a measurement gap or a file-ownership deferral, not a
+break.
+
+**Part H, still owed, named plainly a third time.** A real-GPU frame
+budget and a human stranger playtester are still not built — no wave's
+brief asked for them, none attempted them, and no bot can supply either.
+Left for the player, exactly as ROADMAP-WOW2's own Closed section left
+them.
+
+**Harness lessons, for the memory.** GLSL 300 (WebGL2) composite passes
+want `texture()`, not `texture2D()` — a silent per-frame compile error
+otherwise (W1). `game.tick` runs every module regardless of
+`game.state.started`, so a pre-Begin render is already reachable without
+a special hook (W2). `ensureBuilt()` runs a chapter's build exactly ONCE
+per session — every return after the first reattaches the same standing
+objects, so a flag read at build time cannot see anything armed after
+that chapter was first built (W3). Internal `sfx()` calls inside
+systems.js never route through the externally-published `game.sfx`, so
+a monkey-patch from outside a file can observe nothing it does not
+itself publish — `game.sfxAudit()`/`game.farGlanceAudit()` exist because
+of exactly this gap (W4). And one from this closeout: five or more
+concurrent playwright-cli sessions hitting the one dev server produces
+occasional `page.goto` timeouts that are pure contention, not a game or
+script fault — the fix is to retry solo, not to debug the script.
+
+**Left open, named.** Quay and monaco's crowd mask (0px, an instrument
+miss); manly and antarctic's still-pixel floor (measured worse under the
+honest mask, unexplained); hanoi's still-pixel floor (explained, not
+closed — real recycled traffic); the traveller's own walk-off at the
+opening (N4/D8, blocked on npc.js file ownership within its own wave,
+not on difficulty); the thin-cylinder un-merge (V0/D10, blocked the same
+way, a fourth pass running); the cat's landing spot (D7, numerically
+correct, no landmark in frame from the vantage tried); the drip's shared,
+unpositioned voice (X2.2, a deliberate scope decision, not a bug); and
+Part H's two items, which stay for a human. None of these are silently
+dropped — each carries the number or the reason a future pass needs to
+pick it up.
