@@ -3605,7 +3605,7 @@ export function createNPCs(game) {
         const cdx = capy.x - r.gBX, cdz = capy.z - r.gBZ;
         const close = cdx * cdx + cdz * cdz < npcTRAV_GLIMPSE_LEAVE_R * npcTRAV_GLIMPSE_LEAVE_R;
         if (close || r.gHold <= 0) {
-          r.gSt = 'leave'; r.gT = 0;
+          r.gSt = 'leave'; r.gT = 0; r.gStepT = 0;
           // away from the door, into the chapter and out of the approach lane
           r.gGoX = -Math.sin(r.gBYaw); r.gGoZ = -Math.cos(r.gBYaw);
         }
@@ -3614,6 +3614,22 @@ export function createNPCs(game) {
         r.group.position.x += r.gGoX * npcTRAV_GLIMPSE_SPD * dt;
         r.group.position.z += r.gGoZ * npcTRAV_GLIMPSE_SPD * dt;
         r.group.rotation.y = Math.atan2(r.gGoX, r.gGoZ);
+        // ROADMAP-WOW3 X2: THE TRAVELLER'S WALK-OFF. This state moves the
+        // figure by a raw position increment rather than through the shared
+        // gait (rec.speed/walkPhase) every ordinary walking local uses, so it
+        // never trips that gait's own stride math and was — checked first,
+        // per the roadmap's own "grep before building" rule — genuinely
+        // silent: nothing in this file plays a footstep off walkPhase for
+        // ANY local, gated or not. This is the one figure the player is
+        // looking straight at for the whole three seconds, so it alone gets
+        // one: capybara.js's own material-aware 'step' voice, on a plain
+        // walking cadence (~2.6 Hz), through the local sfx() wrapper so it is
+        // positioned off `r.group.position` and falls off with distance like
+        // every other cue in this file.
+        if (!(game.state && game.state.noVoice2)) {
+          r.gStepT = (r.gStepT || 0) - dt;
+          if (r.gStepT <= 0) { r.gStepT = 0.38; sfx('step', r, 0.24, 1.0); }
+        }
         if (r.gT >= npcTRAV_GLIMPSE_WALK) r.gSt = 'done';
       } else if (r.gSt === 'done') {
         // REALITY CHECK: localsStep's own gateChap visibility check runs

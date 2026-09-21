@@ -1010,6 +1010,14 @@ const sysCAM_AUTO_V  = 1.8;   // m/s below which the capybara counts as stopped
 const sysCAM_IDLE_T  = 1.1;   // seconds stood still before the rig tidies itself
 const sysCAM_HAND_T  = 1.6;   // seconds the player keeps the rig after touching it
 const sysCAM_KEY_RATE = 2.4;  // rad/s on Q/R — was 1.9, which read as sticky
+// ---- A GLANCE AT A FAR MOVER (ROADMAP-WOW3, X3.2) -------------------------
+// Idle a shade longer than the ordinary tidy-up (sysCAM_IDLE_T, 1.1 s) before
+// this is allowed to touch the lens at all — the roadmap's own "capy.grounded
+// && no input for 2s" — reusing `camIdleT`, the one idle clock the rig
+// already keeps, rather than a second timer.
+const sysFAR_GLANCE_IDLE_T = 2.0;   // s, camIdleT threshold
+const sysFAR_GLANCE_NDC    = 0.82;  // |x|,|y| in clip space counting as "in frame"
+const sysFAR_GLANCE_HOLD   = 4.0;   // s the ease holds before releasing
 // ---- ...AND IT COMES BACK WHILE YOU WALK (L6, E1 / play #1) ---------------
 // The note above is right that the loop is unstable for a stick at any screen
 // angle but dead ahead — and dead ahead is the one case it IS stable, and the
@@ -22966,6 +22974,14 @@ export function createSystems(game) {
   // between a swallow and a silence, and rate-limited to one console line every
   // four seconds because the failure mode this exists for is per-frame.
   let sysSynthThrew = 0, sysSynthWhy = '', sysSynthLogT = -99;
+  // Counted, for ever, the same way capyStepN counts footfalls — nothing in
+  // src reads it, the harness does (ROADMAP-WOW3, X2's own wow3-heard.js:
+  // every internal call in this file goes through the bare `sfx(...)`
+  // closure, never through `game.sfx`, which only exists for the OTHER
+  // files to call — so a monkey-patch of `game.sfx` from outside can never
+  // observe one of this file's own cues, and this is the one door they all
+  // actually pass through).
+  const sysSfxN = Object.create(null);
   function sfx(name, opts) {
     if (muted) return;
     // ---- THE WORLD IS ONLY ALLOWED TO SPEAK WHILE IT IS BEING PLAYED ------
@@ -23208,6 +23224,11 @@ export function createSystems(game) {
     // Two voices read past the four numbers: the footfall's `mat` (audio #4)
     // and the wheek's `tuned` (audio #7). Threaded as the object rather than
     // as a sixth and seventh positional, so the next one costs nothing here.
+    sysSfxN[name] = (sysSfxN[name] || 0) + 1;
+    if (opts && opts.mat) {
+      const mk = name + ':' + opts.mat;
+      sysSfxN[mk] = (sysSfxN[mk] || 0) + 1;
+    }
     try { fn(vol, pitch, extra, wetness, opts || null); }
     catch (e) {
       // See the sysSynthThrew block. Counted, named, and said out loud at most
@@ -36387,6 +36408,37 @@ export function createSystems(game) {
     // elsewhere queues each of them rather than only the newest.
     if (grew.length) {
       try { game.events.emit('shelf:grew', { ks: grew }); } catch (e) { /* a line is not worth the shelf */ }
+      // ROADMAP-WOW3 X2: A VOICE FOR WHAT BECAME VISIBLE. One sound the
+      // moment a NEW keepsake is laid — 'chime' rather than a new voice,
+      // reusing the exact channel every other "you got something" moment in
+      // this file already plays (an upgrade bought, a personal best, a boon,
+      // a notoriety tier — grep `sfx('chime'` in this file).
+      //
+      // TWO REAL BUGS FOUND HERE, MEASURED WITH `game.sfxAudit()` (also new
+      // this pass): this same function is ALSO the one `startGame` calls
+      // SYNCHRONOUSLY, in the same tick as the Begin/Carry On click, for a
+      // restore that lands straight in Sydney (the `!landed` branch, below)
+      // — the single most common way a returning player ever sees the shelf
+      // grow, and a plain call here was measured completely silent, twice
+      // over: (1) `audioUnlock()`'s own `ac.resume()` is async and has not
+      // settled at that exact point in the SAME click handler — `sfx()`'s
+      // `ac.state !== 'running'` gate drops it outright — and (2) even
+      // deferred past that with a `setTimeout`, the same start-of-session
+      // tick is loud enough (16 voices started against the D9 ceiling's own
+      // 12, `sysVOICE_MAX`) that the ordinary per-call ceiling drops it a
+      // SECOND way (`sysVoiceDrop`, not the `lastPlay` throttle — that read
+      // `undefined`, never fired before). Every OTHER call site of
+      // sysShelfStage (an ordinary walk back into Sydney) runs long after
+      // boot, past both of those, and needs neither fix. `setTimeout(...,
+      // 80)` clears (1) — the AudioContext is reliably 'running' well inside
+      // 80 ms of `resume()` — and `force: true` clears (2), exactly the case
+      // its own comment names: "a once-a-chapter payoff can land inside
+      // somebody else's ambient [burst] and be dropped silently — which is
+      // the worst possible failure for the one sound in the chapter the
+      // player was owed." Both together, live-verified: chime count +1.
+      if (!(game.state && game.state.noVoice2)) {
+        setTimeout(function () { sfx('chime', { volume: 0.4, pitch: 1.15, force: true }); }, 80);
+      }
     }
   }
   /** The place card's one extra sentence on a Sydney return. See N1. */
@@ -36925,6 +36977,20 @@ export function createSystems(game) {
   let sysCamOkYaw = 0, sysCamOkDist = sysCAM_DEF, sysCamSaves = 0;
   const sysCamOk = new THREE.Vector3(0, sysCAM_DEF, sysCAM_DEF);
   let shotReq = null, shotAge = 0, shotW = 0, shotKill = 0;
+  // ---- X3.2: A GLANCE AT WHAT MOVED (ROADMAP-WOW3) -----------------------
+  // Built once, generically, off far.js's own published `game.far` (the
+  // LIVE chapter's farBundle handle, set every frame in its own update — see
+  // far.js: "publishes itself as game.far so the instruments find the LIVE
+  // chapter's layer"). Every chapter with a far mover gets this for free;
+  // a chapter with none simply never has `mp` and the block below no-ops.
+  // `sysFarGlanced` is a one-shot latch for the CURRENT crossing: it is set
+  // the moment the glance fires and cleared the moment the mover leaves the
+  // frustum (or stops being a candidate for any other reason), so one
+  // crossing gets one glance rather than one shotReq restart every frame —
+  // see game.frameShot's own doc: "Calling it every frame just restarts the
+  // envelope and it will never leave the ease-in."
+  let sysFarGlanced = false;
+  const sysFarGlanceV = new THREE.Vector3();
   let camDolly = 0;             // 0..1 of the run speed, damped. See sysCAM_DOLLY_P.
   let skyEyeT = 0;              // the PLAYER'S share of the skyward blend. See sysEYE_RAISE_W.
   let skyRestT = 0;             // ...and the STILLNESS's share of it. See sysREST_W.
@@ -41604,6 +41670,15 @@ export function createSystems(game) {
   };
   /** What the framing layer is doing, 0..1. Nothing in src reads it; the harness does. */
   game.framing = function () { return shotW; };
+  /** Every real (past every gate) sfx() call, counted by name, and by
+   *  'name:mat' too where a caller passed one (the footfall's own material).
+   *  Harness only — nothing in src reads it. */
+  game.sfxAudit = function () { return sysSfxN; };
+  /** X3.2's own latch and the live shot's yaw, if any. Harness only. */
+  game.farGlanceAudit = function () {
+    return { glanced: sysFarGlanced, shotW: +shotW.toFixed(3),
+             yaw: shotReq && typeof shotReq.yaw === 'number' ? +shotReq.yaw.toFixed(3) : null };
+  };
   /**
    * THE MIX, AS NUMBERS (F3). Nothing in src reads it; the harness does.
    *
@@ -47921,6 +47996,49 @@ export function createSystems(game) {
     if (!(rideYaw === rideYaw)) {
       const ra = sysLiveBiomeApi(game);
       if (ra && ra !== game.cali && typeof ra.rideYaw === 'function') rideYaw = ra.rideYaw();
+    }
+    // ---- X3.2: A GLANCE AT A FAR MOVER ------------------------------------
+    // Generic and built once: `game.far` is whichever chapter is live's own
+    // farBundle handle (far.js publishes it every frame; read-only here, this
+    // file never touches far.js). Gated on the exact same idle signal the
+    // rig's own tidy-up uses (camIdleT), a slightly longer threshold, actual
+    // ground contact, no hand on the camera and no other shot already
+    // running — "the resting camera is not mid-transition" is `shotW < 0.002`
+    // and `camHandT <= 0`, the two conditions the priority chain right below
+    // this block already uses to decide the idle branch gets the wheel at
+    // all. Below `mounted`/`sailing`/`rideYaw`, which must all be resolved
+    // first: this must never fire under a rig that owns the lens outright.
+    if (!(game.state && game.state.noLens2) && ((game.state && game.state.perfRung) | 0) === 0 &&
+        started && capy && capy.grounded &&
+        camIdleT > sysFAR_GLANCE_IDLE_T && camHandT <= 0 &&
+        !mounted && !sailing && !(rideYaw === rideYaw) &&
+        game.far && typeof game.far.audit === 'function') {
+      if (shotW < 0.002) {
+        const fa = game.far.audit();
+        const mp = fa && fa.mover;
+        let onScreen = false;
+        if (mp) {
+          sysFarGlanceV.set(mp[0], mp[1], mp[2]).project(camera);
+          onScreen = sysFarGlanceV.z < 1 &&
+                     Math.abs(sysFarGlanceV.x) < sysFAR_GLANCE_NDC && Math.abs(sysFarGlanceV.y) < sysFAR_GLANCE_NDC;
+        }
+        if (onScreen && !sysFarGlanced) {
+          sysFarGlanced = true;
+          const dx = mp[0] - r.x, dz = mp[2] - r.z;
+          // Not so close the bearing is noise (directly underfoot).
+          if (dx * dx + dz * dz > 1) {
+            game.frameShot({ yaw: Math.atan2(dx, dz) + Math.PI, hold: sysFAR_GLANCE_HOLD });
+          }
+        } else if (!onScreen) {
+          sysFarGlanced = false;
+        }
+      }
+      // shotW >= 0.002: either this glance's own hold/ease-out, or somebody
+      // else's shot — either way, leave `sysFarGlanced` exactly as it is
+      // rather than re-arm mid-hold, which would fire again the instant this
+      // shot releases while the mover is still crossing.
+    } else {
+      sysFarGlanced = false;
     }
     // ---- THE TITLE OWNS THE BEARING BEFORE THE GAME OWNS ANYTHING (T1) ---
     // Ahead of the shot rung, because nothing below can legitimately be asking
