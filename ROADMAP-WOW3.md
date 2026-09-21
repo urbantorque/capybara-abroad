@@ -548,6 +548,134 @@ to fix, and which has sat unused against the original target ever since.
 - **Instrument:** the extended mask against L11's original 19-chapter
   before/after set, one table, no new flag (measurement only).
 
+### W3 — shipped (21 Sep 2026)
+
+X1a/X1b/X1c and X4. Two commits, `c2ba220` (X1) and `a9240c4` (X4).
+
+- **X1a, the shelf in earn order — built.** One new save field, `keptAt`
+  (`sysSAVE_SHAPE`, systems.js), additive like `chapms` beside it. The
+  single real choke point turned out to be `completeTask`, not
+  `sysShelfStage`: `keepHeld(cn)` can go true two ways (`chapComplete` at
+  100%, or `chapEnough` at 70% plus the chapter's own `to-` task
+  specifically), and both changes only ever happen by a task finishing
+  there — one line, `if (cn && jrKeptAt[cn] === undefined && keepHeld(cn))
+  jrKeptAt[cn] = jrTotalMs();`, right after the ceremony's own gate, catches
+  both paths with nothing scattered. `sysShelfStage` now sorts the held
+  chapters by `keptAt` ascending (a chapter held before this field existed
+  falls back to its own chapter number, which sorts ahead of every real
+  timestamp) and hands `sysShelfSlot` the sorted RANK rather than the raw
+  chapter index — the nineteen physical slot positions are unchanged, only
+  which chapter lands in which one moves. The journal's own flat grid
+  (`game.shelfAudit`) stays in chapter order on purpose; it shows all
+  nineteen, earned or not, and a reshuffling index would be unreadable.
+  Cuts cleanly to chapter order under `game.state.noRemember`. Verified
+  live (`qa/wow3-x1a-shelf-order.js`): three saves over the same three
+  chapters (quay/venice/cave) with `keptAt` scrambled a different way each
+  time — the shelf's physical left-to-right order, read off each held
+  chapter's own keepsake prop (`physics.keepOut(biome).body.position.z`),
+  matched the earn order every time, and reverted to chapter order the
+  moment `noRemember` was set and the shelf re-staged.
+- **X1b, the world remembers — built, three chapters.** `sysWorldAwayCheck`
+  (systems.js), a genuine sibling to `sysPalAwayCheck` just above it: same
+  `sysChapLeftAt` table (already written for every chapter, not only ones
+  with a regular) and the same `sysPAL_AWAY_MS` threshold, no `jrChapPal`
+  gate at all. Arms exactly three chapters — quay, kyoto, venice — via a new
+  `game.worldAwayArm(biome)` hook into npc.js. The other sixteen are
+  correctly left out, not forgotten: every chapter's own local grows a
+  stall through npc.js's shared `addTraveller`/`npcMakeStall`, so the
+  mechanism itself works anywhere; three is what got checked live against
+  the actual resting arrival lens in the time this wave had, and a fourth
+  was not forced. **A real bug found and fixed along the way:** the first
+  build read the armed flag at `npcMakeStall`'s own build time, on the
+  doc-comment assumption that "a chapter's locals are rebuilt fresh on
+  every arrival" — measured false. `main.js`'s `toSet.built` gate means a
+  chapter is `ensureBuilt()` exactly ONCE per session; every return after
+  the first reattaches the same standing objects. Since arming structurally
+  cannot happen before a chapter has been left once — which means the
+  stall already exists — the build-time read was dead code that would
+  never see the flag in time. Fixed: `worldAwayArm` now finds the
+  already-built stall directly and repaints its roof and two stripes in
+  place (`npcSwapStall`, a material swap via `npcLocMat`'s own cache, no
+  new draw calls) the moment the door opens; the build-time branch stays as
+  a harmless fallback for the one path that would see it fresh (a failed
+  build's retry). The alternate pair is `PALETTE.cloth2`/`cloth1`, two
+  colours, both already textile tints, neither the default. Verified live
+  end to end (`qa/wow3-x1b-remembers.js`): the gate itself does not arm at
+  5 minutes and does at ~25 for all three chapters, and never arms the
+  control (pasto, at 999 minutes); quay's stall is unswapped on first
+  arrival, unswapped after a real 5-minute absence, and swapped after a
+  real ~25-minute one — read by eye too
+  (`qa/wow3-x1b-quay-short.png`/`-long.png`): the long-absence shot shows
+  the roof/stripe assembly in blue and coral where the short one does not.
+- **X1c, the companion that comes over — built.** Lives in **systems.js**,
+  not npc.js as the roadmap's own file list guessed — checked by grep
+  before writing anything: npc.js has no companion code at all, every
+  `compHOME`/`compLeave`/`compTake` reference is in systems.js. `compLeave`'s
+  own `'home'` branch now also records `compWentHome[kind] = compFrom`
+  (session-only, like `sysChapLeftAt`) at the one moment a kind is
+  genuinely sent home. `stowUpdate` gained one new idle-only check: nothing
+  currently held, standing in a biome some kind was sent home to, within
+  `compHOME_NEAR` (8 m — the same order as a local's own default `near`) of
+  `compHOME[kind]` — and it reuses the EXACT beat the save-restore branch
+  a few lines above it already uses (`compTake`, then `compState =
+  'follow'`), not a new one; the ordinary follow logic already in this
+  function closes the rest of the distance on its own. Cuts under
+  `noRemember`. Verified live for two kinds
+  (`qa/wow3-x1c-comes-over.js`, W6's own save-forced-stow pattern): pigeon
+  (venice) and heron (kyoto) both sent home and confirmed cleared
+  (`kind: null`), teleported to within 3 m of their own `compHOME`, and
+  both picked themselves back up as a follower unprompted — held stable a
+  second read 1.5 s later, not a one-frame flicker.
+- **X4, the still frame, closed — measured, not chased.** No src/ edits.
+  The 9 chapters L11's Closed section traced to the old mask were derived
+  exactly rather than hand-copied: every chapter whose `movedPct` ROSE
+  between `qa/wow-still.json` (the pre-A3 "before" floor, still on file)
+  and `qa/wow-still-after.json` (A3's own after-sweep, old mask) — sydney,
+  pasto, cali, kowloon, goreme, manly, cave, antarctic, hanoi, exactly nine,
+  and the three largest increases (hanoi +185%, cave +176%, manly +57%) are
+  exactly the three ROADMAP-WOW.md names "the worst". Re-measured each
+  live against W0's extended mask (`qa/wow3-x4-still-remeasure.js` — the
+  algorithm in `qa/wow2-still-mask.js`, adapted to loop chapters directly
+  against this wave's dev server rather than that script's own
+  port-5189/`chapter.txt` driver, which this wave's port-5188 setup cannot
+  reach) and compared fresh against the SAME original "before" floor.
+  **6 of 9 now meet −40 %:** sydney −73 %, pasto −65 %, cali −41 %,
+  kowloon −100 %, goreme −92 %, cave −75 %. **3 do not:** manly +208 %,
+  antarctic +295 %, hanoi +36 % (down sharply from +165 % under the old
+  mask — the extended mask genuinely helps here, it is just not enough).
+  Hanoi's remaining gap reads as real: traffic the extended mask does not
+  fully catch (a moving train/lane recycled rather than newly spawned, so
+  it never trips the "moved > 1 cm" instance test the mask uses). Manly and
+  antarctic are the honest miss of this item: under the SAME live session,
+  the extended mask (hiding a strict superset of what the old one hides)
+  produced a LARGER diff than the old mask did, which should not happen if
+  the excess were purely masked motion — measured, not explained, and
+  named here rather than guessed at or chased with a new suppression term.
+- **Budget.** No new `game.state.noX` flag beyond `noRemember` (X1's own,
+  covering the shelf sort, the world-difference arm and the companion
+  approach in one). No new per-frame term and no new draw calls: the shelf
+  sort is a comparator over ≤19 items run at Sydney arrival, the stall
+  repaint is a one-time material reassignment reusing an existing cache,
+  and the companion's approach reuses the existing follow-movement code
+  path entirely. X4 added no runtime cost at all (measurement only).
+
+**Miss, named plainly:** X1b shipped three chapters, not "every chapter
+that has one" — a deliberate scope cut for what could be checked live in
+the time this wave had, not a technical limit (see X1b's own note on why
+the mechanism generalises). X4's manly/antarctic misses are measured and
+unexplained, not root-caused; hanoi's is explained (real remaining
+traffic) but not closed. **For W4:** `game.worldAwayArm(biome)` (npc.js) is
+the exact hook name if X3's Sydney-arrival-ease or far-mover-glance work
+needs to coexist with a stall repaint on the same arrival — they should
+not collide (the ease/glance are camera-only, this is geometry-only), but
+both now fire off the same `biome:enter` payload. This wave's systems.js
+edits (`sysWorldAwayCheck` beside `sysPalAwayCheck`, ~line 35660;
+`jrKeptAt`/the completeTask hook, ~line 35410-35470; `sysShelfStage`'s sort,
+~line 36350; `compWentHome`/the stowUpdate check, ~line 43160-43600) sit in
+a different region from W2's opening/finale code (`sysOpeningPlay`,
+`compHOME`/`compLeave`'s own D7 edit) and from W1's own touches — confirmed
+by reading the diff, not assumed.
+
 ## Order and ownership
 
 Four waves, matching the file-exclusivity discipline that held clean for
