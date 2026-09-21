@@ -63,8 +63,18 @@ navigation and musical live-state semantics. Reuse the existing marquee and
 Verify earned first completion, successful/missed encore, leaving the stage,
 transition, pause/resume and mid-countdown fallback. An ordinary completed-task
 publisher must remain hidden. Stationary and narrow-screen screenshots must
-show the action without the checklist's tuck logic losing it. This is planned,
-not shipped; E5 validation remains the current source-edit checkpoint.
+show the action without the checklist's tuck logic losing it. D3 is under live
+validation; E5/G shipped in checkpoint `3993dd6`.
+
+D4 candidate after D3: the signature-completion card repeats the completed
+instruction across the centre of the authored reward shot. Use an explicit
+earned-card mode on the existing place card, separate from arrival/act-break
+titles. Smaller upper-right title, close-fitting paper backing, no obsolete
+subtitle/rule; keep the existing 3.6-second reading time, camera and reward
+audio. `noEarnedCard`/rung one restores the full inherited card. No new save
+state. Compare pinned desktop/narrow earned/cut images, long titles, ordinary
+arrival parity and protected lessons. Do not hide or consume protected speech
+to improve a screenshot; resolve any narrow overlap before accepting layout.
 
 ## Seven standards
 
@@ -562,3 +572,25 @@ work. A green static suite is necessary and never a claim of perfection.
   38 suite checks pass, zero failed. Independent source review found no new
   concrete regression. Historical soak staleness remains informational and
   does not count as fresh runtime coverage.
+- D3 initial natural concert passes: explicit encore readout survives task
+  completion, trusted Q earns the existing fireworks/glow, display then closes.
+  Musical live state remains -1 after task completion. Missed encore closes
+  without reward. Browser pause case exposed a retained readout behind the
+  overlay; added an explicit paused-state gate and queued a fresh rerun.
+  721 shipped-helper cases plus publisher ownership and sixteen actual HUD
+  gate combinations pass. Narrow-screen and transition acceptance remain open.
+- D3 pause rerun passes: readout hides, resumes with remaining game-time window,
+  flag/rung restores and Q still earns the reward. Screenshot review found the
+  wallet temporarily covering the action between its inherited 350ms position
+  polls. The existing docking function now runs on continuation-state changes
+  after the paper's tuck update. Added a wallet/readout intersection assertion;
+  fresh browser checks pending. No independent position writer.
+- D3 corrected controls, outgoing transition, 390px success and stage departure
+  pass with zero errors and zero wallet/readout intersection. Actual podium
+  predicate confirms departure; no reward on expiry. Both widths inspected.
+  CPU eligibility-gate p95 .000020ms for flag/rung, excluding inherited
+  HUD/layout/GPU; 1,010,000 calls per mode. The large inherited celebration
+  card overlaps expanded paper on narrow screens; D4 remains open.
+- D3 checkpoint: edited-source/instrument syntax, fresh one-file build and
+  39 suite checks pass, zero failed. Independent source review found no new
+  concrete regression. Historical soak remains stale, not current coverage.

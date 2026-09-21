@@ -1,3 +1,29 @@
+## REIMAGINE D3 — THE ENCORE STAYS READABLE (21 Sep 2026)
+
+Sydney explicitly opts its post-concert countdown into a display-only
+continuation. Completed-task navigation, proximity cues and musical live state
+remain unchanged. The current biome, matching completed task and existing .7s
+publisher watchdog own the readout; ordinary publishers clear the opt-in.
+`noEarnedFocus` or rung one restores inherited presentation. Pause hides it,
+travel clears it, and its active action prevents automatic checklist tucking.
+No new save fields, reward logic or countdown clock.
+
+Natural desktop and 390px concert runs keep the encore instruction visible;
+trusted Q still earns the existing fireworks and glow. A missed window closes
+without reward. Flag/rung cut and restore, pause/resume and outgoing transition
+checks pass with zero runtime errors. Initial testing exposed a paused readout
+behind the overlay and a wallet overlapping the new line between its 350ms
+polls. Explicit pause gating and event-driven use of the existing wallet dock
+fix both. Fresh live samples have zero wallet/readout rectangle intersection.
+The large inherited completion banner still needs its separate D4 layout pass.
+
+721 shipped-helper cases, publisher ownership checks and sixteen actual HUD
+eligibility combinations pass. Browser screenshots were inspected at both
+widths. These checks cover Sydney's opted-in encore, not every repeatable
+encounter or all narrow-screen HUD states.
+Hardware-browser eligibility-gate CPU p95 is .000020ms for both flag and rung
+cuts across 1,010,000 calls each, excluding inherited HUD/layout/GPU work.
+
 ## REIMAGINE E5 — CLEAR FOREGROUND (21 Sep 2026)
 
 The inherited lens aperture retained three of sixteen foreground pixels over

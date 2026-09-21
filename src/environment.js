@@ -3892,7 +3892,7 @@ export function createEnvironment(game) {
         }
         if (envEncoreT > 0) {
           envEncoreT -= dt;
-          if (typeof game.wowLive === 'function' && !envEncoreDone) game.wowLive('THE ENCORE · wheek once more · ' + Math.ceil(envEncoreT) + ' s', 1);
+          if (typeof game.wowLive === 'function' && !envEncoreDone) game.wowLive('THE ENCORE · wheek once more · ' + Math.ceil(envEncoreT) + ' s', 1, 'opera-stage');
         }
         // ---- the answer, a beat after the note (L5) ------------------------
         if (envAnswerT >= 0) {

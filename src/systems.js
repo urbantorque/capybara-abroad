@@ -1267,6 +1267,11 @@ const sysWOW_SLOW_T  = 0.75;
 // flourish. The watchdog closes it, so a chapter that stops calling cannot
 // leave the paper saying NOW.
 const sysWOW_LIVE_STALE = 0.7;   // s since the last wowLive() before it closes
+// D3: an earned follow-up owns only its readout, never the task or score.
+function sysEarnedLive(id, ownerBiome, biome, done, sameChapter, line, age, cut, rung, transition) {
+  return !!(id && ownerBiome && ownerBiome === biome && done && sameChapter && line &&
+    Number.isFinite(age) && age >= 0 && age < sysWOW_LIVE_STALE && !cut && (rung | 0) < 1 && !transition);
+}
 const hkROOF_HINT = 30;          // m: above this in Hong Kong you are on the roof (X2)
 // ---- THE MIX, MEASURED (S2). See qa/s1-spectrum.js and qa/s1-sfx.js. ------
 // ---- ...AND THE LID, LIFTED (L7, E1 / audio #4) -----------------------------
@@ -10059,6 +10064,7 @@ function sysBuildCSS() {
 '.capyui-marq{display:none;grid-template-columns:auto 1fr;gap:1px 7px;',
   'margin:4px 0 8px;padding:0 0 8px;border-bottom:1px dashed ' + paper2 + ';}',
 '.capyui-marq.on{display:grid;}',
+'.capyui-marq.continuation{display:grid;}',
 '.capyui-marqtier{grid-column:1;grid-row:1;align-self:center;color:' + ink + ';',
   'font-size:clamp(9.5px,1.55vw,13px);line-height:1;}',
 /* the words beside the star (V2): the kicker's register at the label size,
@@ -10121,6 +10127,7 @@ function sysBuildCSS() {
 '.capyui-marqbar i{display:block;height:100%;width:0;background:' + accentInk + ';',
   'transition:width .25s linear;}',
 '.capyui-marq.live .capyui-marqtxt,.capyui-marq.live .capyui-marqsay{display:none;}',
+'.capyui-marq.continuation .capyui-marqhow{display:none;}',
 '.capyui-marq.live .capyui-marqlive{display:block;}',
 '.capyui-marq.live.bar .capyui-marqbar{display:block;}',
 '.capyui-marq.live .capyui-marqhead{color:' + accentInk + ';}',
@@ -26076,13 +26083,13 @@ export function createSystems(game) {
     const stopped = spd < sysTUCK_V;
     if (busy || todoAwayHold > 0 || !stopped) todoAwayT = 0;
     else todoAwayT += dt;
-    const want = todoAwayT > sysTUCK_AFTER;
+    const want = !wowEarnedOn && todoAwayT > sysTUCK_AFTER;
     if (want !== todoAway) {
       todoAway = want;
       todoEl.classList.toggle('away', want);
     }
     // the marquee's own state (L4, E4): see the .marq rule
-    const wantMarq = !busy && !want && (wowLiveOn || !!(game.capy && game.capy.atHelm));
+    const wantMarq = !busy && !want && (wowLiveOn || wowEarnedOn || !!(game.capy && game.capy.atHelm));
     if (wantMarq !== todoMarq) { todoMarq = wantMarq; todoEl.classList.toggle('marq', wantMarq); }
     if (want) {
       const top = taskRec[todoTopId];
@@ -26226,11 +26233,17 @@ export function createSystems(game) {
   let wowLiveT = -1;
   let wowLiveSince = 99;
   let wowLiveOn = false;
+  let wowLiveDisplay = false;
+  let wowEarnedId = '', wowEarnedBiome = '', wowEarnedOn = false;
   let wowLiveBar = -1;           // last width written, in whole per cent
-  function wowLive(line, t) {
+  function wowLive(line, t, continuationTaskId) {
     wowLiveLine = String(line || '');
     wowLiveT = (typeof t === 'number' && t === t) ? clamp(t, 0, 1) : -1;
     wowLiveSince = 0;
+    // Explicit opt-in: a repeat ride is not automatically an encore. Ordinary
+    // publishers release the owner; the same watchdog closes both readouts.
+    wowEarnedId = typeof continuationTaskId === 'string' ? continuationTaskId : '';
+    wowEarnedBiome = wowEarnedId && game.biome ? game.biome.current : '';
   }
   game.wowLive = wowLive;
   /** Is a marquee under way right now, and how far through (0..1, or -1). */
@@ -50183,13 +50196,36 @@ export function createSystems(game) {
     // on the one live instrument the paper has would read as a fault.
     wowLiveSince += (game.state.rawDt || dt);
     const wl = !!marqId && wowLiveSince < sysWOW_LIVE_STALE;
-    if (wl !== wowLiveOn) {
-      wowLiveOn = wl;
-      marqHeadEl.textContent = wl ? 'the big one · now' : 'the big one here';
-      marqEl.classList.toggle('live', wl);
-      if (!wl) { wowLiveBar = -1; marqLiveEl.textContent = ''; }
+    wowLiveOn = wl;
+    // The concert pays before its encore. Keep that action visible without
+    // reopening its task, proximity cue, musical bed or narration channel.
+    const earnedBio = game.biome ? game.biome.current : '';
+    if (transBusy || wowEarnedBiome !== earnedBio) { wowEarnedId = ''; wowEarnedBiome = ''; }
+    let earned = false;
+    if (!game.state.paused && !game.state.noEarnedFocus && (game.state.perfRung | 0) < 1 && wowEarnedId) {
+      const r = taskRec[wowEarnedId];
+      earned = sysEarnedLive(wowEarnedId, wowEarnedBiome, earnedBio, r && r.done,
+        !!(r && r.def && r.def.chapter === chapterOf(earnedBio)), wowLiveLine,
+        wowLiveSince, game.state.noEarnedFocus, game.state.perfRung, transBusy);
     }
-    if (wl) {
+    const earnedChanged = earned !== wowEarnedOn;
+    if (earnedChanged) {
+      wowEarnedOn = earned;
+      marqEl.classList.toggle('continuation', earned);
+      if (earned) {
+        const d = taskRec[wowEarnedId].def;
+        marqNameEl.textContent = sysSay(typeof d.wow === 'string' ? d.wow : d.text);
+        wowLivePaintT = 1;                    // the action arrives on this frame
+      }
+    }
+    const displayLive = wl || earned;
+    if (displayLive !== wowLiveDisplay || earnedChanged) {
+      wowLiveDisplay = displayLive;
+      marqHeadEl.textContent = displayLive ? 'the big one · now' : 'the big one here';
+      marqEl.classList.toggle('live', displayLive);
+      if (!displayLive) { wowLiveBar = -1; marqLiveEl.textContent = ''; }
+    }
+    if (displayLive) {
       // ...at eight a second, not sixty: the five vehicle marquees rewrite the
       // metres every frame, and a text node replaced per frame is a layout
       // per frame (L3 audit)
@@ -50359,6 +50395,8 @@ export function createSystems(game) {
       sysArmedTick();
     }
     todoTuckTick(dt);
+    // The earned readout changes the paper between the wallet's slow polls.
+    if (earnedChanged) yuzuWalletReposition();
     // the riddle's clock (L3-14): the arrow comes on its own after a while
     if (!riddleShown && started && !game.state.paused && !transBusy) {
       riddleT += dt;

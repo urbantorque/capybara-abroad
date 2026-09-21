@@ -38,6 +38,7 @@ const ASSERTS = [
   ['qa/reimagine-head.mjs', 'finite head contours with preserved anatomical extents', ['--static']],
   ['qa/reimagine-camera.mjs', 'deliberate stillness and player-owned camera priority'],
   ['qa/reimagine-clear-view.mjs', 'clear foreground aperture and inherited shader fallbacks', ['--static']],
+  ['qa/reimagine-encore.mjs', 'earned encore visibility without reopening task or score state'],
   ['qa/reimagine-boarding.mjs', 'held talon pickup, release latch and inherited flight feedback'],
   ['qa/reimagine-kyoto.mjs', 'Gion frontage rhythm with unchanged roofs, ground and colliders', ['--static']],
   ['qa/strip-test.mjs',   'the comment stripper: 16 cases plus every source file re-parsed'],
