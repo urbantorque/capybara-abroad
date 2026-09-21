@@ -92,7 +92,8 @@ for (const ch in last.chapters) {
   }
 }
 const okNow = last.ok || {};
-const okLine = Object.keys(okNow).map(k => k + ' ' + (okNow[k] ? 'ok' : 'FAIL')).join('  ');
+const skippedNow = new Set(last.skipped || []);
+const okLine = Object.keys(okNow).map(k => k + ' ' + (skippedNow.has(k) ? 'skipped' : okNow[k] ? 'ok' : 'FAIL')).join('  ');
 console.log('soak-diff: ' + last.commit + ' (' + String(last.date).slice(0, 16).replace('T', ' ') + ') against the median of ' + base.length + ' earlier row' + (base.length === 1 ? '' : 's') + '  |  ' + okLine);
 if (!moves.length) {
   console.log('soak-diff: no column moved more than ' + Math.round(SOAK_TOL * 100) + ' % — ' + Object.keys(last.chapters).length + ' chapters, ' + Object.keys(COLS).length + ' columns');

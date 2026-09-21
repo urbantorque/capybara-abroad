@@ -29,6 +29,7 @@ const artifactName = name => {
 
 export async function openHarness({ url = 'http://localhost:5188/',
   width = 1280, height = 760, deviceScaleFactor = 1,
+  hasTouch = false, isMobile = false,
   channel = process.env.CAPY_QA_CHANNEL || 'msedge', storage = {},
   pinRung = true } = {}) {
   const { chromium } = playwright();
@@ -38,7 +39,7 @@ export async function openHarness({ url = 'http://localhost:5188/',
     const origin = new URL(url).origin;
     const entries = { ...storage };
     if (pinRung && !Object.hasOwn(entries, 'capy3.prefs.v1')) entries['capy3.prefs.v1'] = { v: 1, pf: 1 };
-    const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor,
+    const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor, hasTouch, isMobile,
       // Seed only at context creation; reload tests must retain later writes.
       storageState: { cookies: [], origins: [{ origin, localStorage:
         Object.entries(entries).map(([name, value]) => ({ name,
@@ -47,6 +48,7 @@ export async function openHarness({ url = 'http://localhost:5188/',
     page.setDefaultTimeout(20000);
     const errors = [], warnings = [], requests = [];
     page.on('pageerror', e => errors.push({ kind: 'pageerror', message: String(e.stack || e) }));
+    page.on('crash', () => errors.push({ kind: 'crash', message: 'Owned browser page crashed' }));
     page.on('console', m => {
       if (m.type() === 'error') errors.push({ kind: 'console', message: m.text() });
       if (m.type() === 'warning') warnings.push(m.text());
@@ -65,7 +67,7 @@ export async function openHarness({ url = 'http://localhost:5188/',
         version: gl.getParameter(gl.VERSION), hidden: document.hidden };
     });
     const metadata = { at: new Date().toISOString(), browser: browser.version(), channel,
-      headless: false, viewport: { width, height, deviceScaleFactor }, renderer,
+      headless: false, viewport: { width, height, deviceScaleFactor, hasTouch, isMobile }, renderer,
       gpu: system.gpu, errors, warnings, requests };
     const hold = async (key, ms = 350) => {
       if (ms < 1 || ms > 20000) throw new Error('Key hold must be 1–20000 ms.');

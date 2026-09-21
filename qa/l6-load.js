@@ -25,7 +25,8 @@ async page => {
   }
   await page.waitForTimeout(1500)
   const tBegin = Date.now()
-  await page.evaluate(() => { const b = document.querySelector('.capyui-go'); if (b) b.click() })
+  await page.evaluate(() => { const b = document.querySelector('.capyui-carry') || document.querySelector('.capyui-go'); if (b) b.click() })
+  await page.keyboard.press('Shift')
   let tStarted = -1
   for (let i = 0; i < 80; i++) {
     await page.waitForTimeout(100)
@@ -33,6 +34,7 @@ async page => {
     if (s) { tStarted = Date.now() - tBegin; break }
   }
   await page.waitForTimeout(5000)
+  if (tStarted < 0) throw new Error('load probe never started the game')
   const names = ['pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland',
                  'sahara', 'drift', 'venice', 'kowloon', 'palawan', 'goreme',
                  'manly', 'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi', 'sydney']
@@ -79,6 +81,7 @@ async page => {
           frames: gaps.length, rung: g.state.perfRung, lastError: g.state.lastError || null }
       }, { name: n, win: lap === 0 ? 9000 : 6000 })
       rows.push(r)
+      console.log('load lap ' + (lap + 1) + ' ' + n + ' ' + JSON.stringify({ ok: r.ok, maxAfter: r.maxAfter, rung: r.rung }))
     }
     laps.push(rows)
   }

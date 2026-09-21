@@ -1,3 +1,53 @@
+## REIMAGINE D10/D11/G — RELEASE AND REBOUND (21 Sep 2026)
+
+Interrupted touch controls release through shared event-only helpers. Pause,
+blur and backgrounding neutralise published input without waiting for another
+tick; keyboard/mouse/pad takeover clears touch state. Capture loss follows the
+existing local release paths. Normal tap buffers, other-device ownership and
+idle accessibility toggles remain. No new save field, visual/audio term or
+per-frame polling. 102 extracted-helper checks pass. Trusted mobile contacts
+pass all 17 cases in four owned hardware-browser shards, zero runtime errors.
+The initial after-run crashed Edge on navigation nine; it is not a pass and
+the cause remains unassigned. Lead inspected stick release before/after images.
+
+Rio's full fuzz reached 44.2 m/s; an isolated replay reproduced a grounded
+58.2 m/s runaway during unmounted bird contacts. The collision callback added
+its shove toward the obstacle. Correct the wall/person/dynamic rebound signs,
+reject separating contacts, and bound repeated dynamic additions by the
+existing six-metre/second component limit. Authored strengths, flight, release
+momentum and the general 30 m/s fuzz threshold stay unchanged. 196 tests execute
+the actual callback with real Cannon ContactEquations, both body orders and
+eight bearings. Repeated-event tests prove aggregate bounds, not callback
+cadence. Two fresh Rio replays pass at 27.6/25.6 m/s overall and 12.71/15.00
+grounded, with riding exercised and zero NaN/void frames. A separate pre-fix
+33.7 m/s ballistic fall is distinguished from the grounded runaway.
+
+The direct headful soak adapter preserves the existing probes and records GPU,
+browser, runtime errors and clean/fresh exits. Its full 23.7-minute pre-fix run
+started all 19 places and completed both transition laps with zero runtime
+errors; it failed Rio's speed gate and a newly strengthened audio assertion.
+That audio assertion mistakenly treated a boolean as an AudioContext; it now
+reads the existing mix-state diagnostic. Failed history remains. Quay's 350 ms
+post-fade frame and the unresolved full-run status remain visible, not hidden
+by static test success. Git provenance no longer mistakes stderr warnings
+about the global ignore file for dirty game source.
+
+Kyoto's fresh real-control pond, three-gate river/chute and matcha route passes
+with all tasks/memory saved and reloaded, zero runtime errors. The reward powder
+has cleared after 4.67 game seconds; lead inspected the unobscured animal beside
+the mill. Keep the existing world visuals. Earlier failed navigation went into
+solid shop rows, the Zen wall and the bowl rim; the driver route was repaired.
+
+Natural Pasto summon, held-E pickup, eight real wingbeat presses, twelve-second
+signature and held release also pass after the repairs, zero runtime errors;
+lead inspected the airborne signature. Syntax, 6999.3 KB one-file build and
+48 suite checks pass. The older tutorial fixture counts its delegated release
+call while the new helper probe owns detailed input assertions.
+The corrected offline-audio rerun passes all three running contexts, worklets
+ready, 14 standalone-file Rio string notes and zero throws/runtime errors.
+Its history row explicitly skips fuzz/load; reports distinguish those from
+failures. A complete post-repair soak is still required.
+
 ## REIMAGINE D9/E9/G — THE DISC AND THE PHO STALL (21 Sep 2026)
 
 The manta's rectangular trunk/head becomes a closed tapered disc welded to

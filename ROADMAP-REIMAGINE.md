@@ -896,3 +896,86 @@ work. A green static suite is necessary and never a claim of perfection.
   with E9 explicitly cut. Historical soak staleness remains informational;
   the pending Kyoto settled-reward screenshot driver is excluded from this
   checkpoint until a fresh complete route reaches that added capture.
+- Checkpoint 724d3fd pushed to codex/redesign-delight; public master unchanged.
+- G runtime gate: preserve the existing long 19-place fuzz, two-lap crossing
+  timing and offline string-worklet probes. The historical command launcher
+  is absent here, so use the established direct headful Edge harness, retain
+  CLI as an explicit option, and update probe startup to the current title
+  controls. Record hardware/browser provenance and original failure gates.
+  A complete run takes about 25 minutes, not the stale six-minute comment.
+  Synthetic fuzz, body rescue fixtures and frame stepping are disclosed;
+  they do not substitute for the separately recorded natural-control routes.
+- G Kyoto settled reward pass: full route, all three river gates/chute, matcha
+  and save/reload pass with zero runtime errors. The successful driver uses
+  the open end of Gion, passes south of the Zen wall, and approaches the mill
+  outside the giant bowl rim; no jumps or detours were needed on that run.
+  At 4.67 game seconds after reward, the powder cloud is gone and the animal
+  is unobscured beside the mill. Lead inspected the settled image. Preserve
+  the world/reward visuals; earlier failures were driver paths through solids.
+- D10 investigation: source-only touch review finds incomplete held-input
+  clearing on pause, blur and backgrounding. Before implementing any change,
+  exercise real touch contacts, cancellation, capture loss and touch-to-keyboard
+  switching in a fresh mobile-emulated hardware browser. A confirmed input
+  release repair is core interaction correctness, not an optional visual term.
+- G full hardware soak on 724d3fd: 23.7 minutes, all 19 fuzz chapters started,
+  no NaN/void frames and zero browser runtime errors; both 19-place crossing
+  laps completed. Not a clean soak: Rio reached 44.2 m/s against the unchanged
+  30 m/s ceiling. Targeted velocity/contact/carrier tracing precedes any fix.
+  Quay also recorded a 350 ms post-crossing frame on lap one, retained for the
+  performance pass. Historical timing comparisons have different scene/input
+  histories and are reports, not claims of a measured same-scene speedup.
+- G offline-audio probe correction: its new context assertion read `.state`
+  from `audioBuses().ac`, which is a boolean. The string worklet was ready in
+  all three cases, with 13 Rio notes and zero thrown errors. Read the existing
+  `mixAudit().state` instead and rerun; do not alter game audio for a bad probe.
+  The first failed history row remains intact. Its `+` suffix came from a Git
+  global-ignore stderr warning, not dirty game source; future provenance uses
+  stdout only and rejects a failed source-status command.
+- D11 collision correctness: isolated Rio replay v2 reproduces 58.2 m/s on
+  the ground, unmounted, with repeated dynamic bird contacts. The actual
+  collision callback fails a real Cannon-normal directional test: its added
+  shove points into the other body. Correct wall/person/dynamic rebound signs,
+  reject separating contacts and give repeated dynamic contact entries the existing
+  six-metre/second external-shove component bounds. Preserve all authored
+  strengths, flight dynamics and natural release momentum; no optional bug
+  flag or per-frame subsystem. The extracted callback now passes 196 checks.
+  Browser acceptance is pending. A separate v3 trace exceeds 30 m/s during a
+  real ballistic drop from about 18m; that is not the grounded v2 runaway and
+  must not be repaired by clamping the animal's entire velocity.
+- D10 touch acceptance: corrected before-fixture confirms all four held
+  controls persist after capture loss, the joystick survives final release,
+  keyboard takeover hides a still-active stick, and all four pause cases
+  retain input/pressed UI. Normal end/cancel cases already passed. The fixture
+  now explicitly processes capture and ends the intended CDP contact; earlier
+  fixture failures are not counted as game defects.
+  Event-only repair shares touch/context release across pause, blur, hidden
+  state and device takeover; lost capture uses existing local release paths.
+  Normal tap buffering, other-device ownership and idle accessibility toggles
+  survive. Actual helper/callback probes pass 102 checks. The first full
+  after-run passed eight cases then Edge crashed on the ninth navigation;
+  browser acceptance is being repeated in isolated four/five-case shards.
+  Do not count that crashed run as a pass or diagnose its cause from this alone.
+- D11 two fresh Rio fuzz replays after repair pass: overall peaks 27.6/25.6
+  m/s, grounded peaks 12.71/15.00 m/s, with 1000/806 mounted samples and zero
+  NaN/void frames. Same stimulus generator, not deterministic same-frame
+  before/after physics. Cannon source independently confirms normal/closing
+  conventions and body-pair entry event cadence; the synthetic repeated-event
+  unit test measures the channel bound, not a claim of per-contact dispatch.
+- D10 hardware acceptance passes all 17 cases across four owned browser shards:
+  joystick five, action/jump/honk four each. End, cancellation, actual capture
+  loss and pause release correctly; keyboard takeover clears the joystick.
+  Zero runtime errors in the completed shards. Lead read before/after capture
+  images and verified the active stick visual disappears after interruption.
+  This establishes input correctness, not a clean 17-navigation stress run.
+- D10/D11 regression gates: natural Pasto summon, held-E pickup, eight real
+  wingbeat presses, twelve-second signature and held release pass with zero
+  runtime errors. Lead inspected the airborne signature image. Syntax checks,
+  one-file build (6999.3 KB, 8453 top-level declarations, no collisions) and
+  48 suite checks pass, zero failed. The older tutorial fixture now stubs and
+  counts the delegated release call; release behavior is executed separately
+  by the 102-check input probe. Corrected offline-audio rerun remains pending.
+- G corrected offline-audio rerun passes all three running contexts, worklet
+  ready, 14 standalone-file Rio string notes, zero throws/runtime errors.
+  The history row explicitly skips fuzz/load; reporting now prints "skipped"
+  rather than mislabelling those unrun probes as failures. This partial rerun
+  does not replace the still-pending full post-repair soak.

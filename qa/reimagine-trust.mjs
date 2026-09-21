@@ -44,6 +44,7 @@ const t = vm.createContext({
   pauseSync: noop, uiSfx: noop, musDuck: noop, document: { activeElement: null, hidden: false },
   keys: {}, mouseAction: false, dragId: -1, sysPinchPts: new Map(), sysPinchD: 0,
   sysDragLastX: null, touchSlide: false, touchBack: false, touchLook: false, sysBufClearAll: noop,
+  inputReleases: 0, sysInputRelease() { t.inputReleases++; }, // input behavior has its own extracted-helper probe
   pauseReturnFocus: null, jrShown: false, ledShown: false, albShown: false,
 });
 for (const name of ['tutLive', 'tutEnd', 'tutReplay', 'tutBeatClose', 'tutSkip', 'pauseShow', 'pauseHide']) {
@@ -54,6 +55,7 @@ check('Pause preserves the active lesson and leaves the save unfinished', () => 
   assert.equal(t.game.state.paused, true);
   assert.equal(t.tutLive(), true); assert.equal(t.tutEver, false); assert.equal(t.tutBeat, 1);
   assert.equal(t.saves, 0); assert.equal(t.pauseTutSkip.hidden, false);
+  assert.equal(t.inputReleases, 1, 'pause delegates input release without ending the lesson');
 });
 check('Resume returns to the same lesson and counters', () => {
   t.pauseHide();

@@ -4778,7 +4778,7 @@ export function createCapybara(game) {
     const ud = other.userData;
     const who = ud && (ud.npc || ud.local);
     if (who && other.mass === 0) {
-      const nv = Math.abs(c.getImpactVelocityAlongNormal());
+      const nv = c.getImpactVelocityAlongNormal();
       if (nv < capyBARGE_V) return;
       if (Math.abs(c.ni.y) > capyBONK_NY) return;
       const nowB = game.state.time;
@@ -4795,7 +4795,7 @@ export function createCapybara(game) {
       if (capyPop > -0.14) capyPop = -0.14;
       if (capyPopVel > -2.2) capyPopVel = -2.2;
       const bsB = clamp(nv * 0.08, 0.25, 1.1);
-      const bsignB = (body === c.bi) ? 1 : -1;
+      const bsignB = (body === c.bi) ? -1 : 1;
       capyShove.x += c.ni.x * bsB * bsignB;
       capyShove.z += c.ni.z * bsB * bsignB;
       capyEarFlick = 1;
@@ -4807,7 +4807,7 @@ export function createCapybara(game) {
       return;
     }
     if (other.mass === 0) {
-      const nv = Math.abs(c.getImpactVelocityAlongNormal());
+      const nv = c.getImpactVelocityAlongNormal();
       if (nv < capyBONK_V) return;
       if (Math.abs(c.ni.y) > capyBONK_NY) return;
       const now = game.state.time;
@@ -4825,7 +4825,7 @@ export function createCapybara(game) {
       if (capyPop > -0.26) capyPop = -0.26;
       if (capyPopVel > -3.5) capyPopVel = -3.5;
       const bs = clamp(nv * 0.16, 0.5, 2.2);
-      const bsign = (body === c.bi) ? 1 : -1;
+      const bsign = (body === c.bi) ? -1 : 1;
       capyShove.x += c.ni.x * bs * bsign;
       capyShove.z += c.ni.z * bs * bsign;
       capyEarFlick = 1;
@@ -4833,12 +4833,16 @@ export function createCapybara(game) {
     }
     if (other.mass < 0.8) return;
     const v = c.getImpactVelocityAlongNormal();
-    if (Math.abs(v) < 2.0) return;
+    if (v < 2.0) return;             // a separating pair is already leaving
     const n = c.ni;
-    const s = clamp(Math.abs(v) * other.mass / 30, 0, 4.5);
-    const sign = (body === c.bi) ? 1 : -1;
-    capyShove.x += n.x * s * sign;
-    capyShove.z += n.z * s * sign;
+    const s = clamp(v * other.mass / 30, 0, 4.5);
+    // Cannon's normal points out of bi. Rebound away from the other body;
+    // the old sign pulled into it and fed repeated bird contacts in Rio.
+    const sign = (body === c.bi) ? -1 : 1;
+    // Repeated contact entries share shove()'s existing six-metre/second
+    // component bounds instead of stacking an unbounded tail.
+    capyShove.x = clamp(capyShove.x + n.x * s * sign, -capySHOVE_MAX, capySHOVE_MAX);
+    capyShove.z = clamp(capyShove.z + n.z * s * sign, -capySHOVE_MAX, capySHOVE_MAX);
   });
 
   // ===================================================================

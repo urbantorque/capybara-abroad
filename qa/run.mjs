@@ -114,6 +114,8 @@ const ASSERTS = [
   // glyph and its off-map arrow, the paper's sysSHOP_ID row gated on
   // chapDoneHere and cheapestUnowned(), and no new save key.
   ['qa/l9-shop-static.mjs', 'the shop: the shared stall, the map glyph, the paper row, no new save key'],
+  ['qa/reimagine-collision-shove.mjs', 'collision rebounds: real Cannon normals, separating contacts, bounded repeated shoves'],
+  ['qa/reimagine-touch-reset.mjs', 'touch release: capture loss, context interruption, device ownership and toggle preservation'],
   ['build.mjs',           'the one-file build: wraps, splices, no collisions, writes dist/'],
 ];
 const REPORTS = [

@@ -26035,11 +26035,7 @@ export function createSystems(game) {
     // camera with, and any half-finished pinch, have no such guarantee. Same
     // clear the blur handler does, for the same reason: nothing may still be
     // held down across a card that took the input away.
-    for (const k in keys) keys[k] = false;
-    mouseAction = false; dragId = -1;
-    sysPinchPts.clear(); sysPinchD = 0; sysDragLastX = null;
-    touchSlide = false; touchBack = false; touchLook = false;
-    sysBufClearAll();
+    sysInputRelease();
   }
   function pauseHide() {
     if (!pauseShown) return;
@@ -38832,6 +38828,7 @@ export function createSystems(game) {
   }
   // --- keyboard ---
   addEventListener('keydown', function (e) {
+    sysTouchHide();
     // On the card this also brings the score up; in the game it is the plain
     // unlock it has always been. titleAudio() is audioUnlock() plus two lines.
     if (started) audioUnlock(); else titleAudio();
@@ -39201,17 +39198,13 @@ export function createSystems(game) {
   });
   addEventListener('keyup', function (e) { keys[e.code] = false; });
   addEventListener('blur', function () {
-    for (const k in keys) keys[k] = false;
-    mouseAction = false; dragId = -1;
     // A pinch interrupted by leaving the window never gets its pointerups, so
     // the two fingers would still be "down" on the way back and the next single
     // touch would read as the second half of a pinch.
-    sysPinchPts.clear(); sysPinchD = 0; sysDragLastX = null;
-    touchSlide = false; touchBack = false; touchLook = false;
     // rAF stops while the tab is hidden, so a buffered press taken half a
     // second before an alt-tab would still be 0.02 s old on the way back and
     // would fire by itself. A press does not survive leaving the window.
-    sysBufClearAll();
+    sysInputRelease();
   });
 
   // --- mouse / pointer on the canvas ---
@@ -39413,12 +39406,11 @@ export function createSystems(game) {
   // it would swallow canvas pointer events over the bottom-left of the viewport.
   const isTouch = !!(window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches);
   if (isTouch) touchLayer.classList.add('on');
-  addEventListener('keydown', function () { touchLayer.classList.remove('on'); }, { once: true });
   // pointermove filtered to a real mouse: touch taps synthesize compatibility
   // mousemove events, which would otherwise tear the pad off a phone on tap one.
   function sysSawMouse(e) {
     if (e.pointerType && e.pointerType !== 'mouse') return;
-    touchLayer.classList.remove('on');
+    sysTouchHide();
     removeEventListener('pointermove', sysSawMouse);
   }
   addEventListener('pointermove', sysSawMouse);
@@ -39452,12 +39444,17 @@ export function createSystems(game) {
   });
   function stickEnd(e) {
     if (e.pointerId !== stickId) return;
+    if ((e.type === 'pointercancel' || e.type === 'lostpointercapture') &&
+        stickActive && Math.hypot(stickX, stickZ) > 0.86 && !keys.ShiftLeft && !keys.ShiftRight && !padRun) {
+      sysRunLatch = false; sysRunWas = false;
+    }
     stickId = -1; stickActive = false; stickX = 0; stickZ = 0;
     baseEl.classList.remove('on');
     knobEl.style.transform = 'translate(0px,0px)';
   }
   zoneEl.addEventListener('pointerup', stickEnd);
   zoneEl.addEventListener('pointercancel', stickEnd);
+  zoneEl.addEventListener('lostpointercapture', stickEnd);
 
   function bindBtn(el, down, up) {
     el.addEventListener('pointerdown', function (e) {
@@ -39473,9 +39470,18 @@ export function createSystems(game) {
       down();
       try { el.setPointerCapture(e.pointerId); } catch (err) {}
     });
-    const off = function () { el.classList.remove('press'); up(); };
+    const off = function (e) {
+      if (e.type === 'pointercancel' || e.type === 'lostpointercapture') {
+        if (el === hopBtn && touchJump && !keys.Space && !padJump) { input.jumpPressed = false; input.clearJumpBuf(); }
+        if (el === grabBtn && touchAction && !keys.KeyE && !mouseAction && !padAction) { input.actionPressed = false; input.clearActionBuf(); }
+        if (el === wheekBtn && touchHonk && !keys.KeyQ && !padHonk) { input.honkPressed = false; input.whistlePressed = false; }
+        if (el === slideBtn && touchSlide && !keys.KeyG && !padSlide) { sysSlideLatch = false; sysSlideWas = false; }
+      }
+      el.classList.remove('press'); up();
+    };
     el.addEventListener('pointerup', off);
     el.addEventListener('pointercancel', off);
+    el.addEventListener('lostpointercapture', off);
     el.addEventListener('pointerleave', off);
   }
   // A THUMB IS THE READER THIS BUFFER WAS BUILT FOR. The touch fan is the one
@@ -39536,6 +39542,41 @@ export function createSystems(game) {
   menuBtn.addEventListener('pointercancel', menuOff);
   menuBtn.addEventListener('pointerleave', menuOff);
 
+  // An interrupted thumb cannot deliver its own up. Reset only its channels;
+  // a keyboard or pad already holding the same verb keeps its pending press.
+  function sysTouchReset() {
+    if (touchJump && !keys.Space && !padJump) { input.jumpPressed = false; input.clearJumpBuf(); }
+    if (touchAction && !keys.KeyE && !mouseAction && !padAction) { input.actionPressed = false; input.clearActionBuf(); }
+    if (touchHonk && !keys.KeyQ && !padHonk) { input.honkPressed = false; input.whistlePressed = false; }
+    if (stickActive && Math.hypot(stickX, stickZ) > 0.86 && !keys.ShiftLeft && !keys.ShiftRight && !padRun) {
+      sysRunLatch = false; sysRunWas = false;
+    }
+    if (touchSlide && !keys.KeyG && !padSlide) { sysSlideLatch = false; sysSlideWas = false; }
+    touchJump = false; touchHonk = false; touchAction = false;
+    touchSlide = false; touchBack = false; touchLook = false;
+    stickEnd({ pointerId: stickId });
+    for (const el of touchLayer.querySelectorAll('.press')) el.classList.remove('press');
+  }
+  function sysTouchHide() {
+    sysTouchReset();
+    touchLayer.classList.remove('on');
+  }
+  function sysInputRelease() {
+    // Idle accessibility toggles survive; an interrupted physical hold does not.
+    if (keys.ShiftLeft || keys.ShiftRight || padRun) { sysRunLatch = false; sysRunWas = false; }
+    if (keys.KeyG || padSlide) { sysSlideLatch = false; sysSlideWas = false; }
+    sysTouchReset();
+    for (const k in keys) keys[k] = false;
+    mouseAction = false; dragId = -1;
+    sysPinchPts.clear(); sysPinchD = 0; sysDragLastX = null;
+    sysBufClearAll();
+    // Paused/hidden pages do not tick to republish neutral input.
+    input.x = 0; input.z = 0;
+    input.run = false; input.slide = false;
+    input.honk = false; input.whistle = false; input.action = false; input.jump = false;
+    input.honkPressed = false; input.whistlePressed = false; input.actionPressed = false; input.jumpPressed = false;
+  }
+
   // ---- THE PAD, POLLED ----------------------------------------------------
   // See the sysPAD_* block. Called once at the top of update(). Writes the held
   // state directly and QUEUES the three edges; publishing them is the last
@@ -39544,7 +39585,7 @@ export function createSystems(game) {
     padIdx = e.gamepad ? e.gamepad.index : 0;
     // A pad is a pointing device as much as the mouse is: the moment one is in
     // use the thumb-stick overlay is in the way rather than in the game.
-    touchLayer.classList.remove('on');
+    sysTouchHide();
     audioUnlock();
     // The one moment the scheme is actually wanted. The journal's fold has it
     // too, but a player who has just picked a pad up is not going to go and
@@ -39843,7 +39884,7 @@ export function createSystems(game) {
       const st0 = padBtn(g, 9), bk0 = padBtn(g, 8);
       if (st0 && !padWasStart) sysPadBack();
       padWasStart = st0; padWasBack = bk0;
-      if (!padSeen && padOn) { padSeen = true; sysPadSeenN = true; padSayHello(); touchLayer.classList.remove('on'); }
+      if (!padSeen && padOn) { padSeen = true; sysPadSeenN = true; padSayHello(); sysTouchHide(); }
       return;
     }
 
@@ -39940,7 +39981,7 @@ export function createSystems(game) {
     }
     padWasStart = start; padWasBack = back;
 
-    if (!padSeen && padOn) { padSeen = true; sysPadSeenN = true; padSayHello(); touchLayer.classList.remove('on'); }
+    if (!padSeen && padOn) { padSeen = true; sysPadSeenN = true; padSayHello(); sysTouchHide(); }
   }
 
   /**
@@ -42323,12 +42364,9 @@ export function createSystems(game) {
       ambientSet(false);
       // Held keys can never produce a keyup while hidden — clear them or the
       // capybara sprints off on its own the moment the tab comes back.
-      for (const k in keys) keys[k] = false;
-      mouseAction = false; dragId = -1;
       // Same reason as the blur handler: a held touch button or half a pinch
       // cannot produce its own release while the tab is in the background.
-      sysPinchPts.clear(); sysPinchD = 0; sysDragLastX = null;
-      touchSlide = false; touchBack = false; touchLook = false;
+      sysInputRelease();
       if (ac && ac.suspend && ac.state === 'running') {
         const pz = ac.suspend(); if (pz && pz.catch) pz.catch(function () {});
       }

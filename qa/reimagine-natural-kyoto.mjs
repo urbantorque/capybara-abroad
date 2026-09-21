@@ -28,6 +28,30 @@ async function sample(label) {
   report.steps.push(row); console.log(JSON.stringify({label,t:row.t,pos:row.pos,tasks:row.tasks}));return row;
 }
 
+async function clearDetour(target) {
+  return h.page.evaluate(target => {
+    const g=window.__capy,p=g.capy.body.position,k=g.kyoto,V=p.constructor;
+    const angle=Math.atan2(target.z-p.z,target.x-p.x), candidates=[];
+    for(const turn of [Math.PI/2,-Math.PI/2,Math.PI*.75,-Math.PI*.75,Math.PI]) {
+      for(const distance of [4,7]) {
+        const a=angle+turn,q={x:p.x+Math.cos(a)*distance,z:p.z+Math.sin(a)*distance};
+        const hits=[], ground=k.terrainHeight(q.x,q.z), blocked=k.navBlocked(q.x,q.z,.8);
+        for(const offset of [-.5,0,.5]) {
+          const ox=-Math.sin(a)*offset,oz=Math.cos(a)*offset;
+          g.world.raycastAll(new V(p.x+ox,p.y+.25,p.z+oz),new V(q.x+ox,p.y+.25,q.z+oz),
+            {skipBackfaces:true}, hit=>{
+              if(hit.hasHit&&hit.body!==g.capy.body&&hit.body.collisionResponse!==false)
+                hits.push({body:hit.body.id,distance:hit.distance,position:hit.body.position.toArray()});
+            });
+        }
+        candidates.push({target:q,hits,ground,blocked});
+      }
+    }
+    return {from:p.toArray(),candidates,
+      chosen:candidates.find(c=>!c.blocked&&!c.hits.length&&c.ground<p.y+.65)?.target||null};
+  },target);
+}
+
 async function walkTo(target, radius = 1.4, maxMs = 50000, detours=2) {
   const started = Date.now(); let best = Infinity, progressAt = Date.now(), jumps=0;
   try {
@@ -57,13 +81,10 @@ async function walkTo(target, radius = 1.4, maxMs = 50000, detours=2) {
         if(jumps<1){await h.page.keyboard.press('Space');jumps++;progressAt=Date.now();}
         else if(detours>0){
           await release();
-          const side=await h.page.evaluate(({dx,dz,d})=>{
-            const g=window.__capy,p=g.capy.position,k=g.kyoto,ux=dx/d,uz=dz/d;
-            const candidates=[1,-1].map(sign=>({x:p.x-ux*2-uz*6*sign,z:p.z-uz*2+ux*6*sign}));
-            return candidates.find(q=>!k.navBlocked(q.x,q.z,.75))||candidates[0];
-          },{dx,dz,d});
-          report.navigation.push({detour:side,from:s.p});
-          await walkTo(side,1.6,14000,0);detours--;best=Infinity;progressAt=Date.now();jumps=0;
+          const detour=await clearDetour(s.target);
+          report.navigation.push({detour});
+          assert.ok(detour.chosen,'no clear physical detour corridor: '+JSON.stringify(detour));
+          await walkTo(detour.chosen,1,14000,0);detours--;best=Infinity;progressAt=Date.now();jumps=0;
         }else throw new Error('walk stuck after bounded real-key avoidance: '+JSON.stringify(s));
       }
       await h.page.waitForTimeout(160);
@@ -73,8 +94,11 @@ async function walkTo(target, radius = 1.4, maxMs = 50000, detours=2) {
 }
 
 async function swimPond() {
-  // The direct spawn-to-centre line hits a shoreline boulder at (12,22).
-  // Walk around its western side with real keys, then enter the open water.
+  // Leave Gion through the open end before crossing the solid shop rows.
+  // The pond approach then stays west of its shoreline boulder at (12,22).
+  await walkTo({x:-56,z:52});
+  // The Zen garden occupies x[-49,-19], z[-2,18]; stay south of its wall.
+  await walkTo({x:-56,z:-10});await walkTo({x:-16,z:-10});
   await walkTo({x:-16,z:0});
   await walkTo({x:8,z:-4},2.2);
   await h.page.waitForFunction(() => window.__capy.taskDone('golden-swim'), null, { timeout: 7000 });
@@ -128,7 +152,8 @@ try {
   await h.start(); await h.arrive('kyoto'); await sample('fresh Kyoto arrival');
   await swimPond(); await sample('golden swim earned');
   // Gion has two solid shop rows; use the open western end of the lane.
-  await walkTo({x:-16,z:0});await walkTo({x:-10,z:34});await walkTo({x:-56,z:34});
+  await walkTo({x:-16,z:0});await walkTo({x:-16,z:-10});
+  await walkTo({x:-56,z:-10});
   await walkTo({x:-56,z:80});
   await h.page.locator('.capyui-txt').filter({hasText:/^Ride the Uji rapids down to the mill$/}).click();
   await walkTo('uji-run', 2.4); await sample('river entry waypoint');
@@ -137,9 +162,14 @@ try {
   const runEnd = await sample('uji run earned'); await h.screenshot(name + '-uji');
   assert.equal(runEnd.run.through,3,'all three boat gates crossed');
   assert.equal(report.chuteCapture,true,'actual chute launch observed');
+  // Approach south of the authored tea bowl (24,196), whose rim is solid.
+  await walkTo({x:42,z:212});await walkTo({x:14.4,z:212});
   await walkTo('matcha-raid', 1.8);
   await h.page.waitForFunction(() => window.__capy.taskDone('matcha-raid'), null, { timeout: 12000 });
   const end = await sample('natural Kyoto memory'); await h.screenshot(name + '-memory');
+  // Separate the four-second reward cloud from persistent world occlusion.
+  await h.page.waitForTimeout(4300);
+  await sample('matcha reward settled'); await h.screenshot(name + '-memory-settled');
   assert.ok(ids.every(id => end.tasks[id]), 'signature plus two support actions earned');
   assert.equal(end.gate.enough, true, 'Kyoto signature plus two supports earns route memory');
   await h.page.waitForFunction(ids => {

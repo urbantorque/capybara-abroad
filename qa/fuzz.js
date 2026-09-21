@@ -40,7 +40,9 @@ async page => {
   const sysFUZZ_SPEED_BY = { drift: 34, goreme: 50 };
   await page.goto('http://localhost:5188/index.html');
   await page.waitForTimeout(6000);
-  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => window.__capy && (document.querySelector('.capyui-carry') || document.querySelector('.capyui-go')));
+  await page.evaluate(() => (document.querySelector('.capyui-carry') || document.querySelector('.capyui-go')).click());
+  await page.keyboard.press('Shift'); // trusted input unlocks synthesized audio
   await page.waitForTimeout(3000);
   const started = await page.evaluate(() => !!(window.__capy && window.__capy.state.started));
   const names = ['sydney', 'pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland',
@@ -241,6 +243,8 @@ async page => {
         errs: errs.slice(0, 6), lastError: g.state.lastError || null,
       };
     }, [n, sysFUZZ_SEC]);
+    console.log('fuzz ' + n + ' ' + JSON.stringify({ started: res[n].started,
+      maxSpeed: res[n].maxSpeed, nan: res[n].nanFrames, void: res[n].belowVoid }));
   }
   // ---- THE GATE --------------------------------------------------------
   // Written into the file AND thrown, so a caller reading the JSON and a
@@ -248,7 +252,7 @@ async page => {
   // one the title card passes silently: started, moved, no NaN, no fall, no
   // error, and landed in the chapter it was sent to.
   const fail = [];
-  if (started !== true) fail.push('started !== true after Enter (the fuzz ran against the title card)');
+  if (started !== true) fail.push('started !== true after live title control (the fuzz ran against the title card)');
   for (const n of names) {
     const r = res[n] || {};
     if (r.started !== true) fail.push(n + ': started ' + r.started);

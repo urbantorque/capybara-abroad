@@ -9,8 +9,8 @@
 // nineteen rows against the title card and nobody could have known, because
 // there was nothing to compare with.
 //
-// This runs the three under playwright-cli, in its own session (`-s=soak`;
-// never close-all, which is global and kills whatever else is open), and
+// This runs the three in an owned headful browser (or `-s=soak` for the
+// optional playwright-cli runner; never close-all), and
 // appends ONE LINE to qa/soak-history.jsonl: the commit, the date, and per
 // chapter the fuzz's maxSpeed and solver saves, the crossing's longest frame
 // (whole, and after the white came off) and the draw calls. qa/soak-diff.mjs
@@ -23,16 +23,18 @@
 // they are copied to qa/.soak/ with both rewritten to this run's, so a probe
 // is edited in one place and the soak follows. A server is started if nothing
 // answers on the port (and stopped after); `node build.mjs` runs first since
-// the file:// probe opens dist/. About six minutes on the Arc.
+// the file:// probe opens dist/. About 25 minutes for the full 45s/chapter run.
 //
 //   PORT=5188 npm run soak      the port the probes are run against (5188)
 //   SOAK_SKIP=ks npm run soak   skip a probe by name (fuzz, ks, load)
+//   SOAK_RUNNER=cli npm run soak  use the historical command-line launcher
 // ===========================================================================
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import http from 'node:http';
+import { openHarness } from './reimagine-harness.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT) || 5188;
@@ -41,6 +43,8 @@ const SESSION = 'soak';
 const HISTORY = join(ROOT, 'qa', 'soak-history.jsonl');
 const TMP = join(ROOT, 'qa', '.soak');
 const PW = process.platform === 'win32' ? 'playwright-cli.cmd' : 'playwright-cli';
+const RUNNER = process.env.SOAK_RUNNER || 'auto';
+if (!['auto', 'direct', 'cli'].includes(RUNNER)) throw new Error('SOAK_RUNNER must be auto, direct or cli');
 
 const PROBES = [
   // name    source              JSON the probe writes (via /shot)
@@ -52,7 +56,7 @@ const PROBES = [
 function log(s) { process.stdout.write(s + '\n'); }
 function sh(cmd, args, opts) {
   const r = spawnSync(cmd, args, Object.assign({ cwd: ROOT, encoding: 'utf8' }, opts || {}));
-  return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
+  return { code: r.status, stdout: r.stdout || '', out: (r.stdout || '') + (r.stderr || '') };
 }
 // playwright-cli is a .cmd shim on Windows and needs a shell; node and git do
 // not, and a shell would split process.execPath at the space in "Program Files".
@@ -81,8 +85,11 @@ function fresh(rel, since) {
 }
 
 const t0 = Date.now();
-const commit = (sh('git', ['rev-parse', '--short', 'HEAD']).out || '').trim() || 'nogit';
-const dirty = (sh('git', ['status', '--porcelain', '--', 'src', 'index.html']).out || '').trim() ? '+' : '';
+const commit = sh('git', ['rev-parse', '--short', 'HEAD']).stdout.trim() || 'nogit';
+// Git's inaccessible global-ignore warning is stderr, not a source edit.
+const sourceStatus = sh('git', ['status', '--porcelain', '--', 'src', 'index.html']);
+if (sourceStatus.code !== 0) throw new Error('Cannot establish source status: ' + sourceStatus.out);
+const dirty = sourceStatus.stdout.trim() ? '+' : '';
 log('soak  ' + commit + dirty + '  port ' + PORT);
 
 // ---- the build, so the file:// probe has a file -----------------------------
@@ -119,16 +126,39 @@ function stage(src) {
 }
 
 const results = {};
-let opened = false;
+let opened = false, harness = null, browserMetadata = null;
 try {
-  const o = pw(['open', 'http://localhost:' + PORT + '/']);
-  opened = o.code === 0;
-  if (!opened) { log(o.out.split('\n').slice(-6).join('\n')); log('playwright-cli could not open a page'); process.exit(2); }
+  if (RUNNER !== 'cli') {
+    try {
+      harness = await openHarness({ url: 'http://localhost:' + PORT + '/', pinRung: false });
+      browserMetadata = harness.metadata;
+      if (/swiftshader|llvmpipe|software rasterizer/i.test(browserMetadata.renderer.renderer))
+        throw new Error('Hardware GPU required for soak; software rasterizer is not a timing substitute');
+      log('direct headful ' + browserMetadata.channel + ': ' + browserMetadata.renderer.renderer);
+    } catch (error) {
+      if (RUNNER !== 'auto' || !/Playwright unavailable/.test(error.message)) throw error;
+      log('direct dependency unavailable; trying playwright-cli');
+    }
+  }
+  if (!harness) {
+    const o = pw(['open', 'http://localhost:' + PORT + '/']);
+    opened = o.code === 0;
+    if (!opened) throw new Error('playwright-cli could not open a page: ' + o.out.split('\n').slice(-6).join('\n'));
+  }
   for (const [name, src, json] of PROBES) {
     if (SKIP.has(name)) { log('skip  ' + name); results[name] = { skipped: true }; continue; }
     const file = stage(src);
     const since = Date.now();
-    const r = pw(['run-code', '--filename=' + file]);
+    log('running ' + name + '  ' + new Date().toISOString());
+    let r;
+    if (harness) {
+      try {
+        // These are the same trusted repository probes run by playwright-cli,
+        // staged only for the local port, built file path and long fuzz window.
+        const probe = new Function('return (' + readFileSync(file, 'utf8') + '\n);')();
+        await probe(harness.page); r = { code: 0, out: '' };
+      } catch (error) { r = { code: 1, out: String(error.stack || error) }; }
+    } else r = pw(['run-code', '--filename=' + file]);
     const data = fresh(json, since) ? readJson(json) : null;
     const threw = /Error|error:/i.test(r.out) && r.code !== 0;
     results[name] = { code: r.code, threw, data, stale: !data };
@@ -137,6 +167,7 @@ try {
     if (r.code !== 0) log(r.out.split('\n').filter(Boolean).slice(-6).map(l => '        ' + l).join('\n'));
   }
 } finally {
+  if (harness) await harness.close();
   if (opened) pw(['close']);
   if (server) server.kill();
 }
@@ -156,14 +187,18 @@ if (ld && ld.lap2) for (const r of ld.lap2) {
   chapters[r.biome] = Object.assign(chapters[r.biome] || {}, { longest2: r.maxGap });
 }
 const ks = results.ks && results.ks.data;
+const cleanProbe = name => results[name] && results[name].code === 0 && !results[name].stale;
 const row = {
   commit: commit + dirty, date: new Date().toISOString(), ms: Date.now() - t0, port: PORT,
   ok: {
-    fuzz: !!(fz && fz.pass === true),
-    ks: !!(ks && ks.pass === true),
-    load: !!(ld && ld.rows && ld.rows.every(r => r.ok && !r.lastError)),
+    fuzz: !!(cleanProbe('fuzz') && fz && fz.pass === true),
+    ks: !!(cleanProbe('ks') && ks && ks.pass === true),
+    load: !!(cleanProbe('load') && ld && ld.tStarted >= 0 && ld.rows?.length === 19 &&
+      ld.lap2?.length === 19 && [...ld.rows, ...ld.lap2].every(r => r.ok && !r.lastError)),
+    runtime: !browserMetadata || browserMetadata.errors.length === 0,
   },
   skipped: Array.from(SKIP),
+  runner: harness ? 'direct' : 'cli', browser: browserMetadata,
   chapters,
 };
 appendFileSync(HISTORY, JSON.stringify(row) + '\n');
