@@ -4798,6 +4798,20 @@ const sysMUS_BUS    = 0.14;            // music sits UNDER the sfx
 // takes the pad DOWN 3 dB and puts +3 dB on the plucks, so walking thins the
 // score instead of swelling it.
 const sysMUS_SIDE = { bump: 0.7, depth: 0.5, cut: 500, in: 0.05, out: 0.6, flowPad: 0.29, flowPluck: 0.41 };
+// ---- THE INVERSION UNDONE (ROADMAP-SCORE, Q1) ------------------------------
+// The three lines above were the inversion: the score under the world, ducked
+// by its transients, thinned by walking. The player's ear reversed it — the
+// score leads. `sysMUS_FORE` multiplies sysMUS_BUS and every palette's `bus`
+// in the ONE place the pad's gain is written (the pad writer), not in
+// twenty-one rows, so every comment beside a palette's bus stays true; the
+// sidechain's depth is halved; the flow's −3 dB on the pad is gone (a field
+// theme does not get quieter when you run — the plucks keep their +3 dB).
+// The world's transients keep their room: the bump, the τs and the filter's
+// `cut` term are untouched. Every Part Q row keeps its L7 value behind
+// `game.state.noQuiet` — one flag, the settings card's "as before" — read
+// once per frame where the row is written, never two writers.
+const sysMUS_FORE = 1.7;
+const sysMUS_SIDE_Q = { depth: 0.25, flowPad: 0 };   // the Q1 values of the two rows that move
 const sysMUS_FLINCH_CUT = 300;   // Hz a startle takes off the pad filter for a block (L7, E1)
 // THE ENSEMBLE. See the note in musicStart. Two taps at 0.46 add
 // sqrt(1 + 2*0.46^2) = 1.19 to the bus, so the trim is 1/1.19.
@@ -52618,7 +52632,9 @@ export function createSystems(game) {
       if (musWorldEnv < 0.005) musWorldEnv = 0;
     }
     if (musSideG && ac && ac.state === 'running') {
-      const sideWant = 1 - sysMUS_SIDE.depth * musWorldEnv;
+      // ...at half the depth since Q1 (ROADMAP-SCORE); L7's behind noQuiet.
+      const sideDepth = (game.state && game.state.noQuiet) ? sysMUS_SIDE.depth : sysMUS_SIDE_Q.depth;
+      const sideWant = 1 - sideDepth * musWorldEnv;
       sysAudioSet(musSideG.gain, sideWant, ac.currentTime,
                   sideWant < musSideLast ? sysMUS_SIDE.in : sysMUS_SIDE.out);
       musSideLast = sideWant;
@@ -52824,8 +52840,14 @@ export function createSystems(game) {
       // struck notes over the world, not a bigger pad. The intensity's own
       // flow share (sysFLOW_MUS) stays: that is the plucks' density and the
       // filter, which is the score going with you; this is its LEVEL.
-      const flowPad = 1 - sysMUS_SIDE.flowPad * clamp(sysFlowNow, 0, 1);
-      sysAudioSet(musPad.gain, Math.max(0.0001, musPal.bus * voiceBusK * padUp *
+      // ---- ...AND THE INVERSION UNDONE (ROADMAP-SCORE, Q1) -----------------
+      // `foreK` is sysMUS_FORE on the pad's bus (Sydney's sysMUS_BUS and every
+      // palette's `bus` go through this one line), and the flow's cut on the
+      // pad is zero; under noQuiet both are L7's. See sysMUS_FORE.
+      const quietOld = !!(game.state && game.state.noQuiet);
+      const foreK = quietOld ? 1 : sysMUS_FORE;
+      const flowPad = 1 - (quietOld ? sysMUS_SIDE.flowPad : sysMUS_SIDE_Q.flowPad) * clamp(sysFlowNow, 0, 1);
+      sysAudioSet(musPad.gain, Math.max(0.0001, musPal.bus * foreK * voiceBusK * padUp *
         (1 - clamp(calmLean, 0, 1) * sysMUS_CALM_PAD * calmYield) * musBreath *
         (1 + skyRain * sysMUS_SKY_BUS) * (1 - 0.18 * musSpeak) * musPadSpecK * stingK * sleepK * flowPad),
         nowA, padTau);
