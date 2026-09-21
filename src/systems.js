@@ -4969,6 +4969,81 @@ const sysMUS_LAYER_OSTINATO = 1.0;
 // written: 21/21 at six or more (Sydney 7, Kyoto 6, Sơn Đoòng 6).
 const sysMUS_THEME     = [0, 4, 7, 4, 3, 2, 1, 0];
 const sysMUS_THEME_DUR = [2, 1, 1, 3, 2, 1, 1, 3];   // × the phrase gap; the arrival's own rhythm
+// ---- THE THEME, IN FULL (ROADMAP-SCORE, M1) ---------------------------------
+// The eight notes above are A, and a tune is two phrases and a tag. B is the
+// answer that climbs and comes home — the same long-short-short-long, from
+// the sixth instead of the tonic, and it ENDS on a held do where A ended on
+// a short one, because the second phrase is the one that closes:
+//
+//   la  sol  fa  sol  |  mi  re  do  re  |  do
+//    5   4    3   4   |   2   1   0   1  |   0        long-short-short-long, then held
+//
+// Nine notes, not eight: the held do is a note of its own (the brief's
+// degrees) and the coda pays for the extra one in sysFinaleCoda. The same
+// resolver as A (musDegOff) so the third and the sixth go flat where the
+// scale is minor — la is the one note B adds that A never touched, and it
+// is the note that tells major from minor. Over the progression (below)
+// the long notes are chord tones in every mode: la on I is the sixth, the
+// held sol on IV the ninth, re on V its fifth, the held do on I the root.
+//
+// The tag is three notes over the cadence: sol la do' — the adventure
+// close, ♭VI–♭VII–I where the scale has a flat sixth and seventh, and the
+// palette's own dominant where it does not. do' is the tune's top and its
+// end, held for four beats.
+const sysMUS_THEME_B     = [5, 4, 3, 4, 2, 1, 0, 1, 0];
+const sysMUS_THEME_B_DUR = [2, 1, 1, 3, 2, 1, 1, 1, 4];
+const sysMUS_THEME_TAG     = [4, 5, 7];
+const sysMUS_THEME_TAG_DUR = [1, 1, 4];
+// Where each phrase's chords change, as NOTE INDICES into the phrase: A and
+// B both turn on their fourth and fifth notes and close on their last, so
+// the four chords of a phrase land under do·sol·do' / sol / fa·mi·re / do.
+// The tag's chords land one per note.
+const sysMUS_THEME_CH   = [0, 3, 4, 7];
+const sysMUS_THEME_B_CH = [0, 3, 4, 8];
+// ---- THE PROGRESSION A STATEMENT PLAYS OVER (M1) ----------------------------
+// A statement is a fixed progression and the drift is a walk; they hand over
+// on a chord. `mode` rows build their chords from the palette's scale on its
+// tonic (musProgChord) — I–V–vi–IV | I–IV–V–I in major, i–♭VI–♭III–♭VII |
+// i–iv–V–i in minor, the Hyrule cadence ♭VI–♭VII–i on the tag where the
+// scale has those two degrees and V–I where it does not. `own` rows never
+// leave the palette's chord table: the two quartal palettes, the hijaz row,
+// Kyoto's thirdless hirajoshi, the Drift's fourths and Antarctica's fifths
+// have no I–V–vi–IV in them to build, and the five bands are arrangements
+// whose harmony is the arrangement — for those the progression is the
+// palette's own cycle (a vamp plays its vamp) or a two-chord oscillation on
+// its own roots. Every tag ends on chord 0 so the drift resumes from home;
+// an A-only statement resumes from the fourth chord, which on an `own` row
+// is a table index and on a `mode` row is voice-led back to chord 0.
+// Keyed by palette index like sysMUS_2ND, beside the composition and
+// never inside it: not one chord, root or next row moves for this.
+//   deg: scale degree of the root; q: 'M' major triad, 'm' minor triad.
+const sysMUS_PROG_MAJOR = { prog: [[0, 'M'], [4, 'M'], [5, 'm'], [3, 'M'], [0, 'M'], [3, 'M'], [4, 'M'], [0, 'M']],
+                            tag:  [[4, 'M'], [0, 'M']] };
+const sysMUS_PROG_MINOR = { prog: [[0, 'm'], [5, 'M'], [2, 'M'], [6, 'M'], [0, 'm'], [3, 'm'], [4, 'M'], [0, 'm']],
+                            tag:  [[5, 'M'], [6, 'M'], [0, 'm']] };
+const sysMUS_PROG = [
+  { mode: 'major' },                                            // 0  Sydney
+  { mode: 'minor' },                                            // 1  Pasto
+  { mode: 'major' },                                            // 2  Quay
+  { mode: 'major' },                                            // 3  under way
+  { own: [0, 1, 0, 1, 0, 1, 0, 3], tag: [3, 0] },               // 4  Kyoto: D and F; Bb→D, the Bb→A half-step, to close
+  { own: [0, 1, 2, 3, 0, 1, 2, 3], tag: [3, 0] },               // 5  Cali: the vamp
+  { own: [0, 1, 2, 3, 0, 1, 2, 3], tag: [3, 0] },               // 6  Rio: the turnaround
+  { mode: 'minor' },                                            // 7  Iceland
+  { own: [0, 1, 0, 1, 0, 1, 0, 1], tag: [1, 0] },               // 8  Marrakech: the drone and the A
+  { own: [0, 1, 0, 1, 0, 1, 0, 1], tag: [1, 0] },               // 9  the Drift: fourths
+  { own: [0, 1, 2, 3, 4, 5, 6, 0], tag: [6, 0] },               // 10 Venice: the whole sequence, its own cadence
+  { own: [0, 1, 2, 3, 0, 1, 2, 3], tag: [3, 0] },               // 11 Hong Kong: the vamp
+  { mode: 'major' },                                            // 12 Palawan
+  { own: [0, 1, 0, 1, 0, 1, 0, 1], tag: [1, 0] },               // 13 Cappadocia: D and the Eb over it (hijaz)
+  { mode: 'major' },                                            // 14 Manly
+  { mode: 'major' },                                            // 15 the Pantanal
+  { own: [0, 1, 0, 1, 0, 1, 0, 1], tag: [1, 0] },               // 16 Son Doong: D and C, quartal
+  { own: [0, 1, 0, 1, 0, 1, 0, 1], tag: [1, 0] },               // 17 Antarctica: fifths
+  { mode: 'major' },                                            // 18 the title card
+  { own: [0, 1, 0, 1, 0, 1, 0, 1], tag: [1, 0] },               // 19 Monte Carlo
+  { own: [0, 1, 0, 1, 0, 1, 0, 1], tag: [1, 0] },               // 20 Hanoi: sus
+];
 // THE MUSICIAN (L7, F2): the tune, played from a POSITION by a bed-class
 // mover instead of on the non-diegetic pad. One beat here is 0.6 s (the
 // theme's own eight notes, weighted by sysMUS_THEME_DUR, run about 8.4 s —
@@ -18608,6 +18683,62 @@ export function createSystems(game) {
     const sc = sysMUS_SCALES[p && p.scale] || sysMUS_SCALES.major;
     const d = sysMUS_THEME[((i % sysMUS_THEME.length) + sysMUS_THEME.length) % sysMUS_THEME.length];
     return sc[((d % 7) + 7) % 7] + 12 * Math.floor(d / 7);
+  }
+  // ...and the same rule for ANY degree (M1): B, the tag, the motifs and the
+  // countermelody all resolve through this, so the third and the sixth go
+  // flat in one place. `scale` overrides the palette's for the absence mode
+  // (M4) — the parallel minor of a major palette.
+  function musDegOff(d, pal, scale) {
+    const p = pal || musPal;
+    const sc = sysMUS_SCALES[scale || (p && p.scale)] || sysMUS_SCALES.major;
+    return sc[((d % 7) + 7) % 7] + 12 * Math.floor(d / 7);
+  }
+  // THE WHOLE TUNE, as [degree, beats] pairs (M1): A, or A + B + tag.
+  function musThemeNotes(kind) {
+    const out = [];
+    for (let i = 0; i < sysMUS_THEME.length; i++) out.push([sysMUS_THEME[i], sysMUS_THEME_DUR[i]]);
+    if (kind === 'full') {
+      for (let i = 0; i < sysMUS_THEME_B.length; i++) out.push([sysMUS_THEME_B[i], sysMUS_THEME_B_DUR[i]]);
+      for (let i = 0; i < sysMUS_THEME_TAG.length; i++) out.push([sysMUS_THEME_TAG[i], sysMUS_THEME_TAG_DUR[i]]);
+    }
+    return out;
+  }
+  // ---- A CHORD OF THE PROGRESSION (M1) ------------------------------------
+  // Returns { chord, root, idx } for step `k` of a statement over palette
+  // `n`: `chord` in the pad's own shape (five notes, root·fifth·octave·
+  // third·twelfth, placed just over the palette's home chord so the pad
+  // voice-leads a step and not a leap), `root` in the bass's register beside
+  // roots[0], and `idx` the table chord this IS when the row is `own` (or 0
+  // when the progression is built, so the drift resumes from home). `part`
+  // is 'prog' or 'tag'.
+  function musProgChord(n, part, k, scale) {
+    const pal = sysMUS_PAL[n] || sysMUS_PAL[0];
+    const row = sysMUS_PROG[n] || sysMUS_PROG[0];
+    if (row.own) {
+      const list = part === 'tag' ? row.tag : row.own;
+      const idx = list[Math.min(k, list.length - 1)];
+      return { chord: pal.chords[idx], root: pal.roots[idx], idx: idx };
+    }
+    const sc = sysMUS_SCALES[scale || pal.scale] || sysMUS_SCALES.major;
+    const isMin = sc === sysMUS_SCALES.minor;
+    const src = isMin ? sysMUS_PROG_MINOR : sysMUS_PROG_MAJOR;
+    const list = part === 'tag' ? src.tag : src.prog;
+    const step = list[Math.min(k, list.length - 1)];
+    const off = sc[step[0]];
+    const third = step[1] === 'M' ? 4 : 3;
+    const lo = pal.chords[0][0];
+    const tonicPc = ((pal.roots[0] % 12) + 12) % 12;
+    const r = lo + ((((tonicPc + off) - lo) % 12) + 12) % 12;
+    const root = pal.roots[0] + off - (off > 7 ? 12 : 0);
+    return { chord: [r, r + 7, r + 12, r + 12 + third, r + 19], root: root, idx: 0 };
+  }
+  // How many chords a statement of `kind` has in its progression part.
+  function musProgLen(n, part) {
+    const row = sysMUS_PROG[n] || sysMUS_PROG[0];
+    if (row.own) return (part === 'tag' ? row.tag : row.own).length;
+    const pal = sysMUS_PAL[n] || sysMUS_PAL[0];
+    const src = (sysMUS_SCALES[pal.scale] === sysMUS_SCALES.minor) ? sysMUS_PROG_MINOR : sysMUS_PROG_MAJOR;
+    return (part === 'tag' ? src.tag : src.prog).length;
   }
   // The MIDI note the tune starts on: the palette's tonic, two octaves over
   // the bass root plus `oct`, folded ONCE — the whole tune moves by the same
@@ -44276,6 +44407,51 @@ export function createSystems(game) {
                inst: (ph && ph.inst) ? ph.inst
                      : ((musPal.lead && musPal.lead !== 'none') ? musPal.lead : 'pluck'),
                second: sysMUS_2ND[musPalN] ? sysMUS_2ND[musPalN].inst : null };
+    },
+    /**
+     * IS THE WHOLE TUNE IN KEY IN THIS PALETTE (ROADMAP-SCORE, M1). The same
+     * method as phraseAudit, for A + B + tag over sysMUS_PROG rather than the
+     * eight over chord 0 — and without touching the live palette, so all
+     * twenty-one sweep in one evaluate. `inScale` is every note's pitch class
+     * against the palette's scale on its tonic (the resolver's own promise);
+     * `inChord` is the honest one: each note against the progression chord
+     * actually sounding under it, long notes weighted by their beats.
+     */
+    themeAudit: function (n) {
+      const pal = sysMUS_PAL[n] || sysMUS_PAL[0];
+      const sc = sysMUS_SCALES[pal.scale] || sysMUS_SCALES.major;
+      const tonicPc = ((pal.roots[0] % 12) + 12) % 12;
+      const scPcs = {};
+      for (let i = 0; i < sc.length; i++) scPcs[(tonicPc + sc[i]) % 12] = 1;
+      const notes = musThemeNotes('full');
+      const chA = sysMUS_THEME_CH, chB = sysMUS_THEME_B_CH;
+      const nA = sysMUS_THEME.length, nB = sysMUS_THEME_B.length;
+      const base = 60 + ((tonicPc - 60) % 12 + 12) % 12;   // register-free: pitch class is the test
+      const rows = [];
+      let inScale = 0, inChord = 0, beats = 0, chordBeats = 0;
+      const chords = [];
+      for (let i = 0; i < notes.length; i++) {
+        const d = notes[i][0], b = notes[i][1];
+        const midi = base + musDegOff(d, pal);
+        const pc = ((midi % 12) + 12) % 12;
+        // which progression chord is under note i
+        let part = 'prog', k = 0;
+        if (i < nA) { for (let j = 0; j < chA.length; j++) if (i >= chA[j]) k = j; }
+        else if (i < nA + nB) { for (let j = 0; j < chB.length; j++) if (i - nA >= chB[j]) k = 4 + j; }
+        else { part = 'tag'; k = Math.min(i - nA - nB, musProgLen(n, 'tag') - 1); }
+        const pc0 = musProgChord(n, part, k);
+        const cpcs = {};
+        for (let j = 0; j < pc0.chord.length; j++) cpcs[((pc0.chord[j] % 12) + 12) % 12] = 1;
+        const okS = !!scPcs[pc], okC = !!cpcs[pc];
+        if (okS) inScale++;
+        beats += b;
+        if (okC) { inChord++; chordBeats += b; }
+        rows.push({ i: i, deg: d, midi: midi, pc: pc, chord: part + k, inScale: okS, inChord: okC });
+        chords.push(part + k + ':' + pc0.chord.join(' '));
+      }
+      return { pal: n, scale: pal.scale || 'major', tonic: pal.roots[0], mode: (sysMUS_PROG[n] || {}).own ? 'own' : 'mode',
+               n: notes.length, inScale: inScale, inChord: inChord, beats: beats, chordBeats: chordBeats,
+               chordShare: +(chordBeats / beats).toFixed(3), rows: rows, chords: chords };
     },
     moverAudit: function () {
       const rows = [];
