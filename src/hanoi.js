@@ -5117,6 +5117,8 @@ export function createHanoi(game) {
     return true;
   };
   api.cubAt = function () { return { x: hanCubX, y: hanGROUND, z: hanCubZ }; };
+  // The refill stays at the stall when the scooter has gone elsewhere.
+  api.cubStall = function () { return { x: hanCUB.x, y: hanGROUND, z: hanCUB.z }; };
   api.dropAt = function (i) { const d = hanDROPS[Math.max(0, Math.min(hanDROPS.length - 1, i | 0))]; return { x: d[0], y: hanGROUND + 1, z: d[1], name: d[2] }; };
   api.cubDebug = function (o) {
     if (o && o.take && !hanCubOn) hanCubTake(game);

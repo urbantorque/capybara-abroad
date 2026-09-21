@@ -32262,13 +32262,20 @@ export function createSystems(game) {
                       const g = game.pantanal;
                       if (!g) return 'take them over the river';
                       const n = g.following();
-                      if (n < 4) return 'Q near the herd — they follow · ' + n + ' of 4, then swim across';
+                      if (n < 4 && !g.crossing()) return 'Q near the herd — they follow · ' + n + ' of 4, then swim across';
                       const h = game.pantanal && typeof game.pantanal.huntDebug === 'function' ? game.pantanal.huntDebug() : null;
                       if (h && h.on && h.under > 0) return 'it is under. stay with the line — it comes back';
                       if (h && h.on) return 'O GRANDÃO is behind the last one: get within 20 m and press Q · ' + h.hits + ' of 3';
                       return 'straight across. the big one comes up behind the line — Q at it, three times';
                     },
-                    where: function () { return hintObj(game.pantanal && game.pantanal.bank); } },
+                    where: function () {
+                      const g = game.pantanal;
+                      if (!g) return null;
+                      // Once committed, the arrow leads out of the river, even
+                      // if a follower drops away during the crossing.
+                      if (g.crossing()) return hintObj(g.farBank);
+                      return hintObj(g.following() < 4 ? g.herd() : g.bank);
+                    } },
     // THE WINDOW (L6, F2): the stork's circuit is a clock, and it is the line.
     'jabiru-home':    { clue: function () {
                       const g = game.pantanal;
@@ -32466,6 +32473,8 @@ export function createSystems(game) {
     'pho-run':        { clue: function () {
                       const h = game.hanoi;
                       const c = h && typeof h.cub === 'function' ? h.cub() : null;
+                      if (c && c.on && !c.run && !c.done) return 'back to the pho stall. stop there and press E for three warm bowls';
+                      if (c && c.on && c.run && c.bowls <= 0) return 'the rack is empty. stop at the pho stall to refill it';
                       if (c && c.on && c.hold >= 0) return 'behind one — A/D round it';
                       if (c && c.on) return 'W throttle · S brake · A/D steer · stop inside the lit lantern’s ring';
                       return 'the red scooter by the pho stall: press E at the seat';
@@ -32474,7 +32483,8 @@ export function createSystems(game) {
                       const h = game.hanoi;
                       if (!h || typeof h.cub !== 'function') return null;
                       const c = h.cub();
-                      return hintObj(c.on && !c.done ? h.dropAt(c.next) : h.cubAt());
+                      if (c.on && ((!c.run && !c.done) || (c.run && c.bowls <= 0))) return hintObj(h.cubStall());
+                      return hintObj(c.on && c.run ? h.dropAt(c.next) : h.cubAt());
                     } },
     'the-train':      { clue: 'stand in the rail alley, off the rails. wait for the horn, then hold still',
                     where: function () { return hintObj(game.hanoi && game.hanoi.rails); } },
@@ -37877,6 +37887,17 @@ export function createSystems(game) {
   let skyEyeT = 0;              // the PLAYER'S share of the skyward blend. See sysEYE_RAISE_W.
   let skyRestT = 0;             // ...and the STILLNESS's share of it. See sysREST_W.
   let restIdleT = 0;            // banked stillness, which camIdleT is not. See sysREST_FORGET.
+  let restStillT = 0;           // REIMAGINE E2: uninterrupted, unclaimed stillness
+  function sysRestReady(dt, idle, owned) {
+    if (game.state.noRestRestraint || game.state.perfRung >= 1) {
+      restStillT = 0;
+      return true;              // inherited thresholds remain below
+    }
+    const busy = !game.state.started || owned || photoOn || camHandT > 0 ||
+      input.action || input.honk || input.jump;
+    restStillT = idle && !busy ? Math.min(6.5, restStillT + dt) : 0;
+    return restStillT >= 6 && !sysCalmOn();
+  }
   // ...and whether this SPOT has already refused the wide shot. See restAsk.
   let restBlocked = false;
   // THE ORBIT (L7, E3). See sysORBIT_CUT: how long the boom has been cut, how
@@ -39013,7 +39034,7 @@ export function createSystems(game) {
     // swung it round the back over a second and a half (L6, E1).
     if (c === 'KeyC' && started) {
       const cg = game.capy && game.capy.group;
-      if (cg) { camYawTarget = cg.rotation.y + Math.PI; camHandT = 0; camIdleT = 0; }
+      if (cg) { camYawTarget = cg.rotation.y + Math.PI; camHandT = 0; camIdleT = 0; restStillT = 0; }
     }
     // Move the arrow to the next thing you have not done. See todoStep.
     if (c === 'KeyF' && started) {
@@ -39812,7 +39833,7 @@ export function createSystems(game) {
     const snap = padBtn(g, 11);
     if (snap && !padWasSnap && started) {
       const cg = game.capy && game.capy.group;
-      if (cg) { camYawTarget = cg.rotation.y + Math.PI; camHandT = 0; camIdleT = 0; }   // + PI: behind, as C (L6, E1)
+      if (cg) { camYawTarget = cg.rotation.y + Math.PI; camHandT = 0; camIdleT = 0; restStillT = 0; }   // + PI: behind, as C (L6, E1)
     }
     // ...and KEEPING it down is the eye-raise, exactly as V is. See padEyeT.
     padEyeT = snap ? padEyeT + dt : 0;
@@ -40863,6 +40884,7 @@ export function createSystems(game) {
     const capy = game.capy;
     const b = capy && capy.body;
     if (!b || !sp) return;
+    restStillT = 0;             // a new arrival has not chosen to linger yet
     b.position.set(sp.x, sp.y, sp.z);
     if (b.previousPosition) b.previousPosition.copy(b.position);
     if (b.interpolatedPosition) b.interpolatedPosition.copy(b.position);
@@ -41609,7 +41631,7 @@ export function createSystems(game) {
   // rig from inside this closure and neither had ever left it, so "the camera
   // will not settle in this chapter" was a question nothing could answer. See
   // sysREST_W, which is the second feature to hang off camIdleT.
-  const sysCamInfo = { reach: 0, dist: 0, clear: 1, pitch: 0, sky: 0, rest: 0, rig: 0, shot: 0, lift: 0, lift2: 0, floor: 0, idle: 0, hand: 0,
+  const sysCamInfo = { reach: 0, dist: 0, clear: 1, pitch: 0, sky: 0, rest: 0, rig: 0, shot: 0, lift: 0, lift2: 0, floor: 0, idle: 0, hand: 0, still: 0,
                        lens: 0, lensUnfaded: 0, lensBias: 0,
                        // (L7, E3): the orbit held, how many chosen, the capsule's radius, the swim cap, the underwater tint
                        orbit: 0, orbits: 0, capR: 0, swim: 0, sub: 0 };
@@ -49023,6 +49045,9 @@ export function createSystems(game) {
       const ra = sysLiveBiomeApi(game);
       if (ra && ra !== game.cali && typeof ra.rideYaw === 'function') rideYaw = ra.rideYaw();
     }
+    // E2: a short pause belongs to the player. The old gates stay intact;
+    // six uninterrupted seconds permit their composed view to take over.
+    const restReady = sysRestReady(dt, camIdle, mounted || sailing || rideYaw === rideYaw);
     // ---- X3.2: A GLANCE AT A FAR MOVER ------------------------------------
     // Generic and built once: `game.far` is whichever chapter is live's own
     // farBundle handle (far.js publishes it every frame; read-only here, this
@@ -49036,7 +49061,7 @@ export function createSystems(game) {
     // first: this must never fire under a rig that owns the lens outright.
     if (!(game.state && game.state.noLens2) && ((game.state && game.state.perfRung) | 0) === 0 &&
         started && capy && capy.grounded &&
-        camIdleT > sysFAR_GLANCE_IDLE_T && camHandT <= 0 &&
+        restReady && camIdleT > sysFAR_GLANCE_IDLE_T && camHandT <= 0 &&
         !mounted && !sailing && !(rideYaw === rideYaw) &&
         game.far && typeof game.far.audit === 'function') {
       if (shotW < 0.002) {
@@ -49122,7 +49147,7 @@ export function createSystems(game) {
     // orbit written into `camYaw` behind this one's back — that would be a
     // second writer on the rig's own input, which is the thing this file has
     // spent four passes taking OUT.
-    } else if (started && !mounted && camHandT <= 0 && camIdleT > sysCAM_IDLE_T &&
+    } else if (restReady && started && !mounted && camHandT <= 0 && camIdleT > sysCAM_IDLE_T &&
                sysNapNow < 0.5 && capy && capy.group) {
       // BEHIND THE ANIMAL, WHICH IS HALF A TURN FROM WHERE IT IS LOOKING.
       // camYaw is the direction FROM the capybara TO the camera, and the mesh's
@@ -49379,7 +49404,7 @@ export function createSystems(game) {
     // answer said twice.
     const orbitSwing = camOrbitYaw === camOrbitYaw && Math.abs(sysWrapPi(camYaw - camOrbitYaw)) > 0.15;
     if (camClearF < 0.48 && skyRestT > sysREST_W * 0.42 && !orbitSwing) restBlocked = true;
-    const restAsk = (started && !mounted && !sysCalmOn() && !restBlocked &&
+    const restAsk = (restReady && started && !mounted && !sysCalmOn() && !restBlocked &&
                      camHandT <= 0 && restIdleT >= sysREST_T) ? sysREST_W : 0;
     skyRestT = damp(skyRestT, restAsk,
                     restAsk > 0 ? sysREST_LAMBDA : sysREST_DROP, dt);
@@ -49431,7 +49456,7 @@ export function createSystems(game) {
       const nw = sysNapNow * (1 - flyT) * (1 - sailT) * (1 - skyT);
       camReach += sysNAP_DOLLY * nw;
       camPitch += sysNAP_PITCH * nw;
-      if (camHandT <= 0 && !sysCalmOn()) camYawTarget += sysNAP_YAW * nw * dt;
+      if (restReady && camHandT <= 0 && !sysCalmOn()) camYawTarget += sysNAP_YAW * nw * dt;
     }
     // ---- ...AND THE FLOW EASES IT BACK THE OTHER WAY --------------------
     // The loaf pulls the boom out because the animal has stopped and there is
@@ -49842,6 +49867,7 @@ export function createSystems(game) {
     sysCamInfo.pitch = camPitch; sysCamInfo.sky = skyT; sysCamInfo.rig = rigT;
     sysCamInfo.shot = shotW; sysCamInfo.rest = skyRestT;
     sysCamInfo.idle = restIdleT; sysCamInfo.hand = camHandT;
+    sysCamInfo.still = restStillT;
     sysCamInfo.swim = swimRigT;   // (L7, E3)
 
     // The spring is tracked separately from camera.position so the shake offset

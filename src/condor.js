@@ -358,6 +358,7 @@ let condorStalled = false;
 // The same loop would have caught an auto-release too. So the talons are shut for
 // long enough that the passenger has to have actually fallen away.
 let condorRegrabT = 0;
+let condorGrabRelease = false;  // a dismount's held key must be released first
 // ---- THE ROLL (L1) ---------------------------------------------------------
 // Twelve seconds of hanging on was the marquee, and the bird could already
 // flap (Q), tuck (Shift) and steer. Space while carrying, with air under the
@@ -1194,6 +1195,12 @@ function condorMount() {
   capy.body.velocity.x += condorFwd.x * condorLAUNCH_KICK;
   capy.body.velocity.y += condorFwd.y * condorLAUNCH_KICK + 1.5;
   capy.body.velocity.z += condorFwd.z * condorLAUNCH_KICK;
+  // C2: catching the descending orbit must not launch the passenger down.
+  // Keep the authored kick and horizontal momentum; cancel only the missing
+  // rise, equally on both bodies. Ordinary flight has no added lift source.
+  const pickupRise = Math.max(0, 1.5 - condorBody.velocity.y);
+  condorBody.velocity.y += pickupRise;
+  capy.body.velocity.y += pickupRise;
   // the yank starts the pendulum trailing behind the acceleration
   condorPendOX = -condorFwd.x * 0.32; condorPendOZ = -condorFwd.z * 0.32;
   condorPendVX = 0; condorPendVZ = 0;
@@ -1321,6 +1328,7 @@ function condorRelease(silent) {
     condorBoredT = condorBORED - 12;         // it sticks around a little longer
   }
   condorRegrabT = condorREGRAB_T;
+  condorGrabRelease = !!(game && game.input && game.input.action);
   if (!silent && game && typeof game.sfx === 'function') game.sfx('gull', { pitch: 0.75 });
   return true;
 }
@@ -2392,13 +2400,37 @@ function condorTalonDist() {
 }
 function condorTalonInReach() {
   if (condorConstraint || condorRegrabT > 0) return false;
-  return condorTalonDist() < condorREACH;
+  return condorTalonDist() < condorREACH && condorPickupReady();
+}
+
+function condorPickupReady() {
+  if (!condorBody) return false;
+  const q = condorBody.quaternion, p = condorBody.position;
+  const up = 1 - 2 * (q.x * q.x + q.z * q.z);
+  const nose = 2 * (q.y * q.z - q.w * q.x);
+  // A held grab waits for a level, clear pass instead of attaching during
+  // the inbound dive. Four metres leaves room below the hanging passenger.
+  if (!(up > 0.65 && nose > -0.15 && nose < 0.45 &&
+    p.y - condorTerrain(p.x, p.z) > 4)) return false;
+  // A level pickup can still fire straight into a facade. Check the first
+  // 1.4 seconds of the authored kick without borrowing future climb height.
+  const vx = condorBody.velocity.x + 2 * (q.x * q.z + q.w * q.y) * condorLAUNCH_KICK;
+  const vz = condorBody.velocity.z + (1 - 2 * (q.x * q.x + q.y * q.y)) * condorLAUNCH_KICK;
+  for (let i = 0; i <= 7; i++) {
+    const t = i * 0.2;
+    if (condorGroundTop(p.x + vx * t, p.z + vz * t) + condorHANG + 0.5 >= p.y) return false;
+  }
+  return true;
 }
 
 function condorTryMount(dt) {
   void dt;
   const game = condorGame;
   const capy = game.capy;
+  const input = game.input;
+  // REIMAGINE C2: "hold E" must work when the talons arrive later. Re-arm
+  // on key-up even out of reach or during the existing release cooldown.
+  if (!input || !input.action) condorGrabRelease = false;
   if (!capy || !capy.body || condorConstraint) return;
   if (condorRegrabT > 0) return;                 // see condorRegrabT
 
@@ -2413,11 +2445,10 @@ function condorTryMount(dt) {
   const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
   if (d > condorREACH + 1.0) return;
 
-  const input = game.input;
-  const grabbed = !!(input && input.actionPressed) && d < condorREACH;
+  const grabbed = !!(input && (input.actionPressed || (input.action && !condorGrabRelease))) && d < condorREACH;
   // a leap into the talons counts even without the grab key
   const leapt = !capy.grounded && capy.body.velocity.y > 0.6 && d < condorREACH + 1.0;
-  if (grabbed || leapt) condorMount();
+  if ((grabbed || leapt) && condorPickupReady()) condorMount();
 }
 
 // ---------------------------------------------------------------------------

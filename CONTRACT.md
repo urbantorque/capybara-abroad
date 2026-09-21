@@ -1,3 +1,46 @@
+## REIMAGINE C2/D2/E2/E4 — CONTROL, DIRECTIONS, STREET RHYTHM (21 Sep 2026)
+
+E2 requires six continuous undisturbed seconds before unsolicited idle camera
+composition. Movement, interaction, manual orbit/snap, photo and vehicle ownership
+reset the bank; reduced motion declines the view. Explicit shots and collision
+escape retain priority. `noRestRestraint`/rung one restores authored thresholds.
+Sydney and Quay real-key camera checks pass without runtime errors. Quay's
+pedestrians can reset stillness by pushing the animal; the test waits for the
+actual bank, not a wall-clock assumption. Cut-gate CPU p95 .000025 ms flag /
+.000050 ms rung, excluding inherited camera and GPU work.
+
+E4 groups Kyoto Gion frontages into full-paper, high-transom and divided-window
+forms. Existing roofline, ground, collider shapes, draw count, 7,416 vertices and
+3,708 triangles remain. Three pinned arrival/walk/reverse mask comparisons were
+inspected. `noMachiyaRhythm`/rung one restores exact cached attributes. Gate CPU
+p95 .000027 ms flag / .000089 ms rung; no GPU timing claim.
+
+C2 makes the advertised held grab work when talons arrive later. Key release
+re-arms before distance/cooldown checks, and a held dismount does not reboard.
+Pickup waits for a level, upright pass, terrain clearance and an unobstructed
+1.4-second launch corridor. An equal one-time vertical correction preserves a
+minimum +1.5 m/s rise for bird and passenger after the original kick. Ordinary
+flight forces, collision immunity duration, leap reach and throwing remain.
+Safe-pose-only testing exposed a church collision; the departure gate addresses
+that measured failure. Two fresh trusted-key runs earned the twelve-second
+signature with wingbeats and passed held release. This is not a complete flight
+course or a guarantee for every approach. Seventeen groups / 562 checks cover
+the shipped boarding, release, readiness and launch code.
+
+D2 points Pantanal gathering toward the herd, then the entry and far bank.
+Follower loss mid-attempt cannot point the arrow or clue back to the beginning.
+Hanoi expired/empty delivery runs target a fixed refill stall; active deliveries
+retain their ordered stops. Existing gameplay state supplies both decisions.
+Eleven extracted-function groups / 50 checks cover the target and clue states.
+Six live Hanoi fixture states pass with zero runtime errors, including a real
+timeout update, fixed-stall recovery through trusted E, completion and replay.
+Positions and prior deliveries were controlled; this was not a natural route.
+After 1.3 game seconds the stale live delivery line clears correctly. The
+marquee folds the pinned task clue; visible recovery is supplied by the existing
+failure toast. Browser evidence establishes targets and transient expiry, not
+persistent recovery-clue visibility.
+No new save fields in this checkpoint.
+
 ## REIMAGINE E3/F — ONE FACE, ROOM FOR THE SCORE (21 Sep 2026)
 
 E3 replaces the capybara's stacked skull/brow/muzzle/cheeks with one continuous

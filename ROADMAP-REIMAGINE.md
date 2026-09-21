@@ -135,6 +135,26 @@ Simplify overlapping comfort upgrades and consumables. Preserve or
 fairly convert existing purchases; never silently erase earned value.
 Make the current interaction target and failed attempt legible.
 
+C2 first concrete friction fix: the flight hint says to hold E, but talon
+pickup only accepts its first pressed frame. Accept a held grab when the bird
+comes within reach. A release latch prevents the same held key from boarding
+again after dismount; key-up re-arms before distance/cooldown early returns.
+Preserve leap pickup, reach, cooldown, prop throwing and ordinary flight physics.
+No save field or new visual/audio term; test real functions and trusted input.
+Natural repeats exposed a separate pickup impulse flaw: the descending orbit
+can still have negative vertical speed after the authored launch kick. One
+instrumented launch went from -5.756 to -1.348 m/s. Add an equal one-time
+correction to bird and passenger so pickup finishes at least +1.5 m/s, preserving
+the original horizontal kick and any already-faster rise. Do not add sustained
+lift or extend collision immunity. Natural flight/wingbeat trials remain required.
+Pickup also waits for an upright, near-level pass with four metres of terrain
+clearance. The reach prompt uses the same gate. A safe-pose pickup still crashed
+after 4.8 seconds: telemetry shows velocity reversing at the church facade,
+not an initial stall. Eight samples along the first 1.4 seconds of the existing
+horizontal kick now reject an obstructed departure, without assuming future
+climb. Two fresh natural runs with real wingbeat inputs earned the signature
+and passed held manual release. These are launch checks, not a full flight course.
+
 Evidence: keyboard and controller paths; tired jump, swim, climb and
 vehicle behavior; existing upgrade saves; representative timed records.
 
@@ -146,6 +166,13 @@ Make narrow-screen layout a first-class case; reserve a clean area for
 the animal and its target. Reuse existing queues and writers where
 possible rather than adding competing systems.
 
+D2 route guidance repairs take priority over new interface decoration. The
+Pantanal crossing arrow must lead to the herd, entry, then far bank as the
+attempt progresses. Hanoi's delivery hint must return an expired or empty
+run to the refill stall, using existing run/bowl state. No new save fields.
+Test actual hint functions across gathering, crossing, timeout, refill and
+completed-run states, then inspect the live arrow and recovery text.
+
 Improve a few existing encounters into clear comic chains with multiple
 solutions. Start with Sydney's picnic/cafe and an interaction in a second
 chapter, using existing people and props. Better causality beats another
@@ -155,6 +182,16 @@ Evidence: normal and narrow screenshots, real actions and visible
 reactions, concurrency of messages, recovery and repeatability.
 
 ### E — a deliberate visual leap
+
+E2 camera agency reverses the inherited 1.0-second rest crane, 1.1-second
+idle yaw and 2.0-second far-glance entry during ordinary exploration. Those
+thresholds can move a camera-relative control frame during a brief inspection.
+The overlay asks for six continuous seconds without movement, action, jump,
+wheek, manual camera input or a camera-owning mode. Reduced motion declines
+these unsolicited views. Existing authored thresholds remain behind
+`noRestRestraint`/rung one; explicit shots, collision escape and vehicles keep
+their priority. Prove short stop, deliberate long rest, interaction, manual
+orbit, reduced motion and cut/rung behavior with real keys and clock.
 
 User emphasis, 21 Sep: visual beauty is a primary redesign deliverable,
 not a finishing pass. Audit and improve all five visual layers: the capybara
@@ -264,16 +301,14 @@ work. A green static suite is necessary and never a claim of perfection.
 
 ## Current wave
 
-- Lead: integrate F1/F2/F3/E3, live Kyoto audio regression and checkpoint
-  gates. Main owns all released source; no simultaneous NPC/systems edits.
-- E3 accepted after twelve paired fixtures and a second eye-clearance pass.
-  Unified head/chin replaces the forehead-only prototype. Agent released files.
-- F2 complete: thirteen behavioral groups and a fresh Sydney browser pass.
-  F3: 13,439 scheduler assertions, including 672 live flag/governor returns
-  and 280 bass-walk handoffs. Independent review fixes are verified; no
-  further concrete issues reported. Not a perceptual OST-quality claim.
-- Read-only Luna scout: map idle camera thresholds and priority hazards for
-  E2. No new camera code until this checkpoint's audio/art gates finish.
+- E3/F1/F2/F3 pushed as `0eda80d`: 33 checks, zero failures.
+- Lead: E2 camera agency and C2 held talon pickup, natural flight regression,
+  integration and checkpoint gates. Browser/source ownership released by art.
+- E4 Kyoto facade rhythm accepted in arrival/walk/reverse views. No added
+  triangles, draw calls or colliders; cut/rung restores inherited buffers.
+- Read-only Luna checkpoint reviewer: E2/C2/E4 runtime regressions. No
+  simultaneous source edits. Next priority is natural route friction, not
+  another layer of decorative effects.
 
 ## Checkpoint log
 
@@ -390,3 +425,57 @@ work. A green static suite is necessary and never a claim of perfection.
   stale and is not counted as fresh browser coverage. First gate found an
   unused shared geometry constant; restored its body-path use and updated
   the extracted geometry fixture, then reran the full suite successfully.
+- E2 Sydney: ordinary short stops tested after manually dismissing the authored
+  arrival shot. Bearing drift between roughly .5 and 5.5 seconds was 0.00000022
+  radians; the rest crane stayed down. Deliberate long rest still opened it.
+  Held action, orbit/snap, photo, reduced motion and flag/rung restoration pass
+  with trusted keys, real clock and zero runtime errors. Other camera-owning
+  modes remain a separate validation obligation, not implied by this test.
+- E4 Kyoto: grouped full-paper, high-transom and divided-window frontages,
+  same roofline/palette. Three pinned mask comparisons inspected by lead:
+  arrival 55,107/78,371, walk 58,417/80,006, reverse 31,836/45,452 changed/affected
+  pixels. 3,024 facade vertices move and 144 tint; roofs/ground/collider shapes
+  unchanged. Existing 7,416 vertices/3,708 triangles and draw count unchanged.
+  `noMachiyaRhythm`/rung one returns exact cached attributes. Gate CPU p95
+  .000027 ms flag / .000089 ms rung, excluding inherited update and GPU cost.
+- C2 held boarding: eleven shipped-function groups, 45 checks pass. Includes
+  delayed approach, strict reach, leap, cooldown, held dismount latch, key-up
+  recovery, prop throwing and ballistic release. Natural browser flight pending.
+- C2 natural repeats: held pickup is confirmed without a new press. One
+  unsteered ride earned the twelve-second signature; another hit ground near
+  launch after 3.2 seconds, and another reached the world edge after 10.9.
+  Physical telemetry confirms an initially downward launch is possible. The
+  one-time rise correction is now under live validation. Do not label all
+  unsteered starts reliable or mistake the passing repeat for full coverage.
+- E2 Quay: trusted short/long rest, action, orbit/snap, photo, reduced motion
+  and fallback checks pass with zero runtime errors. An initial long-rest
+  assertion incorrectly ignored pedestrian shoves; corrected test waits for
+  six continuous undisturbed game seconds. Cut-gate p95 .000025 ms flag /
+  .000050 ms rung, excluding inherited camera/GPU. Foreground foliage dither
+  remains visually intrusive in the inspected short-stop capture.
+- C2 clear departure: safe-pose-only pickup hit the church in about one second
+  (forward velocity +12.69 to -6.64 m/s across its facade). Added the bounded
+  launch-path gate. Two fresh held-key runs earned the twelve-second signature,
+  used real Q wingbeats and stayed released under held E, zero runtime errors.
+  Seventeen extracted-function groups, 562 checks, 75 launch cases pass.
+- D2 route hints: Pantanal now targets herd, entry, then far bank; losing
+  followers during an attempt does not turn arrow or clue back. Hanoi directs
+  expired/empty runs to a fixed refill stall rather than an inactive lantern
+  or the moving scooter. Eleven shipped-function groups, 50 checks pass.
+  Live recovery validation pending. No new save fields.
+- D2 live Hanoi: six controlled states pass, zero runtime errors. Real timeout
+  update points at fixed stall; trusted E restarts ordered deliveries; completion
+  and replay target correctly. Seeded positions/prior deliveries, not natural
+  play. The recovery sentence was not visible in the sampled UI, so presentation
+  coverage remains separate from verified target behavior.
+- C2/D2/E2/E4 gates: source syntax, fresh build, 37 suite checks with zero
+  failed. Independent source review found no concrete regression. Historical
+  soak remains stale and does not count as current runtime coverage.
+- D2 settled UI repeat: after 1.3 actual game seconds, stale delivery status
+  clears as authored. Recovery wording exists in the folded task clue and the
+  visible failure toast; the marquee hides the pinned clue. No persistent
+  stale-line defect reproduced. Six fixture cases pass again, zero errors.
+- Usage follow-up, 21 Sep about 13:40 UTC: weekly 13% used, 87% remaining;
+  Luna reserve remains 0%. Rounded readings imply roughly five to six weekly
+  points per hour, account-wide. The remaining twelve-hour-window work fits
+  that estimate, but rate is variable and no completion quota is guaranteed.

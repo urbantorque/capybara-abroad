@@ -129,6 +129,8 @@ let kyoGame = null;
 let kyoBuilt = false;
 let kyoRoot = null;
 let kyoTime = 0;
+let kyoMachiya = null, kyoMachiyaBase = null, kyoMachiyaLive = null;
+let kyoMachiyaOn = false;
 
 let kyoPondMesh = null, kyoPondAttr = null, kyoRipT = 0;
 let kyoRiverMesh = null, kyoRiverAttr = null;
@@ -804,8 +806,56 @@ function kyoBuildZen(game, root) {
 }
 
 // ==================================================================== GION ====
+// Three frontages, grouped rather than alternating: paper shop, shuttered
+// house with a high transom, and a divided shop window. The fuller fronts
+// gather around the crossing; the rest stop competing with every neighbour.
+const kyoMACHIYA_ROWS = [[1, 2, 1, 0, 0, 2, 1, 1, 2],
+                         [2, 1, 0, 1, 2, 0, 1, 2, 1]];
+function kyoMachiyaBuffers(geometry, fronts) {
+  const pos = geometry.attributes.position.clone();
+  const col = geometry.attributes.color.clone();
+  function move(range, cx, cy, sx, sy, dx, dy) {
+    for (let i = range[0]; i < range[1]; i++) {
+      pos.setXY(i, cx + (pos.getX(i) - cx) * sx + dx,
+        cy + (pos.getY(i) - cy) * sy + dy);
+    }
+  }
+  const paper = new THREE.Color(PALETTE.shoji), warm = new THREE.Color(PALETTE.tatami);
+  for (const f of fronts) {
+    if (!f.type) continue;
+    const high = f.type === 1;
+    const width = high ? 1 : 0.72, height = high ? 0.40 : 0.78;
+    const lift = f.h * (high ? 0.18 : 0.02);
+    move(f.paper, f.x, f.y + f.h * 0.55, width, height, 0, lift);
+    for (let k = 0; k < f.bars.length; k++) {
+      const bx = f.x - f.w * 0.42 + k * (f.w * 0.84 / 6);
+      // A broader middle mullion divides the second shop into two windows.
+      move(f.bars[k], bx, f.y + f.h * 0.55, !high && k === 3 ? 5 : 1,
+        height, (bx - f.x) * (width - 1), lift);
+    }
+    move(f.curtain, f.x, f.y + 2.35, high ? 0.55 : 0.85,
+      high ? 0.70 : 0.85, f.w * (high ? 0.26 : -0.23), high ? -0.40 : -0.20);
+    if (!high) for (let i = f.paper[0]; i < f.paper[1]; i++) {
+      // Retain the inherited per-primitive jitter under this palette tint.
+      col.setXYZ(i, col.getX(i) * (0.82 + 0.18 * warm.r / paper.r),
+        col.getY(i) * (0.82 + 0.18 * warm.g / paper.g),
+        col.getZ(i) * (0.82 + 0.18 * warm.b / paper.b));
+    }
+  }
+  return { position: pos, color: col };
+}
+function kyoUpdateMachiya(game) {
+  if (!kyoMachiya) return;
+  const on = !game.state.noMachiyaRhythm && (game.state.perfRung | 0) < 1;
+  if (on === kyoMachiyaOn) return;
+  const attrs = on ? kyoMachiyaLive : kyoMachiyaBase;
+  kyoMachiya.geometry.setAttribute('position', attrs.position);
+  kyoMachiya.geometry.setAttribute('color', attrs.color);
+  kyoMachiyaOn = on;
+}
 function kyoBuildGion(game, root) {
   const G = kyoMerger();
+  const fronts = [];
   const lanes = [-1, 1];
   for (let li = 0; li < lanes.length; li++) {
     const side = lanes[li];
@@ -816,10 +866,14 @@ function kyoBuildGion(game, root) {
       const h = rand(4.4, 5.6), w = 8.2, dep = 7.0;
       // machiya: dark timber lattice, a deep tiled roof, one warm paper window
       G.box(x, y + h * 0.5, z, w, h, dep, PALETTE.templeWood);
+      const f = { x, y, h, w, type: kyoMACHIYA_ROWS[li][i], paper: [G.n], bars: [], curtain: [] };
       G.box(x, y + h * 0.55, z - side * (dep * 0.5 + 0.05), w - 0.6, h * 0.62, 0.20, PALETTE.shoji);
+      f.paper.push(G.n);
       for (let k = 0; k < 7; k++) {
+        const range = [G.n];
         G.box(x - w * 0.42 + k * (w * 0.84 / 6), y + h * 0.55, z - side * (dep * 0.5 + 0.14),
               0.14, h * 0.66, 0.14, PALETTE.shojiFrame);
+        range.push(G.n); f.bars.push(range);
       }
       // THE ROOF IS THE WHOLE OF GION AND IT WAS TWO FLAT PLATES.
       //
@@ -845,7 +899,9 @@ function kyoBuildGion(game, root) {
               PALETTE.templeWoodDk);
       }
       // noren curtain over the door
+      f.curtain.push(G.n);
       G.box(x, y + 2.35, z - side * (dep * 0.5 + 0.30), 2.4, 1.2, 0.08, PALETTE.indigo);
+      f.curtain.push(G.n); fronts.push(f);
       kyoStaticBox(game, x, y + h * 0.5, z, w * 0.5, h * 0.5, dep * 0.5);
     }
   }
@@ -858,6 +914,12 @@ function kyoBuildGion(game, root) {
   kyoStaticBox(game, 0, ly - 0.15, lz, 54, 0.28, 5.4);
 
   const m = new THREE.Mesh(G.build(), kyoVC());
+  m.name = 'kyoMachiya';
+  kyoMachiya = m;
+  kyoMachiyaBase = { position: m.geometry.attributes.position, color: m.geometry.attributes.color };
+  kyoMachiyaLive = kyoMachiyaBuffers(m.geometry, fronts);
+  // Edits shrink within the old facade bounds, so its sphere remains valid.
+  kyoUpdateMachiya(game);
   m.castShadow = true;
   m.receiveShadow = true;
   root.add(m);
@@ -4737,6 +4799,12 @@ export function createKyoto(game) {
 
   const api = {
     built() { return kyoBuilt; },
+    machiyaAudit() {
+      return { on: kyoMachiyaOn, frontages: kyoMACHIYA_ROWS,
+        inherited: !!kyoMachiya && kyoMachiya.geometry.attributes.position === kyoMachiyaBase.position,
+        vertices: kyoMachiya ? kyoMachiya.geometry.attributes.position.count : 0,
+        triangles: kyoMachiya ? kyoMachiya.geometry.index.count / 3 : 0 };
+    },
     terrainHeight: kyoTerrain,
     /**
      * THE BELL AND THE BIRDS, MEASURED. `startled` is how many cormorants are
@@ -4890,6 +4958,7 @@ export function createKyoto(game) {
       if (kyoRickMover) kyoRickMover.step(dt);
       if (!kyoBuilt) return;
       if (!game.biome.isActive('kyoto')) return;
+      kyoUpdateMachiya(game);
       kyoTime += dt;
 
       // ---- THE WATERLINE USED TO FOLLOW THE ANIMAL, AND NOW IT DOES NOT ----
@@ -5473,4 +5542,3 @@ function kyoBuild(game) {
 
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(kyoRoot);
 }
-

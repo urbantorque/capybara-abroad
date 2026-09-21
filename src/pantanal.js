@@ -5956,6 +5956,7 @@ export function createPantanal(game) {
     otters: { x: panOTTERS.x, z: panOTTERS.z },
     bridge: { x: panRoadX(panBRIDGES[1].z), z: panBRIDGES[1].z },
     bank: { x: panCROSS.x, z: panRIVER.z1 + 3 },
+    farBank: { x: panCROSS.x, z: panRIVER.z0 - 3 },
     sandbar: { x: panSANDBAR.x, z: panSANDBAR.z },
 
     /**
