@@ -194,6 +194,168 @@ today's).
   (`sysMUS_LOOK` 2 s, `sysMUS_TICK` 240 ms); a statement is at most three
   voices more than the drift. ≤ 0.2 ms a tick, measured.
 
+### M1 — shipped (21 Sep 2026)
+
+B is nine notes, not eight: *la sol fa sol | mi re do re | do*, degrees
+5 4 3 4 | 2 1 0 1 | 0, durations 2 1 1 3 | 2 1 1 1 | 4 — the held *do*
+is a note of its own, which is what the brief's degree list says and
+what makes the second phrase close (re over V, then do held on I); the
+tag *sol la do'* is 4 5 7 at 1 1 4. A + B + tag is therefore **twenty**
+notes and the coda pays for the twentieth (M5). `sysMUS_THEME`/`_DUR`
+untouched; `musDegOff(d, pal, scale)` is the one resolver for every
+degree in the pass (the third and sixth flat where the scale is minor,
+the existing rule). `sysMUS_PROG` is one table beside `sysMUS_2ND`:
+`mode` rows build I–V–vi–IV | I–IV–V–I (major) or i–♭VI–♭III–♭VII |
+i–iv–V–i (minor) from the scale on the tonic — `musProgChord` voices
+the five-note pad shape just over the palette's home chord, the root
+beside `roots[0]` — and the tag's cadence is ♭VI–♭VII–i where the scale
+has those degrees, V–I where it does not; `own` rows never leave the
+table: Kyoto's thirdless hirajoshi (D/F, closing Bb→D), the two quartal
+palettes, the hijaz row, the Drift, Antarctica, Monte Carlo and the five
+bands (a vamp plays its vamp, Venice its whole seven-chord sequence).
+Not one chord, root or next row moved. **Measured** (`hud.themeAudit(n)`,
+no palette touched): every note's pitch class in the palette's scale
+**20/20 in 21/21**; against the progression chord actually under each
+note, chord-tone share by beats 0.33–0.83 (the major built rows 0.64,
+the minor built rows 0.44 — the held do over ♭VII is a suspension by the
+roadmap's own progression; Monte Carlo's own cycle 0.83).
+
+### M2 — shipped (21 Sep 2026)
+
+`musOcarina(when, midi, vel, gap)`: a sine with a triangle an octave
+over it at 0.18, the palette's lowpass at 1.6× its cut **with a 1.4 kHz
+floor** (Iceland's 470 × 1.6 = 752 Hz would sit under a D6 — the
+`sysMUS_SKYCUT` argument again), a 40 ms breath from the MONO
+`noiseSrc()` band-passed 1.5–4 kHz at −18 dB, vibrato 5.5 Hz / 12 cents
+on `detune` fading in after 180 ms (nothing else writes this voice's
+detune), 30 ms of portamento when the note before ends where this one
+starts, 220 ms release. Register: the tonic folded into MIDI 69–80
+(`musOcaBase`) so the octave the tune spans sits at D5–D6 in every key.
+Dispatched as `'ocarina'` from `musLiftNote`; `noOcarina` sends the same
+notes to the palette's lead. It has its own gain, **`musOcaBus`, into
+`musWide` — after `musSideG`, so the world's transients never duck it,
+and through musWide's dry taps and its send to the room like every
+sustained voice.** That node is W2's one handle. `sysMUS_OCA_VEL` 0.105
+against the lead's 0.03–0.075 and the lift's 0.115: above the plucks,
+not timid. **Measured** (analyser on `game.music.bus`, Sydney, context
+running): master RMS 0.047 at rest → 0.06–0.14 across the eight notes of
+A on the ocarina (+3 to +9 dB), 0 errors. `hud.ocarina(midi, gap, vel)`
+plays one note for W2's bus work.
+
+### M3 — shipped (21 Sep 2026)
+
+`musSetChord` is now a wrapper on `musSetChordTo(chord, root, nextRoot,
+when, xf)` — the pad's voice-leading, the bass and its walk, one path —
+so a statement hands the pad a built chord exactly as the drift hands
+it a table row. `musStatement(kind, moment, delay, scale)` takes one
+request slot; `musStmtTick` at the top of `musTickBody` builds the
+event list once (chords at the phrase's own turns — notes 0, 3, 4, 7 of
+A and 0, 3, 4, 8 of B, the tag's per note; the tune on the ocarina; the
+countermelody a scale-wise third below, a sixth under the held notes, a
+beat late on the second voice's instrument at its row's velocity ×
+`sysMUS_2ND_GAIN`) and feeds it to the same two-second lookahead, so
+`musCurChord` moves when the pad does and a sting mid-statement is in
+key. The beat: `0.6 × dwellA / 9` clamped 0.42–0.9 (Sydney 0.6, Kyoto
+0.87, Pasto 0.42, the Drift 0.9), a band's own crotchet snapped to its
+bar. `musChordAt` parks past the lookahead beyond the end; the hand-over
+is scheduled inside it — a `mode` row voice-leads onto the palette's
+chord 0 at the last note, an `own` row is already on a table chord —
+and the walk continues from there: **never a cut** (the chord index
+held for the whole 21.6 s in Sydney, then 0 with a fresh dwell). The
+plucks thin to a third under a statement. Moments: arrival **6 s after
+the phrase resolves** (1 s after a wait that ran out), the lift's figure
+then the tag over the cadence, chapter done (the ceremony asks for the
+full statement 2.4 s after the resolve, replacing the swell's tag; the
+ostinato now waits for a statement to END with the chapter done —
+`musOstArmed`, so it never plays under or before the tune), the nap's
+wake (A, half tempo), rest (4–6 min since the last, grounded, no pill
+in 6 s, not asleep). One pending slot with a rank — full > A > wake =
+tag — because the harness's animal naps at ten seconds idle and every
+`hud.cross` woke it, and Pasto's arrival read as a `wake` until the
+arrival outranked it. A border cuts a live statement and forgets a
+pending one. `noTheme` cuts all of it; the phrase and the ostinato stay.
+**Measured** (`qa/score-theme.js` sweep + sweep-b, context running): a
+full statement **19/19 arrivals, 6.3–10 s after the cross** (the roadmap
+asked for 40), the right palette and key in every row (Pasto A minor at
+0.42, Kyoto D minor at 0.867 with F and Bb, Göreme hijaz with the Eb,
+Hanoi and the cave pent, Antarctica at 0.8); 20 ocarina notes and 9
+countermelody notes per full statement on a palette with a second row;
+lift → tag 3 notes; done → full statement, ostinato 0 under it, 12 notes
+in the 26 s after.
+
+### M4 — shipped (21 Sep 2026)
+
+`sysMUS_MOTIF`: traveller *sol re mi* (4 1 2, mallet, 1.4 s), home (the
+theme's first four as a **swell on the pad's own bank** — `musPadSwell`,
+two detuned oscillators in the pad's spectrum into `musFilt`, so it has
+the pad's cut, bus, sidechain and width and nothing writes
+`musPad.gain`), companion *do mi sol* (0 2 4, pluck, 0.9 s). Through
+`musLiftNote` (a new `'swell'` case), degrees through `musDegOff`. A
+4 s same-name gap; dropped under a statement or asleep. Wired:
+`npc:travSeen` and `npc:travMet` → traveller, `shelf:grew` → home, the
+companion's pickup, the X1c comes-over, `compClimb` and the homecoming
+(0.6 s after its own sound) → companion; Sydney's arrival statement
+opens with home under its first four notes. Absence: `sysPalAwayCheck`
+arms `musAbsenceArm` beside `palAwayArm`, and the arrival then says A
+alone in the parallel minor (the third and sixth flat), moment
+`absence`. `noMotif` cuts the four. **Measured** (`qa/score-theme.js`
+motifs): each event fires its figure once — travSeen, travMet,
+shelf:grew, the companion door — 0 dropped. Honest gap: the three
+companion sites are wired by reading; no harness run has a herd, and
+the absence mode was not driven (a 20-minute clock; the arm is one
+line beside the one N3 already fires).
+
+### M5 — shipped (21 Sep 2026)
+
+The second voice keeps its 0.15 entry — L6 measured a naive hour at
+chapProg 0.17, and an answer that starts later is one most players
+never hear — and from **a third** its role changes: the scale-wise
+third below the note the walk just played (`musThirdBelow` from
+`musMelDeg`) instead of a random chord tone. The pulse at a half is
+kept. From **two thirds** the bass walks: `musWalkNote` strikes the
+root on each chord change and the fifth at half the dwell into the
+bass's own filter (`musBassIn`), velocity 0.4 against the sine's 0.5,
+so `musBassGain` keeps its one writer. The wake statement opens the
+room ×1.5 as a term in `musRoomSet` (the wet gain's one writer). The
+coda: nineteen keepsakes carry the first nineteen notes of A + B + tag
+at the tune's own rhythm (0.22 s a beat, 7.9 s for 36 beats — near the
+old 19 × 0.34), each on its chapter's lead in Sydney's key, the pad
+walking the progression under them (`musCodaChords`); the twentieth,
+the held *do'* that ends the tag, is the ocarina's, with no keepsake to
+name; then the hush as before. `noArc` puts the gates and the coda
+back. **Measured** (`qa/score-theme.js` sydney, coda): counter live at
+prog 0.35 (every second-voice note a third below), pulse at 0.5
+(8 strokes / 20 s), walk at 0.7 (one change, one strike — Sydney's
+dwell is 9–15 s), the full statement 3.8 s after done; the coda 20
+notes, indices 0..19 in order, pitches in D `62 69 74 69 67 66 64 62 |
+71 69 67 69 66 64 62 64 62 | 69 71 86`, hush at 9 s, the ledger after.
+
+**Cost, measured** (`qa/score-frametime-w1.js`: `musTickBody` timed
+inside `musTick`, every layer live plus a full statement against
+`noTheme + noArc + noMotif`, 20 s an arm × 2, headless): Sydney 0.273 vs
+0.332 ms a tick, Kyoto 0.351 vs 0.195. The pass adds ≤ 0.16 ms a tick
+inside a ±0.1 ms noise floor; the absolute tick with the drift alone
+was already 0.2–0.33 ms on this machine, so "≤ 0.2 ms with every layer
+live" is met on the delta and not on the absolute.
+
+**What no agent could hear:** whether the ocarina sits above the plucks
+on speakers (the bus is W2's), whether B's held do over ♭VII reads as a
+suspension or a wrong note in Pasto and Iceland, whether the home swell
+reads as the pad rising or as a fifth voice, whether 0.42 s a beat is
+too quick in Pasto and Manly. The player is the ear.
+
+**For W2 (the lines W1 touched near the pad writer and the sidechain):**
+`musicStart` — `musOcaBus` is created right after `musWide.connect
+(musSend)` and connects to `musWide` (after `musSideG`); `musBassIn =
+bassLp` beside `musBassGain`. `musRoomSet` — a `wakeK` term on the wet
+gain. The frame writer — the arrival block now asks `musStatement` when
+the pend resolves; the sleep block gained the rest timer; the wake edge
+skips `musChordAt` under a live statement. The pad writer's 0.3 s block
+is untouched. `musTickBody` — `musStmtTick(now, horizon)` at the top,
+`brK × 0.35` under a statement, the ostinato gate on `musOstArmed`.
+`musSetChordTo` — the walking bass strikes at the end of it. The
+settings card sets `game.state.noQuiet` with the other three.
+
 ## Part Q — the quiet (src/systems.js §5b, src/npc.js, src/weather.js)
 
 Every row here is a reversal of L7 E1 or a level the player named; each
