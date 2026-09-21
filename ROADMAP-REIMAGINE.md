@@ -761,3 +761,85 @@ work. A green static suite is necessary and never a claim of perfection.
   concrete release blocker. Historical soak remains stale and is not counted
   as fresh runtime evidence. Palawan's unfinished driver stays outside this
   checkpoint until its route is played successfully.
+- Follow-up diagnosis narrows the matcha obstruction: the green foreground
+  mass is its authored four-second transparent powder burst, not trees. It
+  bypasses the opaque-world aperture intentionally. The mill roof is also in
+  frame; capture after the burst expires before attributing the whole failure
+  to camera geometry or changing the general camera solver.
+- Palawan acceptance has not yet reached the manta. A real jump consistently
+  reaches the raised deck at body y1.590; straight camera-relative steering
+  drifts into the boatman on the narrow passage. Later driver failures include
+  a steering dead zone larger than its waypoint radius and overly strict
+  camera-yaw settling. Those are instrument failures, not game regressions.
+  The driver now records nearby NPC/collider positions and uses real Z/X keys
+  and short right-side corrections. Do not count the unfinished route as passed.
+- D7 candidate: distinguish the jetty's landward entry from its seaward goal
+  in the existing hint, and explain the hop onto the raised bamboo before
+  telling a player to keep walking off the end. Prefer an existing-channel
+  guidance repair over an invisible performance-dependent ramp/collider.
+  No task reward, spawn, save shape or new visual layer is needed.
+- D7 root cause confirmed: the 2.8m exit-board frame spans the actual 2.4m
+  jetty. Its old placement comment mistook full width for half width. Move
+  the existing board to shore (2,32), use the actual ground floor, and move
+  its departure arrow/action together. The boat landmark remains at the
+  seaward jetty; legacy bloom eligibility remains, and the earned route memory
+  also opens its departure interaction. No geometry, draw calls,
+  save fields or optional visual layer added. Natural passage remains pending.
+- First fresh D7/G passage passes: real jump, open-side deck walking, dive,
+  one trusted E boarding edge, automatic manta breach and save/reload. 368
+  navigation samples, all three tasks earned, zero browser errors. Its manta
+  screenshot exposes jagged folded wing strips; investigate that separately.
+- D7 departure fixture opens the relocated board with a genuine walk and
+  three Q presses before bloom, after restoring an earned-memory save. Floor
+  measured y0.2533; 34 navigation samples, zero runtime errors. First image
+  exposed the map-centre-derived yaw facing away from shore; explicitly face
+  the existing board toward the beach and repeat image acceptance.
+- E8 plan: replace only manta wing slabs with connected closed upper/belly
+  skins using existing span stations, chord/sweep/thickness/droop functions
+  and tip pivots. Preserve body details, route, ride, beat/curl and reward rows.
+  `noMantaContour` or governor rung one restores exact cached old geometry;
+  stable frames do no geometry writes. No new save field or added draw call.
+  Validate outward finite triangles, seam bounds at curl extremes, both mantas,
+  natural ride silhouette, masked live/cut/restored views and measured cut cost.
+  Do not count the fix as accepted until those views are inspected.
+- E8 static prototype: 1150 checks against checkpoint 1b367d3; six slots,
+  1344 to 1072 triangles across both mantas, three shared cached geometries
+  (56352 bytes), one private standard Lambert variant. The shared world
+  material is never changed. Original body/detail attribute prefixes, route,
+  mounting, beat/curl and reward code are preserved. Cuff coverage is checked
+  at both tip hinges across inherited curl extrema. Browser review pending.
+- G homecoming fixture passes the ordinary earned-route closing transition:
+  minimal 21-task save, real walk and rest, 20-note whole coda, numeric fin1,
+  reload without replay or notebook rewrite. This is seeded progress, not a
+  whole naturally played journey. Screenshot exposes an AN INCIDENT card
+  over the opening coda; protect the ending presentation in the next D8 pass.
+- D8 plan: while the closing coda runs, moment cards yield to its shot and
+  incidental voices use the existing quiet channel. Timers, rewards, task
+  state, named dialogue and authored coda stay untouched. `noEndingSpace` or
+  governor rung one restores inherited presentation. Check preexisting/new/
+  deferred cards, expiry without resurrection, cut path and actual homecoming.
+- D7/E8 natural acceptance repeated on the new wing surface: 307 telemetry
+  samples, one trusted grab edge, automatic breach, all three tasks and route
+  memory saved/reloaded, then real walk and three wheeks opened the shore board.
+  Zero runtime errors. Lead inspected boarding/breach and shore-board frames.
+- E8 six pinned views across both mantas pass hide-and-diff: 36274–102563
+  changed pixels, zero outside the whole-manta mask, exact cut/restored pixels,
+  unchanged draw counts. Independent image review accepts the connected fins;
+  inherited rectangular trunk/head remains a separate aesthetic weakness.
+  Steady switch cut/rung CPU p95 batch means .000070/.000100ms, zero stable
+  geometry/material writes. Isolated six-mesh Lambert GPU: 40 paired samples,
+  live-minus-cut mean -.0200ms, 95% half-width .0278ms, zero disjoints/timeouts.
+  Interval crosses zero; no full-game speedup or production shader cost claim.
+- D8 static visibility/quiet tests pass 911 checks, retaining original card
+  timers and reward ownership. Empty homecoming also passes: zero saved tasks,
+  genuine 9.2-second settled rest, no coda/ledger, fin0. Both browser modes
+  have zero runtime errors. Optional controlled caption/cut test is next.
+- D8 controlled public-caption test passes during real closing: generic,
+  named and mini live/cut/restored visibility, original generic expiry, full
+  20-note coda, fin1 and repeat-rest protection after reload. Lead inspected
+  generic comparison and settled ledger images. Cut quiet-accessor CPU p95
+  batch mean .000090ms over 500000 calls; zero runtime errors. No GPU claim.
+- D7/D8/E8/G checkpoint gates: syntax, one-file build and 44 suite checks
+  pass, zero failed. First full run exposed a missing ending-space dependency
+  in the old mix fixture; it now executes the actual helper and checks closure
+  and flag/rung release too. Historical soak remains stale/informational.

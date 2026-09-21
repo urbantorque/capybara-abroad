@@ -4,14 +4,24 @@ import { readFileSync } from 'node:fs';
 
 const source = readFileSync('src/systems.js', 'utf8');
 const top = source.match(/function sysMomentVisible\([^]*?\n\}/)[0];
+const endingTop = source.match(/function sysEndingSpace\([^]*?\n\}/)[0];
 const fn = name => source.match(new RegExp('  function ' + name + '\\([^]*?\\n  \\}'))[0];
+const endingClosure = fn('endingSpace');
+const incidentalQuiet = source.match(/incidentalQuiet:\s*(function \([^]*?\n    \})/)[1];
 const cardMs = Number(source.match(/const sysMOMENT_CARD\s*=\s*([\d.]+)/)[1]);
 const deferSeconds = Number(source.match(/const sysMOMENT_DEFER\s*=\s*([\d.]+)/)[1]);
 const gate = new Function(top + ';return sysMomentVisible;')();
+const endingGate = new Function(endingTop + ';return sysEndingSpace;')();
 let checks = 0;
 const equal = (actual, expected, label) => { assert.equal(actual, expected, label); checks++; };
 equal(cardMs, 2600, 'authored moment lifetime retained');
 equal(deferSeconds, 8, 'authored deferred watchdog retained');
+for (const closing of [undefined, false, true, 0, 1, 'closing'])
+for (const cut of [undefined, false, true, 0, 1])
+for (const rung of [undefined, -2, 0, .9, 1, 2, 5, NaN]) {
+  equal(endingGate(closing, cut, rung), !!closing && !cut && (rung | 0) < 1,
+    'exhaustive closing-only space gate');
+}
 
 for (const wanted of [false, true]) for (const incidental of [false, true])
 for (const card of [false, true, 'THE CONCERT']) for (const encore of [false, true])
@@ -28,16 +38,20 @@ function fixture() {
     classWrites++; if (on) classes.add(name); else classes.delete(name);
   } } } };
   for (const name of ['momentKick', 'momentText', 'momentNote']) nodes[name] = { textContent: '', style: {} };
-  const game = { state: { noEarnedSpace: false, perfRung: 0 } };
+  const game = { state: { noEarnedSpace: false, noEndingSpace: false, perfRung: 0, time: 10 } };
   const ctx = new Function('game', 'nodes', 'sysWall', 'setTimeout', 'clearTimeout', `
     const {momentEl,momentKick,momentText,momentNote}=nodes;
     let momentTimer=0,momentWanted=false,momentIncidental=false,momentVisible=false,
-        placeEarned=false,showPlaceLast='',wowEarnedOn=false,wowLiveOn=false,sysMomentDefer=null;
+        placeEarned=false,showPlaceLast='',wowEarnedOn=false,wowLiveOn=false,sysMomentDefer=null,
+        sysFinClosing=false,tutOn=false,tutEl=null,sysTickLastAt=0;
     const sysMOMENT_CARD=${cardMs},sysMOMENT_DEFER=${deferSeconds};
-    ${top};${fn('momentVisibilityTick')};${fn('showMoment')};${fn('showMomentNow')};${fn('sysMomentTick')};
+    ${top};${endingTop};${endingClosure};${fn('momentVisibilityTick')};${fn('showMoment')};${fn('showMomentNow')};${fn('sysMomentTick')};
     return {show:showMoment,now:showMomentNow,tick:sysMomentTick,
       earned:(on,title=on?'THE CONCERT':'')=>{placeEarned=on;showPlaceLast=title;},
       encore:on=>{wowEarnedOn=on;},live:on=>{wowLiveOn=on;},
+      closing:on=>{sysFinClosing=on;},ending:endingSpace,quiet:${incidentalQuiet},
+      tutorial:on=>{tutOn=on;tutEl=on?{parentNode:{},dataset:{}}:null;},
+      recent:on=>{sysTickLastAt=on?game.state.time:0;},
       state:()=>({wanted:momentWanted,incidental:momentIncidental,deferred:sysMomentDefer})};
   `)(game, nodes, () => now, (callback, ms) => {
     const id = ++sequence; timers.set(id, { callback, due: now + ms / 1000, ms }); return id;
@@ -114,6 +128,79 @@ for (const busy of ['earned', 'encore']) {
   equal(f.nodes.momentNote.style.display, '', 'optional note retains inherited display');
 }
 
+const endingCards = [
+  ['generic', ['AN INCIDENT', 'generic caption', '', true]],
+  ['named', ['A NAMED CHAIN', 'named reward', 'a note', false]],
+  ['mini', ['SMALL VICTORY', 'mini task completed']],
+];
+for (const [kind, args] of endingCards) for (const timing of ['preexisting', 'new']) {
+  const f = fixture();
+  if (timing === 'preexisting') {
+    f.show(...args); equal(f.visible(), true, kind + ' visible before closing');
+    f.advance(.5);
+  }
+  f.closing(true);
+  if (timing === 'new') f.show(...args); else f.tick();
+  equal(f.visible(), false, kind + '/' + timing + ' yields to closing coda');
+  equal(f.state().wanted, true, 'closing hides presentation without deleting intent');
+  equal(f.nodes.momentText.textContent, args[1], 'reward/lesson text retained');
+  equal(f.timers.size, 1, 'original card timer retained during closing');
+  const timer = [...f.timers.values()][0], writes = f.writes();
+  f.tick(); f.tick(); equal(f.writes(), writes, 'unchanged closing writes no classes');
+  for (const mode of ['flag', 'rung']) {
+    f.game.state.noEndingSpace = mode === 'flag'; f.game.state.perfRung = mode === 'rung' ? 1 : 0; f.tick();
+    equal(f.visible(), true, mode + ' exactly restores unexpired ' + kind);
+    equal([...f.timers.values()][0], timer, 'fallback does not replace or extend timer');
+    const cutWrites = f.writes(); f.tick(); equal(f.writes(), cutWrites, 'unchanged fallback writes no classes');
+    f.game.state.noEndingSpace = false; f.game.state.perfRung = 0; f.tick();
+    equal(f.visible(), false, 'live closing hides restored ' + kind);
+  }
+  f.closing(false); f.tick(); equal(f.visible(), true, 'short closing restores only remaining lifetime');
+  equal([...f.timers.values()][0], timer, 'closing end leaves original expiry unchanged');
+  f.closing(true); f.tick();
+  f.advance(cardMs / 1000 - (timing === 'preexisting' ? .5 : 0) - .001);
+  equal(f.state().wanted, true, 'intent remains just before original expiry');
+  f.advance(.001); equal(f.state().wanted, false, 'original 2.6s timer expires while hidden');
+  for (const mode of ['flag', 'rung', 'ended']) {
+    f.game.state.noEndingSpace = mode === 'flag'; f.game.state.perfRung = mode === 'rung' ? 1 : 0;
+    f.closing(mode !== 'ended'); f.tick();
+    equal(f.visible(), false, kind + ' never resurrects after expiry: ' + mode);
+  }
+}
+for (const [kind, args] of endingCards) for (const drain of ['early', 'watchdog']) {
+  const f = fixture(); f.live(true); f.show(...args); f.closing(true);
+  equal(f.timers.size, 0, 'deferred ' + kind + ' has no premature timer');
+  equal(f.state().deferred.text, args[1], 'deferred content not dropped by closing');
+  if (drain === 'early') f.live(false); else f.advance(deferSeconds);
+  f.tick(); equal(f.state().deferred, null, drain + ' still drains during closing');
+  equal(f.state().wanted, true, 'drained card owns original intent');
+  equal(f.visible(), false, 'drained ' + kind + ' hidden only for closing');
+  equal([...f.timers.values()][0].ms, cardMs, 'drain uses original 2.6s lifetime');
+  f.game.state.noEndingSpace = true; f.tick(); equal(f.visible(), true, 'cut exposes unexpired deferred ' + kind);
+  f.game.state.noEndingSpace = false; f.tick();
+  f.advance(cardMs / 1000); f.closing(false); f.tick();
+  equal(f.visible(), false, 'expired deferred ' + kind + ' does not return after coda');
+}
+{
+  const f = fixture();
+  equal(f.quiet(), false, 'ordinary idle does not silence incidental speech');
+  f.closing(true); equal(f.ending(), true, 'actual closure reads closing state');
+  equal(f.quiet(), true, 'actual HUD speech accessor yields during closing');
+  for (const mode of ['flag', 'rung']) {
+    f.game.state.noEndingSpace = mode === 'flag'; f.game.state.perfRung = mode === 'rung' ? 1 : 0;
+    equal(f.quiet(), false, mode + ' restores inherited incidental eligibility');
+    f.tutorial(true); equal(f.quiet(), true, mode + ' retains protected tutorial quiet');
+    f.tutorial(false); f.recent(true); equal(f.quiet(), true, mode + ' retains existing earned-action quiet');
+    f.recent(false);
+  }
+  f.game.state.noEndingSpace = false; f.game.state.perfRung = 0;
+  f.closing(false); equal(f.quiet(), false, 'closing end restores ordinary speech eligibility');
+  f.earned(true); f.show('AN INCIDENT', 'generic', '', true); f.closing(true);
+  f.game.state.noEndingSpace = true; f.tick();
+  equal(f.visible(), false, 'ending cut preserves independent earned-space suppression');
+  f.game.state.noEarnedSpace = true; f.tick(); equal(f.visible(), true, 'both cuts restore inherited generic card');
+}
+
 const incidentCall = source.match(/showMoment\(tier === 2 \? 'A SCENE'[^]*?\);/)[0];
 for (const tier of [1, 2]) for (const named of [null, { name: 'A NAMED CHAIN' }]) {
   let args;
@@ -131,6 +218,11 @@ for (const id of ['', 'marquee']) for (const helm of [false, true]) {
 }
 equal((source.match(/momentEl.classList.toggle\('show'/g) || []).length, 1, 'one moment visibility writer');
 equal((source.match(/momentEl.classList\.(add|remove)\('show'/g) || []).length, 0, 'no competing moment show writers');
+const finaleClose = fn('sysFinaleClose');
+const closingAt = finaleClose.indexOf('sysFinClosing = true;');
+const visibilityAt = finaleClose.indexOf('momentVisibilityTick();');
+equal(closingAt >= 0 && visibilityAt > closingAt && visibilityAt < finaleClose.indexOf('sysFinaleCoda();'),
+  true, 'closing edge hides existing card before the coda is scheduled');
 assert.ok(source.includes('showMoment: function (k, t, n, incidental) { showMoment(k, t, n, incidental); }'));
 checks++;
 console.log(`Earned space: ${checks} actual-function gate, timer, deferred, publisher and helm checks passed.`);

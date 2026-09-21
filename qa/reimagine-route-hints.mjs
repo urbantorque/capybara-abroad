@@ -6,6 +6,7 @@ import { stripComments } from '../strip-comments.mjs';
 
 const read = name => stripComments(readFileSync(new URL('../src/' + name + '.js', import.meta.url), 'utf8'));
 const systems = read('systems'), hanoi = read('hanoi'), pantanal = read('pantanal');
+const palawan = read('palawan'), shared = read('shared');
 function block(source, start) {
   assert.ok(start >= 0, 'source boundary exists');
   let depth = 0, quote = '', escaped = false;
@@ -145,6 +146,80 @@ group('river hint follows the channel', () => {
   check(data.riverHint.where()===mill,'absent body fallback');
   q.game.kyoto=null;
   check(data.riverHint.where()===null,'unbuilt chapter no invented coordinates');
+});
+
+function tableRow(table, key) {
+  const start = systems.indexOf('const ' + table + ' =');
+  assert.ok(start >= 0, 'shipped table ' + table);
+  const body = block(systems, systems.indexOf('{', start));
+  const at = body.indexOf(key + ':');
+  assert.ok(at >= 0, 'shipped row ' + key);
+  return block(body, body.indexOf('{', at));
+}
+const pal = vm.createContext({ PALETTE: new Proxy({}, { get: (_, key) => key }), Math });
+vm.runInContext([
+  'const map = ' + tableRow('sysMAP_WORLDS', 'palawan') + ';',
+  'const dress = ' + tableRow('sysBOARD_DRESS', 'palawan') + ';',
+  declaration(palawan, 'palJETTY'), declaration(shared, '_BD_PANEL_W'),
+  'const sysMAP_WORLDS = { palawan: map };',
+].join('\n'), pal);
+const palData = vm.runInContext('({ map, dress, jetty: palJETTY })', pal);
+group('Palawan map, dressing and chapter way agree', () => {
+  const { map, dress, jetty } = palData;
+  check(same({ x: map.way.x, z: map.way.z }, dress.at), 'map and physical board share a coordinate');
+  check(same(dress.at, { x: 2, z: 32 }), 'shore approach coordinate remains authored');
+  check(!('get' in map.way), 'map no longer resolves to the seaward jetty API');
+  check(!('floorY' in dress), 'board measures local sand rather than retaining deck height');
+  check(dress.yaw === 0, 'board face points toward beach arrival rather than offshore map centre');
+  check(dress.at.z > jetty.z1, 'board stands beyond the landward end');
+  const chapterStart = shared.indexOf("{ n: 12, biome: 'palawan'");
+  const chapter = block(shared, chapterStart);
+  const way = chapter.match(/\bway:\s*('[^']*')/);
+  check(!!way && /beside the shore end/.test(vm.runInNewContext(way[1])), 'chapter instruction describes relocated shore approach');
+});
+group('Palawan board clears the actual deck collider', () => {
+  // Evaluate the shipped collider call, not a second hand-written deck box.
+  const deckCall = palawan.match(/palStaticBox\(game, J\.x, J\.y - 0\.15,[^;]+;/);
+  check(!!deckCall, 'authored jetty collider call found');
+  pal.game = {};
+  pal.palStaticBox = (_game, x, y, z, w, h, d) => ({ x, y, z, w, h, d });
+  const deck = vm.runInContext('const J = palJETTY; ' + deckCall[0], pal);
+  const boardStart = shared.indexOf('export function exitBoard(');
+  const board = block(shared, shared.indexOf('{', boardStart));
+  const width = board.match(/const W = ([^;]+);/);
+  const half = board.match(/hx:\s*([^,\n]+),\s*hz:\s*([^\n}]+)/);
+  check(!!width && !!half, 'actual board default width and collider half-extents found');
+  const dims = vm.runInContext('const opt = dress; const W = ' + width[1] +
+    '; ({ hx: ' + half[1] + ', hz: ' + half[2] + ' })', pal);
+  const radius = Math.hypot(dims.hx, dims.hz);
+  check(dims.hx * 2 > deck.w, 'inherited board wider than the jetty');
+  check(palData.dress.at.x + radius < deck.x - deck.w * .5,
+    'entire board footprint stays outside deck at every yaw');
+  check(palData.dress.at.z - radius > deck.z + deck.d * .5,
+    'entire board footprint stays landward of deck at every yaw');
+});
+group('Palawan departure follows earned route or legacy bloom', () => {
+  const door = systems.match(/\bconst palDoor = [^;]+;/);
+  const predicate = systems.match(/\bconst atPal = [^;]+;/);
+  check(!!door && !!predicate, 'actual departure declarations found');
+  vm.runInContext('function eligible(inPal, p, game, chapEnough) {' + door[0] + predicate[0] + 'return atPal;}', pal);
+  const at = palData.map.way;
+  for (const earned of [false, true]) for (const bloom of [false, true]) {
+    for (const distance of [0, 3.499, 3.5, 3.501]) {
+      for (const [dx, dz] of [[distance, 0], [0, -distance]]) {
+        const chapters = [], game = { palawan: { seenBloom: () => bloom } };
+        const actual = pal.eligible(true, { x: at.x + dx, z: at.z + dz }, game,
+          n => { chapters.push(n); return earned; });
+        check(actual === (distance < 3.5 && (earned || bloom)),
+          'eligibility earned=' + earned + ' bloom=' + bloom + ' distance=' + distance);
+        check(chapters.every(n => n === 12), 'only Palawan route memory consulted');
+      }
+    }
+  }
+  check(!pal.eligible(false, at, { palawan: { seenBloom: () => true } }, () => true), 'another chapter cannot trigger departure');
+  check(!pal.eligible(true, at, {}, () => true), 'unbuilt Palawan cannot trigger departure');
+  check(pal.eligible(true, at, { palawan: { seenBloom() { throw Error('unneeded legacy lookup'); } } }, () => true),
+    'earned route exits without requiring optional bloom');
 });
 console.log(JSON.stringify({ groups, checks, failed: 0,
   scope: 'Shipped hint entries and target APIs with controlled gameplay state; no browser or navigation claim.' }, null, 2));

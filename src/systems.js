@@ -1278,6 +1278,9 @@ function sysEarnedCardLive(requested, cut, rung) {
 function sysMomentVisible(wanted, incidental, earnedCard, encore, cut, rung) {
   return !!wanted && !(incidental && (earnedCard || encore) && !cut && (rung | 0) < 1);
 }
+function sysEndingSpace(closing, cut, rung) {
+  return !!closing && !cut && (rung | 0) < 1;
+}
 const hkROOF_HINT = 30;          // m: above this in Hong Kong you are on the roof (X2)
 // ---- THE MIX, MEASURED (S2). See qa/s1-spectrum.js and qa/s1-sfx.js. ------
 // ---- ...AND THE LID, LIFTED (L7, E1 / audio #4) -----------------------------
@@ -8277,7 +8280,7 @@ const sysMAP_WORLDS = {
   // is UNDER the blue — so the water shading, which everywhere else is a nicety,
   // is here the actual terrain read-out.
   palawan: { x0: -80, x1: 80, z0: -145, z1: 70, pad: 8,
-    way: { get: 'jetty', t: 'the bamboo jetty' }, marks: [
+    way: { x: 2, z: 32, t: 'the bamboo jetty' }, marks: [
     { get: 'jetty', k: 'boat', t: 'the jetty' },
     { get: 'reef', k: 'leaf', t: 'the coral' },
     { get: 'wreck', k: 'faint', t: 'the wreck' },
@@ -8513,11 +8516,11 @@ const sysBOARD_DRESS = {
   kowloon: { wood: PALETTE.hkPoleSteel, woodDk: PALETTE.hkConcreteDk,
              face: 0x2f2c2a, trim: PALETTE.hkNeonGold, lamp: PALETTE.hkNeonCyan,
              at: { x: 6.5, z: -59.5 }, floorY: 0.05 },
-  // On the jetty itself, at the shore end, on the centreline: the deck is
-  // 4.8 m wide and the board is 2.8, so you walk round it rather than past it.
+  // The deck is 2.4 m wide, narrower than the 2.8 m board. Keep the frame
+  // on the sand beside its landward approach, clear of the jumping route.
   palawan: { style: 'hang', wood: PALETTE.palBamboo, woodDk: PALETTE.palBambooDk,
              face: 0x4a453a, trim: PALETTE.palThatch,
-             at: { x: 6.0, z: 16.6 }, floorY: 1.15 },
+             at: { x: 2, z: 32 }, yaw: 0 },
   goreme:  { style: 'stele', wood: PALETTE.gorTuff, woodDk: PALETTE.gorTuffDk,
              face: 0x3d3634, trim: PALETTE.gorDoor },
   rio:     { wood: PALETTE.rioTramWood, woodDk: PALETTE.rioTramDk,
@@ -29550,9 +29553,12 @@ export function createSystems(game) {
   let momentWanted = false, momentIncidental = false, momentVisible = false;
   // Generic incident captions yield their remaining lifetime to the earned
   // shot. Keep the timer running: a stale caption is not a queued lesson.
+  function endingSpace() {
+    return sysEndingSpace(sysFinClosing, game.state.noEndingSpace, game.state.perfRung);
+  }
   function momentVisibilityTick() {
     const visible = sysMomentVisible(momentWanted, momentIncidental, placeEarned && showPlaceLast,
-      wowEarnedOn, game.state.noEarnedSpace, game.state.perfRung);
+      wowEarnedOn, game.state.noEarnedSpace, game.state.perfRung) && !endingSpace();
     if (visible !== momentVisible) { momentVisible = visible; momentEl.classList.toggle('show', visible); }
   }
   /**
@@ -37669,6 +37675,7 @@ export function createSystems(game) {
   function sysFinaleClose() {
     if (sysFinClosing || sysFinDone) return;
     sysFinClosing = true;
+    momentVisibilityTick();       // an incident already on screen yields this frame
     sysFinDone = true;
     // ...and the notebook's last page (L6, F4): the traveller's line on the
     // lawn was a bubble, gone in four seconds, and the one sentence the
@@ -45644,7 +45651,7 @@ export function createSystems(game) {
     // Incidental mouths yield to teaching and the first two seconds of a
     // receipt. Direct replies are protected by the caller's classification.
     incidentalQuiet: function () {
-      return !!(tutOn && tutEl && tutEl.parentNode && !tutEl.dataset.going) ||
+      return endingSpace() || !!(tutOn && tutEl && tutEl.parentNode && !tutEl.dataset.going) ||
         game.state.time - sysTickLastAt < 2;
     },
     leaveAudit: function () { return { busy: leaveBusy, n: leaveN, said: game.state.leaveSaid || 0 }; },
@@ -51702,12 +51709,13 @@ export function createSystems(game) {
     // where it is, not by a rule.
     const atHk = !!(inHk && game.kowloon && game.kowloon.inZone('pier', p.x, p.z) &&
                     game.kowloon.seenShow());
-    // Palawan's way out is the end of the bamboo jetty, and only once the bay
+    // Palawan's way out is beside the shore end of the jetty, once the bay
     // has done its trick — the same construction as the fire at the desert camp
     // and the lit lantern in the Drift: the last line of the chapter by where
     // it is, not by a rule.
-    const atPal = !!(inPal && game.palawan && game.palawan.inZone('jetty', p.x, p.z) &&
-                     game.palawan.seenBloom());
+    const palDoor = sysMAP_WORLDS.palawan.way;
+    const atPal = !!(inPal && game.palawan && Math.hypot(p.x - palDoor.x, p.z - palDoor.z) < 3.5 &&
+                     (chapEnough(12) || game.palawan.seenBloom()));
     // Cappadocia's is the landing plain, once you have actually flown. Which is
     // the only exit in the game you have to arrive at by not steering.
     const atGor = !!(inGor && game.goreme && game.goreme.inZone('landing', p.x, p.z) &&

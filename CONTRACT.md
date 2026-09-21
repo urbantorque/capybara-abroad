@@ -1,3 +1,57 @@
+## REIMAGINE D7/D8/E8/G — THE JETTY, MANTA AND HOMECOMING (21 Sep 2026)
+
+Palawan's 2.8m departure board occupied its 2.4m-wide jetty. Move the existing
+frame and its arrow/action to dry sand at (2,32), facing the beach; retain the
+seaward boat landmark. The board measures floor y0.2533, not the old deck
+height. An earned route memory or the inherited bloom now qualifies for its
+departure interaction. Chapter wording follows the move. No added geometry,
+collision object, save field or optional layout flag. Actual-source regressions
+cover footprint separation, coordinates, yaw and eligibility boundaries.
+
+The manta's independently rotated wing slabs become connected closed skins
+at the existing stations, with an overlapping constant-section tip cuff. Both
+animals retain their rig, body details, ride seat, routes, mounting, beat/curl,
+breach and reward logic. `noMantaContour` or governor rung one restores exact
+inherited geometry/material references; `noRound` retains flat lighting. Three
+shared cached geometries use 56352 bytes, one private standard-Lambert material
+keeps the shared world material untouched. Six draw slots remain; triangles
+across both mantas fall from 1344 to 1072. No per-frame geometry writes.
+
+1150 builder/cache/seam checks pass. Six frozen views of both animals have
+36274–102563 changed pixels inside the whole-manta contribution mask, zero
+outside it and exact cut/restored pixels. Lead and independent reviewer read
+the images. Connected wings are accepted; the inherited rectangular head and
+trunk are not claimed as a finished creature redesign. Steady cut/rung CPU p95
+batch means .000070/.000100ms. Isolated representative six-mesh Lambert GPU
+comparison: 40 paired samples, mean live-minus-cut -.0200ms, 95% half-width
+.0278ms, no disjoints/timeouts. This interval crosses zero; no full-game
+speedup or production shader cost claim follows from it.
+
+A fresh real-control Palawan run earns jetty jump, dive, manta ride and memory,
+then saves/reloads and walks to the relocated board for three wheeks: 307
+telemetry samples, one grab edge, automatic breach, zero runtime errors.
+No body/task/clock writes. Chapter arrival and read-only navigation telemetry
+remain disclosed fixtures. Lead inspected boarding, breach and board images.
+
+The ordinary homecoming accepts a minimal 21-task route-save fixture followed
+by real walking/rest: numeric fin1, full 20-note coda, ordinary ledger, and no
+repeat award/coda on reload. A genuinely empty save rests for 9.2 seconds on
+the lawn and remains fin0, without coda or ledger. Neither fixture proves a
+naturally played whole journey. Its opening incident card prompted D8:
+`noEndingSpace`/rung-one fallback preserves inherited presentation; live mode
+lets closing music and the shot own the moment-card space and reuses the
+incidental-speech quiet channel. Card timers, rewards, authored dialogue and
+coda scheduling stay intact. 911 actual-function visibility/quiet checks pass.
+Controlled public-caption checks inside the real closing coda prove generic,
+named and mini cards hidden live, visible under cut, hidden after restoration;
+the generic card still expires at its original 2.6 seconds. Lead inspected
+live/cut/restored images and the settled ordinary ledger. Actual quiet-accessor
+cut CPU p95 batch mean .000090ms (500000 calls), not a GPU/full-frame measure.
+Ordinary fin1/full coda/reload invariants remain intact; zero runtime errors.
+Checkpoint syntax, one-file build and 44 suite checks pass, zero failed.
+The mix fixture now includes the actual ending-space helper dependency.
+Historical soak remains stale and is not presented as new runtime evidence.
+
 ## REIMAGINE D6/E6/E7/G — PEOPLE AND THE RIVER (21 Sep 2026)
 
 The pinned Uji task points sixteen metres along the existing river centreline,

@@ -303,8 +303,8 @@ function palMerger() {
  * on the ground, which is the surface the player actually spends the chapter
  * looking at.
  */
-function palVC() {
-  return grain(mat(0xffffff, { vertexColors: true }),
+function palVC(own) {
+  return (own ? grainOwn : grain)(mat(0xffffff, { vertexColors: true }),
                { scale: 0.45, amount: 0.085, warp: 0.55, near: 0.28, nearScale: 9, contact: 1,
                  // The karst feet and the boat hulls. A wall gets the line and
                  // nothing else: no soak worth seeing on wet limestone, and no
@@ -2386,6 +2386,79 @@ const palManta2Pos = new THREE.Vector3();
 let palMantaTips = null;
 let palMantaShade = null;
 let palMantaSlowed = false;
+let palMantaContours = [], palMantaContourOn = false, palMantaSmoothOn = false;
+let palMantaSmoothMat = null;
+const palMANTA_CUFF = 0.10;             // m either side of the existing tip hinge
+
+// A wing is one closed skin. The old station curves still set its outline;
+// sharing each boundary removes the gaps between independently rolled slabs.
+function palMantaWingGeo(stations, side, pivot, cuff) {
+  let rows = stations;
+  if (cuff) {
+    const r = stations[0];
+    rows = [Object.assign({}, r, { x: r.x - cuff }), Object.assign({}, r, { x: r.x + cuff })].concat(stations.slice(1));
+  }
+  const pos = [], col = [], index = [];
+  const dark = new THREE.Color(PALETTE.palWreckDk), pale = new THREE.Color(PALETTE.palClam);
+  // Front edge, upper surface, back edge, belly. The edge keeps its dark rim.
+  const section = [[0, 0.5], [0.5, 0.25], [0.5, -0.25], [0, -0.5], [-0.5, -0.25], [-0.5, 0.25]];
+  for (const r of rows) for (let j = 0; j < section.length; j++) {
+    pos.push(side * (r.x - pivot.x), r.y + section[j][0] * r.th - pivot.y,
+      r.z + section[j][1] * r.ch - pivot.z);
+    const c = j >= 4 ? pale : dark;
+    col.push(c.r, c.g, c.b);
+  }
+  function tri(a, b, c) { if (side < 0) index.push(a, c, b); else index.push(a, b, c); }
+  for (let i = 0; i < rows.length - 1; i++) for (let j = 0; j < 6; j++) {
+    const a = i * 6 + j, b = (i + 1) * 6 + j, next = (j + 1) % 6;
+    tri(a, b, (i + 1) * 6 + next); tri(a, (i + 1) * 6 + next, i * 6 + next);
+  }
+  const end = (rows.length - 1) * 6;
+  for (let j = 1; j < 5; j++) { tri(0, j, j + 1); tri(end, end + j + 1, end + j); }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.setIndex(index); geo.computeVertexNormals();
+  geo.computeBoundingBox(); geo.computeBoundingSphere();
+  return geo;
+}
+
+// Keep the baseline attribute prefix untouched, including all body details.
+// Only indices in the wing range are replaced; unused slab vertices do not draw.
+function palMantaJoin(base, first, last, skins) {
+  const geo = new THREE.BufferGeometry(), index = [];
+  for (let i = 0; i < base.index.count; i += 3) {
+    const a = base.index.array[i];
+    if (a < first || a >= last) index.push(a, base.index.array[i + 1], base.index.array[i + 2]);
+  }
+  let offset = base.attributes.position.count;
+  for (const skin of skins) {
+    for (const i of skin.index.array) index.push(offset + i);
+    offset += skin.attributes.position.count;
+  }
+  for (const key of ['position', 'normal', 'color']) {
+    const array = new Float32Array(offset * 3);
+    array.set(base.attributes[key].array);
+    let at = base.attributes[key].array.length;
+    for (const skin of skins) { array.set(skin.attributes[key].array, at); at += skin.attributes[key].array.length; }
+    geo.setAttribute(key, new THREE.BufferAttribute(array, 3));
+  }
+  geo.setIndex(index); geo.computeBoundingBox(); geo.computeBoundingSphere();
+  for (const skin of skins) skin.dispose();
+  return geo;
+}
+
+function palMantaContourTick(game) {
+  if (!palMantaContours.length) return;
+  const on = !game.state.noMantaContour && (game.state.perfRung | 0) < 1;
+  const smooth = on && !game.state.noRound;
+  if (on === palMantaContourOn && smooth === palMantaSmoothOn) return;
+  for (const r of palMantaContours) {
+    r.mesh.geometry = on ? r.live : r.base;
+    r.mesh.material = smooth ? palMantaSmoothMat : r.material;
+  }
+  palMantaContourOn = on; palMantaSmoothOn = smooth;
+}
 
 function palBuildManta(root) {
   const M = palMerger();
@@ -2422,6 +2495,7 @@ function palBuildManta(root) {
   const tP = palMANTA_TIP / palMANTA_N;
   const pivX = MX0 + (MX1 - MX0) * tP, pivZ = sweepAt(tP), pivY = droopAt(tP);
   const TL = palMerger(), TR = palMerger();
+  const wingStart = M.n;
   for (let i = 0; i < palMANTA_N; i++) {
     const t0 = i / palMANTA_N, t1 = (i + 1) / palMANTA_N, tm = (t0 + t1) * 0.5;
     const x0 = MX0 + (MX1 - MX0) * t0, x1 = MX0 + (MX1 - MX0) * t1;
@@ -2440,7 +2514,23 @@ function palBuildManta(root) {
             PALETTE.palClam, 0, -s * yawSeg, s * (0.06 + tm * 0.42));
     }
   }
+  const wingEnd = M.n;
   const tipGeo = [TL.build(), TR.build()];
+  const stations = [];
+  for (let i = 0; i <= palMANTA_N; i++) {
+    const t = i / palMANTA_N;
+    stations.push({ x: MX0 + (MX1 - MX0) * t, y: droopAt(t), z: sweepAt(t), ch: chordAt(t), th: thickAt(t) });
+  }
+  const pivot = { x: pivX, y: pivY, z: pivZ }, origin = { x: 0, y: 0, z: 0 };
+  // The constant section straddles the hinge. At the inherited maximum curl
+  // (.42 rad), its 0.0774 m half-thickness needs only 0.0346 m of overlap.
+  const tipLive = [-1, 1].map((s, i) => palMantaJoin(tipGeo[i], 0, tipGeo[i].attributes.position.count,
+    [palMantaWingGeo(stations.slice(palMANTA_TIP), s, pivot, palMANTA_CUFF)]));
+  palMantaContours = []; palMantaContourOn = false; palMantaSmoothOn = false;
+  function register(mesh, live) {
+    palMantaContours.push({ mesh: mesh, base: mesh.geometry, live: live, material: mesh.material });
+    mesh.userData.mantaContour = true;        // the lighting mask includes the body
+  }
   palMantaTips = [];
   /** the two tip pivots on one manta group, sharing the two tip geometries */
   const addTips = function (grp, matr, sc) {
@@ -2450,6 +2540,7 @@ function palBuildManta(root) {
       piv.position.set(s * pivX * k, pivY * k, pivZ * k);
       piv.scale.setScalar(k);
       const tm = new THREE.Mesh(tipGeo[s < 0 ? 0 : 1], matr);
+      register(tm, tipLive[s < 0 ? 0 : 1]);
       tm.castShadow = true;
       piv.add(tm);
       grp.add(piv);
@@ -2481,6 +2572,12 @@ function palBuildManta(root) {
           PALETTE.palWreckDk);
   }
   const mesh = new THREE.Mesh(M.build(), palVC());
+  const bodyLive = palMantaJoin(mesh.geometry, wingStart, wingEnd,
+    [-1, 1].map(s => palMantaWingGeo(stations.slice(0, palMANTA_TIP + 1), s, origin, 0)));
+  // palVC is shared by the buildings. Only this private standard Lambert
+  // variant reads the skin's smooth normals; noRound uses the old material.
+  palMantaSmoothMat = palVC(true); palMantaSmoothMat.flatShading = false;
+  register(mesh, bodyLive);
   mesh.castShadow = true;
   palMantaGroup = new THREE.Group();
   palMantaGroup.name = 'palManta';
@@ -2500,6 +2597,7 @@ function palBuildManta(root) {
   palManta2Group = new THREE.Group();
   palManta2Group.name = 'palManta2';
   const mesh2 = new THREE.Mesh(mesh.geometry, mesh.material);
+  register(mesh2, bodyLive);
   mesh2.castShadow = true;
   mesh2.scale.set(0.88, 0.88, 0.88);
   palManta2Group.add(mesh2);
@@ -2507,6 +2605,7 @@ function palBuildManta(root) {
   root.add(palManta2Group);
   palMantaA = 0.7;
   palMantaRideT = -1;
+  palMantaContourTick(palGame);
 }
 /**
  * THE FLIGHT, AS A MODULATION OF THE LAP IT WAS ALREADY FLYING.
@@ -2575,6 +2674,7 @@ function palUpdateLeap(game, dt) {
 function palUpdateManta(game, dt) {
   palUpdateLeap(game, dt);
   if (!palMantaGroup) return;
+  palMantaContourTick(game);
   const capy = game.capy;
   const cp = capy && capy.position;
   const input = game.input;
@@ -4918,6 +5018,29 @@ export function createPalawan(game) {
     },
     built() { return palBuilt; },
     terrainHeight: palTerrain,
+    mantaContourAudit() {
+      const seen = new Set(); let cacheBytes = 0;
+      const rows = palMantaContours.map(r => {
+        let root = r.mesh.parent;
+        while (root && root.name !== 'palManta' && root.name !== 'palManta2') root = root.parent;
+        if (!seen.has(r.live)) {
+          seen.add(r.live); cacheBytes += r.live.index.array.byteLength;
+          for (const key of ['position', 'normal', 'color']) cacheBytes += r.live.attributes[key].array.byteLength;
+        }
+        return { uuid: r.mesh.uuid, rootUuid: root ? root.uuid : '', rootName: root ? root.name : '',
+          baseUuid: r.base.uuid, liveUuid: r.live.uuid, baseMaterialUuid: r.material.uuid, materialUuid: r.mesh.material.uuid,
+          flatShading: r.mesh.material.flatShading, baselineFlatShading: r.material.flatShading,
+          inheritedTriangles: r.base.index.count / 3, contourTriangles: r.live.index.count / 3,
+          baseVertices: r.base.attributes.position.count, contourVertices: r.live.attributes.position.count,
+          inheritedGeometry: r.mesh.geometry === r.base, inheritedMaterial: r.mesh.material === r.material,
+          exact: r.mesh.geometry === (palMantaContourOn ? r.live : r.base) &&
+            r.mesh.material === (palMantaSmoothOn ? palMantaSmoothMat : r.material) };
+      });
+      const half = 0.07734375, required = half * Math.tan(0.42);
+      return { on: palMantaContourOn, smooth: palMantaSmoothOn, meshes: rows.length, materialsAdded: 1, cacheBytes,
+        seam: { cuffHalf: palMANTA_CUFF, rootHalfThickness: half, maxAbsCurl: 0.42, requiredOverlap: required,
+          margin: palMANTA_CUFF - required }, rows };
+    },
     /** THE MANTA, for the harness (L5): where it is, the ride clock, the leap. */
     mantaAudit() {
       return { x: +palMantaPos.x.toFixed(2), y: +palMantaPos.y.toFixed(2), z: +palMantaPos.z.toFixed(2),

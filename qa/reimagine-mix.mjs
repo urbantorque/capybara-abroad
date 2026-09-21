@@ -116,12 +116,14 @@ reset(false, 1); c = candidates();
 near(c[0], 1.5 * 1.328, 'governor restores sea');
 reset(); const s = q.scoreTargets();
 near(s[0], 0.8, 'shallower world sidechain'); near(s[1], 1, 'walking no longer removes pad');
-// The cross-file priority hook reports only visible guidance and fresh
-// receipts. Classification and admission belong to npc.js, not this hook.
+// The cross-file priority hook reports guidance, fresh receipts and closure.
+// Classification and admission belong to npc.js, not this hook.
 const hold = source.match(/incidentalQuiet:\s*(function \(\) \{[\s\S]*?\n\s*\}),/)?.[1];
 assert.ok(hold);
-Object.assign(q, { tutOn: false, tutEl: null, sysTickLastAt: 0 });
+Object.assign(q, { tutOn: false, tutEl: null, sysTickLastAt: 0, sysFinClosing: false });
 q.game.state.time = 100;
+vm.runInContext(source.match(/function sysEndingSpace\([^]*?\n\}/)[0] + '\n' +
+  source.match(/  function endingSpace\([^]*?\n  \}/)[0], q);
 vm.runInContext('var incidentalHeld = ' + hold, q);
 check(!q.incidentalHeld(), 'ordinary world does not suppress incidental speech');
 q.tutOn = true; q.tutEl = { parentNode: {}, dataset: {} };
@@ -132,4 +134,10 @@ q.tutOn = false; q.sysTickLastAt = 98.1;
 check(q.incidentalHeld(), 'receipt has two seconds of priority');
 q.sysTickLastAt = 98;
 check(!q.incidentalHeld(), 'receipt boundary releases exactly');
+q.sysFinClosing = true;
+check(q.incidentalHeld(), 'closing coda owns incidental speech channel');
+q.game.state.noEndingSpace = true;
+check(!q.incidentalHeld(), 'ending-space cut restores ordinary speech eligibility');
+q.game.state.noEndingSpace = false; q.game.state.perfRung = 1;
+check(!q.incidentalHeld(), 'governor restores ordinary speech eligibility');
 console.log(checks + ' foreground-mix target assertions passed');

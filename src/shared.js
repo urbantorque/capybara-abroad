@@ -4103,7 +4103,7 @@ export const CHAPTERS = [
     ] },
   { n: 12, biome: 'palawan', name: 'Palawan',        sub: 'the interesting half is underneath',
     arrive: 'to-palawan', far: 1100, tall: true,  pal: 12,
-    hint: 'another world below the surface',          open: 'the water has been keeping something from you.', way: 'the end of the bamboo jetty',
+    hint: 'another world below the surface',          open: 'the water has been keeping something from you.', way: 'beside the shore end of the jetty',
     keep: 'a pearl out of the giant clam',
     kept: 'the gardener turns it in his fingers and says it is the roundest thing on the shelf.',
     // D4.0: was (0, -70) — the hidden lagoon, reached through a submerged
