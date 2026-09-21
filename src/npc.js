@@ -3287,6 +3287,59 @@ export function createNPCs(game) {
       npcStallStripeGeo = null;
   const npcSTALL_ROOF = PALETTE.cloth6;     // one tint, reads on grass/sand/stone alike
   const npcSTALL_STRIPE = PALETTE.sail;
+  // ---- ROADMAP-WOW3 X1b: THE PLACE REMEMBERS -----------------------------
+  // systems.js's sysWorldAwayCheck arms a biome, chapter-level (no regular
+  // required), on the same ≥20-minute-away test N3's own absence line uses —
+  // see its own doc comment there for which three chapters and why only
+  // three. SESSION-ONLY, like every other one-shot door systems.js opens
+  // into this file (`npcPalAwayBiome` etc.) — not a save field.
+  //
+  // REALITY CHECK (measured live, qa/wow3-x1b-remembers.js): this is NOT
+  // read once at build time the way the doc comment here first assumed. A
+  // chapter is only ever `ensureBuilt()` ONCE per session (main.js's
+  // `toSet.built` gate) — every return after the first REATTACHES the same
+  // objects rather than rebuilding them, and `worldAwayArm` cannot fire
+  // before a chapter has been left at least once, which means it cannot
+  // fire before that chapter's stall already exists. So arming has to
+  // repaint the STANDING stall directly, here, the moment the door opens —
+  // not merely set a flag npcMakeStall (below) would only ever read too
+  // late. The npcMakeStall-time check stays too, as a harmless fallback for
+  // the one path that WOULD see it fresh (a chapter that fails to build and
+  // is retried — see main.js's own rollback comment on `toSet.built`).
+  const npcWorldArmed = Object.create(null);      // biome -> true
+  function npcSwapStall(rec) {
+    if (!rec || rec.worldSwapped || !rec.stallRoof) return;
+    rec.worldSwapped = true;
+    rec.stallRoof.material = npcLocMat(npcSTALL_ROOF_ALT);
+    for (let i = 0; i < rec.stallStripes.length; i++) {
+      rec.stallStripes[i].material = npcLocMat(npcSTALL_STRIPE_ALT);
+    }
+  }
+  function worldAwayArm(biome) {
+    if (!biome || npcWorldArmed[biome]) return;
+    npcWorldArmed[biome] = true;
+    for (let i = 0; i < locals.length; i++) {
+      const r = locals[i];
+      if (r.trav && r.biome === biome) { npcSwapStall(r); break; }
+    }
+  }
+  if (game.state) {
+    game.worldAwayArm = worldAwayArm;
+    // QA-only readback, same shape as qaStallInfo just below.
+    game.state.qaWorldStall = function (biome) {
+      for (let i = 0; i < locals.length; i++) {
+        const r = locals[i];
+        if (r.trav && r.biome === biome) return { armed: !!npcWorldArmed[biome], swapped: !!r.worldSwapped };
+      }
+      return { armed: !!npcWorldArmed[biome], swapped: false };
+    };
+  }
+  // A SMALL, FIXED SET — "≤ 3 variants" (X1b's own words): the awning's roof
+  // and its two stripes move together, one alternate PALETTE pair, not a
+  // roll. `cloth2`/`cloth1` are both already textile tints (see PALETTE,
+  // shared.js) and neither is `npcSTALL_ROOF`/`npcSTALL_STRIPE` above.
+  const npcSTALL_ROOF_ALT = PALETTE.cloth2;
+  const npcSTALL_STRIPE_ALT = PALETTE.cloth1;
   // S5: the in-person gift is the one real reason to visit and it was never
   // said out loud. Not a new field on the fragile lines/gift/praise state
   // machine documented a few hundred lines down (see npcTRAV_GIFT_HOLD's own
@@ -3323,15 +3376,29 @@ export function createNPCs(game) {
     top.position.y = 1.0;
     top.castShadow = true;
     g.add(top);
-    const roof = new THREE_.Mesh(npcStallRoofGeo, npcLocMat(npcSTALL_ROOF));
+    // X1b: the one visible difference on a long-absence return, for the
+    // three chapters armed (sysWorldAwayCheck, systems.js). `rec.biome` is
+    // already set by addLocal before this runs. This build-time branch is a
+    // fallback that in practice never fires first (see npcSwapStall's own
+    // note above — arming repaints the standing stall directly, since a
+    // chapter is only ever built once); kept so a genuinely fresh build
+    // still comes out right if it ever DOES run after the door is armed.
+    // `rec.stallRoof`/`stallStripes` are what npcSwapStall repaints live.
+    const worldSwap = !!(rec && rec.biome && npcWorldArmed[rec.biome]);
+    if (rec) rec.worldSwapped = worldSwap;
+    const roof = new THREE_.Mesh(npcStallRoofGeo, npcLocMat(worldSwap ? npcSTALL_ROOF_ALT : npcSTALL_ROOF));
     roof.position.y = 1.55;
     roof.castShadow = true;
     g.add(roof);
+    if (rec) rec.stallRoof = roof;
+    const stripes = [];
     for (let k = -1; k <= 1; k += 2) {
-      const st = new THREE_.Mesh(npcStallStripeGeo, npcLocMat(npcSTALL_STRIPE));
+      const st = new THREE_.Mesh(npcStallStripeGeo, npcLocMat(worldSwap ? npcSTALL_STRIPE_ALT : npcSTALL_STRIPE));
       st.position.set(k * 0.62, 1.555, 0);
       g.add(st);
+      stripes.push(st);
     }
+    if (rec) rec.stallStripes = stripes;
     const a = angle || 0, d = (typeof dist === 'number') ? dist : -1.6;
     g.position.set(d * Math.sin(a), 0, d * Math.cos(a));
     g.rotation.y = a;

@@ -4381,6 +4381,12 @@ const sysSAVE_SHAPE = {
   // per ten minutes" rule the moment it mattered most. One wall-clock number
   // per chapter, restored and clamped exactly like `platedAt`.
   bathAt: 'object',
+  // THE SHELF IN EARN ORDER (ROADMAP-WOW3, X1a): chapter -> jrTotalMs() at
+  // the moment its keepsake was first held. Additive, exactly like `chapms`
+  // and `bathAt` above, and the version does not move for it — a file
+  // written before this existed simply has none for any chapter, and those
+  // sort by chapter number instead (see sysShelfStage). Never re-based.
+  keptAt: 'object',
 };
 const sysSAVE_DEBOUNCE = 700;      // ms — a streak of ticks writes once
 // ---- THE TWO WAYS STORAGE LETS A PLAYER DOWN, BOTH SILENT UNTIL R3 ---------
@@ -33263,6 +33269,10 @@ export function createSystems(game) {
         v: 1, tasks: tasks, seen: seen, recs: jrRecs, recg: jrRecGen(),
         ms: jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0),
         chapms: jrChapMs, finds: finds, foundAt: findWhere,
+        // ...and THE SHELF IN EARN ORDER (ROADMAP-WOW3, X1a), on exactly the
+        // same additive terms. See the write site in completeTask and the
+        // sort in sysShelfStage.
+        keptAt: jrKeptAt,
         // Additive, like everything below it. See jrChapInc.
         inc: jrChapInc, scn: jrChapScene,
         told: jrIncTold ? 1 : 0,   // the chain explainer, once (N1)
@@ -35399,6 +35409,15 @@ export function createSystems(game) {
     // the paper quietly changed country. A chapter is the unit this game is
     // actually built out of; finishing one has to be a moment.
     const cn = r.chapter;
+    // ---- THE ONE CHOKE POINT FOR "WHEN" (ROADMAP-WOW3, X1a) ---------------
+    // keepHeld(cn) can go true two ways — chapComplete (100%) below, or
+    // chapEnough (70%) plus the chapter's own `to-` task specifically — and
+    // both of those changes only ever happen by a task here finishing. So
+    // this one check, run on every real (non-silent) tick, is the whole log:
+    // no scattering. A restore never reaches this line (the `silent` branch
+    // above returns first), which is correct — a restored file's own
+    // `keptAt` already carries whatever this wrote in an earlier session.
+    if (cn && jrKeptAt[cn] === undefined && keepHeld(cn)) jrKeptAt[cn] = jrTotalMs();
     let ceremony = false;
     if (chapComplete(cn) && !jrChapDone[cn]) {
       jrChapDone[cn] = true;
@@ -35429,6 +35448,22 @@ export function createSystems(game) {
   // wants and the only one of the two worth keeping across a session. The
   // running total above is derivable from it and is not saved.
   const jrChapMs = Object.create(null);
+  // ---- WHEN A KEEPSAKE WAS ACTUALLY TAKEN (ROADMAP-WOW3, X1a) ------------
+  // `keepHeld` above is a PROJECTION, on purpose (see its own comment): it
+  // answers only THAT a chapter's keepsake is held, never when. The shelf
+  // used to lay every keepsake in CHAPTER order for exactly that reason —
+  // nothing on the file recorded earn order. This does, now: chapter ->
+  // jrTotalMs() the first time completeTask (below) finds keepHeld(cn) has
+  // gone true. Additive, like `chapms` beside it, never re-based — a
+  // chapter held before this field existed simply has no entry, and
+  // sysShelfStage falls back to its own chapter number for those (sorts
+  // ahead of every real timestamp, which is a small number by comparison).
+  const jrKeptAt = Object.create(null);
+  // QA-only readback, same shape as qaChapLeftSet's own peephole a few
+  // hundred lines up: the raw table, for a harness that needs to confirm
+  // the restore actually populated it rather than inferring it indirectly
+  // through the shelf's own physical layout.
+  game.state.qaKeptAt = function () { const o = {}; for (const k in jrKeptAt) o[k] = jrKeptAt[k]; return o; };
   // ---- HOW MANY OF THEM YOU HAVE CAUSED, AND WHERE (P3) ------------------
   // The incident chain is the only repeatable reward in the game — three
   // witnessed things in one place is AN INCIDENT, five is A SCENE — and it
@@ -35640,6 +35675,48 @@ export function createSystems(game) {
         sysChapRowsAt[toN] = rowsNow;
         try { game.palKeptArm(chapterDef(toN).biome); } catch (e) { /* an older npc.js has no regulars */ }
       }
+    }
+  }
+  // ===========================================================================
+  // THE PLACE REMEMBERS (ROADMAP-WOW3, X1b)
+  // ===========================================================================
+  // N3 gave a REGULAR a line on a long absence (sysPalAwayCheck, just above);
+  // nothing in the world itself moved. This is a SIBLING check, not a second
+  // gate bolted onto the first: it reuses the exact same table
+  // (`sysChapLeftAt`, already written for EVERY chapter on leave, not only
+  // ones with a regular — see its own declaration above) and the exact same
+  // threshold (`sysPAL_AWAY_MS`, 20 minutes of journey time), but is
+  // CHAPTER-level, never gated on `jrChapPal`/the regular tier: a place with
+  // nobody in it yet still has a stall on it.
+  //
+  // A SMALL, NAMED SET OF CHAPTERS, not all nineteen. Every chapter's local
+  // grows a stall (npc.js's `addTraveller`/`npcMakeStall`), so the mechanism
+  // below (npc.js's own `npcWorldArmed`) works anywhere — this table is the
+  // one throttle, and it is deliberately three, not all of them: these three
+  // were checked live, resting-camera, against the actual arrival lens (see
+  // qa/wow3-x1b-remembers.js and this wave's own report for the per-chapter
+  // read). The other sixteen are correctly left out, not forgotten — see
+  // the report for which were tried and why they did not clear the bar.
+  const sysWORLD_CHAPS = { quay: 1, kyoto: 1, venice: 1 };
+  // QA-only readback: has this biome's stall actually been armed this
+  // session. Session-only, like `npcTravMet` — nothing here is saved.
+  const sysWorldArmedOnce = Object.create(null);
+  game.state.qaWorldArmed = function (biome) { return !!sysWorldArmedOnce[biome]; };
+  /** Called from the same `biome:enter` payload as sysPalAwayCheck, right
+   *  after it — see the call site below. */
+  function sysWorldAwayCheck(p) {
+    const toName = (p && p.name) || 'sydney';
+    if (!sysWORLD_CHAPS[toName]) return;
+    if (game.state && game.state.noRemember) return;   // the cut path, X1
+    const toN = chapterOf(toName);
+    if (toN <= 0) return;
+    const leftAt = sysChapLeftAt[toN];
+    if (leftAt === undefined) return;   // never left this chapter yet this session
+    const awayMs = jrTotalMs() - leftAt;
+    if (awayMs < sysPAL_AWAY_MS) return;
+    if (typeof game.worldAwayArm === 'function') {
+      try { game.worldAwayArm(toName, awayMs); sysWorldArmedOnce[toName] = true; }
+      catch (e) { /* an older npc.js has no world-away hook */ }
     }
   }
   /** THE HARNESS’S WINDOW ON THE NUMBER. npc.js’s palAudit is the window on
@@ -36243,16 +36320,24 @@ export function createSystems(game) {
   // stands in Sydney, and the finale (gated on sysFinaleAll) overrides
   // wherever it likes the moment the game is actually finished.
   //
-  // ONE SLOT PER CHAPTER, IN CHAPTER ORDER — not the order actually earned.
-  // The journal's own shelf (THE SHELF — `keep`, v18) already made this
-  // choice ("ONE SLOT PER CHAPTER... the unearned ones drawn greyscale") and
-  // it is the only choice available here too: the roadmap asks for "the
-  // order earned" but nothing on the save file records WHEN a keepsake was
-  // taken, only THAT it was (keepHeld is a projection, not a log), and the
-  // rules for this pass forbid a new save field beyond travSeen/kept/tut.
-  // A per-chapter fixed slot is also the more honest physical object: an
-  // earned-order shelf would shuffle every item sideways each time a new one
-  // arrived, which is furniture, not a shelf.
+  // ONE PHYSICAL SLOT PER CHAPTER, IN EARN ORDER (ROADMAP-WOW3, X1a). This
+  // used to lay chapter k at slot k always, because nothing on the save file
+  // recorded WHEN a keepsake was taken, only THAT it was (keepHeld is a
+  // projection, not a log). `jrKeptAt` (declared beside `jrChapMs`, written
+  // once from completeTask) fixes that: sysShelfStage below now SORTS the
+  // held chapters by `jrKeptAt` ascending and hands sysShelfSlot the sorted
+  // RANK, not the raw chapter number — the nineteen fixed physical positions
+  // are unchanged (still `sysShelfSlot`, still one per chapter's worth of
+  // width), only which held chapter lands in which position moves. The
+  // journal's own flat grid (`game.shelfAudit`, THE SHELF — `keep`, v18,
+  // "ONE SLOT PER CHAPTER... the unearned ones drawn greyscale") is a
+  // DIFFERENT widget and stays in chapter order on purpose: it shows all
+  // nineteen, earned or not, and a grid that reshuffles as you play would be
+  // unreadable as an index. The shelf still does not shuffle sideways as you
+  // play either — a chapter's rank among what is ALREADY held only ever
+  // grows forward, it never moves an already-placed item once staged, since
+  // stageKeep is keyed by biome and this loop simply restates the same
+  // positions every arrival (idempotent, per its own doc comment below).
   const sysSHELF_X = 35.6, sysSHELF_Z = 27.4, sysSHELF_LEN = 4.6;   // == environment.js's envSHELF_*
   const sysSHELF_SURF = 0.84;
   function sysShelfSlot(k) {
@@ -36271,16 +36356,32 @@ export function createSystems(game) {
   function sysShelfStage() {
     const ph = game.physics;
     if (!ph || typeof ph.stageKeep !== 'function') return;
-    let n = 0;
+    const held = [];
+    for (let k = 1; k <= chapMax; k++) if (keepHeld(k)) held.push(k);
+    // EARN ORDER (X1a): a real `jrKeptAt[k]` sorts by when it was actually
+    // taken; a chapter held from before this field existed has none, and
+    // falls back to its own chapter number, which — being 1-19 against a
+    // real jrTotalMs() reading in the thousands the moment any live one is
+    // recorded — always sorts ahead of every genuinely-timed entry, i.e. as
+    // if it had been earned before this session started, which it was.
+    // The cut path (X1's own `noRemember`): chapter order, exactly the shelf
+    // this replaced — no new geometry either way, so cutting it costs the
+    // sort comparator's own few extra comparisons and nothing else.
+    const noRem = !!(game.state && game.state.noRemember);
+    held.sort(function (a, b) {
+      if (noRem) return a - b;
+      const ta = (typeof jrKeptAt[a] === 'number') ? jrKeptAt[a] : a;
+      const tb = (typeof jrKeptAt[b] === 'number') ? jrKeptAt[b] : b;
+      return (ta - tb) || (a - b);
+    });
     const grew = [];
-    for (let k = 1; k <= chapMax; k++) {
-      if (!keepHeld(k)) continue;
-      n++;
-      const sp = sysShelfSlot(k);
+    for (let i = 0; i < held.length; i++) {
+      const k = held[i];
+      const sp = sysShelfSlot(i + 1);   // slot by EARN RANK, not by chapter number (X1a)
       try { ph.stageKeep(chapterDef(k).biome, sp.x, sp.z, sp.y); } catch (e) { /* one shelf slot is not worth the sentence */ }
       if (!sysShelfSpoken[k]) { sysShelfSpoken[k] = true; grew.push(k); }
     }
-    sysShelfCount = n;
+    sysShelfCount = held.length;
     // ...AND THE GARDENER NOTICES (N1). Once per keepsake, ever — never
     // twice — so a first Sydney visit after finishing several chapters
     // elsewhere queues each of them rather than only the newest.
@@ -37319,6 +37420,11 @@ export function createSystems(game) {
       jrCarriedMs = typeof jrFile.ms === 'number' ? jrFile.ms : 0;
       const cms = jrFile.chapms || {};
       for (const k in cms) if (typeof cms[k] === 'number') jrChapMs[k] = cms[k];
+      // ...and THE SHELF IN EARN ORDER (ROADMAP-WOW3, X1a), read back the
+      // same way — a file written before it existed simply has none, which
+      // sysShelfStage's own fallback (sort by chapter number) already covers.
+      const ka = jrFile.keptAt || {};
+      for (const k in ka) if (typeof ka[k] === 'number') jrKeptAt[k] = ka[k];
       const inc = jrFile.inc || {}, scn = jrFile.scn || {};
       for (const k in inc) if (typeof inc[k] === 'number') jrChapInc[k] = inc[k];
       for (const k in scn) if (typeof scn[k] === 'number') jrChapScene[k] = scn[k];
@@ -42933,6 +43039,11 @@ export function createSystems(game) {
   const compWALK     = 1.6;    // m/s it wanders off at
   const compLAMBDA_Y = 9;      // how fast its height follows the ground
   const compPORTRAIT = 30;     // m within which it is stood in a picture
+  // ROADMAP-WOW3 X1c: "the next time you stand there, it is there, and it
+  // comes over" — the clause N3 never shipped. The same order as a local's
+  // own default `near` (7 m, npc.js addLocal), big enough to read as
+  // "back in the area" rather than standing on its doorstep.
+  const compHOME_NEAR = 8;
   // ---- THE FETCH (L6, F1 — the design's fourth combination) ----------------
   // A thrown prop under compFETCH_KG that comes to rest inside compFETCH_R of
   // a following companion is brought back: it goes to it, takes it up (the
@@ -43104,6 +43215,13 @@ export function createSystems(game) {
   let compSaved = null;      // { kind, from } off the file, until the first started frame
   let compWhy = '';          // why the last one left, for the harness
   let compTold = false;      // "sit beside it and it climbs back on" — said once
+  // ROADMAP-WOW3 X1c: kind -> the biome it was last sent home to, the
+  // moment `compLeave(capy, 'home')` actually applies a home destination
+  // (see there). SESSION-ONLY, like `npcTravMet` and `sysChapLeftAt` above
+  // it — not a save field, and not one of this pass's own new one
+  // (`keptAt`, X1a). A kind with no entry has never gone home this session
+  // and `compHomeStep` below has nothing to do for it.
+  const compWentHome = Object.create(null);
   /** 'a pigeon', 'an ibis'. The article is the only grammar this needs. */
   function stowName(k) {
     return (/^[aeiou]/i.test(k) ? 'an ' : 'a ') + k;
@@ -43211,6 +43329,10 @@ export function createSystems(game) {
     // stands" walk-off exactly as it was.
     const home = why === 'home' ? compHOME[compKind] : null;
     if (home) {
+      // X1c: this is the one moment a kind is genuinely "sent home" — record
+      // it here, before compClear() (below, once the walk-off finishes)
+      // blanks compFrom/compKind for the harness. compHomeStep reads this.
+      compWentHome[compKind] = compFrom;
       // the drop point IS the named spot, not wherever the animal happened
       // to be standing — so what shrinks and fades over compLEAVE is the
       // actual ledge/colony/doorstep. It then walks the same short distance
@@ -43490,6 +43612,37 @@ export function createSystems(game) {
         compAt.x = p0.x + 1.0; compAt.z = p0.z; compAt.y = compStandY(compAt.x, compAt.z);
         compObj.visible = true;
         if (game.biome && game.biome.current === sv.from) compLeave(capy0, 'home');
+      }
+    }
+    // ---- ROADMAP-WOW3 X1c: THE COMPANION THAT COMES OVER -------------------
+    // N3's own line, never shipped: "the next time you stand there, it is
+    // there, and it comes over." Idle only (compObj null — nothing already
+    // held or mid walk-off), and only in the biome a kind was actually sent
+    // home to (compWentHome, set once by compLeave's own 'home' branch,
+    // above, and never cleared — its home is a standing fact, not a single
+    // arming). Reuses the EXACT beat the restore branch just above already
+    // uses to put a companion down beside you, following — compTake, then
+    // compState = 'follow' — rather than inventing a second one; the
+    // ordinary follow logic further down in THIS function is what then
+    // actually closes the distance to you, on its own, frame by frame.
+    if (!compObj && started && !(game.state && game.state.noRemember)) {
+      const capyH = game.capy, pH = capyH && capyH.position;
+      const hereBiome = game.biome && game.biome.current;
+      if (pH && hereBiome) {
+        for (const k in compWentHome) {
+          if (compWentHome[k] !== hereBiome) continue;
+          const home = compHOME[k];
+          if (!home) continue;
+          const dx = pH.x - home.x, dz = pH.z - home.z;
+          if (dx * dx + dz * dz > compHOME_NEAR * compHOME_NEAR) continue;
+          const tr = compTRAITS[k];
+          if (compTake(k, hereBiome, tr ? tr.span : 1)) {
+            compState = 'follow'; compMt = 0;
+            compAt.x = home.x; compAt.z = home.z; compAt.y = compStandY(home.x, home.z);
+            compObj.visible = true;
+          }
+          break;
+        }
       }
     }
     if (!compObj) return;
@@ -47144,6 +47297,10 @@ export function createSystems(game) {
     // F3 (see THE COMPANION's own note on the same field, above) and read
     // here for the first time by anything that is not that mechanic.
     sysPalAwayCheck(p);
+    // ===== X1b: THE PLACE REMEMBERS (ROADMAP-WOW3) =========================
+    // Same payload, same table, no regular required — see sysWorldAwayCheck's
+    // own doc comment above.
+    sysWorldAwayCheck(p);
     // Every biome is authored in the SAME coordinates, so a breadcrumb dropped
     // on the Corso is a point inside a basilica once Venice is attached. The
     // trail belongs to the world it was walked in and to no other.
