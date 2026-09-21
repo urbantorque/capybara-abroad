@@ -5044,6 +5044,31 @@ const sysMUS_PROG = [
   { own: [0, 1, 0, 1, 0, 1, 0, 1], tag: [1, 0] },               // 19 Monte Carlo
   { own: [0, 1, 0, 1, 0, 1, 0, 1], tag: [1, 0] },               // 20 Hanoi: sus
 ];
+// ---- THE VOICE (ROADMAP-SCORE, M2): the ocarina -----------------------------
+// The theme's timbre is the same in every palette and the palette is the
+// arrangement — its pad, its lead, its room, its tempo. One instrument, and
+// it is not one of the fifty: a sine with a triangle an octave over it
+// (an ocarina is nearly a pure tone; the octave is what keeps it from being
+// a test tone), the palette's lowpass at 1.6× its cut with a floor under
+// the register (Iceland's 470 × 1.6 is 752, and a D6 through that would be
+// under its own fundamental — the same floor logic as sysMUS_SKYCUT), a
+// breath at the onset (40 ms of the MONO noise buffer, band-passed 1.5–4
+// kHz, −18 dB — noiseSrc, never the stereo one: THE MIX PASS's trap), a
+// vibrato on `detune` at 5.5 Hz and 12 cents fading in after 180 ms (one
+// writer: nothing else touches this voice's detune), 30 ms of portamento
+// between adjacent notes, a 220 ms release. Register D5–D6: the tune's
+// base folds the tonic into lo..hi so the octave the tune spans sits there
+// in every key. It goes to musWide (the ensemble and, through it, the room)
+// through its own gain, musOcaBus — the one node W2 re-routes for the
+// foreground. `noOcarina` sends the theme to the palette's lead instead.
+const sysMUS_OCA = { cutK: 1.6, cutMin: 1400, oct2: 0.18,
+                     breath: 0.04, breathG: 0.126, breathLo: 1500, breathHi: 4000,
+                     vibHz: 5.5, vibCents: 12, vibIn: 0.18, porta: 0.03, rel: 0.22,
+                     lo: 69, hi: 80 };
+// ...and how hard. 0.115 is the lift's note; the lead's plucks run 0.03–0.075
+// (the roadmap's "0.5"); the theme sits ABOVE them, not timidly under. The
+// bus is W2's; the voice itself is not shy.
+const sysMUS_OCA_VEL = 0.105;
 // THE MUSICIAN (L7, F2): the tune, played from a POSITION by a bed-class
 // mover instead of on the non-diegetic pad. One beat here is 0.6 s (the
 // theme's own eight notes, weighted by sysMUS_THEME_DUR, run about 8.4 s —
@@ -18673,6 +18698,14 @@ export function createSystems(game) {
       case 'twang':  musTwang(when, midi, pan, vel, 2); return;
       case 'danbau': musDanBau(when, midi, vel); return;
       case 'horn':   musBondHorn(when, midi, vel); return;
+      // THE OCARINA (ROADMAP-SCORE, M2): the theme's voice. `noOcarina`
+      // sends the same notes to the palette's lead, so the two can be A/B'd.
+      case 'ocarina':
+        if (game.state && game.state.noOcarina) {
+          musLiftNote((musPal && musPal.lead && musPal.lead !== 'none') ? musPal.lead : 'pluck', when, midi, pan, vel, gap);
+          return;
+        }
+        musOcarina(when, midi, vel, gap); return;
       default:       musPluck(when, midi, pan, vel); return;
     }
   }
@@ -18750,6 +18783,14 @@ export function createSystems(game) {
     const p = pal || musPal;
     const tonic = (p && p.roots && p.roots.length) ? p.roots[0] : 38;
     return musFold(tonic + 24 + (oct || 0), sysMUS_LIFT_LO, sysMUS_LIFT_HI - 12);
+  }
+  // ...and where the OCARINA starts it (M2): the tonic folded into
+  // sysMUS_OCA.lo..hi, so the octave the tune spans sits at D5–D6 in every
+  // key — the same fold-once rule as musThemeBase, a fifth higher.
+  function musOcaBase(pal) {
+    const p = pal || musPal;
+    const tonicPc = ((((p && p.roots && p.roots.length) ? p.roots[0] : 38) % 12) + 12) % 12;
+    return sysMUS_OCA.lo + (((tonicPc - sysMUS_OCA.lo) % 12) + 12) % 12;
   }
 
   // The default character, for a palette that has not been given one. Nothing
@@ -20565,6 +20606,71 @@ export function createSystems(game) {
     o.start(when); o2.start(when); lfo.start(when);
     const stop = when + dur + 0.08;
     o.stop(stop); o2.stop(stop); lfo.stop(stop);
+  }
+
+  /**
+   * THE OCARINA (ROADMAP-SCORE, M2) — the theme's own voice. See sysMUS_OCA.
+   * `gap` is the time to the next note: the tone holds to it and the release
+   * starts there, so a phrase is a line and not a row of blips. Adjacent
+   * notes slide: if the last ocarina note ends where this one starts, the
+   * pitch leaves from that note over sysMUS_OCA.porta.
+   */
+  let musOcaLastMidi = 0, musOcaLastEnd = -1;   // the note before, for the portamento
+  let musOcaN = 0;                               // notes scheduled, for musThemeAudit
+  let musOcaBus = null;                          // its gain into musWide; see musicStart
+  function musOcarina(when, midi, vel, gap) {
+    if (!musOcaBus) { musPluck(when, midi, 0, vel); return; }
+    const O = sysMUS_OCA;
+    const hz = sysMidiHz(midi);
+    const dur = Math.max(0.10, (gap || 0.5) - 0.02);
+    const slide = musOcaLastEnd >= 0 && Math.abs(when - musOcaLastEnd) < 0.08 && musOcaLastMidi !== midi;
+    const o = ac.createOscillator(); o.type = 'sine';
+    const o2 = ac.createOscillator(); o2.type = 'triangle';
+    if (slide) {
+      const h0 = sysMidiHz(musOcaLastMidi);
+      o.frequency.setValueAtTime(h0, when);
+      o.frequency.exponentialRampToValueAtTime(hz, when + O.porta);
+      o2.frequency.setValueAtTime(h0 * 2, when);
+      o2.frequency.exponentialRampToValueAtTime(hz * 2, when + O.porta);
+    } else {
+      o.frequency.value = hz;
+      o2.frequency.value = hz * 2;
+    }
+    const g2 = ac.createGain(); g2.gain.value = O.oct2;
+    const g = ac.createGain();
+    const v = Math.max(0.0006, vel);
+    g.gain.setValueAtTime(0.0001, when);
+    // a tongued note speaks in 45 ms; a slid one is already speaking
+    g.gain.exponentialRampToValueAtTime(v, when + (slide ? 0.02 : 0.045));
+    g.gain.setValueAtTime(v, when + dur);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur + O.rel);
+    // the vibrato, on detune, arriving after the note has settled
+    const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = O.vibHz;
+    const lg = ac.createGain();
+    lg.gain.setValueAtTime(0.0001, when);
+    lg.gain.setValueAtTime(0.0001, when + O.vibIn);
+    lg.gain.linearRampToValueAtTime(O.vibCents, when + O.vibIn + 0.25);
+    lfo.connect(lg); lg.connect(o.detune); lg.connect(o2.detune);
+    // the palette's lowpass, opened, with the floor
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 0.7;
+    lp.frequency.value = Math.max(O.cutMin, ((musPal && musPal.cut) || 620) * O.cutK);
+    o.connect(g); o2.connect(g2); g2.connect(g);
+    g.connect(lp); lp.connect(musOcaBus);
+    // the breath: the air before the pipe speaks, above the tone
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter();
+    const f0 = Math.sqrt(O.breathLo * O.breathHi);
+    bp.type = 'bandpass'; bp.frequency.value = f0; bp.Q.value = f0 / (O.breathHi - O.breathLo);
+    const ng = ac.createGain();
+    env(ng, when, v * O.breathG, 0.008, O.breath);
+    ns.connect(bp); bp.connect(ng); ng.connect(musOcaBus);
+    ns.start(when); ns.stop(when + O.breath + 0.05);
+    o.start(when); o2.start(when); lfo.start(when);
+    const stop = when + dur + O.rel + 0.05;
+    o.stop(stop); o2.stop(stop); lfo.stop(stop);
+    musOcaLastMidi = midi; musOcaLastEnd = when + dur;
+    musOcaN++;
   }
 
   /**
@@ -22674,6 +22780,13 @@ export function createSystems(game) {
     musPad.connect(musSideG);
     musSideG.connect(musWide);
     musWide.connect(musSend);                       // the reverb gets it clean
+    // ---- THE OCARINA'S BUS (ROADMAP-SCORE, M2): one gain into the ensemble
+    // — so the theme has the width and the room every sustained voice has —
+    // and AFTER musSideG, so the world's transients do not duck it. W2's
+    // foreground work re-routes or trims this one node, not the voice.
+    musOcaBus = ac.createGain();
+    musOcaBus.gain.value = 1;
+    musOcaBus.connect(musWide);
     const musWideDry = ac.createGain();
     musWideDry.gain.value = sysMUS_ENS_TRIM;
     musWide.connect(musWideDry);
@@ -44417,6 +44530,13 @@ export function createSystems(game) {
      * `inChord` is the honest one: each note against the progression chord
      * actually sounding under it, long notes weighted by their beats.
      */
+    /** One ocarina note, now (M2) — for W2's bus measurement and nothing in src. */
+    ocarina: function (midi, gap, vel) {
+      if (!ac || !musVol || ac.state !== 'running') return false;
+      musLiftNote('ocarina', ac.currentTime + 0.05, typeof midi === 'number' ? midi : musOcaBase(), 0,
+                  typeof vel === 'number' ? vel : sysMUS_OCA_VEL, gap > 0 ? gap : 0.6);
+      return true;
+    },
     themeAudit: function (n) {
       const pal = sysMUS_PAL[n] || sysMUS_PAL[0];
       const sc = sysMUS_SCALES[pal.scale] || sysMUS_SCALES.major;
