@@ -1,0 +1,123 @@
+- [Headless QA harness](headless-qa-harness.md) — how to playtest capy3 unattended; 55 harness traps
+- [Progression chain](capy3-progression-chain.md) — how the worlds connect; travel is three whistles
+- [Visibility metrics that lie](capy3-visibility-metrics.md) — judge framing from the rendered PNG
+- [Biome build gotchas](capy3-biome-build-gotchas.md) — heightfield axis, half-vs-full extents
+- [Module drop failure](capy3-module-drop-failure.md) — one throw in systems.update looks like a freeze
+- [One voice, not two](capy3-controls-one-voice.md) — the settled control scheme
+- [Slip and sky](capy3-slip-and-sky.md) — two mechanics whose obvious build measured wrong
+- [Shared-space leaks](capy3-shared-space-leaks.md) — position tests must gate on the live biome
+- [Drift air and gravity](capy3-drift-air-and-gravity.md) — per-biome gravity, wind as a frame
+- [Reference frames](capy3-reference-frames.md) — the one channel for moving worlds
+- [Centreline worlds](capy3-centreline-worlds.md) — the polyline pattern (chiva road, Uji run)
+- [Chapters ten and eleven](capy3-chapters-ten-eleven.md) — movable waterline, climb hook, black neon
+- [Render pose heuristics](capy3-render-pose-heuristics.md) — the guess that broke every hop
+- [The lift](capy3-the-lift.md) — celebrating a marquee inside a score that never stops
+- [World size audit](capy3-world-size-audit.md) — scenery density per chapter
+- [The dive and the balloon](capy3-dive-and-balloon.md) — ch 12-13; a new verb fights an old one
+- [Shared-module blindness](capy3-shared-module-blindness.md) — the props.js gates that leaked Sydney
+- [External forces on the capybara](capy3-external-forces-on-the-capybara.md) — frame vs launch vs shove
+- [The middle rung](capy3-the-middle-rung.md) — the mini tier; how a carrier drops its passenger
+- [The backlog closed](capy3-the-backlog-closed.md) — the rule that made sixteen tasks cheap
+- [Things that are simply there](capy3-things-that-are-simply-there.md) — ambient movers, three rules
+- [Catch-all state](capy3-catch-all-state.md) — the rung that resets the timer it waits on
+- [The paper](capy3-the-paper.md) — to-do card, journal, hint arrow; two tables that go stale
+- [Put me back](capy3-put-me-back.md) — the stuck-rescue; last grounded position is worthless
+- [The picture](capy3-the-picture.md) — composite pass, sky dome, grain and sparkle
+- [The sea has a shape](capy3-the-sea-has-a-shape.md) — ch 14; a swell needs a phase table
+- [The herd](capy3-the-herd.md) — ch 15; followers as a trail; a raft is ground
+- [The dark](capy3-the-dark.md) — ch 16; the wheek as a torch
+- [Layouts that scale](capy3-layouts-that-scale.md) — the picker and the atmosphere ladder
+- [Solid or drawn](capy3-solid-or-drawn.md) — the walk-through-buildings audit
+- [The locals](capy3-the-locals.md) — talking NPCs in fourteen empty chapters
+- [Two pages and a chart](capy3-two-pages-and-a-chart.md) — split title card, six verbs
+- [The pack and the pod](capy3-the-pack-and-the-pod.md) — ch 17; a sea with a density field
+- [Chapter audits hub](capy3-hub-chapter-audits.md) — the second to fifth passes over chapters 1-17, 24 notes
+- [Clone eats the shader](capy3-clone-eats-the-shader.md) — the method call that left five seas flat
+- [Quay is two places](capy3-quay-is-two-places.md) — Circular Quay is chapter 1 and chapter 3
+- [Props in every world](capy3-props-in-every-world.md) — rigid bodies for chapters 3-17
+- [Springs are clipped](capy3-springs-are-clipped.md) — measure every spring peak; two writers on scale
+- [The micro-environment](capy3-the-micro-environment.md) — the mood table (weather.js)
+- [Shape and thread](capy3-shape-and-thread.md) — acts give a middle, souvenirs a spine
+- [Water and witness](capy3-water-and-witness.md) — the dive became a property of water
+- [The front of the game](capy3-the-front-of-the-game.md) — the menu score; four layout traps
+- [Finds belong to a place](capy3-finds-belong-to-a-place.md) — six ways a place find fails silently
+- [The Delight Pass](capy3-delight-pass.md) — all four waves and their traps (Aug)
+- [Calm, keepsakes and a camera](capy3-waves-three-and-four.md) — the six systems of waves 3-4
+- [Payoff pass hub](capy3-hub-payoff-pass.md) — batches one to four and the closeout, 5 notes
+- [A gust is an impulse](capy3-gust-is-an-impulse.md) — the puff, the cap, impulse-to-distance
+- [Mischief radii](capy3-mischief-radii.md) — measured numbers behind the reaction layer
+- [Two runs, one tree](capy3-two-runs-one-tree.md) — the batch that fired twice
+- [Monte Carlo](capy3-monte-carlo.md) — ch 18; the first place that denies anything
+- [Hanoi](capy3-hanoi.md) — ch 19; traffic as a medium
+- [The lens and the wall](capy3-lens-and-wall.md) — eye-raise, flattening dolly, the climb
+- [Instruments that cannot hold a line](capy3-instruments-that-cannot-hold-a-line.md) — three suites that drift
+- [The number and the first frame](capy3-number-and-first-frame.md) — live record, done-flag, arrival lens
+- [The place remembers](capy3-the-place-remembers.md) — the heat field; six ways an accumulator reads zero
+- [The independent list](capy3-the-independent-list.md) — the float that bulldozed the spawn
+- [The movement pass](capy3-the-movement-pass.md) — three-frame stop, silent wall
+- [The polish pass](capy3-polish-pass.md) — ground-flatness measurement and its batch
+- [The second flier](capy3-the-second-flier.md) — the condor left Pasto; a 69 m noise floor
+- [The polish batch](capy3-the-polish-batch.md) — four phases; two targets not met honestly
+- [The presence pass](capy3-the-presence-pass.md) — what /polish bought; the wind nobody draws
+- [Presence, batch one](capy3-presence-batch-one.md) — contact and sway; the concurrent writer
+- [Presence, batch two](capy3-presence-batch-two.md) — spill not point lights; camera never sees sky
+- [Sounds people make](capy3-sounds-people-make.md) — NPC sfx with no volume and no position
+- [Spawn rings and a frontage](capy3-spawn-rings-and-frontage.md) — the ring metric lied again
+- [Lattice, not element size](capy3-lattice-not-element-size.md) — why ground mesh and collider drift
+- [Record spam](capy3-record-spam.md) — per-frame game.record(); flush on the edge
+- [Names nothing publishes](capy3-names-nothing-publishes.md) — api-key mismatch; the audit that finds them
+- [Barge, then grab](capy3-barge-then-grab.md) — knocking a hat off ticked nothing
+- [Carriers that drop you](capy3-carriers-that-drop-you.md) — the zero-velocity carrier
+- [The resting lens](capy3-the-resting-lens.md) — the frame shown most; a photograph of the ground
+- [Five things already built](capy3-five-things-already-built.md) — v36; five instruments that lied
+- [The ghost and the incident](capy3-ghost-and-incident.md) — v37; loops added rather than finished
+- [The deck is not a wall](capy3-deck-is-not-a-wall.md) — the ferry cutting its own boom
+- [Light on the shelf](capy3-light-on-the-shelf.md) — v38 title/picker; WCAG ceiling on a wash
+- [The yacht and the band](capy3-the-yacht-and-the-band.md) — two tasks with no route; first costume
+- [The lens](capy3-the-lens.md) — v40; five composite terms; bloom at one window size
+- [The mix](capy3-the-mix.md) — v41; the score composed and never produced
+- [The wardrobe](capy3-the-wardrobe.md) — ten costumes; four ways a hat fails
+- [Nine skills](capy3-nine-skills.md) — chapters that teach a move; five instruments that lied
+- [The herd anywhere](capy3-the-herd-anywhere.md) — obey tiers, hold timer, offer contract
+- [The bridge had no ends](capy3-bridge-had-no-ends.md) — a pylon wearing its cap 4 m high
+- [Under the floor](capy3-under-the-floor.md) — three ways under the ground; six probes that lied
+- [The feel pass](capy3-the-feel-pass.md) — v44; five movement systems
+- [The depth pass](capy3-the-depth-pass.md) — v45; one texture, three terms; AO that darkened lawns
+- [The leaf](capy3-the-leaf.md) — v46; transmission; the strength a frame-mean could not see
+- [Exposure](capy3-exposure.md) — v47; one chapter not three; the lever that did nothing
+- [The airlight](capy3-the-airlight.md) — v48; a falloff with no distance term
+- [The penumbra](capy3-the-penumbra.md) — v49; the softness table never wired
+- [The blossom](capy3-the-blossom.md) — v50; the rim makes a decal stop being one; flipped discs
+- [The second hour](capy3-the-second-hour.md) — v51+v53; features never reachable
+- [The front door](capy3-the-front-door.md) — v52; the $' that split the bundle
+- [The review sweep](capy3-review-sweep-aug31.md) — 31 Aug six-agent audit; REVIEW-2026-08-31.md
+- [Release pass hub](capy3-hub-release-pass.md) — the release review and R1-R10, 7 notes
+- [Polish pass hub](capy3-hub-polish-pass.md) — the polish review and P1-P8, 8 notes
+- [Delight pass hub](capy3-hub-delight-pass.md) — the delight review and D1-D9, 8 notes
+- [Physics pass hub](capy3-hub-physics-pass.md) — the physics review and X7-X9, 4 notes
+- [Finish pass hub](capy3-hub-finish-pass.md) — the title pass T1-T3 and the finish pass F1-F4, 8 notes
+- [Character pass hub](capy3-hub-character-pass.md) — the character review and R1-R6, 6 notes
+- [The sound review](capy3-the-sound-review.md) — 6 Sep audio audit; no Doppler anywhere
+- [The mover](capy3-the-mover.md) — S1a; first continuously positioned sound
+- [The sound pass](capy3-the-sound-pass.md) — S1b/S2/M1; the flock as a difference of voices
+- [Fun pass hub](capy3-hub-fun-pass.md) — the fun review and B1-B15, 12 notes
+- [Next pass hub](capy3-hub-next-pass.md) — the perch, the nap, the regulars, the repertoire, the postcard
+- [The review sweep](capy3-review-sweep.md) — the geometry differential; systems.js has no seam
+- [The beauty pass](capy3-the-beauty-pass.md) — one star for eight chapters; the cloud; the sRGB gate; the second near: line
+- [The second beauty pass](capy3-the-second-beauty-pass.md) — the sky is 0% of the frame; shade is a face turned away; three wrong metrics
+- [The depth audit](capy3-the-depth-audit.md) — the three-class crowd; nine marquees that ask for nothing
+- [Something eats something](capy3-something-eats-something.md) — Tier 5; the first predator layer, and four hunts that measured as nothing
+- [Terms that cannot bite](capy3-terms-that-cannot-bite.md) — correct code, zero effect; what the controller shape does to a new term
+- [The lift pass](capy3-lift-pass.md) — the frame had no place in it; every task was compulsory; two undeclared identifiers
+- [The second lift pass](capy3-second-lift-pass.md) — the sky band, the getaway rule, five instruments that lied
+- [The waist-high pass](capy3-waist-high.md) — V1/V2; the audit's 1.6 m floor; instanced pass; the paper labelled
+- [The big ones](capy3-the-big-ones.md) — W1/W2; wow rows are names, game.wowLive(), nine new beats; the Uji finish fired 100 m early
+- [The mix, measured](capy3-the-mix-measured.md) — S1/S2; the score has no top end, the sfx bus does; tap the limiter from a probe; Capybara Abroad
+- [The ridiculous five](capy3-the-ridiculous-five.md) — X1–X5/N1; five vehicle/boss marquees on the helm pattern; the ladder said; floor tests need the sign of vy
+- [The third lift](capy3-third-lift.md) — L3; the composite air was the wash, a value field smaller than the frame, the authority is the march with a carry on the end
+- [The fourth lift](capy3-fourth-lift.md) — L4; a before is a stash, two probes measured the title card, Sydney is never entered, the cast is never free
+- [The marquee pass](capy3-marquee-pass.md) — L5; nineteen marquees a notch higher: a verb, a number, a second go, a frame; gen-2 rows; the tuck is a run
+- [The sixth lift](capy3-sixth-lift.md) — L6; the companion, the second ask, the tune; resuming a pass a session limit killed; five agents on one file
+- [The seventh lift](capy3-seventh-lift.md) — L7, closed; musician 13/19; the marqId string-swap trap; the sidechain is a bus not a table; PORT=5188
+- [The owed and the link](capy3-owed-and-the-link.md) — L6-5; the remote and the Pages link; the build was the clone; a rising floor is a throw; the still state moves 4 dB
+- [The third beauty pass](capy3-third-beauty-pass.md) — L11/ROADMAP-WOW; mirrors, grass, mist, the living made round; eight agents, what stalled them
