@@ -4534,6 +4534,13 @@ let sysArrowsNow = false;      // arrows straight away (L3-14): the riddle switc
 let sysPerfMode = 0;
 let sysPerfRung = 0;
 const sysPERF_MODES = ['auto', 'pretty', 'fast'];
+// ---- THE SCORE ROW (ROADMAP-SCORE, Part L) ---------------------------------
+// `in front` (this pass: the theme, the arc, the motifs, the quieter world)
+// or `as before` (L7's mix). One switch, four flags — noTheme, noArc,
+// noMotif and noQuiet (W2's; harmless if nothing reads it yet) — applied
+// by sysScoreApply, saved as `sc` beside the volumes.
+let sysScoreBefore = false;
+const sysSCORE_MODES = ['in front', 'as before'];
 const sysCUE_TEXT = {
   horn: 'a horn', geyser: 'the ground rumbles', siren: 'a siren', bonsho: 'a temple bell',
   campanile: 'the campanile', muezzin: 'the call to prayer', organ: 'the organ', cheer: 'a cheer',
@@ -4598,6 +4605,7 @@ function sysPrefsRead() {
   sysCaptions = !!o.cc;
   sysArrowsNow = !!o.ar;
   sysPerfMode = (o.pf === 1 || o.pf === 2) ? o.pf : 0;
+  sysScoreBefore = o.sc === 1;
   sysMuteMaster = !!o.mm;
   sysMuteMusic  = !!o.um;
   sysMuteSfx    = !!o.sm;
@@ -4622,6 +4630,7 @@ function sysPrefsWrite() {
       cc: sysCaptions ? 1 : 0,
       ar: sysArrowsNow ? 1 : 0,
       pf: sysPerfMode,
+      sc: sysScoreBefore ? 1 : 0,
     }));
   } catch (e) { sysPrefsOff = true; }
 }
@@ -25579,6 +25588,20 @@ export function createSystems(game) {
   function pausePerfSay() { pausePerfNote.textContent = sysPERF_SAY[sysPerfMode] || ''; }
   pauseSet.appendChild(pausePerfNote);
   pausePerfSay();
+  // THE SCORE ROW (ROADMAP-SCORE, Part L): two stops in the same shape.
+  // `as before` is L7's mix — the four flags together, one switch — so the
+  // player can hear each half of the pass against what it replaced.
+  function sysScoreApply() {
+    game.state.noTheme = sysScoreBefore;
+    game.state.noArc = sysScoreBefore;
+    game.state.noMotif = sysScoreBefore;
+    game.state.noQuiet = sysScoreBefore;
+  }
+  sysScoreApply();
+  const pauseScore = pauseRange('score', 'the score', 0, sysSCORE_MODES.length - 1, 1,
+    function () { return sysScoreBefore ? 1 : 0; },
+    function (v) { sysScoreBefore = Math.round(v) === 1; sysScoreApply(); },
+    function (v) { return sysSCORE_MODES[clamp(Math.round(v), 0, sysSCORE_MODES.length - 1)]; });
   const pauseInv = pauseSwitch('invert turning',
     function () { return sysLookInv; },
     function (v) { sysLookInv = !!v; });
@@ -25600,7 +25623,7 @@ export function createSystems(game) {
       // Leaving the setting must not leave a latch on.
       sysRunLatch = false; sysSlideLatch = false;
     });
-  void pauseLook; void pauseInv; void pauseFov; void pauseText; void pauseHold; void pauseCc; void pauseAr; void pausePerf;
+  void pauseLook; void pauseInv; void pauseFov; void pauseText; void pauseHold; void pauseCc; void pauseAr; void pausePerf; void pauseScore;
 
   // ---- THE WARDROBE (L3-7). See sysWearPick. Rebuilt every time the card
   // opens, because what has been earned changes.
