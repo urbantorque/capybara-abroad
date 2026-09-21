@@ -31610,7 +31610,10 @@ export function createSystems(game) {
                     where: function () {
                       const k = game.kyoto;
                       if (!k) return null;
-                      return hintObj(k.inRiver() ? k.mill : k.bridge);
+                      if (!k.inRiver()) return hintObj(k.bridge);
+                      const p = game.capy && game.capy.position;
+                      // Follow the channel, not a chord through the gorge.
+                      return hintObj((p && k.aheadOnRiver && k.aheadOnRiver(p.x, p.z, 16)) || k.mill);
                     } },
     'matcha-raid':    { clue: 'the heap by the mill at Uji',
                     where: function () { return hintObj(game.kyoto && game.kyoto.matchaHeap); } },

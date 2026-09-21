@@ -1,3 +1,43 @@
+## REIMAGINE D6/E6/E7/G — PEOPLE AND THE RIVER (21 Sep 2026)
+
+The pinned Uji task points sixteen metres along the existing river centreline,
+not directly through its bends to the mill. Dry bridge targeting, authored
+flow, gates, launch physics and save shape remain unchanged. A fresh real-key
+Kyoto route earns pond swim, all three boat gates, chute launch, mill finish,
+matcha and memory; all three tasks and memory survive reload. Latest run:
+201 river samples, 183 wet public-hint matches, 162 trusted key events, zero
+runtime errors. Scripted navigation is not a novice pacing claim. The matcha
+reward frame still exposes architecture occlusion, recorded for follow-up.
+
+Foreground people use closed planar garment hulls with sloping shoulders and
+a mild waist. Roster/local skeletons, accessories, authored colours and distant
+merged crowd parts remain intact. `noPersonContour` or rung one swaps exact old
+buffers; stable frames do no per-person switching work. Two cached buffers use
+14256 attribute bytes. Shared torso triangles rise 48 to 72, local 12 to 60;
+draw calls do not rise. 1128 geometry/baseline/switch checks pass. Sydney and
+Quay neutral views, a genuine scaled child holding a camera, and a controlled
+production-concert cheer with a held bag pass front/profile mask comparisons.
+Selected-body-box contribution, zero change outside the torso mask and exact
+cut/restored pixels are required. The fixture freezes poses, clears contact
+uniforms equally and disables the aperture only for explicit person cameras;
+it does not establish natural camera placement or every animation interaction.
+
+The existing six chute primitives become low separated crests and short flow
+patches. The first long-patch version crossed into T shapes and was rejected
+after close inspection. Final approach/launch/reverse comparisons change
+16140/132715/35703 pixels, zero outside the foam mask; exact cut/restoration,
+same draw calls and triangle counts. `noChuteContour` or rung one restores old
+attributes. 177 vertices, 8496 cached bytes; 620 actual builder/cache checks
+preserve topology, colours, colliders, downstream foam and all flow writers.
+Natural launch/finish coverage uses this final geometry.
+
+Hardware-browser stable-writer CPU batch-p95: person .000030ms flag/.000040ms
+rung; chute .000040ms flag/.000050ms rung. These include counted getters but
+exclude transition uploads, GPU and full frames. An isolated 576-torso Lambert
+scene yields 40 valid GPU pairs, mean live-minus-cut .05068ms with 95% mean
+half-width .09108ms, too broad for a precise GPU claim. No production material,
+shadow, post-process or dense full-game frame-cost claim is made.
+
 ## REIMAGINE D5 — THE WAY ON STAYS VISIBLE (21 Sep 2026)
 
 At-helm paper compacts only with an actual marquee ID. A fresh real-key

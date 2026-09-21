@@ -131,6 +131,8 @@ let kyoRoot = null;
 let kyoTime = 0;
 let kyoMachiya = null, kyoMachiyaBase = null, kyoMachiyaLive = null;
 let kyoMachiyaOn = false;
+let kyoChuteMesh = null, kyoChuteBase = null, kyoChuteLive = null, kyoChuteRange = null;
+let kyoChuteOn = false;
 
 let kyoPondMesh = null, kyoPondAttr = null, kyoRipT = 0;
 let kyoRiverMesh = null, kyoRiverAttr = null;
@@ -3373,9 +3375,49 @@ function kyoBuildRiverMesh() {
  * whose record is a clock — it makes the fast line worth finding without ever
  * making the slow line a failure.
  */
+// E7: cache only the six crest primitives. The rocks and downstream trail
+// keep their original attributes; the live profile is a low, broken rapid.
+function kyoChuteBuffers(geometry, parts) {
+  const start = parts[0].range[0], end = parts[parts.length - 1].range[1];
+  const base = { position: geometry.attributes.position.array.slice(start * 3, end * 3),
+    normal: geometry.attributes.normal.array.slice(start * 3, end * 3) };
+  const live = { position: base.position.slice(), normal: base.normal.slice() };
+  const v = new THREE.Vector3();
+  for (const p of parts) {
+    const from = kyoXform(...p.from).clone().invert();
+    const transform = kyoXform(...p.to).clone().multiply(from);
+    const normal = new THREE.Matrix3().getNormalMatrix(transform);
+    for (let i = p.range[0]; i < p.range[1]; i++) {
+      const at = (i - start) * 3;
+      v.fromBufferAttribute(geometry.attributes.position, i).applyMatrix4(transform).toArray(live.position, at);
+      v.fromBufferAttribute(geometry.attributes.normal, i).applyMatrix3(normal).normalize().toArray(live.normal, at);
+    }
+  }
+  let indexStart = -1, indexEnd = 0;
+  for (let i = 0; i < geometry.index.count; i++) {
+    const vertex = geometry.index.array[i];
+    if (vertex >= start && vertex < end) { if (indexStart < 0) indexStart = i; indexEnd = i + 1; }
+  }
+  return { base, live, range: { start, count: end - start, indexStart, indexCount: indexEnd - indexStart } };
+}
+function kyoUpdateChute(game) {
+  if (!kyoChuteMesh) return;
+  const on = !game.state.noChuteContour && (game.state.perfRung | 0) < 1;
+  if (on === kyoChuteOn) return;
+  const profile = on ? kyoChuteLive : kyoChuteBase;
+  for (const key of ['position', 'normal']) {
+    const attr = kyoChuteMesh.geometry.attributes[key];
+    const start = kyoChuteRange.start * 3;
+    attr.array.set(profile[key], start);
+    attr.clearUpdateRanges(); attr.addUpdateRange(start, profile[key].length);
+    attr.needsUpdate = true;
+  }
+  kyoChuteOn = on;
+}
 function kyoBuildRocks(game, root) {
   kyoRocks = [];
   const R = kyoMerger();
+  const chuteParts = [];
   // AUTHORED AS A FRACTION OF THE RUN, not of the river.
   //
   // The river is four hundred and sixty metres long and the run is the last two
@@ -3436,10 +3478,26 @@ function kyoBuildRocks(game, root) {
     for (let k = -1; k <= 1; k++) {
       const ax = seg.x + nx * k * w * 0.62, az = seg.z + nz * k * w * 0.62;
       const back = Math.abs(k) * 1.4;
+      const boxStart = R.n;
       R.box(ax + seg.tx * back, kyoRIVER_Y + 0.22, az + seg.tz * back,
             w * 0.72, 0.42, 0.6, PALETTE.ujiFoam, 0, fy + k * 0.35, 0);
+      // Unequal short spans leave water between the crests. Their centres and
+      // V bearing stay where the launch already teaches the player to look.
+      const height = [0.10, 0.14, 0.11][k + 1], span = [0.44, 0.50, 0.40][k + 1];
+      chuteParts.push({ range: [boxStart, R.n],
+        from: [ax + seg.tx * back, kyoRIVER_Y + 0.22, az + seg.tz * back, 0, fy + k * 0.35, 0, w * 0.72, 0.42, 0.6],
+        to: [ax + seg.tx * back, kyoRIVER_Y + height * 0.5 + 0.02, az + seg.tz * back,
+          0, fy + k * 0.35, 0, w * span, height, 0.48] });
+      const patchStart = R.n;
       R.sph(ax + seg.tx * (back - 0.9), kyoRIVER_Y + 0.12, az + seg.tz * (back - 0.9),
             w * 0.36, 0.26, 0.7, PALETTE.ujiFoam);
+      // The old long axes were world-X. Short slicks lead the current without
+      // crossing the crest like a T; the five downstream patches stay intact.
+      chuteParts.push({ range: [patchStart, R.n],
+        from: [ax + seg.tx * (back - 0.9), kyoRIVER_Y + 0.12, az + seg.tz * (back - 0.9),
+          0, 0, 0, w * 0.72, 0.52, 1.4],
+        to: [ax + seg.tx * (back - 2.2), kyoRIVER_Y + 0.055, az + seg.tz * (back - 2.2),
+          0, fy - Math.PI * 0.5, 0, w * 0.20, 0.11, 1.0] });
     }
     // ...and the slick below it, where the water lands again
     for (let k = -2; k <= 2; k++) {
@@ -3452,6 +3510,10 @@ function kyoBuildRocks(game, root) {
   m.receiveShadow = true;
   m.frustumCulled = false;
   root.add(m);
+  const contour = kyoChuteBuffers(m.geometry, chuteParts);
+  kyoChuteMesh = m; kyoChuteBase = contour.base; kyoChuteLive = contour.live; kyoChuteRange = contour.range;
+  m.userData.chuteContourRange = contour.range;
+  kyoUpdateChute(game);
 }
 
 const kyoSegOut = { x: 0, z: 0, tx: 0, tz: 0, w: 15 };
@@ -4805,6 +4867,11 @@ export function createKyoto(game) {
         vertices: kyoMachiya ? kyoMachiya.geometry.attributes.position.count : 0,
         triangles: kyoMachiya ? kyoMachiya.geometry.index.count / 3 : 0 };
     },
+    chuteContourAudit() {
+      return { on: kyoChuteOn, uuid: kyoChuteMesh ? kyoChuteMesh.uuid : '',
+        range: kyoChuteRange ? Object.assign({}, kyoChuteRange) : null,
+        primitives: 6, cacheBytes: kyoChuteBase ? (kyoChuteBase.position.byteLength + kyoChuteBase.normal.byteLength) * 2 : 0 };
+    },
     terrainHeight: kyoTerrain,
     /**
      * THE BELL AND THE BIRDS, MEASURED. `startled` is how many cormorants are
@@ -4959,6 +5026,7 @@ export function createKyoto(game) {
       if (!kyoBuilt) return;
       if (!game.biome.isActive('kyoto')) return;
       kyoUpdateMachiya(game);
+      kyoUpdateChute(game);
       kyoTime += dt;
 
       // ---- THE WATERLINE USED TO FOLLOW THE ANIMAL, AND NOW IT DOES NOT ----

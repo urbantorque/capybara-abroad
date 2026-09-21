@@ -55,10 +55,11 @@ vm.runInContext([
   'const authored = { hanGROUND, hanCUB, panCROSS, panRIVER };',
   'const crossingHint = ' + entry('the-crossing') + ';',
   'const phoHint = ' + entry('pho-run') + ';',
+  'const riverHint = ' + entry('uji-run') + ';',
   'const nearBank = ' + property(pantanal, 'bank') + ';',
   'const farBank = ' + property(pantanal, 'farBank') + ';',
 ].join('\n'), q);
-const data = vm.runInContext('({ authored, crossingHint, phoHint, nearBank, farBank })', q);
+const data = vm.runInContext('({ authored, crossingHint, phoHint, riverHint, nearBank, farBank })', q);
 let checks = 0, groups = 0;
 const check = (ok, why) => { assert.ok(ok, why); checks++; };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -124,6 +125,26 @@ group('unbuilt Hanoi', () => {
   q.game.hanoi = null;
   check(data.phoHint.where() === null, 'no target before chapter API exists');
   check(typeof data.phoHint.clue() === 'string', 'fallback instruction remains readable');
+});
+group('river hint follows the channel', () => {
+  const bridge={x:4,z:128},mill={x:126,z:152};let wet=false,calls=[];
+  q.game.capy={position:{x:80,z:122}};
+  q.game.kyoto={bridge,mill,inRiver:()=>wet,aheadOnRiver:(x,z,ahead)=>{calls.push([x,z,ahead]);return{x:x+7,z:z+12};}};
+  check(data.riverHint.where()===bridge,'dry approach retains bridge');
+  check(calls.length===0,'dry approach does not query river');
+  wet=true;
+  check(same(data.riverHint.where(),{x:87,z:134}),'wet arrow follows bend rather than mill chord');
+  check(same(calls[0],[80,122,16]),'actual position and authored sixteen-metre lookahead');
+  q.game.capy.position={x:151,z:150};
+  check(same(data.riverHint.where(),{x:158,z:162}),'target recomputed as animal moves');
+  q.game.kyoto.aheadOnRiver=()=>null;
+  check(data.riverHint.where()===mill,'unbuilt centreline falls back to mill');
+  delete q.game.kyoto.aheadOnRiver;
+  check(data.riverHint.where()===mill,'older API fallback');
+  q.game.capy=null;
+  check(data.riverHint.where()===mill,'absent body fallback');
+  q.game.kyoto=null;
+  check(data.riverHint.where()===null,'unbuilt chapter no invented coordinates');
 });
 console.log(JSON.stringify({ groups, checks, failed: 0,
   scope: 'Shipped hint entries and target APIs with controlled gameplay state; no browser or navigation claim.' }, null, 2));

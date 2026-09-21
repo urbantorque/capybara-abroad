@@ -223,6 +223,52 @@ function npcMakeGeo(parts) {
   return geo;
 }
 
+// E6: one closed garment, with planar shoulders instead of a second slab.
+// Rings are [y, half-width, half-depth]; the bevel stays the same on every
+// ring so each side panel is planar. Only the foreground rigs use this.
+function npcGarmentGeo(rings, tones, detail) {
+  const points = [], positions = [], colors = [];
+  const bevel = 0.035;
+  for (let i = 0; i < rings.length; i++) {
+    const r = rings[i], y = r[0], x = r[1], z = r[2];
+    points.push([[-x + bevel, y, -z], [x - bevel, y, -z], [x, y, -z + bevel],
+      [x, y, z - bevel], [x - bevel, y, z], [-x + bevel, y, z],
+      [-x, y, z - bevel], [-x, y, -z + bevel]]);
+  }
+  function tri(a, b, c, tone) {
+    positions.push(...a, ...b, ...c);
+    for (let j = 0; j < 3; j++) colors.push(tone[0], tone[1], tone[2]);
+  }
+  for (let i = 0; i < points.length - 1; i++) {
+    const lower = points[i], upper = points[i + 1], tone = tones[i];
+    for (let j = 0; j < 8; j++) {
+      const next = (j + 1) % 8;
+      tri(lower[j], upper[j], upper[next], tone);
+      tri(lower[j], upper[next], lower[next], tone);
+    }
+  }
+  const first = points[0], last = points[points.length - 1];
+  for (let j = 1; j < 7; j++) {
+    tri(first[0], first[j], first[j + 1], tones[0]);
+    tri(last[0], last[j + 1], last[j], tones[tones.length - 1]);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.computeVertexNormals();                // non-indexed: crisp garment planes
+  if (detail) {
+    for (const key of ['position', 'normal', 'color']) {
+      const a = geo.attributes[key].array, b = detail.attributes[key].array;
+      const merged = new Float32Array(a.length + b.length);
+      merged.set(a); merged.set(b, a.length);
+      geo.setAttribute(key, new THREE.BufferAttribute(merged, 3));
+    }
+  }
+  geo.computeBoundingBox();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
 // --- dialogue (dry, Australian, never repeated back to back) ---------------
 const npcLINES = {
   // ---- THE LAST THING ANYBODY SAYS IN THIS GAME (M11) ----------------------
@@ -1196,6 +1242,14 @@ export function createNPCs(game) {
   // the hair with its part. Same lists, same buffers — and the same lists
   // Marrakech and Rio merge their crowds from.
   const gTorso = npcMakeGeo(npcPERSON.torso);
+  // Keep exported part lists byte-for-byte: distant merged crowds retain
+  // their baseline. The placket and the three garment tones are inherited.
+  const gPlacket = npcMakeGeo([npcPERSON.torso[3]]);
+  const gTorsoContour = npcGarmentGeo([
+    [0.7145, 0.258, 0.158], [0.7995, 0.235, 0.15],
+    [1.18, 0.31, 0.16], [1.32, 0.21, 0.14],
+  ], [npcPERSON.torso[2].c, [1, 1, 1], npcPERSON.torso[1].c], gPlacket);
+  gPlacket.dispose();
   const gHips = npcMakeGeo(npcPERSON.hips);
   const gHead = npcMakeGeo(npcPERSON.head);
   const gHair = npcMakeGeo(npcPERSON.hairParts);
@@ -1344,6 +1398,32 @@ export function createNPCs(game) {
   const npcRoundMeshes = [];
   let npcRoundOn = !(game.state && game.state.noRound);
 
+  const npcPersonMeshes = [];
+  let npcPersonOn = !game.state.noPersonContour && (game.state.perfRung | 0) < 1;
+  function npcPersonRegister(mesh, contour, kind) {
+    npcPersonMeshes.push({ mesh: mesh, inherited: mesh.geometry, contour: contour, kind: kind });
+    mesh.userData.personContour = true;       // a foreground-only mask for the audit
+    if (npcPersonOn) mesh.geometry = contour;
+    return mesh;
+  }
+  function npcPersonTick() {
+    const on = !game.state.noPersonContour && (game.state.perfRung | 0) < 1;
+    if (on === npcPersonOn) return;
+    npcPersonOn = on;
+    for (let i = 0; i < npcPersonMeshes.length; i++) {
+      const r = npcPersonMeshes[i];
+      r.mesh.geometry = on ? r.contour : r.inherited;
+    }
+  }
+  game.personContourAudit = function () {
+    return { on: npcPersonOn, meshes: npcPersonMeshes.length,
+      rows: npcPersonMeshes.map(r => ({ uuid: r.mesh.uuid, kind: r.kind,
+        instances: r.mesh.isInstancedMesh ? r.mesh.count : 1,
+        inheritedTriangles: (r.inherited.index ? r.inherited.index.count : r.inherited.attributes.position.count) / 3,
+        contourTriangles: (r.contour.index ? r.contour.index.count : r.contour.attributes.position.count) / 3,
+        exact: r.mesh.geometry === (npcPersonOn ? r.contour : r.inherited) })) };
+  };
+
   // ---------------------------------------------------------------- roster
   const roster = [];
   for (let i = 0; i < 11; i++) roster.push('tourist');
@@ -1377,6 +1457,7 @@ export function createNPCs(game) {
     return m;
   }
   const iTorso = mkInst(gTorso, HUMANS);
+  npcPersonRegister(iTorso, gTorsoContour, 'roster');
   const iHips  = mkInst(gHips, HUMANS);
   const iHead  = mkInst(gHead, HUMANS);
   const iHair  = mkInst(gHair, HUMANS);
@@ -1929,6 +2010,12 @@ export function createNPCs(game) {
     m.castShadow = true;
     return m;
   }
+  // The local mesh stays centred at its old shirt origin, under its old
+  // collar. Shoulder width at y=1.32 still overlaps the sleeve at x=0.30.
+  const npcLocTorsoContour = npcGarmentGeo([
+    [-0.31, 0.25, 0.14], [-0.23, 0.215, 0.14],
+    [0.23, 0.25, 0.14], [0.31, 0.19, 0.14],
+  ], [[1, 1, 1], [1, 1, 1], [1, 1, 1]]);
   // ---- SIX STANCES (L7, E4 / art #4) ---------------------------------------
   // MEASURED (qa/l7r-art-scene.json.png, every local in the live chapter):
   // torso z sd 0.000, knee sd 0.000, shoulder x sd 0.04–0.06 rad, elbow
@@ -2038,7 +2125,7 @@ export function createNPCs(game) {
     // person, which is what a counter-rotation has to be to be one at all.
     const torsoN = new THREE_.Object3D();
     g.add(torsoN);
-    torsoN.add(npcLocPart(0.50, 0.62, 0.28, shirt, 0, 1.09, 0));
+    torsoN.add(npcPersonRegister(npcLocPart(0.50, 0.62, 0.28, shirt, 0, 1.09, 0), npcLocTorsoContour, 'local'));
     // a collar, so the shirt reads as clothing rather than as a painted block
     torsoN.add(npcLocPart(0.52, 0.07, 0.30, hair, 0, 1.38, 0));
     const headN = new THREE_.Object3D();
@@ -13830,6 +13917,7 @@ export function createNPCs(game) {
     const PA_LL = 3, PA_DG = 2;
 
     pTorso = mkInst(gTorso, PA_H);
+    npcPersonRegister(pTorso, gTorsoContour, 'pasto');
     pHips = mkInst(gHips, PA_H);
     pHead = mkInst(gHead, PA_H);
     pHair = mkInst(gHair, PA_H);
@@ -15526,6 +15614,7 @@ export function createNPCs(game) {
 
   function update(dt) {
     if (dt > 0.08) dt = 0.08;
+    npcPersonTick();
     npcWxRead();
     // the gesture's flag and its parking rung (V2.2), read once a frame
     npcGestOn = !game.state.noGesture && ((game.state.perfRung | 0) < 1);

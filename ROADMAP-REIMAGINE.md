@@ -98,6 +98,38 @@ ordinary/protected moment priority and the natural post-voyage navigation.
 
 ## Seven standards
 
+E6 human contour prototype: foreground spectators retain a wide box shoulder
+slab even beside the rounded animal. Test a shared closed planar garment hull
+with sloping shoulders and a mild waist taper, preserving neck, hem, shoulder
+pivots, hands, accessories, colours and animation. Own only npc.js; leave the
+exported baseline parts and distant merged crowds intact. Include instanced
+Sydney/Quay/Pasto people and local characters only where the same anchors can
+be preserved. `noPersonContour`/rung one restores exact old geometry through
+one edge-triggered switch, no per-person frame work or added draw calls.
+Require front/profile/cheering/carrying and child-scale comparisons at actual
+gameplay size, masked pixel proof and real-browser cut/dense-crowd costs. A
+subtle or inflated-looking result is rejected, not another automatic layer.
+
+D6 river guidance repair: the production Uji hint points directly at the mill
+while in the river, despite an existing authored centreline helper intended
+for that arrow. Use the point sixteen metres downstream from the animal,
+falling back to the mill if the helper is unavailable. Preserve dry bridge
+target, clue text, task state and all flow/camera parameters. This repairs
+the existing navigation target rather than introducing a visual layer. Test
+the actual hint publisher and capture bends under real controls; the driver
+must not hide a production navigation mismatch with private route knowledge.
+
+E7 chute contour prototype: the natural launch frame shows three thick foam
+boxes reading as a fence across the river. Reshape those existing primitives
+into lower separated crests, retain the central downstream V and broken trail,
+and align existing flattened patches with the flow. Same palette, primitive
+count and draw calls; no new animation, motes, collision or physics changes.
+Cache old/live attributes for this range only; `noChuteContour`/rung one
+restores exact old geometry using the existing edge-switch pattern. Compare
+approach, launch and reverse views under a foam-only mask, preserving a clear
+advance warning. Verify natural jump/finish and cut cost below .1ms. Reject
+if lower geometry becomes unreadable. Leave the sparse banks open for now.
+
 1. **Identity.** Trouble, wonder and belonging have different rhythms.
    Quiet places do not need a boss to count as memorable.
 2. **Agency.** The player can predict an action's target and understand
@@ -660,3 +692,72 @@ work. A green static suite is necessary and never a claim of perfection.
 - D5 checkpoint: edited JavaScript syntax, fresh single-file build and 41
   suite checks pass, zero failed. Independent diff review found no concrete
   regression. Historical soak data remains stale, not fresh runtime coverage.
+- G Kyoto audio repeat: 20s resting plus 20s real-key walking at the arrival
+  area, hardware browser, zero hidden/paused/invalid-audio polls or synth
+  errors. Final music reads -19.29/-21.00 dBFS and final SFX -40.19/-41.42;
+  the score clearly leads by measured power here. This is not the river run,
+  a phase-matched walking attenuation comparison, or perceptual OST approval.
+  Account check at this milestone: weekly usage 19%, Luna reserve 0%.
+- G Kyoto natural-route work remains open. Pond swim earned repeatedly with
+  real keys; straight-line approaches hit shoreline rocks, pavilion and Gion
+  walls. Driver now uses open western water and the western street end. A
+  later attempt reached the river naturally, then incorrectly kept its walking
+  routine chasing the moving target. Fixed that handoff and an ambiguous task
+  text locator; fresh end-to-end repeat remains running. These are recorded
+  driver failures, not evidence that the river itself is broken or verified.
+- D6 source repair uses the existing downstream helper; 12 route-hint groups,
+  59 checks pass. Natural browser validation remains open. The public task
+  hint is tested when pinned, without forcing unrelated automatic task focus.
+- E6 prototype: 1,128 actual geometry/baseline/switch checks pass; independent
+  review found no concrete lifecycle regression. First Sydney arrival frame
+  cut/restore is exact, 1,225 changed torso-box pixels. Gameplay-distance
+  silhouette looks cleaner but first new-camera cut differs in foliage;
+  fixture needs view settling and front/profile checks. No acceptance or GPU
+  budget claim yet; do not register/commit this prototype as completed work.
+- D6/G fresh Kyoto acceptance now passes twice. The latest run uses final E7
+  geometry: pond swim, all three boat gates, actual chute launch, mill finish,
+  matcha and route memory survive autosave/reload. 201 river samples include
+  183 wet-state checks of the public sixteen-metre downstream hint; 162 trusted
+  key events, zero runtime errors or hidden/paused milestones. Scripted route
+  knowledge assists navigation; this is not a novice discoverability test.
+  The matcha reward frame exposes inherited architecture occlusion around
+  the animal. Keep that as a separate camera investigation, not a passed shot.
+- E7 close-up rejected the first live patch proportions: their flow-aligned
+  long axes crossed the crests into T shapes. Shorter patches moved upstream
+  leave the crest separate. Final approach/launch/reverse masked comparisons
+  change 16140/132715/35703 pixels, zero outside the six-primitive contribution
+  mask, exact flag-cut/restored pixels and inherited rung attributes. Same
+  draw/triangle counts. Lead inspected all views and the natural launch.
+  620 static builder/cache checks pass; cache 8496 bytes, 177 affected vertices.
+  Stable actual-writer CPU batch-p95 .000040ms flag/.000050ms rung, including
+  counted getters, excluding transition uploads, GPU and full-game frames.
+- E6 cost probe: actual stable-writer CPU batch-p95 .000030ms flag/.000040ms
+  rung. Isolated 576-torso Lambert scene has 40 valid GPU pairs, zero disjoints:
+  live-minus-cut mean .05068ms, 95% mean half-width .09108ms. The interval is
+  too wide for a precise GPU cost claim; this excludes production shadows,
+  material hooks, animation and post. Shared/local contour buffers 14256 bytes,
+  no extra draw calls; shared torso 48 to 72 triangles, local 12 to 60.
+- E6 staged acceptance tightened to the selected person's projected body box.
+  Early Quay/Kyoto profile cameras sat in a kiosk/building or behind a tree;
+  those failures are not accepted as visual coverage. Explicit subject/side/
+  distance controls now allow a visible local profile. A separate natural-lens
+  comparison showed 1–2 RGB-level drift around the animal's contact patch;
+  controlled garment fixtures now clear contact uniforms equally in all modes,
+  preserving sun shadows and exact zero-tolerance parity. Neutral Quay passes
+  all four views; child/cheer pose checks remain open before E6 acceptance.
+- E6 final pose checks pass: a genuine built child at .8312 height scale
+  holding a camera, and a production concert-API cheer (not an earned-concert
+  simulation) with arm angles -2.5401/-2.2872 radians and a held bag. All four
+  views have exact cut/restored pixels and zero outside-mask changes; staged
+  selected-body boxes contribute. Lead inspected front/profile images for
+  both and the neutral Quay local. Existing skeleton/accessory geometry stays
+  byte-exact. This is bounded pose coverage, not every possible interaction.
+- Next G acceptance: Palawan jetty, first dive and manta ride. First real-key
+  approach walks under the raised deck: no ramp joins its beach path to the
+  1.25m collision top. A bounded real-jump driver is prepared but unverified.
+  Investigate a coherent landward approach before adding decorative features.
+- D6/E6/E7/G checkpoint gates: edited JavaScript syntax, fresh one-file build
+  and 43 suite checks pass, zero failed. Independent source review found no
+  concrete release blocker. Historical soak remains stale and is not counted
+  as fresh runtime evidence. Palawan's unfinished driver stays outside this
+  checkpoint until its route is played successfully.
