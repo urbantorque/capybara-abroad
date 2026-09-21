@@ -1,10 +1,11 @@
 # HANDOFF — state of play, 21 Sep 2026
 
-## Codex refinement update (21 Sep, 23:12 UTC)
+## Codex refinement update (21 Sep, closing twelve-hour pass)
 
 Read this update before the historical migration notes below. The current
-branch is `codex/redesign-delight`, previously pushed through `cf8d94e`.
-The closing D14/D15 checkpoint follows the newest CONTRACT entry. `master`
+branch is `codex/redesign-delight`, production pushed through `dca5930`.
+The closing regression is NOT release-cleared: Monaco fails the speed gate.
+Read the newest CONTRACT entry and retained soak-history row. `master`
 remains the public build; this pass has
 not been merged or published there. The user shortened the autonomous pass
 to twelve hours total: feature freeze 22:32 UTC, stop 23:32 UTC on 21 Sep
@@ -34,7 +35,16 @@ transitions. This is neither maximum-quality performance proof nor evidence
 that the seven-stop cumulative journey is complete. Closing latest-build
 regression repeats all nineteen 45-second random-play windows and offline
 audio but skips the separate 38-transition load sweep to fit the timebox.
-Check the newest soak-history row and final task handoff for its outcome.
+The nineteen-place sweep fails Monaco at 33.1975 m/s against the unchanged
+30 m/s gate (17 observed frames, 12 polls). The animal is grounded with an
+active moving-platform frame; that is a lead, not a certified explanation.
+Zero NaN/below-world frames across all nineteen. Do not weaken the limit or
+call this a clean latest-build soak. Offline single-file/audio passes in
+129 s, zero runtime errors; scoped regression total 18.7 minutes. The
+twelve-hour refinement pass closes here; continuation must not silently
+resume the superseded 48-hour brief. The recurring heartbeat is paused at
+handoff. Next priority: reproduce the Monaco grounded carrier/contact peak,
+then finish the cumulative journey and conduct human play/listening review.
 The cumulative journey remains incomplete, with failed runs retained. All individual recommended stops have
 passed real-key drivers; those drivers use waypoint knowledge and public
 chapter-arrival fixtures, not blind novice exploration.

@@ -1206,3 +1206,24 @@ work. A green static suite is necessary and never a claim of perfection.
   play windows plus offline single-file audio, with the separate load sweep
   skipped to fit the remaining timebox. The earlier 38-transition/full-soak
   pass remains attached to production 7ede665. No full latest-build soak claim.
+- G closing sweep completes all nineteen places but FAILS Monaco's unchanged
+  30 m/s gate: peak 33.1975, seventeen observed frames/twelve polls, no release
+  fall certificate. Grounded peak at (-12.30,3.14,-92.59), velocity
+  (-33.20,0,-0.37), moving-platform frame (-24.51,5.77). Investigate carrier
+  velocity composition/contact provenance before changing any threshold.
+  Zero NaN/below-world frames across all nineteen. Production dca5930 is a
+  development checkpoint, not a release-cleared build.
+
+## Closed — twelve-hour scope
+
+The user-shortened pass closes with production checkpoint `dca5930` pushed,
+53 suite checks passing and the failures retained. Closing scoped regression
+takes 18.7 minutes: nineteen-place random play fails Monaco's speed gate;
+offline single-file/audio passes in 129 s; runtime errors zero; load skipped.
+The earlier complete soak belongs to `7ede665`, not the closing build.
+
+Next work is evidence-led: reproduce Monaco's grounded carrier/contact speed;
+complete one naturally accumulated seven-memory journey and ordinary ending;
+resolve the known Pasto post collision and distinguish host/browser stalls
+from game faults; conduct first-player and headphone listening reviews.
+No further features or autonomous continuation are scheduled by this pass.

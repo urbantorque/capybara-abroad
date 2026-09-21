@@ -1,3 +1,21 @@
+## REIMAGINE G — CLOSING REGRESSION, MONACO OPEN (21 Sep 2026)
+
+The closing nineteen-place, 45-second-per-place random-play sweep fails one
+unchanged gate: Monaco peaks at 33.1975 m/s against 30. Seventeen observed
+frames and twelve polls exceed the cap; no release-fall exception applies.
+Peak is grounded at (-12.30, 3.14, -92.59), velocity (-33.20, 0, -0.37),
+with a moving-platform frame (-24.51, 5.77). That is an investigation lead,
+not proof of an acceptable ride or a reason to relax the cap. All nineteen
+places report zero NaN and below-world frames. Do not call this sweep clean.
+
+Production is `dca5930`; the run began as `cf8d94e+` before that commit and no
+game source changed while it ran. The transition sweep is explicitly skipped.
+Keep the earlier complete `7ede665` soak separate. This bounded refinement
+pass is a pushed development checkpoint, not a release certification.
+Offline single-file/audio passes (129 s), with zero recorded runtime errors.
+The scoped regression takes 18.7 minutes; history retains fuzz=false,
+ks=true, runtime=true and load explicitly skipped. Failure is preserved.
+
 ## REIMAGINE D14/D15/G — CONTACTS KEEP THEIR BODIES (21 Sep 2026)
 
 A real Hanoi bowl release moved the animal 95.36 m in one solver step at
