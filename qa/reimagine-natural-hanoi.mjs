@@ -9,7 +9,9 @@ const lanes=vm.runInNewContext(source.match(/const hanLANES = ([^]*?\n\]);/)[1])
 const constant=name=>Number(source.match(new RegExp('const '+name+'\\s*=\\s*([\\d.]+)'))?.[1]);
 const door=constant('hanCUB_DOOR_R'),dropRadius=constant('hanCUB_DROP_R'),dropSpeed=constant('hanCUB_DROP_V');
 assert.ok(door>0&&dropRadius>0&&dropSpeed>0);
-const h=await openHarness(),name='reimagine-natural-hanoi',ids=['cross-the-road','pho-raid','pho-run'];
+const traceEnabled=process.argv.includes('--trace'),tag=process.argv.find(a=>a.startsWith('--tag='))?.slice(6);
+if(tag!==undefined)assert.match(tag,/^[\w-]+$/,'safe artifact tag');
+const h=await openHarness(),name='reimagine-natural-hanoi'+(tag?'-'+tag:''),ids=['cross-the-road','pho-raid','pho-run'];
 const out={metadata:h.metadata,authored:{lanes,door,dropRadius,dropSpeed},steps:[],navigation:[]};
 let held=new Set();
 async function keys(want){
@@ -18,11 +20,90 @@ async function keys(want){
   held=want;
 }
 const release=()=>keys(new Set());
+// Temporary QA observer: method calls and tick boundaries, not a motion writer.
+async function installJumpTrace(){if(!traceEnabled)return;await h.page.evaluate(()=>{
+  const g=window.__capy,slot='__hanoiJumpTrace',prior=Object.getOwnPropertyDescriptor(window,slot);
+  const events=[],frames=[],contacts=[],restores=[],errors=[];let dropped=0,last=null,closed=false;
+  const xyz=p=>p?[p.x,p.y,p.z]:null;
+  const distance=(a,b)=>a&&b?Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]):0;
+  const safe=fn=>{try{return fn();}catch(e){if(errors.length<8)errors.push(String(e));return null;}};
+  function snapshot(){const c=g.capy,i=g.input;return{t:g.state.time,wall:performance.now(),
+    p:xyz(c.position),body:xyz(c.body.position),velocity:xyz(c.body.velocity),
+    solverSaves:g.state.solverSaves||0,worldStep:g.world.stepnumber,
+    held:c.heldProp?{type:c.heldProp.type,id:c.heldProp.body?.id,removed:!!c.heldProp.removed}:null,
+    carried:!!c.carriedBy,carrier:c.carriedBy?.kind||null,atHelm:!!c.atHelm,rideBody:c.rideBody?.id,
+    input:{x:i.x,z:i.z,run:i.run,action:i.action,actionPressed:i.actionPressed,jump:i.jump,honk:i.honk},
+    keys:(window.__hanoiKeys||[]).slice(-12)};}
+  function record(row){if(events.length>=128){events.splice(64,1);dropped++;}
+    events.push({...row,contacts:contacts.slice(),physics:safe(()=>typeof g.physics?.getawayAudit==='function'?g.physics.getawayAudit():null)});}
+  function wrap(object,key,make){const descriptor=Object.getOwnPropertyDescriptor(object,key),original=object[key];
+    if(typeof original!=='function')return;
+    const wrapped=make(original);
+    Object.defineProperty(object,key,{configurable:true,writable:true,enumerable:descriptor?.enumerable??false,value:wrapped});
+    restores.push(()=>{if(object[key]!==wrapped){if(errors.length<8)errors.push('Observer replaced before cleanup: '+key);return;}
+      if(descriptor)Object.defineProperty(object,key,descriptor);else delete object[key];});
+  }
+  const objects=new Map();
+  for(const[label,object]of[['body.position',g.capy.body.position],['capy.position',g.capy.position]]){
+    if(objects.has(object))objects.get(object).push(label);else objects.set(object,[label]);}
+  for(const[object,labels]of objects)for(const key of['set','copy'])wrap(object,key,original=>function(...args){
+    const before=safe(()=>xyz(this));
+    try{return Reflect.apply(original,this,args);}finally{safe(()=>{const after=xyz(this),metres=distance(before,after);
+      if(metres>20)record({kind:'position method',method:labels.join(' / ')+'.'+key,metres,before,after,
+        state:snapshot(),stack:new Error('Position method changed more than 20m').stack});});}
+  });
+  function shapeInfo(s){return s?{id:s.id,type:s.type,radius:s.radius,halfExtents:xyz(s.halfExtents),
+    radiusTop:s.radiusTop,radiusBottom:s.radiusBottom,height:s.height}:null;}
+  function onCapyContact(event){safe(()=>{const c=event.contact,b=event.body;
+    // Narrowphase may swap the body order without swapping si/sj. Resolve
+    // ownership against the body's actual shapes, not the equation order.
+    const otherShape=b.shapes.includes(c.si)?c.si:c.sj,index=b.shapes.indexOf(otherShape);
+    contacts.push({t:g.state.time,wall:performance.now(),worldStep:g.world.stepnumber,
+      capy:xyz(g.capy.body.position),velocity:xyz(g.capy.body.velocity),
+      other:{id:b.id,type:b.type,mass:b.mass,p:xyz(b.position),velocity:xyz(b.velocity),quaternion:b.quaternion.toArray(),
+        shapeCount:b.shapes.length,shapes:b.shapes.slice(0,32).map((s,i)=>({...shapeInfo(s),offset:xyz(b.shapeOffsets[i])})),
+        contactShape:{...shapeInfo(otherShape),index,offset:xyz(b.shapeOffsets[index]),orientation:b.shapeOrientations[index]?.toArray()}},
+      bi:c.bi.id,bj:c.bj.id,normal:xyz(c.ni),ri:xyz(c.ri),rj:xyz(c.rj),enabled:c.enabled,
+      impact:c.getImpactVelocityAlongNormal()});
+    if(contacts.length>24)contacts.shift();
+  });}
+  let priorStep=xyz(g.capy.body.position);
+  function onWorldPostStep(){safe(()=>{const after=xyz(g.capy.body.position),v=g.capy.body.velocity;
+    const metres=distance(priorStep,after),speed=Math.hypot(v.x,v.y,v.z);
+    if(metres>20||speed>90)record({kind:'postStep',metres,speed,before:priorStep,after,state:snapshot()});
+    priorStep=after;
+  });}
+  g.capy.body.addEventListener('collide',onCapyContact);
+  restores.push(()=>g.capy.body.removeEventListener('collide',onCapyContact));
+  g.world.addEventListener('postStep',onWorldPostStep);
+  restores.push(()=>g.world.removeEventListener('postStep',onWorldPostStep));
+  wrap(g,'tick',original=>function(...args){const before=safe(snapshot);
+    safe(()=>{if(last&&before&&(distance(last.body,before.body)>20||distance(last.p,before.p)>20))
+      record({kind:'between ticks',before:last,after:before});});
+    try{return Reflect.apply(original,this,args);}finally{safe(()=>{const after=snapshot();
+      if(before&&(distance(before.body,after.body)>20||distance(before.p,after.p)>20))
+        record({kind:'during tick',before,after});
+      frames.push({before,after});if(frames.length>60)frames.shift();last=after;
+    });}
+  });
+  window[slot]={read:()=>({events,frames,contacts,errors,dropped,thresholdMetres:20,postStepSpeedThreshold:90,
+    scope:'Instance set/copy, tick boundaries and postStep. Events retain first 64 and latest 64. Contact ring 24; first 32 other-body shapes plus exact contact shape. Direct component writes have boundary attribution only.'}),
+    close(){if(closed)return;closed=true;for(const restore of restores.reverse())safe(restore);
+      if(prior)Object.defineProperty(window,slot,prior);else delete window[slot];}};
+});}
+async function collectJumpTrace(close=false){
+  if(!traceEnabled)return;
+  try{const trace=await h.page.evaluate(close=>{const trace=window.__hanoiJumpTrace;if(!trace)return null;
+    const result=trace.read();if(close)trace.close();return result;},close);
+    if(trace)out.jumpTrace=trace;
+  }catch(error){out.jumpTraceReadError=String(error);}
+}
 async function state(){return h.page.evaluate(ids=>{
   const g=window.__capy,p=g.capy.position;
   return{t:g.state.time,wall:performance.now(),p:p.toArray(),yaw:g.input.camYaw,
     hidden:document.hidden,paused:!!g.state.paused,chapter:g.biome.current,
-    carried:!!g.capy.carriedBy,velocity:g.capy.body.velocity.toArray(),
+    carried:!!g.capy.carriedBy,held:g.capy.heldProp?.type||null,velocity:g.capy.body.velocity.toArray(),solverSaves:g.state.solverSaves||0,
+    bag:!!document.querySelector('.capyui-bag')?.classList.contains('show'),traveller:g.hintTarget('traveller'),
     cub:g.hanoi.cub(),cross:g.hanoi.crossState(),swerved:g.hanoi.swerved(),
     pho:{...g.hanoi.pho()},
     tasks:Object.fromEntries(ids.map(id=>[id,g.taskDone(id)])),gate:g.gateInfo(19)};
@@ -36,13 +117,38 @@ function steering(s,p,r){
   if(Math.abs(x)>Math.abs(z)*.42)want.add(x>0?'d':'a');
   if(Math.abs(z)>Math.abs(x)*.42)want.add(z>0?'s':'w');return want;
 }
-async function walk(p,r=.8,maxMs=30000){
-  const end=Date.now()+maxMs;let best=Infinity,progress=Date.now();
+async function walkingDetour(target){return h.page.evaluate(target=>{
+  const g=window.__capy,p=g.capy.body.position,V=p.constructor;
+  const dx=target.x-p.x,dz=target.z-p.z,d=Math.hypot(dx,dz)||1,candidates=[];
+  for(const side of[1,-1]){
+    const q={x:p.x-dx/d-dz/d*2.5*side,z:p.z-dz/d+dx/d*2.5*side};
+    const vx=q.x-p.x,vz=q.z-p.z,len=Math.hypot(vx,vz),hits=[];
+    for(const off of[-.5,0,.5]){
+      const ox=-vz/len*off,oz=vx/len*off;
+      g.world.raycastAll(new V(p.x+ox,p.y+.35,p.z+oz),new V(q.x+ox,p.y+.35,q.z+oz),
+        {skipBackfaces:true},hit=>{if(hit.hasHit&&hit.body!==g.capy.body&&hit.body.collisionResponse!==false)
+          hits.push({body:hit.body.id,distance:hit.distance});});
+    }
+    candidates.push({target:q,hits});
+  }
+  return{candidates,chosen:candidates.find(c=>!c.hits.length)?.target||null};
+},target);}
+async function walk(p,r=.8,maxMs=30000,detours=2){
+  const end=Date.now()+maxMs;let best=Infinity,progress=Date.now(),from=null;
   try{while(Date.now()<end){const s=await state();running(s);out.navigation.push({phase:'walk',target:p,...s});
     const d=Math.hypot(p.x-s.p[0],p.z-s.p[2]);if(d<r)return;
     if(d<best-.25){best=d;progress=Date.now();}
-    assert.ok(Date.now()-progress<7000,'walking route obstructed: '+JSON.stringify(s));
-    await keys(steering(s,p,r*.5));await h.page.waitForTimeout(110);
+    if(Date.now()-progress>4500){
+      assert.ok(detours-->0,'walking route obstructed: '+JSON.stringify(s));
+      await release();const option=await walkingDetour(p);out.navigation.push({phase:'collider detour',...option});
+      assert.ok(option.chosen,'both walking detours blocked');
+      await walk(option.chosen,.6,12000,0);best=Infinity;progress=Date.now();from=null;continue;
+    }
+    if(!from)from={x:s.p[0],z:s.p[2]};
+    const dx=p.x-from.x,dz=p.z-from.z,length=Math.hypot(dx,dz);
+    const along=length?Math.max(0,Math.min(length,((s.p[0]-from.x)*dx+(s.p[2]-from.z)*dz)/length)):0;
+    const u=length?Math.min(1,(along+1)/length):1;
+    await keys(steering(s,{x:from.x+dx*u,z:from.z+dz*u},r*.5));await h.page.waitForTimeout(80);
   }throw Error('walking waypoint timed out');}finally{await release();}
 }
 function project(p,a,b){const dx=b.x-a.x,dz=b.z-a.z,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/(dx*dx+dz*dz)));
@@ -105,7 +211,12 @@ try{
   // Reach the lake's northern street through its actual western ring.
   out.approach=route({x:arrival.p[0],z:arrival.p[2]},{x:0,z:-12});
   for(const p of out.approach)await walk(p,1.2);
-  await walk({x:-8,z:-7},1);await walk({x:-8,z:pho.z},.7);
+  // x=-8 skims the tube-house faces; ordinary eight-way correction can
+  // collide with a frontage. Keep inside the pavement before crossing.
+  // Also clear the crossing reset boundary (road half-width + 1.8m) before
+  // turning: stopping inside that boundary preserves an earlier failed try.
+  await walk({x:-7.4,z:-7},1);await walk({x:-7.4,z:pho.z},.25);
+  assert.equal((await state()).cross[0],-1,'crossing resets on the near pavement');
   // Face the street with real camera keys, then keep one walking direction.
   // Eight-way waypoint corrections themselves count as crossing hesitation.
   const bearing=-Math.PI/2;
@@ -121,10 +232,14 @@ try{
   await walk({x:pho.x,z:pho.z},.65);
   await h.page.waitForFunction(()=>window.__capy.taskDone('cross-the-road'),null,{timeout:3000});
   await sample('crossing earned');
+  await installJumpTrace();
   for(let i=0;i<4&&!((await state()).tasks['pho-raid']);i++){await h.hold('e',90);await h.page.waitForTimeout(550);}
   assert.ok((await state()).tasks['pho-raid'],'actual nearby bowl grabbed');
   await sample('pho raid earned');await h.screenshot(name+'-bowl');
+  assert.equal((await state()).held,'phobowl','real bowl remains held before release');
   await h.hold('e',90);await h.page.waitForTimeout(550);
+  const dropped=await sample('bowl release observed');
+  assert.equal(dropped.bag,false,'throw does not also open the traveller bag');running(dropped);
   const stall=await h.page.evaluate(()=>window.__capy.hanoi.cubStall());
   await walk({x:stall.x+1.5,z:stall.z},.55);await h.hold('e',90);
   await h.page.waitForFunction(()=>window.__capy.hanoi.cub().on,null,{timeout:3500});
@@ -139,9 +254,12 @@ try{
   const end=await sample('Hanoi memory');assert.ok(ids.every(id=>end.tasks[id])&&end.gate.enough);
   await h.page.waitForFunction(ids=>{const s=JSON.parse(localStorage.getItem('capy3.journey.v1')||'{}');return ids.every(id=>s.tasks?.includes(id));},ids,{timeout:12000});
   out.keys=await h.page.evaluate(()=>window.__hanoiKeys);assert.ok(out.keys.length&&out.keys.every(k=>k.trusted));
+  await collectJumpTrace(true);
+  if(traceEnabled){assert.ok(out.jumpTrace,'diagnostic captured');assert.deepEqual(out.jumpTrace.errors,[],'observer stayed valid');
+    assert.equal(out.jumpTrace.events.length,0,'no large position jump or solver speed spike');}
   await h.page.reload();await h.start();const resumed=await sample('Hanoi memory resumed');
   assert.ok(ids.every(id=>resumed.tasks[id])&&resumed.gate.enough);assert.deepEqual(h.metadata.errors,[]);
   out.scope='Chapter arrival fixture, shipped-road navigation telemetry and actual keyboard walking/grab/Cub steering/braking/horn. No task/body/clock/vehicle/debug-state writes. Not novice or unguided pacing proof.';
   await h.result(name,out);console.log(JSON.stringify({pass:true,samples:out.navigation.length,errors:h.metadata.errors}));
-}catch(error){await release();out.failure=String(error.stack||error);try{await sample('failure');await h.screenshot(name+'-failure');}catch{}
-  await h.result(name+'-failure',out);throw error;}finally{await h.close();}
+}catch(error){await collectJumpTrace(true);await release();out.failure=String(error.stack||error);try{await sample('failure');await h.screenshot(name+'-failure');}catch{}
+  await h.result(name+'-failure',out);throw error;}finally{await collectJumpTrace(true);await h.close();}

@@ -1125,3 +1125,84 @@ work. A green static suite is necessary and never a claim of perfection.
   7002.2 KB with 8453 top-level declarations/no collisions, and all 50 suite
   checks pass. The full soak is green; cumulative journey acceptance remains
   outstanding. No rejected D13 source or candidate-only instrument is staged.
+- G corridor study rejects a horizon-only repair. Exact terrain plus the
+  twelve bunting colliders replayed against thirteen recorded mounting edges
+  show that `contact-v1` misses the poles in every straight projection through
+  3.2 s: the bird's nose itself turns about 27 degrees after pickup. Extending
+  to 3.2 s also rejects four previously successful departures. This partial
+  obstacle model is evidence against that proposed fix, not a runtime model.
+  Keep flight forces and readiness unchanged. A second contact-instrumented
+  flight passes the signature/release with zero runtime errors.
+- G cumulative driver now permits at most three actual Pasto flights after
+  early ride loss, preserving each failed artifact and waiting for a real
+  landing before summoning again. No reload, teleport or task seed between
+  attempts. All other assertion failures and runtime errors remain terminal.
+  Completing the route with retries will not be reported as flawless flight.
+- G cumulative attempt ten passes Sydney and its reload, then the Quay
+  driver runs directly into the stern/cabin while pursuing the wheel. Lead
+  inspects the failure image and the actual gangway/cabin collision geometry.
+  Route the real keys down the finger wharf and through the forward gangway
+  at z=3.65; keep the boat, NPCs, collisions and helm activation unchanged.
+- G attempt eleven reaches the Quay but the long bearing-only walk drifts
+  into the apron bench at x=0.8/z=20.2. The earlier isolated gangway pass did
+  not prove a reliable approach. Use the bench-free west lane, one-metre
+  segment lookahead and walking speed with real keys; retain the failure.
+- G attempt twelve exposes a driver-only hedge oscillation after Sydney's
+  gardener moves the animal: the recovery target switches off at z12.5, turns
+  back toward the sandwich, then switches on again. Retain both recovery
+  corners until actually reached; use real walking keys around the opening.
+  Attempts thirteen/fourteen subsequently earn Sydney and survive reload.
+  Thirteen stops against the Quay apron NPC group, visible in its failure
+  image. Approach behind that group at z31 before taking the west wharf lane;
+  no NPC, geometry, task or collision state is changed to clear the test.
+- G retry-controller fixture extracts the actual execute/flyPasto functions.
+  Eight scenarios cover first success, recovery, third-loss error identity,
+  unrelated errors/assertions, landing timeout, earned-signature refusal and
+  runtime-error refusal before the landing wait. It checks the real landing
+  predicate against mounted/carried/paused/hidden/wrong-place/airborne states,
+  accepts swimming, and preserves each original driver stack and elapsed time.
+  The harness/artifact names are explicit stubs, not live flight evidence.
+- G attempt fourteen earns and reloads the first six memories in one context,
+  including Pasto on its first flight. Hanoi's x=-8 walking approach clips a
+  tube-house face at z13.17, shown in the failure image. Keep the driver on
+  the pavement instead of along the frontage; leave game geometry and traffic
+  unchanged. This attempt is not a complete journey or homecoming pass.
+- D14 action priority: a fresh real-key Hanoi run earns the bowl, then its
+  release also opens the traveller's bag. Both systems consume the same E
+  hold. While a prop occupies the mouth, or the capybara's existing `threwAt`
+  stamp matches this frame, suppress the traveller's tap/hold until release.
+  Preserve an empty-handed bag tap, the authored gift hold, once-per-hold
+  behavior, range and pause rules. No new save field, input writer or optional
+  bug flag. Require extracted real-branch fixtures and fresh real-key play.
+  Separately, an earlier uninstrumented run moved about 190m after the bowl
+  sequence. Its cause remains unproven; do not claim the menu fix repairs it.
+- D15 contact lifetime: the instrumented Hanoi release reproduces a 95.36 m
+  single-step displacement at 5721.62 m/s. The separating bowl contact enters
+  physOnCollide, whose absolute-speed shatter parks the bowl at y=-900 before
+  Cannon solves the existing contact. Queue collision-triggered shatters and
+  spills until postStep, preserving authored thresholds and presentation.
+  Deduplicate per prop, prefer shatter over spill, skip removed/hidden props.
+  No save field or optional bug flag. Require a real-Cannon counterexample,
+  extracted branch tests, fresh natural Hanoi play and a new full soak.
+- D14/D15 fresh instrumented Hanoi passes the crossing, theft, all three
+  deliveries (95.67 s) and reload, with zero jump events, solver recoveries or
+  runtime errors. This does not erase the earlier 95 m/190 m failures.
+- G cumulative attempt fifteen passes Sydney, Quay and first-flight Pasto,
+  then stops after Kyoto awards its river finish with two bonus gates. The
+  route driver incorrectly required a perfect three-gate/chute run. Keep that
+  stricter standalone art/control test; an explicit journey mode instead
+  asserts the authored finish and reports the bonus result. No game award,
+  river geometry, force, timing or save rule changes to make this test pass.
+- D14/D15 extracted fixtures pass: traveller six scenarios/13 checks; real
+  Cannon contact lifetime five scenarios/23 checks. Simplified immediate-hide
+  control moves 276.36 m, deferred version 0.103 m. Actual Hanoi evidence above
+  is separate. All edited JS syntax, build and 53 suite checks pass.
+- G attempt sixteen passes Sydney/Quay, then a 1533.72 s wall gap advances
+  simulation only 0.062 s during the mounted flight. Its wall-time timeout
+  correctly fails the unearned signature (only 7.39 simulation seconds since
+  first mount). Visible, unpaused, no runtime errors. Cause unproven; do not
+  count it as gameplay completion or infer a flight-force defect from it.
+- G closing regression is explicitly scoped to all nineteen 45-second random
+  play windows plus offline single-file audio, with the separate load sweep
+  skipped to fit the remaining timebox. The earlier 38-transition/full-soak
+  pass remains attached to production 7ede665. No full latest-build soak claim.

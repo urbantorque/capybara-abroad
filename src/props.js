@@ -2010,6 +2010,7 @@ function physGetSpillGeo(type) {
 // ===========================================================================
 export function createProps(game) {
   physGame = game;
+  game.world.addEventListener('postStep', physFlushImpacts);
   // ---- A PROP IS WET TOO ---------------------------------------------------
   // The weather pass puts a mirror on the road and left everything standing on
   // it bone dry. `wetOnly` is the wet half of grain() with none of the
@@ -3838,6 +3839,25 @@ function physCausedByCapy(prop, win) {
   return (t - prop.lastCapyTouch) < win || (t - prop.releaseTime) < win;
 }
 
+// Collision callbacks run before Cannon solves its contact equations. A broken
+// bowl parked at -900 there dragged the animal 95 m in one step. Keep those
+// bodies intact until postStep; a shatter wins over a spill on the same prop.
+const physPendingImpacts = [];
+function physQueueImpact(prop, kind) {
+  if (!prop.pendingImpact) physPendingImpacts.push(prop);
+  prop.pendingImpact = Math.max(prop.pendingImpact || 0, kind);
+}
+function physFlushImpacts() {
+  for (let i = 0; i < physPendingImpacts.length; i++) {
+    const prop = physPendingImpacts[i], kind = prop.pendingImpact;
+    prop.pendingImpact = 0;
+    if (prop.removed || prop.hidden) continue;
+    if (kind === 2) physShatter(prop);
+    else if (kind === 1) physSpill(prop);
+  }
+  physPendingImpacts.length = 0;
+}
+
 function physOnCollide(prop, e) {
   // Stamp causation BEFORE any speed gate: a slow shove that eventually topples
   // a bin is still the capybara's doing, and must be credited as such.
@@ -3929,9 +3949,9 @@ function physOnCollide(prop, e) {
 
   // Ceramic does not negotiate. A set-down is ~2 m/s; physSHATTER_MIN is the
   // impact speed of a drop from roughly head height at this gravity.
-  if (prop.fragile && speed > physSHATTER_MIN) { physShatter(prop); return; }
+  if (prop.fragile && speed > physSHATTER_MIN) { physQueueImpact(prop, 2); return; }
 
-  if (!prop.spilled && speed > physSPILL_MIN && physTYPES[prop.type].spill) physSpill(prop);
+  if (!prop.spilled && speed > physSPILL_MIN && physTYPES[prop.type].spill) physQueueImpact(prop, 1);
 }
 
 /**

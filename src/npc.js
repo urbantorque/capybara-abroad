@@ -8643,6 +8643,11 @@ export function createNPCs(game) {
       if (r.trav) {
         if (game.state && game.state.paused) {
           r.eGiftT = -1;
+        } else if (game.capy && (game.capy.heldProp || game.capy.threwAt === game.state.time)) {
+          // The mouth owns this hold. Its release runs before the traveller,
+          // so the existing throw stamp also covers that now-empty frame.
+          // Keep -2 until key-up: losing a prop mid-hold must not arm a gift.
+          r.eGiftT = game.input && game.input.action ? -2 : -1;
         } else {
           const inReach = d2 < npcTRAV_MET_R * npcTRAV_MET_R;
           const input = game.input;

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { openHarness } from './reimagine-harness.mjs';
 
 const h = await openHarness(), name = 'reimagine-natural-kyoto';
+const journeyMode = process.argv.includes('--journey');
 const ids = ['golden-swim', 'uji-run', 'matcha-raid'];
 const report = { metadata: h.metadata, steps: [], navigation: [], river: [], keys: [] };
 const keys = new Set();
@@ -160,8 +161,13 @@ try {
   await runRiver();
   await h.page.waitForFunction(() => window.__capy.taskDone('uji-run'), null, { timeout: 12000 });
   const runEnd = await sample('uji run earned'); await h.screenshot(name + '-uji');
-  assert.equal(runEnd.run.through,3,'all three boat gates crossed');
-  assert.equal(report.chuteCapture,true,'actual chute launch observed');
+  assert.equal(runEnd.run.done,true,'authored river finish awarded');
+  report.riverQuality = { through: runEnd.run.through, chute: !!report.chuteCapture,
+    required: journeyMode ? 'authored finish' : 'three gates and chute' };
+  if (!journeyMode) {
+    assert.equal(runEnd.run.through,3,'all three boat gates crossed');
+    assert.equal(report.chuteCapture,true,'actual chute launch observed');
+  }
   // Approach south of the authored tea bowl (24,196), whose rim is solid.
   await walkTo({x:42,z:212});await walkTo({x:14.4,z:212});
   await walkTo('matcha-raid', 1.8);

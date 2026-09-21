@@ -23,25 +23,34 @@ async function sample(label) {
   report.steps.push(row); return row;
 }
 async function walkTo(target, radius = 1.1, maxMs = 35000) {
-  const started = Date.now(); let best = Infinity, progressAt = Date.now();
+  const started = Date.now(); let best = Infinity, progressAt = Date.now(), from = null;
   try {
     while (Date.now() - started < maxMs) {
       const s = await h.page.evaluate(target => {
-        const g = window.__capy, p = g.capy.position, q = g.hintTarget(target);
+        const g = window.__capy, p = g.capy.position, q = typeof target === 'string' ? g.hintTarget(target) : target;
         return { p: p.toArray(), target: q, yaw: g.input.camYaw, t: g.state.time };
       }, target);
       assert.ok(s.target, 'actual waypoint exists: ' + target);
-      const dx = s.target.x - s.p[0], dz = s.target.z - s.p[2], d = Math.hypot(dx, dz);
+      if(!from)from={x:s.p[0],z:s.p[2]};
+      const d = Math.hypot(s.target.x-s.p[0],s.target.z-s.p[2]);
+      // Eight keyboard directions need short lookahead, or a small heading
+      // error drifts metres sideways over a long wharf approach.
+      const sx=s.target.x-from.x,sz=s.target.z-from.z,len=Math.hypot(sx,sz);
+      const along=len>0?Math.max(0,Math.min(len,((s.p[0]-from.x)*sx+(s.p[2]-from.z)*sz)/len)):0;
+      const u=len>0?Math.min(1,(along+1)/len):1;
+      const aim={x:from.x+sx*u,z:from.z+sz*u};
+      const dx=aim.x-s.p[0],dz=aim.z-s.p[2];
+      report.navigation.push({ mode:'walk',...s,aim,distance:d });
       if (d < radius) return;
       if (d < best - .35) { best = d; progressAt = Date.now(); }
       const x = dx * Math.cos(s.yaw) - dz * Math.sin(s.yaw);
-      const z = dx * Math.sin(s.yaw) + dz * Math.cos(s.yaw), want = new Set(['Shift']);
+      const z = dx * Math.sin(s.yaw) + dz * Math.cos(s.yaw), want = new Set();
       if (Math.abs(x) > Math.abs(z) * .42) want.add(x > 0 ? 'd' : 'a');
       if (Math.abs(z) > Math.abs(x) * .42) want.add(z > 0 ? 's' : 'w');
       for (const k of [...keys]) if (!want.has(k)) { await h.page.keyboard.up(k); keys.delete(k); }
       for (const k of want) if (!keys.has(k)) { await h.page.keyboard.down(k); keys.add(k); }
       if (Date.now() - progressAt > 3500) throw new Error('walk stuck at ' + JSON.stringify(s));
-      await h.page.waitForTimeout(160);
+      await h.page.waitForTimeout(80);
     }
     throw new Error('walk waypoint timed out: ' + target);
   } finally { await release(); }
@@ -84,6 +93,13 @@ try {
       window.__naturalKeys.push({ type, key: e.code, trusted: e.isTrusted, t: window.__capy.state.time }));
   });
   await h.start(); await h.arrive('quay'); await sample('fresh Quay arrival');
+  // Stay on the finger wharf, then cross the open forward gangway. A straight
+  // line from spawn to the wheel runs through the solid stern/cabin.
+  // The central apron group can stand across the direct spawn-to-lane walk.
+  // Pass behind it before taking the clear west edge of the finger wharf.
+  await walkTo({x:4,z:31},.3);await walkTo({x:-3.3,z:31},.3);
+  await walkTo({x:-3.3,z:3.65},.2);
+  await walkTo({x:5.8,z:3.65},.3);
   await walkTo('take-helm', 1.0);
   await h.page.keyboard.press('e');
   await h.page.waitForFunction(() => window.__capy.taskDone('take-helm') && window.__capy.quay.boat.atHelm, null, { timeout: 12000 });

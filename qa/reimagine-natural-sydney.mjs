@@ -23,7 +23,7 @@ async function sample(label) {
   report.steps.push(s); return s;
 }
 async function go(target, radius = 1.1, maxMs = 35000, run = false) {
-  const start = Date.now(); let best = Infinity, progressAt = Date.now(), jumps = 0;
+  const start = Date.now(); let best = Infinity, progressAt = Date.now(), jumps = 0, detour = [];
   try {
     while (Date.now() - start < maxMs) {
       const s = await h.page.evaluate(target => {
@@ -36,21 +36,29 @@ async function go(target, radius = 1.1, maxMs = 35000, run = false) {
       assert.ok(s.target, 'actual waypoint exists: ' + target);
       // An escort can put it on the other side of the garden hedge. Recover
       // through its open harbour end, using keys rather than the stale line.
-      let aim = s.target;
-      if (s.p[2] > 12.5 && s.target.x >= 20 && s.p[0] < 19)
-        aim = { x: Math.min(s.p[0], 12), z: 10 };
-      else if (s.p[2] > 12.5 && s.target.x <= 12 && s.p[0] > 14)
-        aim = { x: Math.max(s.p[0], 21), z: 10 };
+      if (s.carried) { await release(); detour = []; best = Infinity; progressAt = Date.now(); await h.page.waitForTimeout(160); continue; }
+      if (!detour.length && s.p[2] > 12.5) {
+        if (s.target.x >= 20 && s.p[0] < 19)
+          detour = [{ x: Math.min(s.p[0], 12), z: 10 }, { x: 22, z: 10 }];
+        else if (s.target.x <= 12 && s.p[0] > 14)
+          detour = [{ x: Math.max(s.p[0], 21), z: 10 }, { x: 11, z: 10 }];
+      }
+      // Finish both corners before returning to the live prop. Dropping the
+      // detour at z12.5 made the controller turn back into the hedge forever.
+      if (detour.length && Math.hypot(detour[0].x-s.p[0],detour[0].z-s.p[2]) < 1) {
+        detour.shift(); best = Infinity; progressAt = Date.now();
+      }
+      const aim = detour[0] || s.target;
       const d = Math.hypot(s.target.x - s.p[0], s.target.z - s.p[2]);
       const dx = aim.x - s.p[0], dz = aim.z - s.p[2];
       report.navigation.push({ ...s, aim, distance: d });
-      if (s.carried) { await release(); best = Infinity; progressAt = Date.now(); await h.page.waitForTimeout(160); continue; }
       if (d < radius) return;
-      if (d < best - .35) { best = d; progressAt = Date.now(); }
+      const progressDistance = Math.hypot(dx, dz);
+      if (progressDistance < best - .35) { best = progressDistance; progressAt = Date.now(); }
       const x = dx * Math.cos(s.yaw) - dz * Math.sin(s.yaw);
       const z = dx * Math.sin(s.yaw) + dz * Math.cos(s.yaw);
       const want = new Set();
-      if (run) want.add('Shift');
+      if (run && !detour.length) want.add('Shift');
       if (Math.abs(x) > Math.abs(z) * .42) want.add(x > 0 ? 'd' : 'a');
       if (Math.abs(z) > Math.abs(x) * .42) want.add(z > 0 ? 's' : 'w');
       for (const k of [...keys]) if (!want.has(k)) { await h.page.keyboard.up(k); keys.delete(k); }
@@ -59,7 +67,7 @@ async function go(target, radius = 1.1, maxMs = 35000, run = false) {
         assert.ok(jumps < 2, 'navigation stuck, no teleport: ' + JSON.stringify(s));
         await h.page.keyboard.press('Space'); jumps++; progressAt = Date.now();
       }
-      await h.page.waitForTimeout(160);
+      await h.page.waitForTimeout(80);
     }
     throw new Error('waypoint timed out: ' + JSON.stringify(target));
   } finally { await release(); }

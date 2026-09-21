@@ -115,6 +115,8 @@ const manifest={route,sources:[...drivers.values(),home].map(d=>d.manifest),
     'Driver reloads retain the same storage; wrapper start only starts an unstarted page.',
     'Palawan leaves the journal open; a real Escape closes it before the next chapter.',
     'Pasto flight restores its exact condor.update observer and removes diagnostic timers/listeners before leaving the driver.',
+    'At most three real Pasto flight attempts; early release failures remain recorded. No reload, task seed or body move between attempts.',
+    'Kyoto journey mode requires the authored river finish; bonus gates/chute are reported, with perfect-run assertions retained in the standalone driver.',
     'Public hud.cross chapter transitions are fixtures, not naturally opened travel doors.',
     'Waypoint and physics telemetry assist play; this is not novice/unguided enjoyment proof.']};
 if(prepare){console.log(JSON.stringify({prepared:true,browserLaunched:false,...manifest},null,2));process.exit(0);}
@@ -157,9 +159,30 @@ async function gateSnapshot(label,completed) {
   assert.equal(row.hidden,false);report.gates.push(row);lastTasks=tasks.slice();await root.result(prefix,report);
 }
 async function execute(driver,stage,argv=[]) {
-  current=stage;const before=Date.now();
-  await driver.run(assert,readFileSync,vm,harnessFor(stage),{argv:['node',driver.url,...argv]},driver.url,data);
-  report.stages.at(-1).elapsedMs=Date.now()-before;
+  current=stage;const before=Date.now(), index=report.stages.length;
+  try { await driver.run(assert,readFileSync,vm,harnessFor(stage),{argv:['node',driver.url,...argv]},driver.url,data); }
+  catch(error) { if(report.stages[index])report.stages[index].failure=String(error.stack||error);throw error; }
+  finally { if(report.stages[index])report.stages[index].elapsedMs=Date.now()-before; }
+}
+
+async function flyPasto(driver) {
+  for(let attempt=1;attempt<=3;attempt++) {
+    try { await execute(driver,'pasto-attempt-'+attempt,['chain','--flap','--steer']);return; }
+    catch(error) {
+      // Only an actually lost ride is retryable. Broken assertions, crashes
+      // and navigation failures remain terminal, with their original evidence.
+      if(attempt===3||error.code!=='ERR_ASSERTION'||
+        !/^steered signature remains mounted(?:\n|$)/.test(error.message))throw error;
+      assert.deepEqual(root.metadata.errors,[],'no runtime error hidden by a flight retry');
+      await root.result(prefix,report);
+      await root.page.waitForFunction(()=>{const g=window.__capy;
+        return g.biome.current==='pasto'&&!g.state.paused&&!document.hidden&&
+          !g.condor.mounted&&!g.capy.carriedBy&&(g.capy.grounded||g.capy.swimming);
+      },null,{timeout:15000});
+      assert.equal(await root.page.evaluate(()=>window.__capy.taskDone('condor-ride')),false,
+        'retry only before the signature was earned');
+    }
+  }
 }
 
 // The pastry must be witnessed and then kept four seconds/15m or twelve seconds.
@@ -240,7 +263,8 @@ try {
   const completed=[];
   for(const {n,chapter} of route) {
     if(completed.length)await closeTravelCard();
-    await execute(drivers.get(chapter),chapter,chapter==='pasto'?['chain','--flap','--steer']:[]);
+    if(chapter==='pasto')await flyPasto(drivers.get(chapter));
+    else await execute(drivers.get(chapter),chapter,chapter==='kyoto'?['--journey']:[]);
     if(chapter==='pasto') {
       const memory=await root.page.evaluate(()=>window.__capy.gateInfo(2));
       if(!memory.enough)await empanadaSupport();

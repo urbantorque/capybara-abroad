@@ -1,3 +1,40 @@
+## REIMAGINE D14/D15/G — CONTACTS KEEP THEIR BODIES (21 Sep 2026)
+
+A real Hanoi bowl release moved the animal 95.36 m in one solver step at
+5721.62 m/s. The collision callback shattered the bowl and parked its body
+at y=-900 before Cannon solved the contact already holding it. Breaks and
+spills now queue until postStep. One pending entry per prop, shatter before
+spill, removed/hidden props skipped. Authored impact thresholds, forces and
+presentation remain. No new save field or optional bug flag; idle work is
+an empty queue check per substep, active work is proportional to queued props.
+
+The extracted collision/queue fixture, with real Cannon and declared physical
+hide/spill stubs, reproduces 276.36 m under immediate mutation versus 0.103 m
+when deferred. Five scenarios cover 23 behavioral checks. This simplified
+counterexample is not a full scene replay. Fresh real-key Hanoi then passes
+crossing, theft, three deliveries in 95.67 s and reload with zero jump events,
+solver recoveries or runtime errors.
+
+The same throw also used to open a nearby traveller's bag. The mouth and its
+existing throw timestamp now own that hold; a fresh independent empty-handed
+tap remains available on the next frame. Six extracted-branch scenarios pass
+13 checks, including the gift hold, lost prop, range and pause behavior.
+
+All edited JavaScript passes syntax checks; the single-file build and 53
+suite checks pass. Cumulative journey acceptance is still OPEN. Attempt
+fourteen earned/reloaded six memories before a Hanoi driver obstruction.
+Attempt fifteen completed Kyoto's river with two bonus gates, but the driver
+incorrectly demanded all three. Explicit journey mode now requires the
+authored finish and reports bonuses; standalone three-gate/chute assertions
+remain and both modes have extracted executable checks.
+
+Attempt sixteen fails the twelve-second flight assertion after a 1533.72 s
+wall-clock gap advances simulation by only 0.062 s. The animal remains mounted,
+visible and unpaused, without recorded runtime errors; only 7.39 simulation
+seconds elapsed since the first mounted sample. Cause unproven. Do not label
+this a normal flight failure or use it to justify changing flight forces.
+The earlier independently observed bunting-post collision remains open.
+
 ## REIMAGINE G — NINETEEN PLACES, FULL REGRESSION (21 Sep 2026)
 
 The 23.7-minute hardware soak passes on production `7ede665`: nineteen

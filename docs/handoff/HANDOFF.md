@@ -1,5 +1,72 @@
 # HANDOFF — state of play, 21 Sep 2026
 
+## Codex refinement update (21 Sep, 23:12 UTC)
+
+Read this update before the historical migration notes below. The current
+branch is `codex/redesign-delight`, previously pushed through `cf8d94e`.
+The closing D14/D15 checkpoint follows the newest CONTRACT entry. `master`
+remains the public build; this pass has
+not been merged or published there. The user shortened the autonomous pass
+to twelve hours total: feature freeze 22:32 UTC, stop 23:32 UTC on 21 Sep
+(09:32 Sydney on 22 Sep). Do not resume the superseded 48-hour plan.
+
+`ROADMAP-REIMAGINE.md` owns the current scope and evidence. Its checkpoint log
+and the newest CONTRACT entries supersede the old "in flight" score status.
+The shorter seven-memory route keeps all nineteen places open and existing
+saves compatible. Opening/replay, camera restraint, stamina, earned feedback,
+river/boarding/market guidance and ordinary homecoming have been revised.
+Shared capybara/person contours, Kyoto frontage, river foam and manta anatomy
+are measured procedural art changes. The score-forward mix and phrase clarity
+are implemented; subjective soundtrack approval still requires listening.
+
+Closing candidate gates: 53 suite checks and the single-file build pass.
+D14 prevents a thrown prop also opening the traveller's bag. D15 defers
+collision-triggered shatter/spill until postStep; parking a bowl at y=-900
+inside a live contact had launched the animal 95.36 m. The real-Cannon
+counterexample and fresh Hanoi crossing/theft/three-delivery/reload run pass.
+No jump events, solver recoveries or runtime errors in that Hanoi run.
+
+Earlier full headful hardware soak on production `7ede665` passes nineteen random-play chapters,
+offline audio and 38 transitions in 23.7 minutes, with zero runtime errors,
+NaN or below-world frames. It retains thirteen solver recoveries, a 150 ms
+Goreme post-reveal frame, and governor rung-two operation under sustained
+transitions. This is neither maximum-quality performance proof nor evidence
+that the seven-stop cumulative journey is complete. Closing latest-build
+regression repeats all nineteen 45-second random-play windows and offline
+audio but skips the separate 38-transition load sweep to fit the timebox.
+Check the newest soak-history row and final task handoff for its outcome.
+The cumulative journey remains incomplete, with failed runs retained. All individual recommended stops have
+passed real-key drivers; those drivers use waypoint knowledge and public
+chapter-arrival fixtures, not blind novice exploration.
+
+Open risks: intermittent Edge crashes during cumulative reloads, despite
+twelve isolated Sydney and twelve Quay reloads passing; a Pasto launch that
+turns into an actual bunting post; and incomplete cumulative ending evidence.
+Do not solve the post collision by blindly extending the pickup horizon:
+the recorded failed departure still passes that straight projection, while
+the longer guard rejects previously successful departures. No speculative
+flight-force change was made. Rejected Andes and peripheral-caption art
+candidates are not in production; their rejection records remain.
+
+Attempt fourteen earned/reloaded six memories in one context. Fifteen stopped
+after a valid Kyoto finish because the driver demanded three optional gates;
+explicit journey mode now tests the authored finish and reports bonuses,
+while the standalone river probe retains its perfect-run assertions. Sixteen
+stopped during Pasto after a 25.56-minute wall-clock gap advanced simulation
+only 0.062 s. Still mounted, visible, unpaused; no runtime error recorded.
+Only 7.39 simulation seconds passed since first mount, so the twelve-second
+signature was correctly not claimed. The clock-stall cause is unproven.
+Do not erase it, call it a normal flight-control failure, or weaken the test.
+
+Tooling correction: `qa/reimagine-harness.mjs` launches headful Edge on the
+reference Arc 130V, with a real GPU. Keep one browser experiment active at a
+time and never overlap it with the heavy suite/soak. Agents can work in this
+shared checkout on disjoint files; they do not need separate user tasks.
+Stage only owned named files. Several unrelated untracked QA files and
+`.claude/settings.local.json` belong to earlier work and must be preserved.
+
+## Historical migration handoff
+
 Written when the project moved from Claude Code to Codex. Everything a new
 agent needs to resume is in this repository; nothing lives outside it any
 more except the author's own ear.
