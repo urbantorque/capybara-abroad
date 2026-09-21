@@ -42898,6 +42898,31 @@ export function createSystems(game) {
     'heron':       { fly: true,  swim: false, voice: 'gull', pitch: 0.62, span: 2 },
     'ibis':        { fly: true,  swim: false, voice: 'gull', pitch: 0.80, span: 1 },
   };
+  // ---- THE COMPANION'S PER-KIND LANDING SPOT (ROADMAP-WOW3 D7) ------------
+  // compLeave's own walk-off used to start wherever the animal happened to be
+  // standing when 'home' fired — the generic reason applies to 'told' and
+  // 'far' too, which have no fixed destination, but 'home' does. One data
+  // table, x/z only (the walk-off's own y is a live ground read, below, never
+  // baked): each coordinate is COPIED from the kind's own `from` chapter's
+  // already-built landmark, read there and not imported — six files this
+  // wave does not own, and two numbers apiece is not worth a cross-file
+  // wire. The real `from`<->kind pairing (verified against compTRAITS'
+  // callers, not the roadmap's own illustrative real-world examples, which
+  // do not all hold here):
+  //   pigeon  -> venice     venCAMPANILE     { x: 12, z: -17 }   the campanile
+  //   cat     -> goreme     gorPLAZA         { x: 0, z: 34 }     cats' own wander bounds are gorPLAZA.x +/- 13
+  //   silver gull -> manly  manGULL_HOME     { x: -13.5, z: 47.0 } already named for exactly this
+  //   gentoo  -> antarctic  antCOLONY        { x: 24, z: 92 }    the colony
+  //   heron   -> kyoto      kyoHERON_A       { x: 48, z: -6 }    "the near shallows" it wades
+  //   ibis    -> sydney     environment.js's rubbish-bin stand  { x: -10.0, z: 12.6 } (binX/binZ, envBuildLawn) — the bin chicken's own haunt, not a metaphor
+  const compHOME = {
+    'pigeon':      { x: 12,    z: -17 },
+    'cat':         { x: 0,     z: 34 },
+    'silver gull': { x: -13.5, z: 47.0 },
+    'gentoo':      { x: 24,    z: 92 },
+    'heron':       { x: 48,    z: -6 },
+    'ibis':        { x: -10.0, z: 12.6 },
+  };
   /** One part of a builder: a primitive on a PALETTE colour, casting. */
   function compPart(g, geo, colour, x, y, z) {
     const m = new THREE.Mesh(geo, mat(colour));
@@ -43120,7 +43145,22 @@ export function createSystems(game) {
     compWhy = why || '';
     const p = capy && capy.position;
     const yaw = (capy && capy.group && capy.group.rotation) ? capy.group.rotation.y : 0;
-    if (compMounted() && p) {
+    // ROADMAP-WOW3 D7: 'home' has an actual destination — the other reasons
+    // ('told', 'far') do not, and keep the generic "away from wherever it
+    // stands" walk-off exactly as it was.
+    const home = why === 'home' ? compHOME[compKind] : null;
+    if (home) {
+      // the drop point IS the named spot, not wherever the animal happened
+      // to be standing — so what shrinks and fades over compLEAVE is the
+      // actual ledge/colony/doorstep. It then walks the same short distance
+      // (compLEAVE/compWALK, unchanged) further IN — away from the player,
+      // deeper toward its own place — rather than back out toward you.
+      compAt.x = home.x; compAt.z = home.z;
+      const dx = (p ? p.x : home.x) - home.x, dz = (p ? p.z : home.z) - home.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 0.05) { compGoX = -dx / d; compGoZ = -dz / d; }
+      else { compGoX = Math.cos(yaw); compGoZ = -Math.sin(yaw); }
+    } else if (compMounted() && p) {
       // away from the animal, and across it rather than along it, so it walks
       // out of the frame the camera is holding rather than up the middle of it
       compGoX = Math.cos(yaw); compGoZ = -Math.sin(yaw);
@@ -43227,13 +43267,14 @@ export function createSystems(game) {
       // about it, and it left in total silence. Both fixed here, cheaply,
       // because the branch itself was already doing the hard part.
       //
-      // NOT BUILT: a per-kind landing spot (the Campanile's ledge, the
-      // colony, a doorstep). compLeave's own walk-off is generic — away
-      // from wherever it currently stands — and a real per-kind spot would
-      // need a landmark coordinate authored in each of six BIOME FILES this
-      // wave does not own (venice.js, goreme.js, manly.js, antarctic.js,
-      // kyoto.js, npc.js's own Sydney ibis flock). Left for whichever wave
-      // next owns those files; the generic walk-off is the honest fallback.
+      // BUILT (ROADMAP-WOW3 D7): the per-kind landing spot. compLeave now
+      // reads compHOME (above compTRAITS) when why === 'home' and starts the
+      // same generic walk-off there instead of wherever it currently
+      // stands — the Campanile's foot, the cats' own plaza, the gull's own
+      // home patch, the colony, the heron's own shallows, the bin stand —
+      // six coordinates copied out of the chapter files that already build
+      // them, not imported (this wave does not own those files, and did not
+      // need to: nothing there had to change).
       const homeN = chapterOf(to);
       if (homeN > 0 && !jrChapHome[homeN]) {
         jrChapHome[homeN] = 1;
