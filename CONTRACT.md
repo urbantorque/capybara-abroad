@@ -56,6 +56,25 @@ pass and the one before it, together, for the first time: −0.15 ms
 live-minus-cut in aggregate (live reads faster than fully cut — pure
 noise), governor rung 0 held throughout, comfortably inside budget.
 
+**The real GPU, measured for the first time, and the rule it broke.**
+After the pass, from the desktop app's own browser pane (Intel Arc
+130V via ANGLE/D3D11 — the reference machine, not headless software GL):
+all thirty `noX` terms of L11, L12 and L13 together, live vs fully cut,
+rung pinned 0, drained-pass timing around `game.tick(1/60, true)`. Median
+live-minus-cut **1.6 ms** in a 6–10 ms frame — Kyoto +1.7, the Pantanal
++1.8, Monaco +1.6, Hanoi +2.3, Iceland +1.6; Sydney, Sahara and Goreme
+at noise. The "≤ 0.6 ms per pass" rule the last three lifts were written
+under held in every headless A/B and does not hold here: software GL
+makes a GPU-side term nearly free against its own slow baseline, so the
+rule was never testable in the harness that tested it. Absolute frame
+time is inside 16.7 with room and every term already parks at rung ≥ 1,
+so nothing is fixed — but the budget sentence changes: from now on a
+pass's cost is the pane's number on this GPU, and 0.6 is re-based
+against ROADMAP-WOW3.md's Part H table. The stranger was closed the same
+afternoon as an agent that read nothing, on a fresh file, in the same
+pane — it named every verb the first walk teaches; a person still owes
+the last word.
+
 **A regression sweep that found nothing to fix.** `src/systems.js` was
 touched by all four waves this pass; every identifier any wave's own
 report named was checked for a collision and found declared exactly

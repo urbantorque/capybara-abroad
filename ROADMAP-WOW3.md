@@ -392,21 +392,97 @@ landing (numerically correct, not eye-confirmed as "a plaza" from the
 camera angle tried) are the two honest misses this wave found; both are
 named above with the reason, not rounded up.
 
-## Part H — needs a human, not an agent (not built by this pass's agents)
+## Part H — needs a human, not an agent (closed 21 Sep 2026, after the pass)
 
-Two numbers from ROADMAP-WOW2's own Closed section that no bot can supply.
-**Left for the player, named here so they are not silently dropped:**
+Two numbers from ROADMAP-WOW2's own Closed section that the playwright
+harness could not supply. Both were closed after W5, from the desktop
+app's own browser pane rather than the headless harness — a real GPU, and
+an agent that had read nothing. Neither is a person; both are the first
+honest reading of the thing they stand in for.
 
-- **A real-GPU frame budget.** Every 16.7 ms figure in twelve lifts so far
-  is headless vsync, not the reference machine's own GPU. One session with
-  the in-game perf overlay (`game.perfAudit()`), all `noX` flags from L11
-  and L12 toggled by hand, on the actual hardware.
-- **The stranger.** T's own playtester was a script, twice now (L12's
-  closeout said so plainly). One person who has never seen the game, three
-  minutes, asked the six verbs afterward.
+### H1 — the real-GPU frame budget (closed; the rule did not hold)
 
-Nothing in Part D or Part X substitutes for either. An autonomous pass
-cannot build them; it can only keep naming them, which this section does.
+The pane's Chromium reports `ANGLE (Intel, Intel(R) Arc(TM) 130V GPU (8GB),
+Direct3D11)` — the reference machine's own GPU, not headless software GL.
+Governor pinned to rung 0 (`capy3.prefs.v1 = {v:1, pf:1}`, verified
+`perfRung 0`, dpr 1.5, 800×857 viewport). All thirty `noX` terms of L11,
+L12 and L13 together (`noReflect noGrass noMist noRays noSky2 noDapple
+noFore noRound noCapyRim noSkitter noFleetGlow noCaustic noSpill` +
+`noAlive noFootfall noTracks noGesture noUmbrella noCompany noFar noSub2
+noRainbow noPuddle noStrip noShelf noGlimpse noTut` + `noRemember noLens2
+noVoice2`), live vs fully cut, five interleaved reps of sixty ticks per
+arm. The pane composites at ~33 ms wall (its own throttle, not the
+game's), so the reading is the drained-pass kind L11's A1 agent took:
+`performance.now()` around `game.tick(1/60, true)` — the compute-and-
+submit cost of one frame, not the vsync period. Median of sixty per arm,
+ms:
+
+| chapter | live | cut | live − cut |
+|---|---|---|---|
+| sydney | 5.9 | 6.2 | −0.3 |
+| kyoto (two runs) | 7.4 / 7.1 | 5.7 / 5.4 | +1.7 |
+| pantanal | 7.4 | 5.6 | +1.8 |
+| monaco (two runs) | 8.2 / 8.3 | 6.7 / 6.7 | +1.6 |
+| hanoi | 9.5 | 7.2 | +2.3 |
+| sahara | 8.2 | 8.1 | +0.1 |
+| iceland | 9.0 | 7.4 | +1.6 |
+| goreme | 10.0 | 9.9 | +0.1 |
+
+**Median live-minus-cut: 1.6 ms. The ≤ 0.6 ms rule every one of the last
+three passes was written under does not hold on real hardware in five of
+eight chapters** — the five with a mirror, mist and spill in the same
+frame (Kyoto, the Pantanal, Monaco, Hanoi, Iceland); the three without
+(Sydney, Sahara, Goreme) read as noise, exactly as they did headless.
+Every headless A/B (L11's, L12's, L13's, all reading −0.2 to +0.5 ms)
+was true and useless: software GL makes a GPU-side term nearly free
+against its own slow baseline, so the rule was never testable in the
+harness it was tested in. In absolute terms the live frame is 6–10 ms on
+this GPU at dpr 1.5 — inside 16.7 with room — and every one of the
+thirty terms already parks at rung ≥ 1, so the governor's ladder is the
+right answer and it is already built. What changes is the sentence: the
+next pass writes its budget as "measured in the pane on the reference
+GPU", not in the harness, and the 0.6 ms line is re-based against this
+table rather than against headless noise. Not a regression to fix here;
+the first real number, on the record.
+
+### H2 — the stranger (closed as an agent that read nothing; not a person)
+
+The L6 method, run twice in the pane on a fresh file (the first run
+landed on a mid-journey save — the game's own pagehide save undid the
+storage clear, harness trap 50, and the agent spent three minutes on an
+Antarctic boat; the second run cleared twice with a reload between and
+started at Begin). The agent was forbidden every file and every search
+and given only the tab. It reached all eight beats of the first walk and
+afterwards **named every verb the tutorial teaches, unprompted, from the
+pills alone: W A S D, Shift, Space at the bench, Q, E for the hat, Tab,
+drag-or-C, and the board by the gate — plus the slide from its own pill**
+(the roadmap's own bar was six). Two caveats, both the harness's: the
+pane was hidden for the whole session, so rAF was throttled and a single
+key tap barely moved the animal (the agent held keys synthetically and
+advanced frames by screenshot); and the pills therefore advanced on
+their 20 s timeouts rather than on the action, which the agent read as
+"the pills do not wait for you" — they do, when the key can move the
+animal. What survives the caveat, worth a future pass:
+
+- no beat confirms success — the stranger could not tell it had "done"
+  a lesson; one acknowledgement per beat is cheap;
+- "Tab. the star is the big one here." was the one pill the stranger
+  could not connect to anything it saw (a browser focus ring appeared on
+  the wallet instead — the synthetic Tab may have bypassed the handler;
+  unverified in a visible tab);
+- at the pane's 800 px width the pill's tail and the slide pill's last
+  words sit under the minimap; the layout is authored wider;
+- the picnic lawn is fenced from the outer lawn and the minimap's route
+  line is straight through the fence — a known straight-line hint, read
+  by a stranger as "there is no gate";
+- Esc showed no menu in either run (the DOM had it open — a hidden-pane
+  paint artefact, almost certainly; unverified visible);
+- two rows ticked without the stranger knowing why (the photo, the flat
+  white) — satisfying and unexplained, as the mischief layer intends.
+
+A person is still the only thing that closes this for good; this is the
+nearest reading an autonomous pass can take, and it is written down as
+exactly that.
 
 ## Part X — the fourth notch (new measures)
 
@@ -1027,11 +1103,17 @@ regression found; no separate bug-fix commit this pass** — every miss
 named above is a measurement gap or a file-ownership deferral, not a
 break.
 
-**Part H, still owed, named plainly a third time.** A real-GPU frame
-budget and a human stranger playtester are still not built — no wave's
-brief asked for them, none attempted them, and no bot can supply either.
-Left for the player, exactly as ROADMAP-WOW2's own Closed section left
-them.
+**Part H, closed after the pass (21 Sep 2026) — see Part H above for
+the table.** The real-GPU budget was taken in the desktop app's own
+browser pane (Intel Arc 130V, D3D11): all thirty L11–L13 terms live vs
+cut cost a median **1.6 ms** in a frame of 6–10 ms, over the 0.6 ms rule
+in five of eight chapters — the rule was never testable headless, and
+the governor's rung ladder (every term parked at rung ≥ 1) is already
+the answer. The stranger was an agent that read nothing, on a fresh
+file, in the same pane: it reached all eight beats and named every verb
+the pills teach, with the harness caveat that a hidden pane throttles
+rAF and let the beats time out rather than wait. A person still closes
+that one for good.
 
 **Harness lessons, for the memory.** GLSL 300 (WebGL2) composite passes
 want `texture()`, not `texture2D()` — a silent per-frame compile error
@@ -1058,6 +1140,9 @@ not on difficulty); the thin-cylinder un-merge (V0/D10, blocked the same
 way, a fourth pass running); the cat's landing spot (D7, numerically
 correct, no landmark in frame from the vantage tried); the drip's shared,
 unpositioned voice (X2.2, a deliberate scope decision, not a bug); and
-Part H's two items, which stay for a human. None of these are silently
+the 0.6 ms budget line, re-based by Part H's real-GPU table for the next
+pass to write against (1.6 ms median across thirty terms, not 0.6); and a
+human read of the first walk, which Part H's agent stranger stands in
+for and does not replace. None of these are silently
 dropped — each carries the number or the reason a future pass needs to
 pick it up.
