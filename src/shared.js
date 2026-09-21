@@ -4086,7 +4086,7 @@ export const CHAPTERS = [
     ] },
   { n: 12, biome: 'palawan', name: 'Palawan',        sub: 'the interesting half is underneath',
     arrive: 'to-palawan', far: 1100, tall: true,  pal: 12,
-    hint: 'twelve chapters of paddling. enough.',     open: 'you have been paddling about on the top of the water for eleven chapters.', way: 'the end of the bamboo jetty',
+    hint: 'another world below the surface',          open: 'the water has been keeping something from you.', way: 'the end of the bamboo jetty',
     keep: 'a pearl out of the giant clam',
     kept: 'the gardener turns it in his fingers and says it is the roundest thing on the shelf.',
     // D4.0: was (0, -70) — the hidden lagoon, reached through a submerged
@@ -4258,7 +4258,7 @@ export const CHAPTERS = [
     again: 'the tea lady kept the stool. the road kept nothing.',
     left: 'Six lanes, two hundred and forty riders, and not one of them had to touch a brake on your account.',
     nb: ['Hanoi. Right. I am not even going to write it down.',
-         { if: 'met', t: 'Four countries. Four. I have counted, and I said so, and it sat down on a stool.',
+         { if: 'met', t: 'Another country. The same animal. I said so, and it sat down on a stool.',
            else: 'I saw it across six lanes of mopeds. I was not going to cross for it. Nobody crosses.' },
          { if: 'wow', t: 'It took the pho scooter round. Three deliveries. Two hundred and forty riders in the way.' },
          { if: 'tier>=3', t: 'The tea lady calls it {call}. The whole street does now, she says. Her fault.' },
@@ -4276,6 +4276,54 @@ export function chapterOf(biome) {
   return 1;
 }
 export function chapterDef(n) { return CHAPTERS[n - 1] || CHAPTERS[0]; }
+
+// ---- THE JOURNEY, NOT THE CHAPTER NUMBERS (REIMAGINE, B) -----------------
+// Seven places, then Sydney again. The harbour comes before the flight;
+// the water opens out before the herd, and Hanoi closes the traveller's
+// part of it. Chapter numbers stay put: old saves and every task use them.
+// The other twelve places remain trips, with their own full lists.
+export const JOURNEY = [1, 3, 2, 4, 12, 15, 19];
+
+// A memory asks for the place's signature and two small things around it.
+// These are authored choices, not a fraction of a checklist. Arrival is
+// never one of them. Quay's to-quay is casting off under the player's hand,
+// despite its old name; it is not awarded by entering the chapter.
+export const CHAPTER_EXPERIENCES = {
+  1: { signature: 'opera-stage',
+       supports: ['steal-hat', 'picnic-thief', 'bin-chicken', 'coffee-spill', 'swim', 'cafe-table'] },
+  3: { signature: 'manly-voyage',
+       supports: ['take-helm', 'to-quay', 'under-bridge', 'ferry-salute', 'dolphin-escort'] },
+  2: { signature: 'condor-ride',
+       supports: ['whistle-condor', 'steal-empanada', 'market-chaos', 'carroza', 'church-bell'] },
+  4: { signature: 'uji-run',
+       supports: ['torii-run', 'golden-swim', 'dry-crossing', 'bamboo-dash', 'matcha-raid', 'whisk-spin'] },
+  12: { signature: 'the-manta',
+        supports: ['first-dive', 'jetty-jump', 'bait-ball', 'sea-turtle', 'the-crack'] },
+  15: { signature: 'the-crossing',
+        supports: ['the-locals', 'gather', 'cowbird', 'camalote', 'tamandua'] },
+  19: { signature: 'pho-run',
+        supports: ['cross-the-road', 'pho-raid', 'the-huc', 'ride-the-flow', 'long-bien'] },
+};
+
+/** The same facts for the door, the paper and the save's restored tasks. */
+export function chapterExperience(n, isDone) {
+  if (!Number.isInteger(n)) return null;
+  const def = CHAPTER_EXPERIENCES[n];
+  if (!def) return null;                    // a trip keeps its own rule
+  const signatureDone = !!isDone(def.signature);
+  const supportOpen = [];
+  let supportDone = 0;
+  for (let i = 0; i < def.supports.length; i++) {
+    const id = def.supports[i];
+    if (isDone(id)) supportDone++;
+    else supportOpen.push(id);
+  }
+  const supportMissing = Math.max(0, 2 - supportDone);
+  return { signature: def.signature, signatureDone: signatureDone,
+           supports: def.supports.slice(), supportDone: supportDone,
+           supportMissing: supportMissing, supportOpen: supportOpen,
+           enough: signatureDone && supportMissing === 0 };
+}
 
 // ---------------------------------------------------------------------------
 // RECORDS — the tasks that are worth doing WELL, not merely doing.

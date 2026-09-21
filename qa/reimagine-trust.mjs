@@ -147,7 +147,7 @@ check('Legacy restore stays opted out after writing and restoring its next save'
 // One ordinary partial chapter, Pantanal's empty slot, one final chapter.
 const staged = [], events = [];
 const f = vm.createContext({
-  chapMax: 3, full: new Set(), enough: new Set([1, 2, 3]),
+  chapMax: 3, JOURNEY: [1, 2, 3], full: new Set(), enough: new Set([1, 2, 3]),
   chapRec: { 1: { ids: ['a', 'to-pantanal'] }, 2: { ids: ['b', 'to-last'] }, 3: { ids: ['c'] } },
   taskRec: { 'to-pantanal': { done: true }, 'to-last': { done: true } },
   chapterDef: n => [{ biome: 'sydney' }, { biome: 'pantanal', keepNone: true }, { biome: 'hanoi' }][n - 1],
@@ -158,7 +158,7 @@ const f = vm.createContext({
   sysSHELF_X: 35.6, sysSHELF_Z: 27.4, sysSHELF_LEN: 4.6, sysSHELF_SURF: 0.84,
 });
 f.chapComplete = n => f.full.has(n); f.chapEnough = n => f.enough.has(n);
-for (const name of ['keepHeld', 'sysFinaleAll', 'sysFinaleFull', 'sysFinaleStage', 'sysShelfSlot', 'sysShelfStage']) {
+for (const name of ['keepHeld', 'sysFinaleAll', 'sysFinaleKeeps', 'sysFinaleFull', 'sysFinaleStage', 'sysShelfSlot', 'sysShelfStage']) {
   vm.runInContext(fn(name), f);
 }
 check('Ordinary partial journey earns its ending without 100 percent', () => {

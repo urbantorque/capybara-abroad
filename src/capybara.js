@@ -2191,12 +2191,11 @@ let capyStamHold = 0;               // s left of the regen delay
 // A bought thing multiplies one of the constants above; a pocketed one
 // starts a `capy.boon` that ALSO multiplies them, layered underneath. Both
 // paths land here so a stacked stamina frame is one small block, not three.
-// The two caps below are the roadmap's own rule ("capped at the F3 tier
-// caps ×1.5") applied only while a BOON is actively stacking on top of a
+// The two caps below apply only while a BOON is actively stacking on top of a
 // bought multiplier — the bought multipliers alone are never touched by
-// these (puff2+lungs' own 0.50 floor and wind2+lungs' own 1.9 ceiling are
-// already exactly what their own numbers produce with no boon running).
-const capyDRAIN_MOD_FLOOR = 0.75;   // 0.50 (puff III + lungs) * 1.5
+// these. A half-drain boon may halve the roughly 0.50 bought/learned floor;
+// the old 0.75 floor made a mango cost MORE puff after altitude training.
+const capyDRAIN_MOD_FLOOR = 0.25;   // 0.50 (puff III + lungs) * 0.5
 const capyREGEN_MOD_CAP   = 2.85;   // 1.9  (wind II + lungs)  * 1.5
 // Base per-id banks for the three consumables (F6) — the bag's own prices
 // and names live in systems.js's `sysCONSUM`; these are the hard numbers
@@ -5882,7 +5881,7 @@ export function createCapybara(game) {
     // freezes at the wheel (this function returns before the stamina block
     // ever runs); the cap gives it a slow regen instead, doubled worn, so
     // standing at the wheel undoes a hard sprint rather than just holding it.
-    capyStam = Math.min(1, capyStam + capySTAM_REGEN * 0.5 * (capyWorn === 'ferrycap' ? 2 : 1) * dt);
+    capyStam = clamp(capyStam + capySTAM_REGEN * 0.5 * (capyWorn === 'ferrycap' ? 2 : 1) * dt, 0, 1);
     // The normal per-frame PUBLISH of capyStam onto capy.stamina happens
     // further down capyUpdate, which this pose never reaches (capyUpdate
     // returns right after calling capyHelmPose) — without this line the
@@ -6500,7 +6499,9 @@ export function createCapybara(game) {
           const cold = mood && typeof mood.cold === 'number' ? mood.cold : 0;
           if (cold >= 0.9) drainK *= 0.85;
         }
-        if (capyBoonDrainMul !== 1) drainK = Math.max(drainK * capyBoonDrainMul, capyDRAIN_MOD_FLOOR);
+        if (capyBoonDrainMul !== 1) {
+          drainK = Math.min(drainK, Math.max(drainK * capyBoonDrainMul, capyDRAIN_MOD_FLOOR));
+        }
         capyStam -= capySTAM_DRAIN * drainK * dt;
       }
       // BOTTOMLESS PUFF (L8, F3 capstone `puff2`): the one everyday-drain
@@ -6522,6 +6523,9 @@ export function createCapybara(game) {
       capyStam += capySTAM_REGEN * regenK * dt;
       if (capyStam > 1) capyStam = 1;
     }
+    // Bottomless with lungs can replenish while running. It fills this bar;
+    // it cannot bank invisible bars for a later dive or a string of hops.
+    capyStam = clamp(capyStam, 0, 1);
     if (capyStam <= 0) {
       capyStam = 0;
       if (!capyStamBlown) {
@@ -6540,7 +6544,6 @@ export function createCapybara(game) {
     // The animal lets go of the bottom and goes up, which is what a swimmer
     // does, and the gasp is already the sound stamina makes when it runs out.
     if (capyStamBlown && capyDiving) { capyDiving = false; capyDiveGrace = 0; capy.diving = false; }
-    capy.stamina = capyStam;
     capy.grade = capyGrade;
 
     capy.blown = capyStamBlown;
@@ -7413,6 +7416,10 @@ export function createCapybara(game) {
       capyYaw += capyWrapAngle(Math.atan2(-hold.nx, -hold.nz) - capyYaw) *
                  (1 - Math.exp(-capyTURN_LAMBDA * dt));
     }
+
+    // Publish after the hop, wall kick and climb have paid too. The HUD and
+    // other systems read this mirror, never the controller's private bank.
+    capy.stamina = capyStam = clamp(capyStam, 0, 1);
 
     // ---- STEP ASSIST / HAULING OUT ----------------------------------
     // Two halves of the same idea: the stick is hard over and the capybara is

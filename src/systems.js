@@ -4,7 +4,7 @@ import * as THREE from 'three';
 // and the two shape-type constants it must ignore. See sysCamClear.
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount, rand, randInt, clamp, damp, lerp,
-         CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY, cloudSet,
+         CHAPTERS, JOURNEY, chapterExperience, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY, cloudSet,
          rimTick, cloudTick, skyTick, fresnelTick, paleTick, triTick, mirrorTick, shadeTick, bounceSlots, bounceTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo, keyDomeTick, keyDomeInfo, skyDomeLit, sky2CloudTick, sky2SunTick, sky2Info,
@@ -10144,7 +10144,7 @@ function sysBuildCSS() {
    of the card's navigation for free — but not a TASK: no checkbox, nothing to
    tick, and nothing that can be pinned. It reads as the sentence it is. */
 '.capyui-task.capyui-way{cursor:default;pointer-events:none;color:' + accentInk + ';',
-  'font-weight:700;font-style:italic;padding-left:1.75em;}',
+  'font-weight:700;font-style:italic;padding-left:1.75em;max-height:none;}',
 '@media (hover:hover){.capyui-task.capyui-way:hover .capyui-txt{color:' + accentInk + ';}}',
 /* ...and before the road is open it is the clue's grey, not a promise (L3, E3) */
 '.capyui-task.capyui-way.soon{color:' + inkSoft + ';font-weight:600;}',
@@ -30105,7 +30105,8 @@ export function createSystems(game) {
       row.appendChild(sysEl('div', 'capyui-ledname', def.name));
       const ms = jrChapMs[n];
       row.appendChild(sysEl('div', 'capyui-ledtime',
-        d + ' / ' + rec.ids.length + (ms > 0 ? '   ·   ' + sysFmtTime(ms) : '')));
+        (ledFinal ? (ms > 0 ? sysFmtTime(ms) : '') :
+          d + ' / ' + rec.ids.length + (ms > 0 ? '   ·   ' + sysFmtTime(ms) : ''))));
       // The line under the name: what you took out of the place, then every
       // number the place got out of you.
       const line = sysEl('div', 'capyui-ledline');
@@ -30213,8 +30214,8 @@ export function createSystems(game) {
     // "nobody has heard of you" printed on a ledger is a scolding, and the
     // player who has caused no trouble has not done anything wrong.
     const noto = notoChip();
-    ledSub.textContent = done + ' of ' + TASKS.length + '  ·  ' + places + ' of ' + chapMax +
-      ' places  ·  ' + kept + ' kept' +
+    ledSub.textContent = (ledFinal ? kept + ' places remembered  ·  home again' :
+      done + ' of ' + TASKS.length + '  ·  ' + places + ' of ' + chapMax + ' places  ·  ' + kept + ' kept') +
       (noticed ? '  ·  ' + noticed + ' noticed' : '') +
       // ...but NOT on the final one, where the foot says it as a sentence two
       // lines below. Measured on the real ending: "19 kept · a legend" over
@@ -30248,7 +30249,7 @@ export function createSystems(game) {
     // `ledFinal` only, and deliberately: on a ledger opened halfway through a
     // journey it would be a claim about chapters the player has not seen.
     ledLast.textContent = ledFinal
-      ? 'nineteen places, and not one of them agreed with another about what you were.'
+      ? 'all those places, and not one of them agreed with another about what you were.'
       : '';
     ledLast.hidden = !ledFinal;
     // A journey of nowhere is still a card, and it should say something.
@@ -30263,9 +30264,9 @@ export function createSystems(game) {
     if (ledShown) return;
     ledFinal = !!final;
     ledShown = true;
-    // MISCHIEF COMPLETE is every box; a thing from every place is the other
-    // ending, and it has its own name (L3, E3)
-    ledTitle.textContent = ledFinal ? (sysFinaleFull() ? 'MISCHIEF COMPLETE' : 'ONE THING FROM EVERY PLACE') : 'THE JOURNEY SO FAR';
+    // Complete collections retain their title. The ordinary route celebrates
+    // coming home, without claiming that every optional place was visited.
+    ledTitle.textContent = ledFinal ? (sysFinaleFull() ? 'MISCHIEF COMPLETE' : 'BACK WHERE IT BEGAN') : 'THE JOURNEY SO FAR';
     // The old card's line, kept word for word for the one player who gets
     // here — plus the way out that did not used to exist. Reloading was the
     // ONLY thing you could do with the end of this game, and a sandbox whose
@@ -30597,6 +30598,12 @@ export function createSystems(game) {
   jrCard.appendChild(jrFoot);
 
   const jrNb = Object.create(null);   // chapter -> { d, f }; 'fin' -> { d, t }
+  // Read saved acquaintance directly. Building notebook text calls travMet,
+  // so calling game.notebook from the NPC getter would recurse.
+  game.travSaved = function (biome) {
+    const n = CHAPTERS.findIndex(function (c) { return c.biome === biome; }) + 1;
+    return !!(n && jrNb[n] && jrNb[n].f && jrNb[n].f.met);
+  };
   const sysNB_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   // The date is the real one: a notebook carries the day it was written on,
   // and the journey has no calendar of its own worth inventing one for.
@@ -30643,7 +30650,7 @@ export function createSystems(game) {
                 inc: jrChapInc[n] || 0, scn: jrChapScene[n] || 0, pho: jrChapPho[n] || 0,
                 fed: jrChapFed[n] || 0, pas: jrChapPerch[n] || 0, ln: Math.round(jrChapLine[n] || 0),
                 err: jrChapErr[n] || 0, tier: jrChapPal[n] || 0,
-                wow: 0, keep: chapComplete(n) ? 1 : 0, enough: chapEnough(n) ? 1 : 0, met: 0, par: 0,
+                wow: 0, keep: keepHeld(n) ? 1 : 0, enough: chapEnough(n) ? 1 : 0, met: 0, par: 0,
                 home: jrChapHome[n] || 0 };
     const w = wowOfChapter(n);
     if (w && taskRec[w.id] && taskRec[w.id].done) f.wow = 1;
@@ -30735,7 +30742,7 @@ export function createSystems(game) {
   function nbClose() {
     let known = false;
     try { known = typeof game.travMet === 'function' && game.travMet() >= 2; } catch (e) { known = false; }
-    let t = known ? 'Nineteen places. Every one of them made its own mind up about you.'
+    let t = known ? 'Every place made its own mind up about you.'
                   : 'You will not know me. I have been three steps behind you since Sydney.';
     const names = palNames();
     if (names.length >= 2) t += ' ' + names.join('. ') + '. You have more names than I have countries.';
@@ -30951,20 +30958,17 @@ export function createSystems(game) {
   // the door is the marquee plus seven rows in ten, and the rest of the list
   // stays on the paper as something you may do rather than something you must.
   function jrOpen(n) {
-    if (n === 1) return true;
-    if (jrSeen[n]) return true;
-    // FROM ONE, NOT TWO (L4, F4): the loop began at chapter two, so Pasto
-    // was open on the board from the first minute of a fresh file while the
-    // paper said "the way on · after fourteen more" — the first border was
-    // free through one door and thirty minutes away through the other. The
-    // way on out of a place is the same door whichever card you read it on.
-    // The first chapter that is not yet enough is the frontier, and it is
-    // the one that is open — so starting at one, a Sydney that is not enough
-    // keeps the frontier at Sydney and Pasto shut.
-    for (let k = 1; k <= chapMax; k++) {
-      if (!chapEnough(k)) return k === n;
+    // REIMAGINE B: memories are earned; travel is a choice. The title and
+    // physical board now offer the same nineteen places, including returns.
+    return Number.isInteger(n) && n >= 1 && n <= chapMax;
+  }
+  function journeyNext(here) {
+    const at = JOURNEY.indexOf(here);
+    for (let i = 1; i <= JOURNEY.length; i++) {
+      const n = JOURNEY[(at + i) % JOURNEY.length];
+      if (n !== here && !keepHeld(n)) return n;
     }
-    return false;
+    return 1;
   }
 
   // ---------------------------------------------------------------------------
@@ -31013,8 +31017,9 @@ export function createSystems(game) {
     const nf = findCount();
     // Split either side of the clock, because the clock is the ONLY part of this
     // card that moves while it is open — see jrTick.
-    jrCountPre = done + ' of ' + TASKS.length + '  ·  ' + places + ' of ' + chapMax +
-      ' places  ·  ';
+    const routeKept = JOURNEY.filter(function (n) { return keepHeld(n); }).length;
+    jrCountPre = routeKept + ' of ' + JOURNEY.length + ' journey memories  ·  ' +
+      'all tasks: ' + done + ' of ' + TASKS.length + '  ·  ';
     // ...and the tier, on the same terms as the finds: nothing at all until
     // there is something to say (B14). This is the card the player opens to
     // decide where to go next, which is the one moment "somewhere else has
@@ -31037,7 +31042,7 @@ export function createSystems(game) {
     // The caption is only ever reset by a REFRESH, so a souvenir the player
     // has just tapped stays named while they read the rest of the card.
     jrShelfCap.textContent = kept
-      ? kept + ' of ' + chapMax + ' kept  ·  tap one'
+      ? 'collection: ' + kept + ' of ' + chapMax + ' memories  ·  tap one'
       : 'finish a place and you take something out of it';
     for (let i = 0; i < jrRows.length; i++) {
       const r = jrRows[i];
@@ -31054,7 +31059,7 @@ export function createSystems(game) {
       let d = 0;
       for (let k = 0; k < rec.ids.length; k++) if (taskRec[rec.ids[k]].done) d++;
       const full = d >= rec.ids.length;
-      r.tally.textContent = full ? 'all ' + d : d + ' / ' + rec.ids.length;
+      r.tally.textContent = full ? 'all ' + d : d + ' / ' + rec.ids.length + ' tasks';
       r.tally.classList.toggle('full', full);
       r.bar.style.width = (rec.ids.length ? (d / rec.ids.length) * 100 : 0).toFixed(0) + '%';
       // the best numbers this chapter has produced, if any
@@ -31078,6 +31083,8 @@ export function createSystems(game) {
       // left to find. Every other line on this row changes when a chapter
       // fills up; this one is the last one that should.
       if (r.n === here && r.def.way) bits.unshift('the way on: ' + r.def.way);
+      if (r.n === journeyNext(here)) bits.unshift('next on the journey');
+      else if (JOURNEY.indexOf(r.n) < 0) bits.unshift('a trip off the route');
       const open = jrOpen(r.n);
       // ---- A LOCKED ROW SAYS WHAT UNLOCKS IT (L7, E5 / play 2). The board
       // at 3 of 20 was nineteen dimmed rows and no word on the gate; the
@@ -32757,8 +32764,13 @@ export function createSystems(game) {
   function boardRows(here) {
     const n = chapterCount();
     const chips = [], lit = [];
+    const order = [journeyNext(here)];
+    for (let i = 1; i <= n; i++) {
+      const c = ((here + i - 1) % n) + 1;
+      if (c !== here && order.indexOf(c) < 0) order.push(c);
+    }
     for (let i = 0; i < BOARD_ROWS; i++) {
-      const c = ((here + i) % n) + 1;
+      const c = order[i];
       chips.push(sysBoardChip(c));
       lit.push(chapComplete(c));
     }
@@ -33161,15 +33173,21 @@ export function createSystems(game) {
   // on a CHAPTERS row is the count that opens the way on, and it overrides
   // the fraction; Sydney says ten. Everything that asks "how many more" asks
   // chapNeed, so the way-on row, the picker's count and the gate agree.
-  function chapNeed(n) {
+  function chapLegacyNeed(n) {
     const rec = chapRec[n];
     if (!rec || !rec.ids.length) return 1;
     const def = chapterDef(n);
     const door = def && typeof def.door === 'number' && def.door > 0 ? def.door : 0;
     return door ? Math.min(door, rec.ids.length) : Math.ceil(rec.ids.length * sysCHAP_ENOUGH);
   }
+  function chapExperience(n) {
+    return chapterExperience(n, function (id) { return !!(taskRec[id] && taskRec[id].done); });
+  }
+  function chapNeed(n) { return chapExperience(n) ? 3 : chapLegacyNeed(n); }
   /** How many more rows the door out of chapter n wants (L7, E5). */
   function sysWayNeed(n) {
+    const experience = chapExperience(n);
+    if (experience) return experience.supportMissing + (experience.signatureDone ? 0 : 1);
     const rec = chapRec[n];
     if (!rec || !rec.ids.length) return 1;
     let done = 0;
@@ -33177,6 +33195,8 @@ export function createSystems(game) {
     return Math.max(1, chapNeed(n) - done);
   }
   function chapEnough(n) {
+    const experience = chapExperience(n);
+    if (experience && experience.enough) return true;
     const rec = chapRec[n];
     if (!rec || !rec.ids.length) return false;
     let done = 0;
@@ -33184,7 +33204,9 @@ export function createSystems(game) {
       const r = taskRec[rec.ids[i]];
       if (r && r.done) done++;
     }
-    if (done < chapNeed(n)) return false;
+    // Old quota-qualified saves keep their memories even if their chosen
+    // tasks differ from the newly authored supporting set.
+    if (done < chapLegacyNeed(n)) return false;
     // A chapter with no marquee — there is none today, and the guard is here so
     // that authoring one out does not silently lock a chapter shut for ever.
     const w = wowOfChapter(n);
@@ -33411,6 +33433,15 @@ export function createSystems(game) {
       }
       top = winIds[0] || '';
     }
+    // The recommended experience is visible before optional act clean-up.
+    // Explicit pins still reach every task; none of those tasks is removed.
+    const experience = chapExperience(n);
+    if (experience && !chapEnough(n) && pi < 0 && !travPin && !shopPin) {
+      const choices = experience.supportMissing ? experience.supportOpen.slice(0, 2) : [];
+      winIds = choices;
+      if (!experience.signatureDone) winIds.push(experience.signature);
+      top = winIds[0] || '';
+    }
     // ---- AND WHEN THERE IS NOTHING LEFT, THE DOOR IS THE NEXT THING --------
     // The tick that FINISHES a chapter used to leave `top` as '' — so the whole
     // of the card's navigation switched off at the exact moment the player has
@@ -33437,20 +33468,13 @@ export function createSystems(game) {
     // the door is and how many more it wants — so leaving is a choice the
     // player can see coming rather than a reward they are told about.
     const wayRec = taskRec[sysWAY_ID];
-    const wayDone = openIds.length === 0 && chapComplete(n) && !!(cdef && cdef.way);
-    const wayOpen = chapEnough(n) && !!(cdef && cdef.way);
+    const wayDone = chapEnough(n) && pi < 0 && !travPin && !shopPin && !!(cdef && cdef.way);
+    const wayOpen = !!(cdef && cdef.way);
     const wayOn = !!(cdef && cdef.way);
     if (wayOn) {
       if (wayDone) top = sysWAY_ID;
       show[sysWAY_ID] = true;
       let wtxt = 'the way on: ' + cdef.way;
-      if (!wayOpen) {
-        const rec = chapRec[n];
-        let dn = 0;
-        for (let i = 0; i < rec.ids.length; i++) { const r = taskRec[rec.ids[i]]; if (r && r.done) dn++; }
-        const need = Math.max(1, chapNeed(n) - dn);
-        wtxt += ' · after ' + need + ' more';
-      }
       if (wayRec.txt.textContent !== wtxt) wayRec.txt.textContent = wtxt;
       wayRec.li.classList.toggle('soon', !wayOpen);
     }
@@ -33590,7 +33614,11 @@ export function createSystems(game) {
     }
     // "4 of 10 done", not "4 / 10": a fraction under a list reads as a score
     // or a page number, and the one word says which (V2).
-    countEl.textContent = chapLabel(n) + '  ·  ' + done + ' of ' + rec.ids.length + ' done';
+    countEl.textContent = chapLabel(n) + '  ·  ' + (experience
+      ? (chapEnough(n) ? 'a memory kept' :
+        (experience.signatureDone ? 'signature done' : 'the signature') +
+        (experience.supportMissing ? ' + ' + experience.supportMissing + ' small moments' : ' still to find'))
+      : done + ' of ' + rec.ids.length + ' done');
     todoFindsLine(n);
     // THE YUZU (L8, F1): the wallet sits just under the paper, and the paper's
     // own height swings hard — a marquee in progress runs to six rows and a
@@ -36012,6 +36040,13 @@ export function createSystems(game) {
       }
       p = d / rec.ids.length;
     }
+    const experience = n > 0 ? chapExperience(n) : null;
+    if (experience) {
+      // The arrangement reaches its full colour with the authored memory,
+      // while old quota-qualified journeys retain their musical arrival.
+      p = chapEnough(n) ? 1 : ((experience.signatureDone ? 1 : 0) +
+        Math.min(2, experience.supportDone)) / 3;
+    }
     musProg = clamp(p, 0, 1);
   }
 
@@ -36145,6 +36180,9 @@ export function createSystems(game) {
     // above returns first), which is correct — a restored file's own
     // `keptAt` already carries whatever this wrote in an earlier session.
     if (cn && jrKeptAt[cn] === undefined && keepHeld(cn)) jrKeptAt[cn] = jrTotalMs();
+    // An out-of-order trip can leave Sydney's memory until last. Earning it
+    // at home must stage homecoming now, without a reload or another border.
+    if (game.biome && game.biome.current === 'sydney' && sysFinaleAll()) sysFinaleCheck();
     let ceremony = false;
     if (chapComplete(cn) && !jrChapDone[cn]) {
       jrChapDone[cn] = true;
@@ -37233,8 +37271,16 @@ export function createSystems(game) {
 
   /** Every keepsake earned. Optional boxes are not part of coming home. */
   function sysFinaleAll() {
-    for (let k = 1; k <= chapMax; k++) if (!keepHeld(k)) return false;
+    for (let i = 0; i < JOURNEY.length; i++) if (!keepHeld(JOURNEY[i])) return false;
     return true;
+  }
+  /** Route memories first, then earned trips. Pantanal keeps an empty slot. */
+  function sysFinaleKeeps() {
+    const list = JOURNEY.filter(function (n) { return keepHeld(n); });
+    for (let n = 1; n <= chapMax; n++) {
+      if (JOURNEY.indexOf(n) < 0 && keepHeld(n)) list.push(n);
+    }
+    return list;
   }
   /** ...and every box in every place: the completionist's variant. */
   function sysFinaleFull() {
@@ -37268,13 +37314,15 @@ export function createSystems(game) {
       } catch (e) { /* the fallback is a real direction, not a guess */ }
     }
     const span = Math.PI * 2 - sysFIN_GAP;
-    const n = chapMax > 1 ? chapMax - 1 : 1;
+    const earned = sysFinaleKeeps();
+    const n = Math.max(1, earned.length - 1);
     sysFinOpen = open;
     game.state.finaleOn = true;         // the gardener stands down; npc.js reads it (L6, E5)
-    for (let k = 1; k <= chapMax; k++) {
+    for (let i = 0; i < earned.length; i++) {
+      const k = earned[i];
       const def = chapterDef(k);
-      if (!keepHeld(k) || !def || def.keepNone) continue;
-      const a = open + sysFIN_GAP / 2 + ((k - 1) / n) * span;
+      if (!def || def.keepNone) continue;
+      const a = open + sysFIN_GAP / 2 + (i / n) * span;
       try {
         ph.stageKeep(def.biome,
                      sysFIN_X + Math.cos(a) * sysFIN_R,
@@ -37425,26 +37473,31 @@ export function createSystems(game) {
     const base = musThemeBase(0);
     const arc = !(game.state && game.state.noArc);
     const notes = arc ? musThemeNotes('full') : null;
+    const earned = sysFinaleKeeps();
+    // Keep the complete musical phrase; only places actually earned supply
+    // its voices and captions. A short journey never recalls unvisited trips.
+    const count = arc ? notes.length - 1 : chapMax;
     const canPlay = !!(ac && chord && chord.length && musVol && !musMuted);
     if (arc && canPlay) { try { musCodaChords(musSnap(now + t), sysFIN_CODA_BEAT); } catch (e) { /* the pad stays where it is */ } }
-    for (let k = 1; k <= chapMax; k++) {
-      const def = chapterDef(k);
+    for (let k = 1; k <= count; k++) {
+      const place = earned[Math.min(earned.length - 1, Math.floor((k - 1) * earned.length / count))];
+      const def = place ? chapterDef(place) : null;
       if (!def) continue;
       const pal = sysMUS_PAL[def.pal || 0] || sysMUS_PAL[0];
       const inst = (pal && pal.lead && pal.lead !== 'none') ? pal.lead : 'pluck';
       const ll = sysROUTE_LL[def.biome];
       const pan = ll ? clamp(ll[0] / 180, -1, 1) * 0.8 : 0;
       // the note's index and its length: the tune's own (M5), or the eight
-      const ti = arc ? Math.min(k - 1, notes.length - 1) : sysFinCodaIdx(k, chapMax);
+      const ti = arc ? k - 1 : sysFinCodaIdx(k, count);
       const gapK = arc ? notes[ti][1] * sysFIN_CODA_BEAT : sysFIN_NOTE_GAP;
       if (canPlay) {
         const midi = arc ? base + musDegOff(notes[ti][0]) : base + musThemeOff(ti);
         try { musLiftNote(inst, musSnap(now + t), midi, pan, 0.14, gapK * 1.6); sysFinCodaN++; sysFinCodaTune.push(ti); sysFinCodaPitch.push(midi); } catch (e) { /* one voice missing */ }
       }
-      (function (biome, delay, name, keep) {
+      (function (biome, delay, name, keep, empty) {
         setTimeout(function () {
           try {
-            const p = ph && typeof ph.keepOut === 'function' ? ph.keepOut(biome) : null;
+            const p = !empty && ph && typeof ph.keepOut === 'function' ? ph.keepOut(biome) : null;
             if (p && typeof ph.flash === 'function') ph.flash(p, 10);
           } catch (e) { /* a keepsake that will not flash is still a keepsake */ }
           // ...and its name, with the note (L6, E5)
@@ -37458,12 +37511,12 @@ export function createSystems(game) {
             codaHideT = sysFIN_NOTE_GAP * 3;
           } catch (e) { /* a caption */ }
         }, delay * 1000);
-      })(def.biome, t, def.name, def.keep);
+      })(def.biome, t, def.name, def.keep, def.keepNone);
       t += gapK;
     }
     // ...and the twentieth (M5): the tag's held do', on the ocarina, named
     // for nobody — the caption stays on the last keepsake
-    if (arc && canPlay && notes.length > chapMax) {
+    if (arc && canPlay && notes.length > count) {
       const ti = notes.length - 1;
       const midi = musOcaBase() + musDegOff(notes[ti][0]);
       const gapK = notes[ti][1] * sysFIN_CODA_BEAT;
@@ -42284,7 +42337,8 @@ export function createSystems(game) {
       const w = wowOfChapter(k);
       const wr = w ? taskRec[w.id] : null;
       return { n: k, rows: rec.ids.length, done: done,
-               need: chapNeed(n),
+               need: chapNeed(k), legacyNeed: chapLegacyNeed(k), experience: chapExperience(k),
+               recommended: journeyNext(game.biome ? chapterOf(game.biome.current) : 1) === k,
                wow: w ? w.id : null, wowDone: !!(wr && wr.done),
                enough: chapEnough(k), complete: chapComplete(k), open: jrOpen(k),
                ids: rec.ids.slice() };
@@ -51583,15 +51637,7 @@ export function createSystems(game) {
           // more" was the only word on the door. The number and the other
           // door, as a note — a receipt for the press, so the fresh budget
           // does not hold it.
-          const hereN = game.biome ? chapterOf(game.biome.current) : 1;
-          if (!chapEnough(hereN)) {
-            toast('not yet — ' + sysWayNeed(hereN) + ' more here, or Choose a place from the title card', 'note');
-          } else {
-            // ...and it opens OUT OF the board that is standing there, after
-            // half a second of camera. See boardOpen — every failure of which
-            // is this line as it was.
-            boardOpen();
-          }
+          boardOpen();
         }
       }
     } else if (homeCount || homeT > 0) {
@@ -51611,9 +51657,7 @@ export function createSystems(game) {
           wayNearN = 0; wayNearT = 0;
           const hereN = game.biome ? chapterOf(game.biome.current) : 1;
           const cd = chapterDef(hereN);
-          toast(!chapEnough(hereN)
-            ? 'not yet — ' + sysWayNeed(hereN) + ' more here, or Choose a place from the title card'
-            : 'closer — the door is ' + ((cd && cd.way) || 'there') + '. three wheeks on it', 'note');
+          toast('closer — the door is ' + ((cd && cd.way) || 'there') + '. three wheeks on it', 'note');
         }
       }
     }
@@ -51631,8 +51675,7 @@ export function createSystems(game) {
       // heard from here, as a memory of somewhere else. Once per entry; the
       // board's own horn and F2's J-cut own the crossing itself.
       if (homeVis) {
-        let dest = 1;
-        for (let k = 1; k <= chapMax; k++) { if (!chapEnough(k)) { dest = k; break; } }
+        const dest = journeyNext(game.biome ? chapterOf(game.biome.current) : 1);
         let ddef = chapterDef(dest);
         if (ddef && game.biome && game.biome.isActive(ddef.biome)) ddef = chapterDef(dest < chapMax ? dest + 1 : 1);
         if (ddef && ddef.biome && ambSig(ddef.biome, 0.25)) musCueExitN++;

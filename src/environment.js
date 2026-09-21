@@ -796,6 +796,23 @@ function envPathD2(P, x, z) {
   }
   return best;
 }
+// ROADMAP-REIMAGINE E1. The first lawn has a quiet middle and shaggy edges.
+// These are world coordinates, not a camera ring: walking past a clump must
+// leave it where it grew. The corridor follows the existing podium wear band.
+const envLAWN_WALK = [0.0, 21.0, -0.6, 12.0, 0.2, 4.6];
+function envLawnGrowth(x, z, out) {
+  const ex = x / 11, ez = (z - 22) / 15;
+  let edge = clamp((ex * ex + ez * ez - 0.42) / 0.9, 0, 1);
+  edge = edge * edge * (3 - 2 * edge);
+  let walk = clamp((envPathD2(envLAWN_WALK, x, z) - 2.25) / 6.75, 0, 1);
+  walk = walk * walk * (3 - 2 * walk);
+  const clump = clamp(0.5 + envNoise(x * 0.47 + 8, z * 0.43 - 3) * 0.65, 0, 1);
+  // A clipped lawn still grows blades. The border carries the long ones,
+  // in islands rather than an even comb. No extra instances are allocated.
+  out.density = (0.25 + edge * (0.30 + clump * 0.45)) * (0.38 + walk * 0.62);
+  out.height = (0.34 + edge * (0.30 + clump * 0.56)) * (0.45 + walk * 0.55);
+  return out;
+}
 /** On one of the gardens' walks, at the width envRibbon draws it plus a kerb. */
 function envOnPath(x, z) {
   for (let i = 0; i < envPATHS.length; i++) {
@@ -2479,7 +2496,7 @@ export function createEnvironment(game) {
   // The lawn and the sand run to a hundred and sixty metres and Sydney is the
   // one chapter with no paving in it at all, so the ground carries twice the
   // whisper the buildings do.
-  const matVCGnd = grain(mat(envVC_BASE, { vertexColors: true }),
+  const matVCGndBase = grain(mat(envVC_BASE, { vertexColors: true }),
                          { scale: 0.68, amount: 0.17, warp: 0, near: 1.00, speck: 0.70, nearScale: 8, contact: 1, broad: 0.11, broadM: 17,
                            // the mid octave (L6, E6): worn dry patches on the lawn
                            // in eight-metre pieces, yellowing toward grassPale
@@ -2491,6 +2508,35 @@ export function createEnvironment(game) {
                            // at the crown's own footprint (envCAM_FIG_R, the blobs
                            // reach ~4.1 m and the ground shadow a little past).
                            dapple: { cells: envDAPPLE_FIGS, k: 0.35, scale: 3.2 } });
+  // E1: grass now supplies the fine detail. Keep the authored grain row for
+  // the cut, and quiet only its green lawn here; sand and fallen petals keep
+  // their own surface. A private clone avoids modifying grain's cached material.
+  const lawnComposition = { value: 0 };
+  const matVCGnd = matVCGndBase.clone();
+  const lawnHook = matVCGndBase.onBeforeCompile;
+  const lawnKey = matVCGndBase.customProgramCacheKey;
+  matVCGnd.onBeforeCompile = function (shader) {
+    lawnHook.call(this, shader);
+    shader.uniforms.uLawnComposition = lawnComposition;
+    const mark = '  diffuseColor.rgb *= vec3(1.0 + gn * ';
+    if (shader.fragmentShader.indexOf(mark) < 0) {
+      warnOnce('lawn-composition-hook', 'Sydney lawn composition could not find the grain contribution');
+      return;
+    }
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uLawnComposition;')
+      .replace(mark, [
+        '  if (uLawnComposition > 0.5) {',
+        '    float lawn = smoothstep(0.02, 0.10, diffuseColor.g - max(diffuseColor.r, diffuseColor.b));',
+        '    gnr *= 1.0 - lawn * 0.70;',
+        '    skM *= 1.0 - lawn * 0.72;',
+        '  }',
+        mark,
+      ].join('\n'));
+  };
+  matVCGnd.customProgramCacheKey = function () {
+    return lawnKey.call(matVCGndBase) + '|lawnComposition1';
+  };
   const matVC2  = mat(envVC_BASE2, { vertexColors: true, side: THREE.DoubleSide });
   // DoubleSide defaults shadowSide to DoubleSide -> the open sail surfaces would
   // sample their own depth and speckle. Front faces only.
@@ -3794,6 +3840,7 @@ export function createEnvironment(game) {
       return;
     }
     envAsleep = false;
+    lawnComposition.value = (!game.state.noLawnComposition && (game.state.perfRung | 0) < 1) ? 1 : 0;
     if (envFar) envFar.update(game, dt);
     {
       const capy = game.capy;
@@ -3921,6 +3968,8 @@ export function createEnvironment(game) {
 
   const api = {
     group: root,
+    lawnGrowth: envLawnGrowth,
+    lawnAudit: function () { return { live: lawnComposition.value > 0, nearGain: 0.30, speckGain: 0.28 }; },
     /**
      * WHEN THE FERRY IS NEXT ALONGSIDE (D9).
      *

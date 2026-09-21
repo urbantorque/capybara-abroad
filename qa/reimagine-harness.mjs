@@ -73,7 +73,7 @@ export async function openHarness({ url = 'http://localhost:5188/',
       try { await page.waitForTimeout(ms); } finally { await page.keyboard.up(key); }
     };
     const start = async () => {
-      await page.evaluate(() => document.querySelector('.capyui-go').click());
+      await page.evaluate(() => (document.querySelector('.capyui-carry') || document.querySelector('.capyui-go')).click());
       await page.waitForFunction(() => window.__capy.state.started === true);
       // Trusted input unlocks audio; an evaluated DOM click alone cannot.
       await hold('Shift', 30);

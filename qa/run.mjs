@@ -28,6 +28,9 @@ import { existsSync } from 'node:fs';
 
 const ASSERTS = [
   ['qa/reimagine-trust.mjs', 'guidance continuity, explicit skip/replay and earned finale staging'],
+  ['qa/reimagine-journey.mjs', 'authored route choices and stable chapter/task identities'],
+  ['qa/reimagine-route-integration.mjs', 'open travel, legacy memories and earned-place coda'],
+  ['qa/reimagine-stamina.mjs', 'non-worsening boons and a bounded stamina bank'],
   ['qa/strip-test.mjs',   'the comment stripper: 16 cases plus every source file re-parsed'],
   ['qa/p6-static.cjs',    'CHAPTERS and TASKS: acts, notes, arrivals, the souvenir exception'],
   ['qa/xmodule.mjs',      'cross-module contract: imports, exports, name collisions'],

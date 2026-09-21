@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matOwn, matRound, TASKS, rand, randInt, clamp, damp, lerp, waterYAt,
+import { PALETTE, mat, matOwn, matRound, TASKS, CHAPTERS, rand, randInt, clamp, damp, lerp, waterYAt,
          chapterDef } from './shared.js';
 
 // ===========================================================================
@@ -3431,13 +3431,12 @@ export function createNPCs(game) {
   // A SET and not a count, so four visits to the Quay is one. It is written in
   // the approach branch of localsStep — the only moment in the game that means
   // "the player stood in front of this person and they said something" — and it
-  // is read by the closing lines and by one find. Session-scoped on purpose: it
-  // is not on the save file, so it says what happened on this journey rather
-  // than what has ever happened, which is what the last scene is about.
+  // is read by the closing lines and by one find. The notebook keeps the same
+  // encounter on the journey's save; npcTravCount merges that history with
+  // this session so a reload does not turn an acquaintance into a stranger.
   const npcTravMet = Object.create(null);
-  // ...and whether they rode in the basket (L7, E6 / writing A). Session-
-  // scoped on the same terms as the set above: the finale says what happened
-  // on this journey. The notebook's page keeps its own copy on the file.
+  // ...and whether they rode in the basket (L7, E6 / writing A). This detail
+  // remains session-scoped; the notebook keeps its own copy on the file.
   let npcTravUp = false;
   // "Stood in front of" is a distance, and it is not the greeting's eight
   // metres (L6, F4): counted at `near` the Quay's spawn met them in 0.8 s
@@ -3490,8 +3489,13 @@ export function createNPCs(game) {
   // page and the pointer that hides once they have been stood in front of
   // (L6, F4); with none it is the count the closing lines have always read.
   function npcTravCount(biome) {
-    if (biome) return npcTravMet[biome] ? 1 : 0;
-    let n = 0; for (const k in npcTravMet) n++; return n;
+    if (biome) return npcTravMet[biome] ||
+      (typeof game.travSaved === 'function' && game.travSaved(biome)) ? 1 : 0;
+    // One chapter, one meeting, even when both the live set and file have it.
+    // travSaved reads the stored page directly, never the notebook's live view.
+    let n = 0;
+    for (let i = 0; i < CHAPTERS.length; i++) n += npcTravCount(CHAPTERS[i].biome);
+    return n;
   }
   // ---- WHERE THEY ARE STANDING, BY CHAPTER (L6, F4 / writing W2) ---------
   // Four cameos at `near: 8`, none pointed at, met in 0 of 3 review runs. The
@@ -5363,14 +5367,14 @@ export function createNPCs(game) {
   // 9.2 s, which is three or four of them — somebody talking to you while you
   // sit in the horseshoe, instead of a receipt with a person standing near it.
   const npcTRAV_FIN_LINES = [
-    { t: 'That is the map used up.', when: npcTravKnown },
+    { t: 'That map has earned its creases.', when: npcTravKnown },
     { t: 'I take photographs now. They are all blurry. I have made my peace with it.',
       when: npcTravKnown },
     // ...and THE ASK's one exception (L7, E6 / writing A): the traveller can
     // account for exactly one of the nineteen, because they were in it.
-    { t: 'Six months, and I still could not tell you how you got to half of them.',
+    { t: 'All that way, and I still could not tell you how you got to half of them.',
       when: function () { return npcTravKnown() && !npcTravUp; } },
-    { t: 'Six months, and I still could not tell you how you got to half of them. Cappadocia I can. I was in the basket.',
+    { t: 'All that way, and I still could not tell you how you got to half of them. Cappadocia I can. I was in the basket.',
       when: function () { return npcTravKnown() && npcTravUp; } },
     { t: 'You are back where you started. So am I. Only one of us meant to be.',
       when: npcTravKnown },
@@ -5382,9 +5386,9 @@ export function createNPCs(game) {
     // whatsoever." / "The first place in the world that asked what you thought
     // you were doing."
     //
-    // It may only be said by somebody who has been deciding for six months what
-    // you are, which is the entire reason this character exists.
-    { t: 'Nineteen places. Every one of them made its own mind up about you.',
+    // It belongs to somebody who has met the animal along the way. The route
+    // may be short or long; the line never assumes how many places it visited.
+    { t: 'Every place made its own mind up about you.',
       when: npcTravKnown },
     // ...and the version for a player who never once stopped in front of them.
     // Four cameos you walked past are still four cameos, and the honest scene
@@ -8407,7 +8411,7 @@ export function createNPCs(game) {
       // true and never counted. MEASURED: four arrow-led drives, minD 0.0,
       // 0.1, 1.1 and 1.0 m, travMet 0 in 4/4. The count is the fact of
       // having stood there; the line is a line. See npcTRAV_MET_R.
-      if (r.trav && r.biome && !npcTravMet[r.biome] && d2 < npcTRAV_MET_R * npcTRAV_MET_R) {
+      if (r.trav && r.biome && !npcTravCount(r.biome) && d2 < npcTRAV_MET_R * npcTRAV_MET_R) {
         npcTravMet[r.biome] = 1;
         // ...and the notebook is told (L6, F4): its pointer at this
         // person comes off the paper the moment they have been met.

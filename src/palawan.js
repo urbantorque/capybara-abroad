@@ -4602,7 +4602,7 @@ function palUpdateTasks(game, dt) {
   if (under && !palDiveDone) {
     palDiveDone = true;
     palTask('first-dive');
-    palToast('twelve chapters of paddling about on the top of it. finally.');
+    palToast('the water had another side.');
     palSfx('splash', { volume: 0.6, pitch: 0.65 });
   }
   // ---- HOW FAR DOWN YOU ARE, WHILE YOU ARE DOWN THERE (v32) ---------------

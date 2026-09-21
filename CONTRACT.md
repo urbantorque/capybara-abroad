@@ -1,3 +1,44 @@
+## REIMAGINE B/C1/E1 — A SHORTER JOURNEY, A QUIETER LAWN (21 Sep 2026)
+
+The recommended journey is Sydney, Quay, Pasto, Kyoto, Palawan, Pantanal,
+Hanoi, then home. Chapter numbers, all nineteen destinations and all 256
+task IDs remain. Each route memory is the signature plus two authored
+supporting actions. Old quota qualification remains valid. Every destination
+is available from the departure board; guidance recommends rather than locks.
+The full collection still has its completionist ending.
+
+Finale eligibility, compact souvenir placement and musical captions use the
+earned route plus earned optional trips. Pantanal retains an empty position.
+The complete twenty-note theme remains intact, and musical development now
+follows route experience rather than requiring most optional checklist tasks.
+Saved notebook meetings feed traveller recognition directly, without recursive
+notebook construction. Closing text no longer assumes nineteen visited places.
+
+C1 fixes two arithmetic defects: a mango cannot increase sprint consumption
+after upgrades, and Bottomless Puff cannot bank stamina beyond the visible bar.
+Existing unlimited fully upgraded sprint remains; basic speed, jump physics,
+base drain, prices and consumable durations are unchanged. No new save fields.
+
+E1 composes Sydney's lawn with a short playable centre, a mown podium approach
+and world-fixed taller edge clumps. A private ground layer reduces fine green
+lawn noise while retaining the authored baseline material. `noLawnComposition`
+or governor rung one restores that baseline. Cut recenters skip new field and
+buffer work; enabling after a cut recenter fills four existing layout slices
+before showing composition. Pinned screenshots and a grass hide-and-diff show
+the contribution. Measured added cut placement CPU: .033 ms median, .082 ms
+p95 against inherited code on Arc 130V; this is not a GPU timing claim.
+
+Seeded browser route: 21 tasks, zero fully completed chapters, seven earned
+memories, six physical souvenirs, restored two meetings, saved finale and all
+twenty notes, zero runtime errors. Pure suites cover 409 route assertions,
+61 integrated decisions, 23 opening tests and 144 stamina combinations across
+10 groups. These do not substitute for natural route playtests or human
+judgment of enjoyment. The first art change leaves camera obstruction,
+crowded speech and the other visual layers open for the next pass.
+The browser regression also earns Sydney's final memory after arrival, proving
+the ending wakes without a reload. Natural settling took 8.25 wall seconds;
+no forced pose or manually advanced simulation was used.
+
 ## REIMAGINE A — GUIDANCE AND HOMECOMING (21 Sep 2026)
 
 ROADMAP-REIMAGINE.md supersedes the old pass's feature scope. The user

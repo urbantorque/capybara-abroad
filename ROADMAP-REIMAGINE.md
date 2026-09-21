@@ -129,6 +129,17 @@ reactions, concurrency of messages, recovery and repeatability.
 
 ### E — a deliberate visual leap
 
+User emphasis, 21 Sep: visual beauty is a primary redesign deliverable,
+not a finishing pass. Audit and improve all five visual layers: the capybara
+and supporting characters (silhouette, expression, animation, material
+separation); handled objects and props (readability, proportions, interaction
+affordance); landmark architecture; environmental ground/foliage/water; and
+background/sky/depth composition. Give each place a deliberate focal hierarchy
+and a distinct colour/light mood. Track accepted before/after examples across
+these layers, not only renderer settings or lawn texture. Preserve the animal's
+character and cohesive procedural low-poly identity unless evidence supports
+a specific documented change.
+
 First audit real arrival and walking frames in Sydney, Pasto, Kyoto,
 Venice, Palawan, Pantanal, Iceland and Hanoi. Judge silhouettes, focal
 contrast, composition, foreground obstruction, material separation,
@@ -148,6 +159,20 @@ proving a specific visual term. Inspect screenshots by eye. Measure
 reference-GPU cost honestly; a headless timing is not a GPU budget.
 
 ### F — the score gets its room
+
+User emphasis, 21 Sep: music should sit further forward. The desired OST is
+lush, serene, emotive and inspiring, with strong melodic identity and distinct
+biome arrangements. Zelda is a reference for melodic clarity, emotional pacing
+and restraint, not source material to reproduce. Assess musical continuity,
+harmonic warmth, instrument register, voicing, phrase shape, repetition and
+transitions alongside the mix. Keep quiet and dramatic passages purposeful.
+Reduce overpowering broadband wind/ocean wash and incidental NPC/character
+noise. Preserve intelligible essential action feedback without allowing a
+busy scene to bury the tune. Use common headroom and voice budgets; raising
+every bus is not a solution. Test exploration, crowded encounters, water,
+signature activities, travel and homecoming. Compare identical gameplay
+captures, spectral/bus measurements and perceptual listening where available;
+do not call a numerical gain change a validated emotional improvement.
 
 Complete the intent of ROADMAP-SCORE Part Q after capturing a usable
 baseline. Inspect the WIP branch but do not blindly merge it. Reduce
@@ -226,3 +251,32 @@ work. A green static suite is necessary and never a claim of perfection.
 - Continuation: task heartbeat registered every two hours, with an explicit
   stop/start-no-new-work deadline of 23 Sep 11:32 UTC. Local execution needs
   the computer awake and the app running.
+- A pushed: `434c7d1`, 26 suite checks with zero failed. Only owned checkpoint
+  files staged; prior user files untouched.
+- B integration: all nineteen board choices open. Twenty-one seeded route
+  actions earn seven memories with zero complete chapters; real homecoming
+  stages six objects, restores two traveller meetings, plays all twenty notes
+  and saves the ending with zero runtime errors. Final ledger celebrates home
+  rather than zero-of-nineteen completion. 61 integration assertions supplement
+  the 409 data assertions. Natural route and narrow-screen validation remain.
+- C1: repaired a mango floor that could worsen purchased stamina and an
+  unbounded Bottomless Puff reservoir. Ten behavioral groups cover 144
+  upgrade/skill/wardrobe combinations and 7,200 simulated running frames.
+  Generous traversal tuning remains separate; baseline movement is unchanged.
+- E1 acceptance: parent read both pinned screenshots. The quiet centre exposes
+  feet/contact shadows; 27,846 changed grass-mask pixels and 4,521 changed
+  ground pixels prove contribution, not taste. Isolated live tick medians
+  7.9/8.2 ms versus cut 8.5/8.8 ms, labelled CPU submissions. The first cached
+  cut recenter failed its budget (+.219 ms); corrected bypass measured +.033
+  median/+.082 p95 ms with 11 lifecycle assertions. GPU execution unmeasured.
+- F baseline: Sydney hardware capture, 60 seconds, no runtime errors and all
+  input trusted. Forty-six accepted babble calls illustrate scene density;
+  continuous wash, weather and listener-following beds overlap. Before touching
+  the mix, instrument actual stems. Existing master peak -7.11 dBFS was sampled
+  before the limiter; no clipping in sampled windows, not a contiguous proof.
+- B final regression: earning the last memory while already home triggers the
+  finale without reloading. The natural settling phase took 8.25 wall seconds
+  and 8.12 simulated seconds; the prior 30-second timeout is consistent with
+  intermittent browser throttling, not a reproduced game defect. A longer
+  observation window passed with no forced loaf or manual simulation. Parent
+  inspected the final ledger. Independent B/E1 diff review found no blocker.

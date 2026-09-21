@@ -267,6 +267,7 @@ export function createGrass(game) {
   const uBox   = { value: new THREEx.Vector3(0, 0, grsFADE_R) };  // fade centre x, z, radius
   const uTr    = { value: [] };                           // vec4: x, z, dirx, dirz
   const uTrT   = { value: new Float32Array(grsTR_N) };    // birth time, -1e9 = empty
+  const uLawnComposition = { value: 0 };                 // Sydney's authored mowing, E1
   for (let i = 0; i < grsTR_N; i++) { uTr.value.push(new THREEx.Vector4(0, 0, 0, 0)); uTrT.value[i] = -1e9; }
 
   // ---- the material: mat() + the hook, on a clone -------------------------
@@ -283,10 +284,13 @@ export function createGrass(game) {
     shader.uniforms.uGrsBox = uBox;
     shader.uniforms.uGrsTr = uTr;
     shader.uniforms.uGrsTrT = uTrT;
+    shader.uniforms.uLawnComposition = uLawnComposition;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', [
         '#include <common>',
         'attribute float aH;',
+        'attribute float aLawnScale;',
+        'uniform float uLawnComposition;',
         'uniform float uGrsT;',
         'uniform vec2 uGrsWind;',
         'uniform float uGrsSway;',
@@ -325,6 +329,9 @@ export function createGrass(game) {
         // yaw, so `v * M` is exactly its inverse (see _swayInject).
         '  vec3 gOff = vec3(gLean.x, 0.0, gLean.y) * gRamp;',
         '  transformed += gOff * mat3(instanceMatrix);',
+        // Scale the complete fan, including its sway. Zero means no remnant
+        // triangle lying on the ground; the cut keeps the original fan exactly.
+        '  if (uLawnComposition > 0.5) transformed *= aLawnScale;',
         '}',
       ].join('\n'));
     // DoubleSide flips the normal on a back face, and half the blades in any
@@ -335,7 +342,7 @@ export function createGrass(game) {
                '#include <normal_fragment_begin>\nnormal = normalize(vNormal);\nnonPerturbedNormal = normal;');
   };
   m.customProgramCacheKey = function () {
-    return 'swayDgrass|' + grsTR_N + (prevKey ? '|' + prevKey.call(this) : '');
+    return 'swayDgrass|lawnComposition1|' + grsTR_N + (prevKey ? '|' + prevKey.call(this) : '');
   };
   m.needsUpdate = true;
 
@@ -344,6 +351,9 @@ export function createGrass(game) {
   const aH = new THREEx.InstancedBufferAttribute(new Float32Array(grsMAX), 1);
   aH.setUsage(THREEx.DynamicDrawUsage);
   geo.setAttribute('aH', aH);
+  const aLawnScale = new THREEx.InstancedBufferAttribute(new Float32Array(grsMAX).fill(1), 1);
+  aLawnScale.setUsage(THREEx.DynamicDrawUsage);
+  geo.setAttribute('aLawnScale', aLawnScale);
   const mesh = new THREEx.InstancedMesh(geo, m, grsMAX);
   mesh.name = 'grsField';
   mesh.instanceMatrix.setUsage(THREEx.DynamicDrawUsage);
@@ -375,6 +385,9 @@ export function createGrass(game) {
   let scanTries = 0;
   let slice = grsSLICES;      // next slice to place; grsSLICES = nothing pending
   let placed = 0, standing = 0, recentres = 0, scanMs = 0;
+  let lawnStanding = 0, lawnScaleSum = 0;
+  const lawnSample = { density: 1, height: 1 };
+  let lawnRequested = false, lawnDirty = true, lawnRefresh = false;
   let T = 0;
   const M4 = new THREEx.Matrix4();
   const hit = { y: 0, r: 0, g: 0, b: 0 };
@@ -408,11 +421,25 @@ export function createGrass(game) {
       mesh.instanceColor.setXYZ(i, hit.r * tint[i], hit.g * tint[i], hit.b * tint[i]);
       aH.setX(i, h);
       standing++;
+      // The cut must skip placement work too: the first cached-everywhere
+      // version cost +0.219 ms on recenter frames even with its flag off.
+      // Keep a valid cache for immediate A/B; moving while cut invalidates it.
+      if (lawnRequested) {
+        let lawnScale = 1;
+        if (api && typeof api.lawnGrowth === 'function') {
+          api.lawnGrowth(x, z, lawnSample);
+          lawnScale = grsHash(i, 7) < lawnSample.density ? lawnSample.height : 0;
+        }
+        aLawnScale.setX(i, lawnScale);
+        if (lawnScale > 0) lawnStanding++;
+        lawnScaleSum += lawnScale;
+      }
     } else {
       M4.makeScale(0, 0, 0);
       M4.setPosition(x, -1000, z);
       mesh.setMatrixAt(i, M4);
       aH.setX(i, 0);
+      if (lawnRequested) aLawnScale.setX(i, 1);
     }
     placed++;
   }
@@ -420,11 +447,18 @@ export function createGrass(game) {
   function grsPlaceSlice(s) {
     const n = row ? Math.min(row.n, grsMAX) : 0;
     const from = Math.floor(n * s / grsSLICES), to = Math.floor(n * (s + 1) / grsSLICES);
-    if (s === 0) standing = 0;
+    if (s === 0) {
+      standing = 0;
+      if (lawnRequested) { lawnStanding = 0; lawnScaleSum = 0; }
+    }
     for (let i = from; i < to; i++) grsPlace(i);
     mesh.instanceMatrix.needsUpdate = true;
     mesh.instanceColor.needsUpdate = true;
     aH.needsUpdate = true;
+    if (lawnRequested) {
+      aLawnScale.needsUpdate = true;
+      if (s === grsSLICES - 1) { lawnDirty = false; lawnRefresh = false; }
+    } else lawnDirty = true;
   }
 
   /** Move the layout box to `cx, cz`: wrap what fell out, then re-place all. */
@@ -454,6 +488,8 @@ export function createGrass(game) {
     slice = grsSLICES;
     mesh.count = 0;
     mesh.visible = false;
+    lawnRequested = false; lawnDirty = true; lawnRefresh = false;
+    uLawnComposition.value = 0;
     for (let i = 0; i < grsTR_N; i++) uTrT.value[i] = -1e9;
     trLast.set(1e9, 1e9);
   }
@@ -466,6 +502,9 @@ export function createGrass(game) {
     if (!row) return;
     const state = game.state || {};
     const rung = state.perfRung | 0;
+    lawnRequested = name === 'sydney' && !state.noLawnComposition && rung < 1;
+    if (!lawnRequested) lawnRefresh = false;
+    uLawnComposition.value = lawnRequested && !lawnDirty ? 1 : 0;
     const capy = game.capy;
     const p = capy && capy.position;
     if (state.noGrass || rung >= 2 || !p) { mesh.visible = false; return; }
@@ -486,6 +525,9 @@ export function createGrass(game) {
       if (scanDue !== -1) return;
     }
     if (!table) return;
+    // A dormant field may have moved. Refill its existing four slices once,
+    // keeping the original view until all scales match the current layout.
+    if (lawnRequested && lawnDirty && !lawnRefresh) { slice = 0; lawnRefresh = true; }
 
     // The anchor rides a little ahead of the animal along the lens; the box is
     // relaid when it has moved grsRECENTRE from where it was laid.
@@ -501,6 +543,7 @@ export function createGrass(game) {
       uBox.value.x = cx; uBox.value.y = cz;
     }
     if (slice < grsSLICES) { grsPlaceSlice(slice); slice++; }
+    uLawnComposition.value = lawnRequested && !lawnDirty ? 1 : 0;
     // the fade centre follows smoothly, so the edge never steps with the layout
     const lam = 1 - Math.exp(-grsFOLLOW * dt);
     uBox.value.x += (cx - uBox.value.x) * lam;
@@ -539,6 +582,12 @@ export function createGrass(game) {
         biome: name, row: row ? { n: row.n, h: row.h, gate: row.gate } : null,
         table: table ? { meshes: table.meshes, seen: table.seen, kept: table.kept, blockers: table.blockers, cells: table.cells.size, scanMs: +scanMs.toFixed(1) } : null,
         count: mesh.count, visible: mesh.visible, standing, placed, recentres,
+        compositionActive: uLawnComposition.value > 0,
+        compositionStanding: lawnStanding,
+        compositionMeanScale: standing ? +(lawnScaleSum / standing).toFixed(3) : 0,
+        compositionCacheValid: !lawnDirty,
+        compositionPending: lawnRequested && lawnDirty,
+        layoutPending: slice < grsSLICES,
         anchor: [+anchor.x.toFixed(2), +anchor.y.toFixed(2)],
         fade: [+uBox.value.x.toFixed(2), +uBox.value.y.toFixed(2), uBox.value.z],
         wind: [+uWind.value.x.toFixed(2), +uWind.value.y.toFixed(2)], sway: uSway.value,
