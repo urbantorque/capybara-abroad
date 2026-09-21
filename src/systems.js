@@ -5086,6 +5086,30 @@ const sysMUS_OCA_VEL = 0.105;
 const sysMUS_STMT = { beatK: 0.6 / 9, beatLo: 0.42, beatHi: 0.9, arriveIn: 6,
                       restA: 240, restB: 360, restPill: 6,
                       wakeK: 2, wakeVel: 0.6, restVel: 0.85, cmLate: 1 };
+// ---- THE LEITMOTIFS (ROADMAP-SCORE, M4) -------------------------------------
+// Three figures for the people and the things that recur, each a fixed
+// interval shape on its own instrument, each short enough to sit inside
+// the drift without a progression. Scale degrees like the theme, through
+// musDegOff, so they are in key by construction (the third flat in minor):
+//   traveller — a falling fourth then a rising step, sol re mi, on the
+//               mallet, 1.4 s: the glimpse's walk-off, the cameos' greeting;
+//   home      — the theme's first four notes as a SWELL on the pad's own
+//               bank (through musFilt, not plucked): the shelf growing, and
+//               under the first four notes of Sydney's arrival statement;
+//   companion — a three-note skip up, do mi sol, on the pluck, 0.9 s: the
+//               pickup, the comes-over, the homecoming a beat after its own
+//               sound.
+// `beat` is seconds; `oct` is semitones on musThemeBase. The same name
+// waits `gapMin` before it may sound again, and none sounds under a
+// statement — the tune is not interrupted by a figure. `noMotif` cuts the
+// three and the absence mode (the return's A in the parallel minor).
+const sysMUS_MOTIF = {
+  traveller: { deg: [4, 1, 2],    dur: [1, 1, 2],    beat: 0.35, inst: 'mallet', vel: 0.85, oct: 0,  pan: 0.25 },
+  home:      { deg: [0, 4, 7, 4], dur: [2, 1, 1, 3], beat: 0.40, inst: 'swell',  vel: 0.80, oct: 0,  pan: 0 },
+  companion: { deg: [0, 2, 4],    dur: [1, 1, 1],    beat: 0.30, inst: 'pluck',  vel: 0.80, oct: 12, pan: 0.2 },
+};
+const sysMUS_MOTIF_GAP = 4;      // s between two of the same name
+const sysMUS_SWELL_VEL = 0.10;   // the home swell's level on the pad's filter, against pad voices at 0.058–0.15
 // THE MUSICIAN (L7, F2): the tune, played from a POSITION by a bed-class
 // mover instead of on the non-diegetic pad. One beat here is 0.6 s (the
 // theme's own eight notes, weighted by sysMUS_THEME_DUR, run about 8.4 s —
@@ -18736,6 +18760,8 @@ export function createSystems(game) {
           return;
         }
         musOcarina(when, midi, vel, gap); return;
+      // THE HOME SWELL (M4): the pad's own bank rising through a note
+      case 'swell':  musPadSwell(when, midi, vel, gap); return;
       default:       musPluck(when, midi, pan, vel); return;
     }
   }
@@ -18930,6 +18956,13 @@ export function createSystems(game) {
                   gap: Math.max(0.3, (dur - 1) * beat), pan: (i % 2 ? -0.35 : 0.35),
                   vel: 0.115 * (sec && sec.vel !== undefined ? sec.vel : 0.5) * sysMUS_2ND_GAIN });
       }
+      // ...and Sydney's arrival opens with home (M4): the pad's own bank
+      // rising through the first four notes under the ocarina
+      if (i < 4 && n === 0 && req.moment === 'arrive' && !(game.state && game.state.noMotif)) {
+        ev.push({ t: t0 + t, kind: 'cm', inst: 'swell', midi: musFold(musThemeBase(0, pal) + musDegOff(deg, pal, scale), sysMUS_LIFT_LO, sysMUS_LIFT_HI),
+                  gap: dur * beat, pan: 0, vel: sysMUS_SWELL_VEL * sysMUS_MOTIF.home.vel, home: true });
+        if (i === 0) { musMotifEv.sydneyOpen++; musMotifN.home++; }
+      }
       t += dur * beat;
     }
     ev.sort(function (a, b) { return a.t - b.t; });
@@ -18946,6 +18979,64 @@ export function createSystems(game) {
     musStmtRestGap = rand(sysMUS_STMT.restA, sysMUS_STMT.restB);
     musStmtLast = { kind: kind, moment: req.moment, pal: n, scale: musStmt.scale, tonic: pal.roots[0], beat: +beat.toFixed(3),
                     len: +t.toFixed(2), notes: midis.slice(), t0: +t0.toFixed(2) };
+  }
+  // =========================================================================
+  // THE MOTIFS (ROADMAP-SCORE, M4). See sysMUS_MOTIF.
+  // =========================================================================
+  const musMotifN = { traveller: 0, home: 0, companion: 0 };
+  const musMotifEv = { travSeen: 0, travMet: 0, shelfGrew: 0, compTake: 0, compClimb: 0, compHome: 0, absence: 0, sydneyOpen: 0 };
+  const musMotifAt = { traveller: -1e9, home: -1e9, companion: -1e9 };
+  let musMotifDropped = 0, musMotifCut = 0;
+  /** Fire one by name, `delay` seconds from now. Returns true if scheduled. */
+  function musMotif(name, delay) {
+    const m = sysMUS_MOTIF[name];
+    if (!m) return false;
+    if (game.state && game.state.noMotif) { musMotifCut++; return false; }
+    if (!ac || !musVol || ac.state !== 'running' || musMuted) return false;
+    if (!musCurChord || !musCurChord.length) return false;
+    if (musStmt || musSleep > 0.5) { musMotifDropped++; return false; }
+    const now = ac.currentTime;
+    if (now - musMotifAt[name] < sysMUS_MOTIF_GAP) { musMotifDropped++; return false; }
+    musMotifAt[name] = now;
+    const when = musSnap(now + 0.04 + (delay > 0 ? delay : 0));
+    const base = musThemeBase(m.oct);
+    let t = 0;
+    for (let i = 0; i < m.deg.length; i++) {
+      const gap = m.dur[i] * m.beat;
+      const midi = musFold(base + musDegOff(m.deg[i]), sysMUS_LIFT_LO, sysMUS_LIFT_HI);
+      const vel = m.inst === 'swell' ? sysMUS_SWELL_VEL * m.vel : 0.115 * m.vel;
+      musLiftNote(m.inst, when + t, midi, (i % 2 ? -m.pan : m.pan), musVel(vel), gap);
+      t += gap;
+    }
+    musMotifN[name]++;
+    return true;
+  }
+  /**
+   * A SWELL ON THE PAD'S OWN BANK (M4): two detuned oscillators in the pad's
+   * own spectrum, into the pad's filter — so it has the pad's cut, bus,
+   * sidechain and width, and reads as the pad rising through a note rather
+   * than a voice playing one. Rises over the first third of the note and
+   * falls away over half a second; nothing here touches musPad.gain.
+   */
+  function musPadSwell(when, midi, vel, gap) {
+    if (!musFilt) return;
+    const hz = sysMidiHz(midi);
+    const dur = Math.max(0.3, gap || 0.6);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0006, vel), when + dur * 0.35);
+    g.gain.setValueAtTime(Math.max(0.0006, vel), when + dur * 0.8);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur + 0.5);
+    const types = ['sawtooth', 'triangle'];
+    const det = [-6, 6];
+    for (let k = 0; k < 2; k++) {
+      const o = ac.createOscillator();
+      o.type = types[k]; o.frequency.value = hz; o.detune.value = det[k];
+      const og = ac.createGain(); og.gain.value = k === 0 ? 0.6 : 1;
+      o.connect(og); og.connect(g);
+      o.start(when); o.stop(when + dur + 0.6);
+    }
+    g.connect(musFilt);
   }
   /** Seconds from a statement's start to note `i` (or its end, at i = length). */
   function musStmtNoteT(notes, i, beat) {
@@ -19004,7 +19095,7 @@ export function createSystems(game) {
         musLiftNote('ocarina', when, e.midi, 0, musVel(e.vel), e.gap);
       } else if (e.kind === 'cm') {
         musLiftNote(e.inst, when, e.midi, e.pan, musVel(e.vel), e.gap);
-        musStmtCmN++;
+        if (!e.home) musStmtCmN++;
       }
     }
     if (s.i >= s.ev.length && !s.handed && now >= s.end - 1.0) musStmtEnd(false);
@@ -30614,6 +30705,14 @@ export function createSystems(game) {
     nbTravArm = '';
     todoRefresh();
   });
+  // ---- THE MOTIFS, AT THEIR MOMENTS (ROADMAP-SCORE, M4) --------------------
+  // The events already count these; the figures ride them. The traveller's
+  // on the glimpse's walk-off (npc:travSeen) and the four cameos' greeting
+  // (npc:travMet — counted on distance since L6, F4); home's on the shelf
+  // growing. The companion's three sites are in the companion block itself.
+  game.events.on('npc:travSeen', function () { musMotifEv.travSeen++; musMotif('traveller', 0.3); });
+  game.events.on('npc:travMet', function () { musMotifEv.travMet++; musMotif('traveller', 0.5); });
+  game.events.on('shelf:grew', function () { musMotifEv.shelfGrew++; musMotif('home', 0.2); });
   /**
    * THE PAGE. Rebuilt on every open, like the repertoire and for the same
    * reason. A chapter is on it once it has been stood in (blank) or left
@@ -36168,6 +36267,10 @@ export function createSystems(game) {
       const awayMs = jrTotalMs() - leftAt;
       if (tier >= 2 && awayMs >= sysPAL_AWAY_MS && typeof game.palAwayArm === 'function') {
         try { game.palAwayArm(chapterDef(toN).biome, awayMs); } catch (e) { /* an older npc.js has no regulars */ }
+        // ...and the score notices too (ROADMAP-SCORE, M4): the arrival's
+        // statement is A in the parallel minor. Read where the arrival
+        // phrase resolves; cleared there.
+        musAbsenceArm = true; musMotifEv.absence++;
       }
     }
     if (tier >= sysPAL_KEPT_TIER) {
@@ -42270,6 +42373,12 @@ export function createSystems(game) {
                               in: +(musStmtReq.at - (ac ? ac.currentTime : 0)).toFixed(2) } : null,
       last: musStmtLast,
       cmN: musStmtCmN, ocaN: musOcaN,
+      // THE MOTIFS (M4): by name, and by the event that fired them
+      motifs: { traveller: musMotifN.traveller, home: musMotifN.home, companion: musMotifN.companion },
+      motifEv: { travSeen: musMotifEv.travSeen, travMet: musMotifEv.travMet, shelfGrew: musMotifEv.shelfGrew,
+                 compTake: musMotifEv.compTake, compClimb: musMotifEv.compClimb, compHome: musMotifEv.compHome,
+                 absence: musMotifEv.absence, sydneyOpen: musMotifEv.sydneyOpen },
+      motifDropped: musMotifDropped, motifCut: musMotifCut, absenceArm: musAbsenceArm,
       restT: +musStmtRestT.toFixed(1), restGap: +musStmtRestGap.toFixed(0),
       chordAt: +(musChordAt - (ac ? ac.currentTime : 0)).toFixed(2),
       idx: musIdx, pal: musPalN, scale: (musPal && musPal.scale) || 'major', tonic: musPal && musPal.roots ? musPal.roots[0] : null,
@@ -43909,6 +44018,7 @@ export function createSystems(game) {
       compSfx.pitch = compTr.pitch * (0.98 + Math.random() * 0.10);
       sfx(compTr.voice, compSfx);
     }
+    musMotifEv.compClimb++; musMotif('companion', 0.35);   // M4: the climb, a beat after its voice
   }
   /** Put it down and let it go: N3's walk-off, across the frame and a shrink. */
   function compLeave(capy, why) {
@@ -43925,6 +44035,7 @@ export function createSystems(game) {
       // it here, before compClear() (below, once the walk-off finishes)
       // blanks compFrom/compKind for the harness. compHomeStep reads this.
       compWentHome[compKind] = compFrom;
+      musMotifEv.compHome++; musMotif('companion', 0.6);   // M4: the homecoming; its own sound stays, the figure a beat after
       // the drop point IS the named spot, not wherever the animal happened
       // to be standing — so what shrinks and fades over compLEAVE is the
       // actual ledge/colony/doorstep. It then walks the same short distance
@@ -44020,7 +44131,9 @@ export function createSystems(game) {
       }
     }
     if (!best) return;
-    compTake(best.rec.kind, live, best.rec.span);
+    // ...and the companion's figure (ROADMAP-SCORE, M4): do mi sol, on the
+    // pickup, a beat after the seat sound
+    if (compTake(best.rec.kind, live, best.rec.span)) { musMotifEv.compTake++; musMotif('companion', 0.4); }
   });
   game.events.on('biome:enter', function (e) {
     if (!compObj) return;
@@ -44232,6 +44345,7 @@ export function createSystems(game) {
             compState = 'follow'; compMt = 0;
             compAt.x = home.x; compAt.z = home.z; compAt.y = compStandY(home.x, home.z);
             compObj.visible = true;
+            musMotifEv.compTake++; musMotif('companion', 0.2);   // M4: it comes over
           }
           break;
         }
@@ -44803,6 +44917,8 @@ export function createSystems(game) {
      * `inChord` is the honest one: each note against the progression chord
      * actually sounding under it, long notes weighted by their beats.
      */
+    /** Fire a motif by name (M4) — a QA door; the events in src call musMotif. */
+    motif: function (name, delay) { return musMotif(name, delay || 0); },
     /** Ask for a statement (M3) — a QA door; the moments in src call musStatement. */
     statement: function (kind, moment, delay, scale) { return musStatement(kind || 'full', moment || 'rest', delay || 0, scale || null); },
     /** One ocarina note, now (M2) — for W2's bus measurement and nothing in src. */
