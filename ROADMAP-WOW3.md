@@ -676,6 +676,161 @@ a different region from W2's opening/finale code (`sysOpeningPlay`,
 `compHOME`/`compLeave`'s own D7 edit) and from W1's own touches — confirmed
 by reading the diff, not assumed.
 
+### W4 — shipped (21 Sep 2026)
+
+X2 and X3. Files: capybara.js (read-only claim confirmed, no edit needed),
+weather.js (read-only, no edit needed — reality check only), systems.js,
+npc.js.
+
+- **X2.1, footfalls — found already built.** `capySfxOpts.mat = capySurfMat`
+  (capybara.js:8134) is read straight off the SAME call
+  (`capySurfacePitch`/`capySurfMat`) that already decides V1.3's puff and
+  V6's track, and `sfxStep` (systems.js:14375-14378) prefers `opts.mat`
+  outright when it names a key `sysSTEP_NOM` recognises — which every value
+  `capySurfMat` can ever hold does (grass/sand/gravel/stone/timber/snow/ice
+  all present in both tables). No independent pitch-only classification path
+  exists to disagree with it. Verified live in Venice (`qa/wow3-heard.js`,
+  item 1): 8 real steps on stone paving read `step:stone` 8/8 via the new
+  `game.sfxAudit()` counter (see X2.3's own bug for why a counter had to be
+  added at all — `game.sfx` only exists for callers OUTSIDE this file;
+  nothing inside it, including the footfall, was ever observable from a
+  monkey-patch). No src change.
+- **X2.2, the eaves' drip — found already built, a different file than the
+  roadmap guessed.** `sfxDrip` is already in the dispatch table and already
+  wired to weather.js's own `b.drip` bed level (systems.js:16915-16921,
+  `sysWxBedSet`, not weather.js — weather.js only ever computes the level,
+  never calls `sfx`), firing on a jittered per-event timer keyed to the same
+  wetness/`rainT` signal that drives the visual mote (weather.js's
+  `wxStepLine`/`wxDripLeft`). "The one voice that must NOT be continuous" is
+  its own comment, already there. Verified live (`qa/wow3-heard.js`, item
+  2): a forced shower (`weather.set('venice', {rain:{odds:1,peak:0.9,
+  hold:40}})`, the trap-35 pattern) produced 2 real `drip` calls in a 9 s
+  window at bed level 0.23. Not per-mote-synced (two independent schedules,
+  both keyed off the same wetness signal) and not positioned — named as the
+  one honest gap, not chased: it is a general ambient voice shared with the
+  cave's own stalactite drip (bed.drip 0.90, no canopy/strip mechanism at
+  all), and re-homing it to a specific mote's position would need to
+  disentangle two physically different sources that currently, correctly,
+  share one channel. No src change.
+- **X2.3, the shelf — built, and two real bugs found in the process.**
+  `sysShelfStage()` (systems.js) now plays `sfx('chime', ...)` the moment
+  `grew.length` is nonzero — the exact channel every other "you got
+  something" moment in this file already uses. MEASURED, not assumed: a
+  plain call here was silently dropped, twice over, and only visible at all
+  after adding `game.sfxAudit()` (a counter on the dispatcher's OWN internal
+  `sfx()` closure, the same pattern as `capyStepN`/`game.openAudit` —
+  `game.sfx` is published for the other four files to call and every
+  internal call in systems.js, this one included, never goes through it, so
+  a monkey-patch from outside can observe nothing here). Bug 1: this
+  function is also the one `startGame` calls SYNCHRONOUSLY in the same tick
+  as the Begin/Carry-On click for a restore landing straight in Sydney — the
+  single most common way a returning player ever grows the shelf —
+  and `audioUnlock()`'s own `ac.resume()` had not settled at that exact
+  point, so `sfx()`'s `ac.state !== 'running'` gate dropped it outright. Bug
+  2: even deferred past that, the SAME start-of-session tick is loud (16
+  voices started against the D9 ceiling's 12, `sysVOICE_MAX`), and the
+  ordinary per-call ceiling dropped it a second way (`sysVoiceDrop`, not
+  the throttle — `lastPlay['chime']` read `undefined`, never fired before).
+  `setTimeout(..., 80)` clears the first, `force: true` clears the second —
+  exactly the case the ceiling's own comment names ("a once-a-chapter payoff
+  ... dropped silently ... the worst possible failure"). Verified live
+  (`qa/wow3-heard.js`, item 3, and `qa/_w4-shelfchime.js`'s own trace before
+  being folded in): chime count +1 on a fresh restore that grows the shelf
+  by one chapter; 0 under `noVoice2` with the shelf still correctly held at
+  1 (the cut proven separately).
+- **X2.4, the traveller's walk-off — built, genuinely silent before this.**
+  N2's fifteen glimpse figures (npc.js, `npcGlimpseStep`'s `'leave'` state)
+  move by a raw `group.position` increment, not through the shared gait
+  (`rec.speed`/`walkPhase`) every ordinary walking local drives its own
+  footstep off — checked first, per the roadmap's own rule, and confirmed
+  genuinely silent (no `sfx(` call anywhere near `walkPhase`/`stride` in the
+  whole file). Wired one `sfx('step', r, ...)` on a plain ~2.6 Hz cadence
+  through the file's own positioned wrapper (`sfx(n, rec, ...)`, off
+  `rec.group.position`), gated under `noVoice2`. Verified live
+  (`qa/wow3-heard.js`, item 4): a forced `'leave'` state on Venice's own
+  gated cameo produced 8 step calls over a 3.2 s walk-off (~2.6 Hz, exactly
+  the authored cadence).
+- **X2.5, the companion's approach — found already built.** `compClimb`
+  (systems.js, the re-mount — not `compTake`, which the roadmap named but
+  which only assigns state) unconditionally plays `sfx(compTr.voice,
+  compSfx)` whenever a kind climbs on, and `compTRAITS` sets `voice` for all
+  six kinds with no gate that could skip it. X1c's "comes over" beat reuses
+  `compTake` -> `'follow'` and lets the SAME ordinary follow-then-climb code
+  the rest of the file already runs close the distance and mount — which
+  means it already ends on this exact sound. Not re-verified end to end
+  here (W3's own `qa/wow3-x1c-comes-over.js` already proved the beat live
+  for two kinds, pigeon and heron, "picked themselves back up as a follower
+  unprompted"); this pass checked the one fact that makes the reuse sound
+  as well as move, by grep, not by re-running the whole beat. No src change.
+- **X3.1, Sydney's arrival ease — measured, found already resolved, not
+  built.** Two independent live masked hide/diffs of the shells mesh itself
+  (hide it, render, show it, render, count the pixels that return) against
+  BOTH camera poses that are actually on screen during a fresh file's first
+  Sydney arrival — the composed arrival shot itself (dist `sysCAM_DEF`,
+  pitch `sysARRIVE_PITCH`, raise `sysARRIVE_RAISE`) and N4.1's own nap/bag
+  shot that takes over 700 ms later (dist 8.6, pitch 0.20, raise 0.7) — read
+  0-6% occlusion by the fig canopies at the authored heading in both, and a
+  sweep from -0.3 to +0.3 rad around each found no small offset with a
+  reliable, repeatable win (`qa/wow3-lens-sydney-check.js`; direct screenshot
+  read at delta 0 and +0.1 rad, `qa/w4-syd-arrive-raw.png`/`-eased.png`,
+  confirmed by eye: the shells stand clear across the whole frame width in
+  both). A -0.3 rad offset IS badly occluded (up to 68% at the wider
+  resting-zoom pose a returning player can reach by scrolling out) but that
+  is not what the roadmap named. A.2's own "still behind the fig crowns"
+  finding does not reproduce at the current geometry/camera composition —
+  most likely resolved by v32's own pitch/raise lift, which landed after
+  A2's last assessment, not by anything in this wave. Named honestly rather
+  than building an ease with no measured benefit: `game.state.noLens2` is
+  declared and reserved for X3.2 only. No src change for this half of X3.
+- **X3.2, a glance at a far mover — built, generically, once.** New block in
+  the camera step (systems.js, after `mounted`/`sailing`/`rideYaw` are all
+  resolved, so it can never fight a rig that owns the lens outright): while
+  idle (`camIdleT > 2.0 s`, the SAME clock the rig's own tidy-up already
+  keeps, just a higher threshold — no second timer), grounded, hand off the
+  camera and no other shot running, reads `game.far.audit().mover` (far.js's
+  own published per-chapter handle — READ-ONLY, far.js untouched), projects
+  it to clip space, and on the frame it enters frame (`|x|,|y| < 0.82`)
+  calls `game.frameShot({yaw: bearing, hold: 4})` once per crossing (a
+  latch, `sysFarGlanced`, cleared the instant the mover leaves frame or any
+  gating condition drops). Reuses `game.frameShot` entirely for the ease
+  in/hold/ease-out and the abort-on-input — no new easing code, the same
+  channel T's tutorial beats and every marquee already share. Parks at
+  `perfRung >= 1`. Verified live end to end on Manly's ferry
+  (`qa/wow3-lens.js`): forced idle facing the ferry's path, it fired within
+  the first polled second with a bearing matching `atan2(dx,dz)+PI` off the
+  mover's real live position (6.192 rad measured against ~6.183 computed);
+  a real `KeyZ` hold (Playwright's trusted key dispatch, not a synthetic
+  event) aborted it — `glanced` false and `shotW` visibly decaying
+  (0.636 -> 0.192 -> 0.074 over two ~300 ms reads) the instant the key
+  landed. `game.state.noLens2` cuts it.
+- **`game.sfxAudit()` and `game.farGlanceAudit()`** (systems.js): two small
+  harness-only counters, the same convention as `capyStepN`/`game.openAudit`
+  /`game.musAudit`/`game.framing` — nothing in src reads either. Needed
+  because `game.sfx` is an external-callers-only door; every one of this
+  file's OWN calls (footfalls, the shelf, ambience) is otherwise invisible
+  to any test outside it, which is exactly how X2.3's two bugs went
+  unnoticed until this pass looked.
+- **Flags.** One for X2, one for X3, as the roadmap allowed:
+  `game.state.noVoice2` (the shelf chime + the glimpse footstep — the
+  footfall, drip and companion needed no new trigger to cut) and
+  `game.state.noLens2` (the far-mover glance only — X3.1 built nothing to
+  cut). Both proven live: `noVoice2` true reads chime count 0 with the
+  shelf itself still correctly held at 1; the far-mover glance's own abort
+  is the closest live proof `noLens2` gets a dedicated one (not re-run
+  separately — the two are one boolean check each, not worth a second
+  soak).
+- **Budget.** No new per-frame draw term. The far-mover glance is one
+  `Vector3.project()` and a handful of comparisons per frame while idle,
+  parked at rung 1; the shelf chime and the glimpse footstep are one-line
+  triggers on existing beats, not loops.
+
+**Miss, named plainly:** X3.1 shipped nothing — the item it names is
+measured not to exist at the current geometry, which W5 should read as
+"closed, no code," not "not attempted." X2.2's drip stays a general ambient
+voice rather than per-mote-positioned, named and not chased for the reason
+above. X2.5 relies on W3's own live proof plus a static read rather than a
+fresh end-to-end soak of its own.
+
 ## Order and ownership
 
 Four waves, matching the file-exclusivity discipline that held clean for
