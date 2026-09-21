@@ -18955,8 +18955,13 @@ export function createSystems(game) {
     if (!ac) return false;
     if (musStmt) { musStmtDropped++; return false; }
     if (musStmtReq) {
-      // the chapter closing outranks the marquee that closed it
-      if (kind === 'full' && musStmtReq.kind === 'tag') musStmtReq = null;
+      // A PENDING request yields to a bigger one and drops a smaller or
+      // equal one: the chapter closing outranks the marquee that closed
+      // it, and an arrival outranks the wake edge a crossing fires (the
+      // harness's animal naps at ten seconds idle and every hud.cross
+      // woke it — Pasto's arrival read as a 'wake' until this).
+      const rank = { full: 3, A: 2, wake: 1, tag: 1 };
+      if ((rank[kind] || 0) > (rank[musStmtReq.kind] || 0)) musStmtReq = null;
       else { musStmtDropped++; return false; }
     }
     musStmtReq = { kind: kind, moment: moment || 'rest', at: ac.currentTime + (delay > 0 ? delay : 0), scale: scale || null };
@@ -22449,11 +22454,19 @@ export function createSystems(game) {
   // it tries again — a transient bad frame recovers by itself, and a genuinely
   // broken palette costs a quiet chapter rather than a jammed browser.
   let musThrows = 0, musHoldTo = 0;
+  const musTickMs = { last: 0, sum: 0, n: 0, max: 0 };   // see musTick; reset by hud.tickMsReset
   function musTick() {
     const nowMs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
     if (nowMs < musHoldTo) return;
     try {
+      // THE SCHEDULER'S OWN BILL (ROADMAP-SCORE, M5's cost line): the tick
+      // measured, every tick, for musThemeAudit().tickMs — two clock reads
+      // every 240 ms. qa/score-frametime-w1.js reads it live against cut.
+      const tA = (typeof performance !== 'undefined') ? performance.now() : 0;
       musTickBody();
+      const tB = (typeof performance !== 'undefined') ? performance.now() : 0;
+      musTickMs.last = tB - tA; musTickMs.sum += tB - tA; musTickMs.n++;
+      if (tB - tA > musTickMs.max) musTickMs.max = tB - tA;
       musThrows = 0;
     } catch (e) {
       if (++musThrows >= 3) { musHoldTo = nowMs + 2000; musThrows = 0; }
@@ -42536,6 +42549,9 @@ export function createSystems(game) {
       counterN: musCounterN, walkN: musWalkN, pulseN: musPulseN, ostN: musOstN,
       coda: { n: sysFinCodaN, tune: sysFinCodaTune.slice(), pitches: sysFinCodaPitch.slice() },
       restT: +musStmtRestT.toFixed(1), restGap: +musStmtRestGap.toFixed(0),
+      // the scheduler's bill per tick, ms (see musTick)
+      tickMs: { last: +musTickMs.last.toFixed(3), mean: musTickMs.n ? +(musTickMs.sum / musTickMs.n).toFixed(3) : 0,
+                max: +musTickMs.max.toFixed(3), n: musTickMs.n },
       chordAt: +(musChordAt - (ac ? ac.currentTime : 0)).toFixed(2),
       idx: musIdx, pal: musPalN, scale: (musPal && musPal.scale) || 'major', tonic: musPal && musPal.roots ? musPal.roots[0] : null,
       prog: +musProg.toFixed(3),
@@ -45073,6 +45089,8 @@ export function createSystems(game) {
      * `inChord` is the honest one: each note against the progression chord
      * actually sounding under it, long notes weighted by their beats.
      */
+    /** Zero the scheduler's per-tick bill (musThemeAudit().tickMs). */
+    tickMsReset: function () { musTickMs.last = 0; musTickMs.sum = 0; musTickMs.n = 0; musTickMs.max = 0; },
     /** Fire a motif by name (M4) — a QA door; the events in src call musMotif. */
     motif: function (name, delay) { return musMotif(name, delay || 0); },
     /** Ask for a statement (M3) — a QA door; the moments in src call musStatement. */
