@@ -2026,6 +2026,21 @@ let capyNap    = 0;                 // 0..1 asleep. See THE NAP.
 // rings from spawning. The same shape as the B15 name clash that broke a
 // feature eleven hundred lines away.
 let capyNapWake = 0;                // s since somebody last pressed something
+// ROADMAP-WOW3 D8: THE OPENING's own forced nap. -1 is "off" (the natural
+// state machine above runs exactly as it always has); 0..1 holds `capyNap`
+// (and `capyLoaf`, which the sitting pose itself is gated on) at that value
+// every frame regardless of `capyRestT`. Used ONLY by systems.js's opening
+// sequence — nowhere else sets it — so the animal can be shown asleep on
+// the very first frame instead of waiting the real capyNAP_T (26 s) out.
+// It overrides the OUTPUT, never the inputs: capyRestT/capyBusy keep
+// counting underneath exactly as they do any other frame, so releasing the
+// force (capyForceNap(-1)) just hands the pose back to the ordinary damp —
+// which IS the nap's own wake-up beat, and needed no new animation.
+let capyNapForce = -1;
+/** ROADMAP-WOW3 D8. `v` 0..1 holds the nap pose; anything else releases it. */
+export function capyForceNap(v) {
+  capyNapForce = (typeof v === 'number' && v === v) ? clamp(v, 0, 1) : -1;
+}
 // THE PURR (F4). Fires while the animal is actually sat, not while it is on
 // its way down: 0.6 is past the point the pose has committed, so the sound and
 // the picture agree. See sfxPurr in systems.js.
@@ -5517,6 +5532,7 @@ export function createCapybara(game) {
     capy.diving = false; capy.swimming = false; capy.depth = 0; capy.diveTime = 0;
     capyLoaf = 0; capy.loaf = 0;
     capyNap = 0; capy.nap = 0; capyNapWake = 0;      // ...and THE NAP (N4)
+    capyNapForce = -1;                               // ...and D8's forced hold, if it was ever on
     capyLaunchT = 0;
     capyPlatVX = 0; capyPlatVZ = 0; capyPlatT = 0;
     capyRideBody = null; capyRideT = 0; capy.rideBody = null;
@@ -5875,6 +5891,7 @@ export function createCapybara(game) {
     capy.stamina = capyStam;
     capyLoaf = 0; capy.loaf = 0; capy.loafAsk = 0;   // ...and the loaf. See THE LOAF.
     capyNap = 0; capy.nap = 0; capyNapWake = 0;      // ...and THE NAP (N4)
+    capyNapForce = -1;                               // ...and D8's forced hold, if it was ever on
     capyShakePend = 0; capyShakeP = -1;
     capyWhiffT = 0; capyWhiffPend = false;
     // ...and the L6 clocks: an armed hop, a held landing, a lunge or a breath
@@ -7800,6 +7817,14 @@ export function createCapybara(game) {
     capyNap = damp(capyNap, napWant, napWant > capyNap ? capyNAP_LAM : capyNAP_LAM * 9, dt);
     if (capyNap < 0.0015 && napWant === 0) capyNap = 0;
     capy.nap = capyNap;
+    // ROADMAP-WOW3 D8: THE OPENING's forced nap, held over the natural
+    // value computed just above. `capyLoaf` too — the sitting pose the nap
+    // pose builds on is gated on `capyLoaf`, and a napping animal standing
+    // up is not asleep. See capyForceNap's own comment, above the state.
+    if (capyNapForce >= 0) {
+      capyLoaf = Math.max(capyLoaf, capyNapForce); capy.loaf = capyLoaf;
+      capyNap = capyNapForce; capy.nap = capyNap;
+    }
     // ...AND IT YAWNS ON THE WAY IN (L6, E2 / audio #7). The one edge, once:
     // the wheek's contour turned over and slowed three times, which is what a
     // yawn is. On the want rather than the blend, so it is the first thing the

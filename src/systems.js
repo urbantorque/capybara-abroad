@@ -11,7 +11,7 @@ import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount,
          exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt, lensFadeUniform, lensCapTick, reflectSet, dappleSet,
          rainbowTick, puddleSet } from './shared.js';
 // THE CHARACTER KEY (L7, E4)
-import { capyKeyTick } from './capybara.js';
+import { capyKeyTick, capyForceNap } from './capybara.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -36985,25 +36985,65 @@ export function createSystems(game) {
              wheeks: tutWheekN, grabs: tutGrabN, yuzu: tutYuzuN, tabs: tutTabN, bumps: tutBumpN };
   };
 
-  // ---- THE OPENING, TEN SECONDS (ROADMAP-WOW2, N4.1) ---------------------
+  // ---- THE OPENING'S BAG (ROADMAP-WOW3 D8) --------------------------------
+  // A rucksack, not a suitcase — the traveller walks everywhere in this
+  // game, nineteen chapters of it. Two boxes read as one at the opening's
+  // own establishing distance (frameShot's dist 8.6 below): the body, and
+  // a flap sitting proud of it the way a real pack's does. PALETTE only —
+  // capyPouch is already "worn leather" (the peel pouch's own colour) and
+  // khaki is khaki; nothing new. Built once, lazily, on first use — the
+  // opening plays at most once a session, and most sessions never call this.
+  let sysBagGroup = null;
+  function sysBagBuild() {
+    if (sysBagGroup) return sysBagGroup;
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, 0.20), mat(PALETTE.capyPouch));
+    body.position.set(0, 0.21, 0);
+    body.castShadow = true;
+    g.add(body);
+    const flap = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.13, 0.23), mat(PALETTE.khaki));
+    flap.position.set(0, 0.40, -0.02);
+    flap.rotation.x = -0.12;
+    flap.castShadow = true;
+    g.add(flap);
+    g.visible = false;
+    scene.add(g);
+    registerShadowTarget(g);
+    sysBagGroup = g;
+    return g;
+  }
+
+  // ---- THE OPENING, TEN SECONDS (ROADMAP-WOW2 N4.1, ROADMAP-WOW3 D8) -----
   // Before "be a menace." — startGame's own toast, below — on a fresh file
   // only. `sysOpenArm` is set alongside `tutArm`, above, on the identical
   // gate minus tutArm's own `tutEver`/`noTut`: never on a restore.
   //
-  // WHAT THIS IS NOT: the roadmap's own first choice — the animal asleep,
-  // the traveller's bag beside it, picked up and carried off while the
-  // animal wakes — needs a pose this wave cannot reach without editing
-  // capybara.js (owned by no wave here) and a scripted NPC departure this
-  // wave judged too large a new surface to add safely to npc.js's existing
-  // AI machinery with the time this pass had left. WHAT IT IS: the
-  // established first shot, held — `frameShot` is the same request every
-  // marquee and the exit board already make, already cancels itself on the
-  // player's own camera input (see boardOpen's note, "touching the camera
-  // kills it"), and this pass adds only a second way out (any key or
-  // click) and the delay on the toast that makes it read as a beat rather
-  // than a stall. It is the honest version of "the whole why, shown" this
-  // wave could build in the time it had, not the one the roadmap asked
-  // for; written down rather than shipped silently short.
+  // N4.1 SHIPPED A HELD SHOT ONLY, for two stated reasons: the nap pose
+  // "needs... editing capybara.js (owned by no wave here)", and the
+  // traveller's own walk-off needs "a scripted NPC departure ... too large
+  // a new surface to add safely to npc.js". D8 owns capybara.js (a minimal
+  // hook only) and re-examined both:
+  //   THE NAP — BUILT. `capybara.js:capyForceNap(v)` holds `capyNap` (and
+  //   `capyLoaf`, which the sitting pose is gated on) at `v` regardless of
+  //   the real capyRestT clock, which pre-start never runs anyway (see that
+  //   file's own note by `capyBusy`: "NEITHER CLOCK MAY RUN BEFORE THE
+  //   PLAYER HAS THE ANIMAL" — and by the time this function runs,
+  //   `game.state.started` is ALREADY true, set at the top of `startGame`,
+  //   so there was never a pre-start rendering question to answer). It
+  //   overrides the OUTPUT only, so releasing it hands the pose back to the
+  //   ordinary damp — the nap's own wake-up beat, built already, reused
+  //   rather than re-animated.
+  //   THE BAG — BUILT (sysBagBuild, above): a static prop beside the
+  //   animal, no AI, no npc.js.
+  //   THE TRAVELLER'S OWN WALK-OFF — STILL NOT BUILT. This is the one part
+  //   of the original ask that is genuinely blocked the same way it was
+  //   before: the visible figure is npc.js's (`addTraveller`, the N2
+  //   glimpse pattern), built and animated entirely inside that file, and
+  //   npc.js is this wave's explicit do-not-touch — other work landed
+  //   there this same wave and is not this agent's to disturb. The bag
+  //   itself is hidden the instant the beat ends (skip or timeout) instead
+  //   of being carried off in view — standing in for the traveller's own
+  //   exit without showing it, which is honest about what it is not.
   let sysOpenArm = false, sysOpenT = -1;
   const sysOPEN_HOLD = 10.0;
   function sysOpeningPlay(after) {
@@ -37011,11 +37051,32 @@ export function createSystems(game) {
     try {
       game.frameShot({ yaw: 0.35, dist: 8.6, pitch: 0.20, raise: 0.7, hold: sysOPEN_HOLD });
     } catch (e) { /* the beat is not worth the exception */ }
+    // ---- ASLEEP, BAG BESIDE IT --------------------------------------------
+    try {
+      capyForceNap(1);
+      const cp = game.capy && game.capy.position;
+      if (cp) {
+        const yaw = (game.capy.group && game.capy.group.rotation) ? game.capy.group.rotation.y : 0;
+        // beside, not in front of or behind — the same "across, not along"
+        // placement compLeave uses for a companion's own walk-off, so nothing
+        // this pass builds ever sits a prop where the animal is facing.
+        const bx = cp.x + Math.cos(yaw) * 0.62, bz = cp.z - Math.sin(yaw) * 0.62;
+        const by = sysGroundY(bx, bz);
+        const bag = sysBagBuild();
+        bag.position.set(bx, by, bz);
+        bag.rotation.y = yaw + 0.4;
+        bag.visible = true;
+      }
+    } catch (e) { /* the beat is not worth the exception */ }
     let done = false;
     function finish() {
       if (done) return;
       done = true;
       sysOpenT = -1;
+      // ---- AWAKE, BAG GONE — see the note above: this is where the
+      // traveller's own carry-off would read, if this pass could build it.
+      capyForceNap(-1);
+      if (sysBagGroup) sysBagGroup.visible = false;
       window.removeEventListener('keydown', finish);
       window.removeEventListener('pointerdown', finish);
       after();
