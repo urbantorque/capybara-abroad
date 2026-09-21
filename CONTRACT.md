@@ -1,3 +1,33 @@
+## REIMAGINE D4/G — ROOM FOR THE REWARD SHOT (21 Sep 2026)
+
+Signature completion uses a compact earned card rather than the arrival's
+screen-wide title and completed instruction. Desktop places the 28px title
+upper-right. Phones use an 18px right-column caption below the speech reserve;
+when the live encore already names it, the duplicate card yields. The first
+central phone caption intersected the wallet and was rejected. Stored subtitle,
+authored 3.6s timer, camera, slow motion, reward audio and protected speech stay.
+`noEarnedCard` or rung one restores inherited presentation mid-card without
+restarting its timer. One class writer owns the mode; ordinary cards/lines reset
+it. All inherited CSS outside these selectors is byte-identical to the baseline.
+
+Natural desktop/390px concerts retain the encore action, fireworks/glow and
+protected lesson, zero runtime errors. Controlled 1280/390/320px portrait and
+640x390 landscape frames have
+pixel-exact cut/rung/restoration after a compositor-settling capture, with zero
+changed pixels outside the banner mask. All nineteen authored title variants
+fit without paper/wallet overlap. Earned area is 12.8% of inherited at 1280,
+23.8% at 390. The held-timer fixture invokes the actual callback; it is not a
+natural timing test. Detached steady-state writer CPU p95 .000030ms flag /
+.000010ms rung excludes layout, transition-event and GPU work. No save fields.
+
+G adds one natural Quay passage from a fresh chapter arrival: real-key helm,
+cast-off, bridge horn and Manly docking, with no task/body/clock/input-state
+seeding. Boat reaches [111.35,-515.09] at 3.01m/s; the four named actions and
+route memory survive autosave/reload, zero runtime errors. Waypoint knowledge
+is scripted, not novice pacing. The arrival screenshot exposes a remaining
+blank compact-paper strip at the helm, recorded for D5; incident moments can
+also compete with earned shots. These remain open presentation work.
+
 ## REIMAGINE D3 — THE ENCORE STAYS READABLE (21 Sep 2026)
 
 Sydney explicitly opts its post-concert countdown into a display-only

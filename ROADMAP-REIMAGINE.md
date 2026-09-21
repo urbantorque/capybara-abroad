@@ -76,6 +76,14 @@ state. Compare pinned desktop/narrow earned/cut images, long titles, ordinary
 arrival parity and protected lessons. Do not hide or consume protected speech
 to improve a screenshot; resolve any narrow overlap before accepting layout.
 
+D5 follow-up from natural play: after the Manly signature, at-helm compaction
+leaves an empty paper strip instead of the way on. Require actual compact
+content, preserving the player's navigation choice. Separately, an incident
+moment can cover the concert reward shot once its task has completed. Reuse
+the existing bounded moment deferral for active earned presentation; preserve
+protected guidance and eventual delivery. Name and measure any new flag before
+implementation. These are observed clarity issues, not shipped fixes.
+
 ## Seven standards
 
 1. **Identity.** Trouble, wonder and belonging have different rhythms.
@@ -594,3 +602,32 @@ work. A green static suite is necessary and never a claim of perfection.
 - D3 checkpoint: edited-source/instrument syntax, fresh one-file build and
   39 suite checks pass, zero failed. Independent source review found no new
   concrete regression. Historical soak remains stale, not current coverage.
+- G natural Quay: one real-key passage earns helm, cast-off, bridge horn and
+  Manly signature; docking at [111.35,-515.09], 3.01m/s. Fresh chapter arrival,
+  no task/body/clock/input-state seeding. Four named tasks and route memory
+  survive autosave/reload; zero errors. Scripted waypoint knowledge, not a
+  novice pacing claim. Lead inspected Manly capture: the inherited at-helm
+  compact-paper rule leaves a blank strip after its signature completes.
+  Follow up the way-on presentation before treating journey clarity as done.
+- D4 first desktop pinned comparison passes exact cut/rung/restored pixels;
+  earned card area 23,991 versus 186,707 CSS square pixels, 28px title. The
+  first 390px central-caption candidate intersects the wallet and is rejected.
+  An isolated one-pixel narrow comparison mismatch is being diagnosed, not
+  treated as a game regression or silently loosened to a passing threshold.
+- D4 revised phone card uses the right column below the protected-speech
+  reserve. Natural 1280/390px concerts pass with reward and guidance intact;
+  the phone duplicate yields to its named encore readout. Detached steady-state
+  class-writer CPU p95 .000030ms flag/.000010ms rung, excluding layout/GPU.
+  Initial 320px first-paint comparison differed by two pixels at one RGB level;
+  added a compositor-settling capture, retaining zero-tolerance comparison.
+  Fresh 320px live/cut/rung/restore passes, all 19 authored titles fit at 18px,
+  no paper/wallet overlap, zero changed pixels outside the banner mask.
+- D4 final viewport repeats: 1280x760, 390x760 and 640x390 pass the same
+  nineteen-title fit/clearance and exact cut/rung/restored checks, zero runtime
+  errors and zero changes outside the banner mask. Lead inspected 320px and
+  landscape captures too. This validates the earned card, not every layout
+  inside the inherited checklist or every possible simultaneous speech stack.
+- D4/G checkpoint gates: source/instrument syntax, fresh one-file build and
+  40 suite checks pass, zero failed. Independent lifecycle review found no
+  concrete regression; expiry-callback/reuse coverage was added. Historical
+  soak remains stale and is not counted as fresh runtime evidence.

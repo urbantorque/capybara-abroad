@@ -1272,6 +1272,9 @@ function sysEarnedLive(id, ownerBiome, biome, done, sameChapter, line, age, cut,
   return !!(id && ownerBiome && ownerBiome === biome && done && sameChapter && line &&
     Number.isFinite(age) && age >= 0 && age < sysWOW_LIVE_STALE && !cut && (rung | 0) < 1 && !transition);
 }
+function sysEarnedCardLive(requested, cut, rung) {
+  return !!requested && !cut && (rung | 0) < 1;
+}
 const hkROOF_HINT = 30;          // m: above this in Hong Kong you are on the roof (X2)
 // ---- THE MIX, MEASURED (S2). See qa/s1-spectrum.js and qa/s1-sfx.js. ------
 // ---- ...AND THE LID, LIFTED (L7, E1 / audio #4) -----------------------------
@@ -10940,6 +10943,20 @@ function sysBuildCSS() {
   'max-width:min(84vw,520px);line-height:1.5;text-wrap:balance;}',
 '.capyui-placerule{height:2px;width:min(38vw,190px);border-radius:' + rSm + ';background:' + rule + ';',
   'transform:rotate(.5deg);margin:2px 0;}',
+/* D4: the reward belongs beside the shot, not across its sails. Arrivals
+   keep the full-width title. The instruction remains stored for the cut. */
+'.capyui-place.earned-card{left:auto;right:24px;top:22px;width:max-content;max-width:min(44vw,560px);',
+  'padding:12px 16px;gap:0;background:' + sysRgba(PALETTE.sail, 0.86) + ';border-radius:' + rSm + ';}',
+'.capyui-place.earned-card h2{font-size:clamp(18px,2.2vw,28px);letter-spacing:.025em;',
+  'line-height:1.18;transform:none;text-wrap:balance;overflow-wrap:anywhere;}',
+'.capyui-place.earned-card .capyui-placesub,.capyui-place.earned-card .capyui-placerule{display:none;}',
+/* A phone's guide and wallet own the left column; lessons start at top right.
+   Leave 152 px below that top edge before the reward, with a gutter even at
+   320 px. An encore already names itself on the guide and needs no copy. */
+'@media(max-width:600px){.capyui-place.earned-card{left:auto;right:12px;top:160px;',
+  'width:calc(50vw - 26px);max-width:none;padding:10px 12px;}',
+  '.capyui-place.earned-card h2{font-size:18px;}',
+  '.capyui-place.earned-card.earned-duplicate{visibility:hidden;}}',
 
 /* ---------- flight readout ---------- */
 /* Same paper-and-ink idiom as the to-do list, no new fonts, no gradients. Lives on
@@ -29370,6 +29387,18 @@ export function createSystems(game) {
   // act curtain so a chapter whose act kick and whose marquee are the same word
   // does not say it twice — see the note at that call site.
   let showPlaceLast = '';
+  let placeEarned = false, placeEarnedOn = false, placeEarnedDuplicate = false, placeEarnedTitle = '';
+  // One writer, also called from the HUD tick: a flag changed while the card
+  // is up restores its inherited size and subtitle without restarting time.
+  function placeEarnedTick() {
+    const on = sysEarnedCardLive(placeEarned, game.state.noEarnedCard, game.state.perfRung);
+    const duplicate = !!(on && wowEarnedOn && placeEarnedTitle === marqNameEl.textContent);
+    if (on !== placeEarnedOn) { placeEarnedOn = on; placeEl.classList.toggle('earned-card', on); }
+    if (duplicate !== placeEarnedDuplicate) {
+      placeEarnedDuplicate = duplicate;
+      placeEl.classList.toggle('earned-duplicate', duplicate);
+    }
+  }
   /**
    * THE CLUE, PLUS WHAT A GOOD ONE IS (P3).
    *
@@ -29439,9 +29468,12 @@ export function createSystems(game) {
     return base ? base + '\n' + line : line;
   }
 
-  function showPlace(title, sub, news) {
+  function showPlace(title, sub, news, earned) {
     placeH.textContent = title;
     placeSub.textContent = sub;
+    placeEarned = !!earned;
+    placeEarnedTitle = earned ? sysSay(String(title || '')) : '';
+    placeEarnedTick();
     // Cleared on EVERY call, not only when one is passed: this card is reused
     // by four different events and a headline left on it from an arrival
     // would turn up again under the next act break.
@@ -29476,6 +29508,8 @@ export function createSystems(game) {
   function sysPlaceLine(text) {
     if (!text) return false;
     if (showPlaceLast && placeEl.classList.contains('show')) return false;
+    placeEarned = false; placeEarnedTitle = '';
+    placeEarnedTick();
     placeH.textContent = '';
     placeSub.textContent = '';
     placeNews.textContent = '';
@@ -36199,11 +36233,10 @@ export function createSystems(game) {
       // The ring holds 26 scraps, so this is very nearly all of it — which is
       // right: the small ticks should never be able to look like this one.
       if (cp) confettiBurst(cp.x, cp.y + 0.55, cp.z, 24);
-      // The place card, borrowed: the caption goes in the big slot and the task
-      // underneath it, which is the composition arrivals already use and the one
-      // the type is sized for. The task text is a sentence and would be 60 px of
-      // wrapped headline in the other order.
-      showPlace(wow, r.def ? r.def.text : id);
+      // The earned mode keeps this title beside the shot. Store the completed
+      // instruction underneath for the inherited cut; the live card hides it.
+      // Arrival callers keep their full-width composition and reading time.
+      showPlace(wow, r.def ? r.def.text : id, null, true);
       // EXPLICIT (D4). 0.14 is m = 0.41 against a floor of 0.55, so the marquee
       // the whole chapter is built round has never once stopped the world.
       punch(0.14, sysFREEZE_WOW);
@@ -50243,6 +50276,7 @@ export function createSystems(game) {
       }
     }
     musLiveSet(wl ? (0.45 + 0.55 * (wowLiveT < 0 ? 0.5 : wowLiveT)) * sysWOW_LIVE_BED : 0);
+    placeEarnedTick();
     // ...and the ghost, on the same wall clock the line's watchdog runs on. A
     // ghost stepped by the SCALED dt would slow down inside a hitstop and be
     // racing a run that never happened. See THE GHOST.
