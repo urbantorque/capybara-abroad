@@ -46,6 +46,8 @@ const ASSERTS = [
   ['qa/reimagine-kyoto.mjs', 'Gion frontage rhythm with unchanged roofs, ground and colliders', ['--static']],
   ['qa/reimagine-chute-contour.mjs', 'broken chute crests with unchanged flow, topology and collision'],
   ['qa/reimagine-manta-contour.mjs', 'connected manta wings, inherited rig and exact contour fallbacks'],
+  ['qa/reimagine-manta-anatomy.mjs', 'welded manta disc, eyes, ride-seat clearance and exact cached fallbacks'],
+  ['qa/reimagine-hanoi-stall.mjs', 'pho pavement clearance with unchanged bowl, cook and Cub authoring'],
   ['qa/strip-test.mjs',   'the comment stripper: 16 cases plus every source file re-parsed'],
   ['qa/p6-static.cjs',    'CHAPTERS and TASKS: acts, notes, arrivals, the souvenir exception'],
   ['qa/xmodule.mjs',      'cross-module contract: imports, exports, name collisions'],

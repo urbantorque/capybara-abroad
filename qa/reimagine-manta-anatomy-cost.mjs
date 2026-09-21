@@ -1,4 +1,4 @@
-// E8: actual stable switch CPU plus isolated two-manta GPU comparison.
+// E9: actual stable switch CPU plus E8/E9 isolated geometry-only GPU comparison.
 // No production lighting, grain, shadow, underwater, post or full-frame claim.
 import assert from 'node:assert/strict';
 import { openHarness } from './reimagine-harness.mjs';
@@ -31,26 +31,41 @@ try {
         if (audit.rows.length !== 6 || !audit.rows.every(r => r.exact)) throw new Error('Six exact manta slots required');
         return { audit, map };
       };
-      const mode = (flag, rung = 0, round = false) => {
+      const mode = (anatomyCut, flag = false, rung = 0, round = false) => {
         g.state.noMantaContour = flag; g.state.perfRung = rung; g.state.noRound = round;
-        g.state.noMantaAnatomy = true; // keep this E8 instrument on its accepted geometry
+        g.state.noMantaAnatomy = anatomyCut;
         raw(0, false); return collect();
       };
       const before = mode(true), ids = before.audit.rows.map(r => r.uuid);
       const bases = ids.map(id => before.map.get(id).geometry), baseMaterials = ids.map(id => before.map.get(id).material);
       const after = mode(false), lives = ids.map(id => after.map.get(id).geometry);
-      if (after.audit.anatomy || after.audit.rows.reduce((n, r) => n + r.actualTriangles, 0) !== 1072)
-        throw new Error('E8 fixture must cut E9 anatomy and retain1072 triangles');
       const smooth = after.map.get(ids[0]).material;
-      if (new Set(bases).size !== 3 || new Set(lives).size !== 3 || bases.some((b, i) => b === lives[i]))
-        throw new Error('Expected three distinct inherited/live geometry pairs shared by two mantas');
-      if (smooth.flatShading || baseMaterials.some(m => !m.flatShading || m === smooth))
-        throw new Error('Private smooth material must not mutate inherited material');
+      if (before.audit.anatomy || !after.audit.anatomy ||
+          before.audit.rows.reduce((n, r) => n + r.actualTriangles, 0) !== 1072 ||
+          after.audit.rows.reduce((n, r) => n + r.actualTriangles, 0) !== 1248)
+        throw new Error('Actual E8/E9 modes and1072/1248 triangles required');
+      if (new Set(bases).size !== 3 || new Set(lives).size !== 3 ||
+          bases.filter((b, i) => b !== lives[i]).length !== 2)
+        throw new Error('Only the two shared body slots should change; four tip slots stay E8');
+      if (smooth.flatShading || baseMaterials.some(m => m !== smooth) ||
+          ids.some(id => after.map.get(id).material !== smooth))
+        throw new Error('E8 and E9 must use the exact same private smooth material');
+      const legacy = mode(true, true), originals = ids.map(id => legacy.map.get(id).geometry);
+      const originalMaterials = ids.map(id => legacy.map.get(id).material);
+      if (legacy.audit.rows.reduce((n, r) => n + r.actualTriangles, 0) !== 1344)
+        throw new Error('Original noContour fallback must retain1344 triangles');
+      if (originalMaterials.some(m => !m.flatShading || m === smooth))
+        throw new Error('Original flat material must remain separate and unchanged');
       const parity = [];
-      for (const [label, flag, rung, round] of [['flag', true, 0, false], ['rung', false, 1, false], ['noRound', false, 0, true]]) {
-        const state = mode(flag, rung, round), live = label === 'noRound';
-        parity.push({ label, exactGeometry: ids.every((id, i) => state.map.get(id).geometry === (live ? lives[i] : bases[i])),
-          exactMaterial: ids.every((id, i) => state.map.get(id).material === baseMaterials[i]) });
+      for (const [label, anatomyCut, flag, rung, round] of [
+        ['anatomyCut', true, false, 0, false], ['noContour', false, true, 0, false],
+        ['rung', false, false, 1, false], ['noRound', false, false, 0, true]
+      ]) {
+        const state = mode(anatomyCut, flag, rung, round);
+        const expected = label === 'anatomyCut' ? bases : label === 'noRound' ? lives : originals;
+        parity.push({ label, exactGeometry: ids.every((id, i) => state.map.get(id).geometry === expected[i]),
+          exactMaterial: ids.every((id, i) => state.map.get(id).material ===
+            (label === 'anatomyCut' ? smooth : originalMaterials[i])) });
       }
       mode(false); g.scene.updateMatrixWorld(true);
       const transforms = ids.map(id => before.map.get(id).matrixWorld.clone());
@@ -58,17 +73,18 @@ try {
       // Dummy slots retain actual cached references; no timed call writes to
       // production meshes. Observable getter counts prevent an elided gate.
       const fixtures = [];
-      for (const name of ['live', 'flag', 'rung', 'noRound']) {
+      for (const name of ['anatomyCut', 'live', 'rung', 'noContour']) {
         let reads = 0, writes = 0;
         const game = { state: {
-          noMantaAnatomy: true,
-          get noMantaContour() { reads++; return name === 'flag'; },
+          get noMantaAnatomy() { return name === 'anatomyCut'; },
+          get noMantaContour() { reads++; return name === 'noContour'; },
           get perfRung() { return name === 'rung' ? 1 : 0; },
-          get noRound() { return name === 'noRound'; }
+          noRound: false
         } };
         const rows = ids.map((id, i) => {
-          let geometry = bases[i], material = baseMaterials[i];
-          return { base: bases[i], live: lives[i], material: baseMaterials[i], mesh: {
+          let geometry = originals[i], material = originalMaterials[i];
+          return { base: originals[i], live: bases[i], anatomy: after.audit.rows[i].anatomyUuid ? lives[i] : null,
+            material: originalMaterials[i], mesh: {
             get geometry() { return geometry; }, set geometry(value) { writes++; geometry = value; },
             get material() { return material; }, set material(value) { writes++; material = value; }
           } };
@@ -78,8 +94,9 @@ try {
         for (let i = 0; i < 10000; i++) step(game);
         reads = 0; writes = 0;
         fixtures.push({ name, times: [], step: () => step(game), result: () => ({ mode: name, reads, writes,
-          timedCalls: 1000000, exact: rows.every(r => r.mesh.geometry === (name === 'live' || name === 'noRound' ? r.live : r.base) &&
-            r.mesh.material === (name === 'live' ? smooth : r.material)) }) });
+          timedCalls: 1000000, exact: rows.every(r => r.mesh.geometry ===
+            (name === 'anatomyCut' ? r.live : name === 'live' ? (r.anatomy || r.live) : r.base) &&
+            r.mesh.material === (name === 'live' || name === 'anatomyCut' ? smooth : r.material)) }) });
       }
       for (let batch = 0; batch < 100; batch++) for (let j = 0; j < fixtures.length; j++) {
         const f = fixtures[(batch + j) % fixtures.length], at = performance.now();
@@ -94,9 +111,9 @@ try {
         return cloned.get(geometry);
       };
       const geometries = { cut: bases.map(clone), live: lives.map(clone) };
-      const cutMat = new T.MeshLambertMaterial({ color: shared.PALETTE.sail, vertexColors: true, flatShading: true });
-      const liveMat = new T.MeshLambertMaterial({ color: shared.PALETTE.sail, vertexColors: true, flatShading: false });
-      materials.push(cutMat, liveMat);
+      const cutMat = new T.MeshLambertMaterial({ color: shared.PALETTE.sail, vertexColors: true, flatShading: false });
+      const liveMat = cutMat; // geometry-only: identical material and shader in both variants
+      materials.push(cutMat);
       canvas = document.createElement('canvas');
       Object.assign(canvas.style, { position: 'fixed', left: '0', top: '0', width: '1280px', height: '760px', zIndex: '2147483647' });
       document.body.appendChild(canvas);
@@ -167,14 +184,15 @@ try {
             delta: row.live.gpuPerRenderMs - row.cut.gpuPerRenderMs });
       }
       return {
-        cpu: { scope: 'Actual extracted palMantaContourTick stable path, dummy mesh slots with actual geometry/material references; counted getter and wrapper overhead included. Initial edge/warmup excluded. No construction, edge upload/compile, GPU or full-frame cost.',
+        cpu: { scope: 'Actual extracted palMantaContourTick stable anatomy-cut/live/rung/noContour paths, dummy mesh slots with actual original/E8/E9 references; counted getter and wrapper overhead included. Initial edge/warmup excluded. No construction, edge upload/compile, GPU or full-frame cost.',
           distribution: '100 rotated-order batches of10,000 calls; p95 is across per-call batch means, not individual-frame latency.',
           rows: fixtures.map(f => ({ ...f.result(), ms: stats(f.times) })) },
-        sourceGeometry: { before: before.audit, live: after.audit, fallback: parity,
-          capturedBy: 'Actual game.tick(0,false) flag/rung/noRound transitions; six meshes and frozen production world transforms; clones preserve attributes.',
+        sourceGeometry: { before: before.audit, live: after.audit, original: legacy.audit, fallback: parity,
+          sameProductionMaterial: true, changedBodySlots: 2, sharedTipSlots: 4, actualCacheBytes: after.audit.cacheBytes,
+          capturedBy: 'Actual game.tick(0,false) anatomy/contour/rung/noRound transitions; six meshes and frozen production world transforms; clones preserve attributes.',
           transforms: transforms.map(m => m.toArray()) },
-        gpu: { scope: 'Isolated six meshes across two mantas, three shared actual geometry slots per variant. Plain Lambert flat cut/smooth live with authored vertex colours and frozen transforms. Excludes production grain/material hooks, water, fog, shadows, animation and post; not full-game cost.',
-          identity, viewport: [1280, 760], meshes: 6, geometryPairs: cloned.size / 2, warmup, batchRenders,
+        gpu: { scope: 'Isolated E8 versus E9: six meshes across two mantas, three actual slots per animal. Same plain smooth Lambert material in both variants, authored vertex colours and frozen transforms; geometry-only comparison. Excludes production grain/material hooks, water, fog, shadows, animation and post; not full-game cost.',
+          identity, viewport: [1280, 760], meshes: 6, slotsPerAnimal: 3, uniqueClonedGeometries: cloned.size, sameIsolatedMaterial: cutMat === liveMat, warmup, batchRenders,
           requestedPairs: 40, validPairs: pairs.length, disjoints, timeouts, frames, draws,
           perRenderMs: { cut: stats(pairs.map(p => p.cut)), live: stats(pairs.map(p => p.live)), pairedDelta: stats(pairs.map(p => p.delta)) },
           ciScope: 'Normal-approximation95% confidence half-width for paired mean; repeated GPU samples can be autocorrelated. No independent-population claim.', pairs, samples },
@@ -189,27 +207,29 @@ try {
       raw(0, false); g.tick = raw;
     }
   });
-  await h.result('reimagine-manta-contour-cost', { metadata: h.metadata, ...report });
+  await h.result('reimagine-manta-anatomy-cost', { metadata: h.metadata, ...report });
   console.log(JSON.stringify(report, null, 2));
   assert.ok(!report.hidden && !report.paused, 'visible active hardware browser');
   assert.doesNotMatch(report.gpu.identity.renderer, /swiftshader|llvmpipe|software rasterizer/i, 'hardware GPU required');
   for (const row of report.cpu.rows) {
     assert.equal(row.reads, row.timedCalls, 'observable actual gate execution');
     assert.equal(row.writes, 0, 'zero stable geometry/material writes'); assert.ok(row.exact, 'exact stable references');
-    if (row.mode === 'flag' || row.mode === 'rung') assert.ok(row.ms.p95 <= .1, 'stable cut CPU budget');
+    if (row.mode !== 'live') assert.ok(row.ms.p95 <= .1, 'stable cut CPU budget');
   }
   assert.ok(report.sourceGeometry.fallback.every(r => r.exactGeometry && r.exactMaterial), 'exact production fallback references');
+  assert.ok(report.gpu.sameIsolatedMaterial && report.sourceGeometry.sameProductionMaterial, 'same material geometry-only comparison');
+  assert.equal(report.gpu.uniqueClonedGeometries, 4, 'two unchanged tip caches plus E8/E9 body caches');
   assert.ok(report.gpu.validPairs >= 30, 'sufficient valid GPU pairs');
   assert.equal(report.gpu.draws.cut.calls, 6, 'six actual manta draw slots');
   assert.equal(report.gpu.draws.live.calls, 6, 'no added live draw slots');
-  assert.equal(report.gpu.draws.cut.triangles, 1344, 'actual inherited triangle count');
-  assert.equal(report.gpu.draws.live.triangles, 1072, 'actual live triangle count');
+  assert.equal(report.gpu.draws.cut.triangles, 1072, 'actual accepted E8 triangle count');
+  assert.equal(report.gpu.draws.live.triangles, 1248, 'actual E9 anatomy triangle count');
   assert.ok(report.gpu.frames.cut.colors > 8 && report.gpu.frames.live.colors > 8, 'nonflat visible frames');
-  assert.notEqual(report.gpu.frames.cut.hash, report.gpu.frames.live.hash, 'actual geometry/material contribution visible');
+  assert.notEqual(report.gpu.frames.cut.hash, report.gpu.frames.live.hash, 'actual anatomy geometry contribution visible');
   assert.deepEqual(report.gpu.frames.cut, report.gpu.frames.cutAgain, 'exact isolated cut restoration');
   assert.deepEqual(report.gpu.frames.live, report.gpu.frames.liveAgain, 'exact isolated live restoration');
   assert.deepEqual(h.metadata.errors, [], 'zero runtime errors');
 } catch (error) {
-  await h.result('reimagine-manta-contour-cost-failure', { metadata: h.metadata, failure: String(error.stack || error) });
+  await h.result('reimagine-manta-anatomy-cost-failure', { metadata: h.metadata, failure: String(error.stack || error) });
   throw error;
 } finally { await h.close(); }

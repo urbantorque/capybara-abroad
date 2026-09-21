@@ -2387,6 +2387,7 @@ let palMantaTips = null;
 let palMantaShade = null;
 let palMantaSlowed = false;
 let palMantaContours = [], palMantaContourOn = false, palMantaSmoothOn = false;
+let palMantaAnatomyOn = false;
 let palMantaSmoothMat = null;
 const palMANTA_CUFF = 0.10;             // m either side of the existing tip hinge
 
@@ -2448,16 +2449,148 @@ function palMantaJoin(base, first, last, skins) {
   return geo;
 }
 
+// E9: six-point sections meet the existing wing roots exactly. A disc can
+// carry the same rider without a rectangular trunk bolted across its middle.
+function palMantaLoft(rings, belly) {
+  const pos = [], color = [], index = [], n = rings[0].length;
+  const dark = new THREE.Color(PALETTE.palWreckDk), pale = new THREE.Color(PALETTE.palClam);
+  for (const ring of rings) for (let j = 0; j < n; j++) {
+    pos.push(...ring[j]); const c = belly && j >= 4 ? pale : dark;
+    color.push(c.r, c.g, c.b);
+  }
+  for (let i = 0; i < rings.length - 1; i++) for (let j = 0; j < n; j++) {
+    const a = i * n + j, b = (i + 1) * n + j, next = (j + 1) % n;
+    // Mirrored diagonals keep the two sides of the broad disc identical.
+    if (belly && i >= (rings.length - 1) / 2)
+      index.push(a, b, i * n + next, b, (i + 1) * n + next, i * n + next);
+    else index.push(a, b, (i + 1) * n + next, a, (i + 1) * n + next, i * n + next);
+  }
+  const end = (rings.length - 1) * n;
+  for (let j = 1; j < n - 1; j++) index.push(0, j, j + 1, end, end + j + 1, end + j);
+  let volume = 0;
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let i = 0; i < index.length; i += 3) {
+    a.fromArray(pos, index[i] * 3); b.fromArray(pos, index[i + 1] * 3); c.fromArray(pos, index[i + 2] * 3);
+    volume += a.dot(b.cross(c));
+  }
+  if (volume < 0) for (let i = 0; i < index.length; i += 3) { const b = index[i + 1]; index[i + 1] = index[i + 2]; index[i + 2] = b; }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(color, 3));
+  geo.setIndex(index); geo.computeVertexNormals();
+  return geo;
+}
+
+// Build-time vertical ray. Marks sit on the skin and eyes grow out of it;
+// neither keeps a floating height inherited from the old boxes.
+function palMantaSurface(geo, x, z, top) {
+  const p = geo.attributes.position, ix = geo.index.array;
+  let found = top ? -Infinity : Infinity;
+  for (let i = 0; i < ix.length; i += 3) {
+    const a = ix[i], b = ix[i + 1], c = ix[i + 2];
+    const ax = p.getX(a), az = p.getZ(a), bx = p.getX(b), bz = p.getZ(b), cx = p.getX(c), cz = p.getZ(c);
+    const den = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+    if (Math.abs(den) < 1e-9) continue;
+    const u = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / den;
+    const v = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / den, w = 1 - u - v;
+    if (Math.min(u, v, w) < -1e-6) continue;
+    const y = u * p.getY(a) + v * p.getY(b) + w * p.getY(c);
+    found = top ? Math.max(found, y) : Math.min(found, y);
+  }
+  return found;
+}
+
+function palMantaAnatomyGeo(base, ranges) {
+  const p = base.attributes.position, count = p.count;
+  const ring = start => Array.from({ length: 6 }, (_, j) => [p.getX(start + j), p.getY(start + j), p.getZ(start + j)]);
+  const inner = x => [[x, 0.015, 2.015], [x, 0.30, 1.05], [x, 0.32, -0.76],
+    [x, 0.01, -1.80], [x, -0.40, -0.68], [x, -0.36, 1.05]];
+  const hull = palMantaLoft([ring(ranges.root[0]), inner(-0.56),
+    [[0, 0.035, 2.055], [0, 0.34, 1.05], [0, 0.36, -0.75], [0, 0.015, -1.95],
+      [0, -0.42, -0.75], [0, -0.39, 1.05]], inner(0.56), ring(ranges.root[1])], true);
+  const parts = [hull], eyes = [];
+  function tint(geo, hex) {
+    const c = new THREE.Color(hex), colors = new Float32Array(geo.attributes.position.count * 3);
+    for (let i = 0; i < colors.length; i += 3) { colors[i] = c.r; colors[i + 1] = c.g; colors[i + 2] = c.b; }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    if (!geo.index) geo.setIndex(Array.from({ length: geo.attributes.position.count }, (_, i) => i));
+    return geo;
+  }
+  for (const side of [-1, 1]) {
+    // The old lobe centres remain inside these short, inward-curling fins.
+    const centres = [[side * 0.64, -0.02, 1.78, 0.13, 0.10],
+      [side * 0.71, -0.055, 2.14, 0.105, 0.08], [side * 0.61, 0.035, 2.50, 0.07, 0.07]];
+    parts.push(palMantaLoft(centres.map(r => [[r[0] - r[3], r[1], r[2]], [r[0], r[1] + r[4], r[2]],
+      [r[0] + r[3], r[1], r[2]], [r[0], r[1] - r[4], r[2]]]), false));
+    const x = side * 0.705, z = 1.50, surface = palMantaSurface(hull, x, z, true), y = surface + 0.025;
+    const eye = tint(new THREE.SphereGeometry(1, 6, 4), PALETTE.palCaveDark);
+    eye.scale(0.05, 0.055, 0.075); eye.translate(x, y, z); parts.push(eye);
+    eyes.push({ x, y, z, surface, embedded: 0.030, clear: 0.080 });
+  }
+  // A shallow dark opening below the leading lip, not a second projecting jaw.
+  const mouth = tint(new THREE.OctahedronGeometry(1, 0), PALETTE.palCaveDark);
+  mouth.scale(0.51, 0.045, 0.040); mouth.translate(0, -0.045, 2.015); parts.push(mouth);
+  const geo = new THREE.BufferGeometry(), index = [], coreIndex = [];
+  const rootMap = new Map();
+  for (let j = 0; j < 6; j++) {
+    rootMap.set(ranges.root[0] + j, count + j);
+    rootMap.set(ranges.root[1] + j, count + 24 + j);
+  }
+  const inRange = (v, range) => v >= range[0] && v < range[1];
+  for (let i = 0; i < base.index.count; i += 3) {
+    const triangle = Array.from(base.index.array.slice(i, i + 3));
+    if (inRange(triangle[0], ranges.body) || inRange(triangle[0], ranges.head)) continue;
+    if (ranges.root.some(start => triangle.every(v => v >= start && v < start + 6))) continue;
+    const mapped = triangle.map(v => rootMap.has(v) ? rootMap.get(v) : v);
+    index.push(...mapped);
+    if (triangle[0] >= ranges.root[0]) coreIndex.push(...mapped);
+  }
+  let offset = count;
+  for (const part of parts) {
+    for (let i = 0; i < part.index.count; i += 3) {
+      const triangle = Array.from(part.index.array.slice(i, i + 3));
+      if (part === hull && (triangle.every(v => v < 6) || triangle.every(v => v >= 24))) continue;
+      const mapped = triangle.map(v => v + offset); index.push(...mapped);
+      if (part === hull) coreIndex.push(...mapped);
+    }
+    offset += part.attributes.position.count;
+  }
+  for (const key of ['position', 'normal', 'color']) {
+    const array = new Float32Array(offset * 3); array.set(base.attributes[key].array);
+    let at = count * 3;
+    for (const part of parts) { array.set(part.attributes[key].array, at); at += part.attributes[key].array.length; }
+    geo.setAttribute(key, new THREE.BufferAttribute(array, 3));
+  }
+  const pos = geo.attributes.position;
+  for (const [range, top] of [[ranges.marks, true], [ranges.gills, false]]) {
+    let lo = Infinity, hi = -Infinity;
+    for (let i = range[0]; i < range[1]; i++) { lo = Math.min(lo, p.getY(i)); hi = Math.max(hi, p.getY(i)); }
+    for (let i = range[0]; i < range[1]; i++) {
+      const surface = palMantaSurface(hull, p.getX(i), p.getZ(i), top);
+      pos.setY(i, surface + (top ? 0.005 + (p.getY(i) - lo) * 0.30 : -0.006 - (hi - p.getY(i)) * 0.25));
+    }
+  }
+  geo.setIndex(index); geo.computeVertexNormals(); geo.computeBoundingBox(); geo.computeBoundingSphere();
+  const bounds = new THREE.Box3(), point = new THREE.Vector3();
+  for (const i of index) bounds.expandByPoint(point.fromBufferAttribute(pos, i));
+  geo.userData.mantaAnatomy = { coreIndex, ranges, eyes,
+    seat: { x: 0, y: 0.62, z: -0.35, surface: palMantaSurface(hull, 0, -0.35, true), maxBeatScale: 1.07 },
+    bounds: { min: bounds.min.toArray(), max: bounds.max.toArray() } };
+  for (const part of parts) part.dispose();
+  return geo;
+}
+
 function palMantaContourTick(game) {
   if (!palMantaContours.length) return;
   const on = !game.state.noMantaContour && (game.state.perfRung | 0) < 1;
   const smooth = on && !game.state.noRound;
-  if (on === palMantaContourOn && smooth === palMantaSmoothOn) return;
+  const anatomy = on && !game.state.noMantaAnatomy;
+  if (on === palMantaContourOn && smooth === palMantaSmoothOn && anatomy === palMantaAnatomyOn) return;
   for (const r of palMantaContours) {
-    r.mesh.geometry = on ? r.live : r.base;
+    r.mesh.geometry = on ? (anatomy && r.anatomy ? r.anatomy : r.live) : r.base;
     r.mesh.material = smooth ? palMantaSmoothMat : r.material;
   }
-  palMantaContourOn = on; palMantaSmoothOn = smooth;
+  palMantaContourOn = on; palMantaSmoothOn = smooth; palMantaAnatomyOn = anatomy;
 }
 
 function palBuildManta(root) {
@@ -2474,6 +2607,7 @@ function palBuildManta(root) {
   // than an accident of overlap.
   M.box(0, 0, -0.10, 1.75, 0.72, 3.30, PALETTE.palWreckDk);      // the body
   M.box(0, -0.31, 0.00, 1.50, 0.22, 3.00, PALETTE.palClam);      // and its belly
+  const bodyEnd = M.n;
   // A MANTA IS TWICE AS WIDE AS IT IS LONG. The first table was square and it
   // photographed as a raft with a capybara standing on it. Seven and a half
   // metres across against four of body: the disc IS the animal.
@@ -2526,9 +2660,9 @@ function palBuildManta(root) {
   // (.42 rad), its 0.0774 m half-thickness needs only 0.0346 m of overlap.
   const tipLive = [-1, 1].map((s, i) => palMantaJoin(tipGeo[i], 0, tipGeo[i].attributes.position.count,
     [palMantaWingGeo(stations.slice(palMANTA_TIP), s, pivot, palMANTA_CUFF)]));
-  palMantaContours = []; palMantaContourOn = false; palMantaSmoothOn = false;
-  function register(mesh, live) {
-    palMantaContours.push({ mesh: mesh, base: mesh.geometry, live: live, material: mesh.material });
+  palMantaContours = []; palMantaContourOn = false; palMantaSmoothOn = false; palMantaAnatomyOn = false;
+  function register(mesh, live, anatomy) {
+    palMantaContours.push({ mesh: mesh, base: mesh.geometry, live: live, anatomy: anatomy || null, material: mesh.material });
     mesh.userData.mantaContour = true;        // the lighting mask includes the body
   }
   palMantaTips = [];
@@ -2550,8 +2684,10 @@ function palBuildManta(root) {
   // The two marks on the shoulders. Every manta has a different pair and it is
   // how one is told from another — but at 0.44 by 0.70 they read as skylights
   // on a barge, so they are thin angled bars and not patches.
+  const marksStart = M.n;
   M.box(-0.58, 0.37, -0.40, 0.16, 0.08, 0.95, PALETTE.palClam, 0, -0.34, 0);
   M.box(0.62, 0.37, -0.70, 0.14, 0.08, 0.72, PALETTE.palClam, 0, 0.30, 0);
+  const headStart = M.n;
   // the head: a blunt block with the mouth across the front of it, and the two
   // cephalic lobes rolled forward the way they are when it is feeding
   M.box(0, 0.02, 1.66, 1.45, 0.60, 0.95, PALETTE.palWreckDk);
@@ -2559,6 +2695,7 @@ function palBuildManta(root) {
   for (let s = -1; s <= 1; s += 2) {
     M.box(s * 0.68, -0.06, 2.18, 0.22, 0.32, 0.90, PALETTE.palWreckDk, 0.20, s * 0.14, 0);
   }
+  const headEnd = M.n;
   // gill slits, which are the only marks on the underside
   for (let k = 0; k < 5; k++) {
     for (let s = -1; s <= 1; s += 2) {
@@ -2566,6 +2703,7 @@ function palBuildManta(root) {
     }
   }
   // the tail: a whip, and it is longer than the animal is wide
+  const tailStart = M.n;
   for (let k = 0; k < 6; k++) {
     const t = k / 5;
     M.box(0, 0.02 - t * 0.10, -1.85 - k * 0.62, 0.16 - t * 0.11, 0.14 - t * 0.09, 0.66,
@@ -2574,10 +2712,14 @@ function palBuildManta(root) {
   const mesh = new THREE.Mesh(M.build(), palVC());
   const bodyLive = palMantaJoin(mesh.geometry, wingStart, wingEnd,
     [-1, 1].map(s => palMantaWingGeo(stations.slice(0, palMANTA_TIP + 1), s, origin, 0)));
+  const firstRoot = mesh.geometry.attributes.position.count;
+  const bodyAnatomy = palMantaAnatomyGeo(bodyLive, { body: [0, bodyEnd], head: [headStart, headEnd],
+    marks: [marksStart, headStart], gills: [headEnd, tailStart], tail: [tailStart, firstRoot],
+    root: [firstRoot, firstRoot + (palMANTA_TIP + 1) * 6] });
   // palVC is shared by the buildings. Only this private standard Lambert
   // variant reads the skin's smooth normals; noRound uses the old material.
   palMantaSmoothMat = palVC(true); palMantaSmoothMat.flatShading = false;
-  register(mesh, bodyLive);
+  register(mesh, bodyLive, bodyAnatomy);
   mesh.castShadow = true;
   palMantaGroup = new THREE.Group();
   palMantaGroup.name = 'palManta';
@@ -2597,7 +2739,7 @@ function palBuildManta(root) {
   palManta2Group = new THREE.Group();
   palManta2Group.name = 'palManta2';
   const mesh2 = new THREE.Mesh(mesh.geometry, mesh.material);
-  register(mesh2, bodyLive);
+  register(mesh2, bodyLive, bodyAnatomy);
   mesh2.castShadow = true;
   mesh2.scale.set(0.88, 0.88, 0.88);
   palManta2Group.add(mesh2);
@@ -5023,21 +5165,30 @@ export function createPalawan(game) {
       const rows = palMantaContours.map(r => {
         let root = r.mesh.parent;
         while (root && root.name !== 'palManta' && root.name !== 'palManta2') root = root.parent;
-        if (!seen.has(r.live)) {
-          seen.add(r.live); cacheBytes += r.live.index.array.byteLength;
-          for (const key of ['position', 'normal', 'color']) cacheBytes += r.live.attributes[key].array.byteLength;
+        for (const geometry of [r.live, r.anatomy]) if (geometry && !seen.has(geometry)) {
+          seen.add(geometry); cacheBytes += geometry.index.array.byteLength;
+          for (const key of ['position', 'normal', 'color']) cacheBytes += geometry.attributes[key].array.byteLength;
         }
+        const selected = palMantaContourOn ? (palMantaAnatomyOn && r.anatomy ? r.anatomy : r.live) : r.base;
+        const anatomy = r.anatomy && r.anatomy.userData.mantaAnatomy;
         return { uuid: r.mesh.uuid, rootUuid: root ? root.uuid : '', rootName: root ? root.name : '',
           baseUuid: r.base.uuid, liveUuid: r.live.uuid, baseMaterialUuid: r.material.uuid, materialUuid: r.mesh.material.uuid,
+          anatomyUuid: r.anatomy ? r.anatomy.uuid : '', anatomyTriangles: r.anatomy ? r.anatomy.index.count / 3 : r.live.index.count / 3,
+          actualTriangles: r.mesh.geometry.index.count / 3,
           flatShading: r.mesh.material.flatShading, baselineFlatShading: r.material.flatShading,
           inheritedTriangles: r.base.index.count / 3, contourTriangles: r.live.index.count / 3,
           baseVertices: r.base.attributes.position.count, contourVertices: r.live.attributes.position.count,
-          inheritedGeometry: r.mesh.geometry === r.base, inheritedMaterial: r.mesh.material === r.material,
-          exact: r.mesh.geometry === (palMantaContourOn ? r.live : r.base) &&
+          inheritedGeometry: r.mesh.geometry === r.base, contourGeometry: r.mesh.geometry === r.live,
+          anatomyGeometry: !!r.anatomy && r.mesh.geometry === r.anatomy, inheritedMaterial: r.mesh.material === r.material,
+          anatomy: anatomy ? { eyes: anatomy.eyes.map(e => Object.assign({}, e)), seat: Object.assign({}, anatomy.seat),
+            bounds: { min: anatomy.bounds.min.slice(), max: anatomy.bounds.max.slice() } } : null,
+          exact: r.mesh.geometry === selected &&
             r.mesh.material === (palMantaSmoothOn ? palMantaSmoothMat : r.material) };
       });
       const half = 0.07734375, required = half * Math.tan(0.42);
-      return { on: palMantaContourOn, smooth: palMantaSmoothOn, meshes: rows.length, materialsAdded: 1, cacheBytes,
+      return { on: palMantaContourOn, smooth: palMantaSmoothOn, anatomy: palMantaAnatomyOn,
+        mode: !palMantaContourOn ? 'original' : palMantaAnatomyOn ? 'anatomy' : 'contour',
+        meshes: rows.length, materialsAdded: 1, cacheBytes,
         seam: { cuffHalf: palMANTA_CUFF, rootHalfThickness: half, maxAbsCurl: 0.42, requiredOverlap: required,
           margin: palMANTA_CUFF - required }, rows };
     },

@@ -7,14 +7,16 @@ import { openHarness } from './reimagine-harness.mjs';
 const require=createRequire(import.meta.url);
 const {PNG}=require(join(homedir(),'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/pngjs'));
 const tag=process.argv[2]||'v1';assert.match(tag,/^[\w.-]+$/);
-const name='reimagine-manta-contour-'+tag,h=await openHarness();
+const anatomy=process.argv.includes('--anatomy');
+const name='reimagine-manta-'+(anatomy?'anatomy':'contour')+'-'+tag,h=await openHarness();
 const out={views:[],scope:'Frozen production poses of both mantas, staged local cameras. Whole-manta hide mask includes smooth lighting, body details and shadows. Aperture/contact pool cleared equally; no natural ride or full-game cost claim.'};
+out.comparison=anatomy?'Accepted E8 contour versus E9 anatomy; rung restores original animal.':'Original animal versus E8 contour; E9 explicitly cut.';
 try{
   await h.start();await h.arrive('palawan');
   await h.page.addStyleTag({content:'[class*="capyui"]{visibility:hidden!important}*{animation-play-state:paused!important;transition:none!important}'});
-  out.pin=await h.page.evaluate(async()=>{
+  out.pin=await h.page.evaluate(async(anatomy)=>{
     const g=window.__capy,T=await import('three'),shared=await import('/src/shared.js'),raw=g.tick;
-    g.tick=()=>{};g.state.perfRung=0;g.state.noMantaContour=true;raw(0,false);
+    g.tick=()=>{};g.state.perfRung=0;g.state.noMantaContour=!anatomy;g.state.noMantaAnatomy=true;raw(0,false);
     const audit=g.palawan.mantaContourAudit(),ids=new Set(audit.rows.map(r=>r.uuid)),nodes=[],materials=new Map();
     g.scene.updateMatrixWorld(true);
     g.scene.traverse(o=>{
@@ -25,22 +27,24 @@ try{
     if(roots.length!==2||roots.some(r=>!r))throw Error('Both actual manta roots required');
     const views=[];
     roots.forEach((r,i)=>{
-      for(const[label,offset]of[['front',[0,2.5,10]],['quarter',[8,3,8]],['profile',[10,2.5,0]]]){
+      for(const[label,offset]of[['front',[0,2.5,10]],['quarter',[8,3,8]],['profile',[10,2.5,0]],...(anatomy?[['underside',[4,-5,8]]]:[])]){
         const center=new T.Box3().setFromObject(r).getCenter(new T.Vector3());
         const p=new T.Vector3(...offset).applyQuaternion(r.getWorldQuaternion(new T.Quaternion())).add(center);
         views.push({label:i+'-'+label,root:r.uuid,target:center.toArray(),position:p.toArray()});
       }
     });
-    window.__mantaFixture={raw,shared,ids,nodes,materials,views,time:g.state.time,post:{...g.post.params},fov:g.camera.fov,near:g.camera.near,far:g.camera.far};
+    window.__mantaFixture={raw,shared,ids,nodes,materials,views,anatomy,time:g.state.time,post:{...g.post.params},fov:g.camera.fov,near:g.camera.near,far:g.camera.far};
     return {audit,views,time:g.state.time};
-  });
+  },anatomy);
   for(const view of out.pin.views){
     const frames={},states={};
     for(const variant of['warm-live','warm-before','before','live','cut','rung','restored','hidden-before','hidden-live']){
       states[variant]=await h.page.evaluate(({view,variant})=>{
         const g=window.__capy,f=window.__mantaFixture;
         const live=['warm-live','live','restored','hidden-live'].includes(variant);
-        g.state.noMantaContour=!live&&variant!=='rung';g.state.perfRung=variant==='rung'?1:0;f.raw(0,false);
+        g.state.noMantaContour=f.anatomy?false:!live&&variant!=='rung';
+        g.state.noMantaAnatomy=f.anatomy?!live:true;
+        g.state.perfRung=variant==='rung'?1:0;f.raw(0,false);
         const audit=g.palawan.mantaContourAudit();
         for(const n of f.nodes){
           n.o.position.copy(n.p);n.o.quaternion.copy(n.q);n.o.scale.copy(n.s);n.o.visible=n.v;
@@ -60,6 +64,9 @@ try{
         return{audit,render,time:g.state.time};
       },{view,variant});
       const row=states[variant];assert.equal(row.time,out.pin.time);assert.ok(row.audit.rows.every(r=>r.exact),'exact cached geometry/material state');
+      if(variant==='before')assert.equal(row.audit.mode,anatomy?'contour':'original');
+      if(variant==='live')assert.equal(row.audit.mode,anatomy?'anatomy':'contour');
+      if(variant==='rung')assert.equal(row.audit.mode,'original');
       if(!row.audit.on)assert.ok(row.audit.rows.every(r=>r.inheritedGeometry&&r.inheritedMaterial),'exact inherited fallback');
       if(variant.startsWith('warm'))continue;
       frames[variant]=PNG.sync.read(await h.screenshot(name+'-'+view.label+'-'+variant));

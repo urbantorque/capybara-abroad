@@ -1315,6 +1315,9 @@ function hanBuildQuarter(game, root) {
   hanKeepOut(hanPUPPET.x, hanPUPPET.z, 22);
   hanKeepOut(-8, -4, 12);
   hanKeepOut(hanTRAIN.x1 + 6, hanTRAIN.z, 16);
+  // The pho bowl and its cook stood inside three overlapping terraces.
+  // Reserve their pavement without moving the bowl, cook or delivery Cub.
+  hanKeepOut(11.2, 15.4, 6);
   // ...and a sixth, at the spawn (integrity 9). The arrival puts the lens
   // twelve metres out on the bearing in HANOI_SPAWN.yaw, which is west-south-
   // west, which is the ring's outer side — so the moment that frontage came

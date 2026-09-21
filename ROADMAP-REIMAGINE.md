@@ -843,3 +843,56 @@ work. A green static suite is necessary and never a claim of perfection.
   pass, zero failed. First full run exposed a missing ending-space dependency
   in the old mix fixture; it now executes the actual helper and checks closure
   and flag/rung release too. Historical soak remains stale/informational.
+- Checkpoint 55b1eeb pushed to codex/redesign-delight; public master unchanged.
+- E9 plan after the E8 checkpoint: replace the manta's rectangular centre
+  with a closed tapered disc joined to existing wing roots, a recessed mouth,
+  curved cephalic fins and restrained lateral eyes. Keep the ride seat clear,
+  tail/rig/routes/wing animation intact. Re-seat dorsal/gill detail at build
+  time. Same six draws and one private material, at most the original 1344
+  triangles across both animals. `noMantaAnatomy` restores accepted E8;
+  `noMantaContour`/rung one still restores the original animal. Extend the
+  existing single edge writer; no frame rebuilding or new save state.
+  Require closed/outward seams, eye/seat clearance, fallback pixels, both
+  animals and underside views, natural ride and measured budget before ship.
+- D9 evidence: real-key Hanoi crossing succeeds, then walking to the pho
+  target stops at the frontage. A read-only exact shape-space probe finds the
+  authored bowl position inside three terrace collision boxes. Reserve a
+  six-metre pocket using the existing frontage keep-out system, preserving
+  bowl/vendor/Cub spawn coordinates and task logic. This is a core layout
+  repair, not an optional visual layer that may restore an impassable wall.
+  Verify the pocket across fresh builds, actual grabbing and delivery route.
+- D9/G natural Hanoi acceptance: steady real-key crossing, actual bowl pickup,
+  Cub mounting and all three hot deliveries in 95.5399 seconds. Zero lost
+  bowls, vehicle hits or runtime errors; 937 navigation samples. All three
+  route tasks and earned memory survive reload. Driver alignment uses actual
+  Z/X camera keys; earlier eight-way corrections invalidated the crossing
+  through hesitation, so that fixture was repaired without changing gameplay.
+  Read-only collision probe finds zero boxes at the bowl after the layout fix.
+  The 98-check static fixture covers authored coordinates and clearance wiring,
+  not full collider geometry. Lead inspected bowl and third-delivery images.
+- G natural Pantanal acceptance: five actual recruits and three defensive
+  wheeks, five followers still present at the far-bank crossing award; all
+  three tasks and memory save/reload. Zero runtime errors. The task fires
+  while swimming near the far edge; do not claim every follower is ashore.
+  Its golden water/reed composition is retained after image review. The
+  portable herd unlock's timeout text refers to other small animals, not the
+  persistent native herd; source review found no timeout mechanic defect.
+- E9 accepted visual pass: 2598 static builder/weld/eye/seat/fallback checks;
+  eight live/cut/restored views of both mantas including undersides, with
+  21104–73494 changed pixels and zero outside the whole-animal mask. Lead
+  inspected every live view; independent paired review accepts the anatomy.
+  Six draws, 1248 triangles versus original 1344, total cache 105360 bytes.
+  Actual stable cut/rung CPU p95 batch means .000080/.000060ms, zero writes.
+  Isolated same-material GPU 40 pairs: delta mean -.00513ms, 95% half-width
+  .02038ms; zero disjoints/timeouts, no conclusive cost difference. Fresh
+  natural ride passes 332 samples, one E edge, breach, memory save/reload and
+  shore-board departure, zero errors. Lead inspected boarding/breach images.
+- D9 read-only exact shape-space probes pass across three fresh browser
+  builds: zero static boxes contain the bowl's ground candidate. These point
+  probes supplement the actual walk/grab/delivery pass, not a swept-volume
+  proof of every possible approach. No runtime errors.
+- D9/E9/G checkpoint gates pass: all edited JavaScript syntax, one-file build,
+  46 suite checks, zero failures. E8's six-view fallback regression also passes
+  with E9 explicitly cut. Historical soak staleness remains informational;
+  the pending Kyoto settled-reward screenshot driver is excluded from this
+  checkpoint until a fresh complete route reaches that added capture.

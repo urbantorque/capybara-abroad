@@ -20,7 +20,8 @@ for (const name of ['palWreckDk', 'palClam', 'palCaveDark'])
   PALETTE[name] = Number(shared.match(new RegExp('\\b' + name + ':\\s*(0x[0-9a-f]+)'))[1]);
 const cuff = Number(source.match(/const palMANTA_CUFF\s*=\s*([\d.]+)/)[1]);
 const helpers = ['_mergeHash', '_mergeJitter', 'makeMerger'].map(n => fn(shared, n)).join('\n') +
-  ['palXform', 'palMerger', 'palVC', 'palMantaWingGeo', 'palMantaJoin', 'palMantaContourTick'].map(n => fn(source, n)).join('\n');
+  ['palXform', 'palMerger', 'palVC', 'palMantaWingGeo', 'palMantaJoin', 'palMantaLoft', 'palMantaSurface',
+    'palMantaAnatomyGeo', 'palMantaContourTick'].map(n => fn(source, n)).join('\n');
 const audit = source.match(/    mantaContourAudit\(\) \{[^]*?\n    \},/)[0]
   .replace('    mantaContourAudit()', 'function audit()').replace(/,$/, '');
 
@@ -30,8 +31,8 @@ function fixture(text, flag = true, rung = 0, noRound = false) {
     const palEu=new THREE.Euler(),palQ=new THREE.Quaternion(),palV3=new THREE.Vector3(),
       palSc=new THREE.Vector3(),palM=new THREE.Matrix4(),palG={box:new THREE.BoxGeometry(1,1,1)};
     let palMantaGroup=null,palManta2Group=null,palMantaTips=null,palMantaShade=null,palMantaA=0,palMantaRideT=-1,
-      palMantaContours=[],palMantaContourOn=false,palMantaSmoothOn=false,palMantaSmoothMat=null;
-    const palMANTA_CUFF=${cuff},palGame={state:{noMantaContour:flag,perfRung:rung,noRound}};
+      palMantaContours=[],palMantaContourOn=false,palMantaSmoothOn=false,palMantaAnatomyOn=false,palMantaSmoothMat=null;
+    const palMANTA_CUFF=${cuff},palGame={state:{noMantaContour:flag,perfRung:rung,noRound,noMantaAnatomy:true}};
     const cache=new Map(),mat=(color,opts)=>{const key=JSON.stringify([color,opts]);if(!cache.has(key))
       cache.set(key,new THREE.MeshLambertMaterial({color,flatShading:true,...opts}));return cache.get(key);};
     const grain=m=>m,grainOwn=m=>m.clone();
@@ -159,6 +160,8 @@ eq(fn(source, 'palUpdateManta').replace('  palMantaContourTick(game);\n', ''), f
 eq(fn(source, 'palVC').replace('function palVC(own)', 'function palVC()').replace('(own ? grainOwn : grain)', 'grain'),
   fn(baseline, 'palVC'), 'private variant preserves every inherited grain/material row');
 const a = f.audit();
+eq(a.anatomy, false, 'E8 acceptance isolates E9 with explicit anatomy cut');
+eq(a.rows.reduce((n, r) => n + r.actualTriangles, 0), 1072, 'actual selected E8 triangle count');
 eq(a.rows.reduce((n, r) => n + r.inheritedTriangles, 0), 1344, 'inherited two-animal triangle count');
 eq(a.rows.reduce((n, r) => n + r.contourTriangles, 0), 1072, 'live two-animal triangle count');
 eq(new Set(a.rows.map(r => r.liveUuid)).size, 3, 'three shared cached live geometries');

@@ -1,3 +1,51 @@
+## REIMAGINE D9/E9/G — THE DISC AND THE PHO STALL (21 Sep 2026)
+
+The manta's rectangular trunk/head becomes a closed tapered disc welded to
+its accepted wing roots, with curved cephalic fins, paired eyes and a shallow
+mouth. Dorsal marks and gills keep their footprints and meet the new skin.
+Tail, wing stations, tip cuff, rig, beat/curl, ride, route and rewards remain
+unchanged. `noMantaAnatomy` restores E8; `noMantaContour` or rung one restores
+the original animal. `noRound` keeps inherited flat lighting. Six draw slots,
+the same private material, 1248 triangles across both animals (original 1344,
+E8 1072). One shared additional body cache costs 49008 bytes; total 105360 bytes.
+Stable frames perform no geometry/material writes or rebuilding.
+
+2598 actual-builder/weld/clearance/fallback checks pass; the E8 regression now
+explicitly cuts anatomy and passes 1152 checks. Eight frozen views cover both
+animals, including undersides: 21104–73494 changed pixels, zero outside the
+whole-manta mask, exact cut/restored pixels, unchanged draw counts. Lead read
+all eight; independent paired review accepts the continuous body and eyes.
+The seat anchor clears the maximum scaled hull by about 0.2396m; this is not
+a universal animated capybara-hull clearance claim. Actual stable-writer CPU
+cut/rung p95 batch means .000080/.000060ms, zero writes. Same-material isolated
+GPU comparison: 40 valid pairs, mean E9-minus-E8 -.00513ms, 95% half-width .02038ms,
+zero disjoints/timeouts. Interval crosses zero; no full-game speedup claim.
+Fresh real-control Palawan passage passes with 332 navigation samples, one E
+boarding edge, automatic breach, all three tasks saved/reloaded, and actual
+shore-board departure. Zero runtime errors; lead read boarding/breach images.
+
+Hanoi's bowl at (11.2,15.4) was inside three terrace collision boxes. A six-metre
+reservation through the existing frontage clearance system removes the
+overlap without moving bowl, cook or parked Cub. No new geometry, optional
+layout flag, task change or save field. The 98-check extracted regression
+covers coordinates, disk filtering and build order, not full collider shape.
+Three fresh hardware-browser builds put the bowl point outside every static
+box collider (actual shape-space containment tests); no runtime errors.
+Actual-key crossing, bowl pickup and three deliveries pass in 95.5399 seconds,
+with zero lost bowls/hits/runtime errors and 937 navigation samples. Three
+tasks and memory survive reload. The camera alignment correction belongs to
+the driver: eight-way waypoint corrections had counted as hesitation.
+
+Pantanal's fresh real-key passage recruits five, repels the hunter with three
+calls, earns the crossing with five current followers, and saves/reloads its
+three tasks and memory. The award occurs near the far edge while swimming;
+it does not prove all followers are ashore. Its water/reed composition stays.
+Source review confirms the portable herd skill has a refresh timeout while
+the native capybara herd persists; no mechanic repair was warranted.
+E8's six-view fallback regression also passes after E9 integration. Syntax,
+one-file build and 46 suite checks pass, zero failed. Historical soak remains
+stale and is not presented as current runtime evidence.
+
 ## REIMAGINE D7/D8/E8/G — THE JETTY, MANTA AND HOMECOMING (21 Sep 2026)
 
 Palawan's 2.8m departure board occupied its 2.4m-wide jetty. Move the existing
