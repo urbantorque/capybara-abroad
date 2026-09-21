@@ -13326,6 +13326,7 @@ export function createSystems(game) {
   // 5. AUDIO — pure WebAudio synth, lazily created on first gesture.
   // =========================================================================
   let ac = null, acMaster = null, acNoise = null, acAmbGain = null, acAmbOn = false;
+  let acAmbWant = -1, acSfxFinal = null, musFinal = null;
   let acLimit = null;      // the master compressor — see audioEnsure
   // THE ROOM (see sysROOMS). `acSfxIn` is what every placed and unplaced sound
   // effect in the game is pointed at; the dry half of it goes straight on to
@@ -13360,6 +13361,15 @@ export function createSystems(game) {
   /** Where a not-music voice belongs. Falls back to the master on a browser
    *  whose audio graph would not build — the mix this game had before R4. */
   function sysSfxOut() { return acSfxBus || acMaster; }
+
+  // REIMAGINE F1. Quiet is room for a tune, not a quieter master. The cut
+  // retains the authored mix; the governor parks this layer at rung one.
+  function sysScoreForeground() {
+    return !game.state.noQuiet && !(game.state.perfRung >= 1);
+  }
+  function sysScoreBedPhrase() {
+    return musStmt && !musStmt.ended ? 0.55 : 1;
+  }
 
   function audioEnsure() {
     if (ac) return ac;
@@ -13434,6 +13444,7 @@ export function createSystems(game) {
         sfxOut = top;
       } catch (e) { sfxOut = acSubLP; }
       sfxOut.connect(acMaster);
+      acSfxFinal = sfxOut;
     } catch (e) { acSfxBus = null; acSubLP = null; }
     // ---- THE ROOM, AND IT IS FOUR NODES -----------------------------------
     //
@@ -16788,9 +16799,15 @@ export function createSystems(game) {
     ns.start(); lfo.start();
   }
   function ambientSet(on) {
-    if (!acAmbGain || acAmbOn === on) return;
+    if (!acAmbGain) return;
+    const front = sysScoreForeground();
+    const want = on ? 0.05 * (front ? 0.32 * sysScoreBedPhrase() : 1) : 0.0001;
+    if (acAmbOn === on && acAmbWant === want) return;
     acAmbOn = on;
-    acAmbGain.gain.setTargetAtTime(on ? 0.05 : 0.0001, ac.currentTime, 0.6);
+    // Retarget on a mix/phrase edge even when the on/off state is unchanged.
+    const tau = front && want > acAmbWant ? 4 : 0.6;
+    acAmbWant = want;
+    acAmbGain.gain.setTargetAtTime(want, ac.currentTime, tau);
   }
 
   // =========================================================================
@@ -17002,13 +17019,19 @@ export function createSystems(game) {
     // reason sfx() is: an open journal or a background tab is not weather.
     const playing = game.state.started && !game.state.paused && !document.hidden && !muted;
     const duck = 1 - clamp(musIntensity, 0, 1) * sysWX_DUCK;
+    const front = sysScoreForeground();
+    const phrase = front ? sysScoreBedPhrase() : 1;
     // ...and +3 dB asleep (THE SLEEP, L6 E3): the weather is a bed too.
-    const busy = playing ? sysWX_BED_MAX * duck * (1 + sysMUS_SLEEP_BEDS * musSleep) : 0.0001;
+    const busy = playing ? sysWX_BED_MAX * duck * (front ? 1 : 1 + sysMUS_SLEEP_BEDS * musSleep) : 0.0001;
     wxBedBus.gain.setTargetAtTime(Math.max(0.0001, busy), t, sysWX_BED_TAU * 0.5);
-    wxBedRain.gain.setTargetAtTime(Math.max(0.0001, b.rain * 0.62), t, sysWX_BED_TAU);
-    wxBedWind.gain.setTargetAtTime(Math.max(0.0001, b.wind * 0.50), t, sysWX_BED_TAU);
-    wxBedChirp.gain.setTargetAtTime(Math.max(0.0001, b.chirp * 0.030), t, sysWX_BED_TAU);
-    wxBedRustle.gain.setTargetAtTime(Math.max(0.0001, b.rustle * 0.085), t, sysWX_BED_TAU);
+    // Only weather thins. The rush and belly scrape share this bus but are
+    // player feedback, so their own envelopes and ceiling stay intact.
+    const weatherK = front ? (0.11 / sysWX_BED_MAX) * phrase : 1;
+    const weatherTau = front && phrase === 1 ? 4 : sysWX_BED_TAU;
+    wxBedRain.gain.setTargetAtTime(Math.max(0.0001, b.rain * (front ? 0.45 : 0.62) * weatherK), t, weatherTau);
+    wxBedWind.gain.setTargetAtTime(Math.max(0.0001, b.wind * (front ? 0.30 : 0.50) * weatherK), t, weatherTau);
+    wxBedChirp.gain.setTargetAtTime(Math.max(0.0001, b.chirp * 0.030 * (front ? 0.5 : 1) * weatherK), t, weatherTau);
+    wxBedRustle.gain.setTargetAtTime(Math.max(0.0001, b.rustle * 0.085 * (front ? 0.5 : 1) * weatherK), t, weatherTau);
     // The rain gets BRIGHTER as it gets harder rather than only louder, which
     // is the difference between a shower arriving and a volume knob turning.
     wxBedRainBP.frequency.setTargetAtTime(1250 + b.rain * 1400, t, sysWX_BED_TAU);
@@ -17896,6 +17919,8 @@ export function createSystems(game) {
     if (!sysMovers.length || !ac || ac.state !== 'running') return;
     const now = ac.currentTime;
     const playing = game.state.started && !game.state.paused && !document.hidden && !muted;
+    const front = sysScoreForeground();
+    const bedPhrase = front ? sysScoreBedPhrase() : 1;
     const live = (game.biome && game.biome.current) || '';
     audioEar();
     // ---- 0. this chapter's beds, at the animal (L7, E1) ------------------
@@ -17934,7 +17959,12 @@ export function createSystems(game) {
       // sit down. (G6, and the two halves are genuinely different questions;
       // L6 flipped the sign — see sysMOVER_CALM.) Asleep, the beds are the
       // only thing left and they come up 3 dB more (THE SLEEP, E3).
-      if (m.bed) m.want *= (1 + sysMOVER_CALM * sysCalmNow) * (1 + sysMUS_SLEEP_BEDS * musSleep);
+      if (m.bed) {
+        // An acoustic instrument in a place stays a musical voice. Noise
+        // beds yield; the redundant everywhere-air yields a little further.
+        if (front && m.kind !== 'tune') m.want *= (m.kind === 'air' ? 0.28 : 0.5) * bedPhrase;
+        else m.want *= (1 + sysMOVER_CALM * sysCalmNow) * (1 + sysMUS_SLEEP_BEDS * musSleep);
+      }
       // A J-cut mover is nowhere near the ear in any sense the pan, the top
       // or the room send could honestly compute — dead centre, full
       // brightness, no room, same reasoning as the flat gain above.
@@ -17992,7 +18022,7 @@ export function createSystems(game) {
       m.occ = damp(m.occ || 0, m.occWant || 0, 3.3, dt);
       hz = Math.min(hz, 20000 - m.occ * sysMOVER_OCC_LP);
       sysAudioSet(m.g.gain, Math.max(sysMOVER_PARK, m.live ? m.want * (1 - sysMOVER_OCC_G * m.occ) : sysMOVER_PARK),
-                  now, sysMOVER_TAU);
+                  now, front && m.bed && m.kind !== 'tune' && m.live && bedPhrase === 1 ? 4 : sysMOVER_TAU);
       sysAudioSet(m.lp.frequency, Math.max(200, hz), now, sysMOVER_TAU);
       // ---- 4b. the room, by distance (L4, audio #6) ----------------------
       // Behind the gain, so it is a share of what is delivered; the same
@@ -18112,6 +18142,7 @@ export function createSystems(game) {
   let musWide = null;
   let musTimerId = 0;
   let musChordAt = 0, musPluckAt = 0, musIdx = 0, musChordStart = 0;
+  let musHarmonyReadyAt = 0;   // both sustained banks have finished their last fade
   // R4: from the preferences file. These were session lets, so N and the two
   // bracket keys were controls whose effect ended with the tab.
   let musMuted = sysMuteMusic, musLevel = sysVolMusic;
@@ -18602,6 +18633,7 @@ export function createSystems(game) {
   // Same voice-leading, same crossfade, same bass walk — one path.
   function musSetChordTo(chord, rootMidi, nextRoot, when, xf) {
     const fade = xf || sysMUS_XFADE;
+    musHarmonyReadyAt = when + fade;
     musPrevChord = musCurChord;
     musCurChord = chord;
     musUsed.length = 0;
@@ -19000,7 +19032,10 @@ export function createSystems(game) {
         for (let j = 0; j < L; j++) chAt.push([nA + nB + Math.round(j * (nT - 1) / Math.max(1, L - 1)), 'tag', j]);
       }
     }
-    const t0 = musSnap(now + 0.15);
+    // Let an in-flight ambient change finish before borrowing its two banks.
+    // A statement must not retune a bank whose old chord is still audible.
+    const clear = !game.state.noPhraseClarity && !(game.state.perfRung >= 1);
+    const t0 = musSnap(clear ? Math.max(now + 0.15, musHarmonyReadyAt + 0.04) : now + 0.15);
     const ev = [];
     const base = musOcaBase(pal);
     const sec = sysMUS_2ND[n];
@@ -19047,7 +19082,7 @@ export function createSystems(game) {
     ev.sort(function (a, b) { return a.t - b.t; });
     musStmt = { kind: kind, moment: req.moment, t0: t0, end: t0 + t, ev: ev, i: 0, lastIdx: lastIdx,
                 own: !!row.own, beat: beat, n: n, lastChordT: lastChordT, scale: scale || pal.scale || 'major',
-                midis: midis, ended: false };
+                midis: midis, ended: false, clarity: clear };
     // the drift's chord clock parks PAST the lookahead beyond the end, so
     // the walk cannot queue a chord under the last note; musStmtEnd sets
     // the real one when it hands over
@@ -19148,11 +19183,14 @@ export function createSystems(game) {
       // a built chord: voice-lead onto the palette's own home voicing at the
       // end, and the walk moves on from home after a dwell
       musIdx = 0;
-      musChordStart = s.end;
-      musSetChord(0, s.end, musPal.xfade);
-      musChordAt = s.end + dw;
+      const clear = !game.state.noPhraseClarity && !(game.state.perfRung >= 1);
+      const handAt = clear ? Math.max(s.end, ac.currentTime + 0.01, musHarmonyReadyAt + 0.04) : s.end;
+      musChordStart = handAt;
+      if (clear) musDwellNow = dw;   // the bass walk belongs to the new dwell
+      musSetChord(0, handAt, musPal.xfade);
+      musChordAt = handAt + dw;
     }
-    musDwellNow = musChordAt - (s.own ? s.lastChordT : s.end);
+    musDwellNow = musChordAt - (s.own ? s.lastChordT : musChordStart);
   }
   /** Called at the top of musTickBody: take a request, feed the lookahead. */
   function musStmtTick(now, horizon) {
@@ -19162,6 +19200,25 @@ export function createSystems(game) {
     }
     const s = musStmt;
     if (!s) return;
+    const clear = !game.state.noPhraseClarity && !(game.state.perfRung >= 1);
+    const clarityReturned = clear && s.clarity === false;
+    s.clarity = clear;
+    if (clear && s.i < s.ev.length && (s.ev[s.i].t < now - 0.1 ||
+        (clarityReturned && s.ev[s.i].t < musHarmonyReadyAt + 0.04))) {
+      // After a stalled clock, resume the unsaid phrase at its own pace.
+      // Collapsing overdue changes onto one sample retuned audible banks.
+      // Returning from the inherited mix also lets its longer fade finish.
+      const oldAt = s.ev[s.i].t;
+      const shift = Math.max(now + 0.05, musHarmonyReadyAt + 0.04) - oldAt;
+      for (let i = s.i; i < s.ev.length; i++) s.ev[i].t += shift;
+      if (s.i === 0) {
+        s.t0 += shift;
+        if (musStmtLast) musStmtLast.t0 = +s.t0.toFixed(2);
+      }
+      if (s.lastChordT >= oldAt) s.lastChordT += shift;
+      s.end += shift;
+      musChordAt = s.end + sysMUS_LOOK + 2;
+    }
     let guard = 0;
     while (s.i < s.ev.length && s.ev[s.i].t < horizon && guard++ < 24) {
       const e = s.ev[s.i++];
@@ -19169,7 +19226,10 @@ export function createSystems(game) {
       if (e.kind === 'chord') {
         musChordStart = when;
         musDwellNow = e.dwell;
-        musSetChordTo(e.chord, e.root, e.next, when, musPal.xfade);
+        // A phrase can turn much faster than the ambient chord walk. Finish
+        // its fade before the next change; the authored tempo/voicing stays.
+        const fade = clear ? Math.min(musPal.xfade, Math.max(0.4, e.dwell * 0.8)) : musPal.xfade;
+        musSetChordTo(e.chord, e.root, e.next, when, fade);
       } else if (e.kind === 'note') {
         musLiftNote('ocarina', when, e.midi, 0, musVel(e.vel), e.gap);
       } else if (e.kind === 'cm') {
@@ -23087,6 +23147,7 @@ export function createSystems(game) {
       musOut = hp;
     } catch (e) { musOut = musOutLP; }
     musOut.connect(acMaster);
+    musFinal = musOut;
 
     // ---- THE SCORE WAS IN THE SAME ROOM IN ALL NINETEEN PLACES (v41) ------
     //
@@ -45081,6 +45142,16 @@ export function createSystems(game) {
       return { ac: ac, sfxIn: acSfxIn, roomSend: acRoomSend, roomConv: acRoomConv,
                roomOut: acRoomOut, sfxOut: acSfxBus || null, master: acMaster };
     },
+    // Actual signal points, not the historical music.bus.out master alias.
+    // Read-only: analysers attach here; no runtime writer consumes this API.
+    audioStems: function () {
+      return { ac: ac, limiter: acLimit, musicFinal: musFinal, musicDry: musDry,
+               theme: musOcaBus, ambience: acAmbGain, weather: wxBedBus,
+               sfxFinal: acSfxFinal, foreground: sysScoreForeground(),
+               phrase: sysScoreBedPhrase(), ambientTarget: acAmbWant,
+               bedMovers: sysMovers.filter(function (m) { return m.bed && m.kind !== 'tune'; })
+                 .map(function (m) { return { kind: m.kind, node: m.g, live: m.live }; }) };
+    },
     /**
      * WHAT THE HERD SAID BACK to the last wheek (L4, audio #7): one row per
      * answer as it was FIRED — its delay from the wheek, its distance, the
@@ -45484,6 +45555,12 @@ export function createSystems(game) {
       return { queued: sysToastQ.length, held: sysToastHeld.length, live: wowLiveOn,
                floorFor: +sysToastFloorFor.toFixed(2), sinceFloor: +(sysWall() - sysToastFloorAt).toFixed(2),
                momentHeld: !!sysMomentDefer, whyLast: sysWhyTxt, heardLast: sysHeardTxt };
+    },
+    // Incidental mouths yield to teaching and the first two seconds of a
+    // receipt. Direct replies are protected by the caller's classification.
+    incidentalQuiet: function () {
+      return !!(tutOn && tutEl && tutEl.parentNode && !tutEl.dataset.going) ||
+        game.state.time - sysTickLastAt < 2;
     },
     leaveAudit: function () { return { busy: leaveBusy, n: leaveN, said: game.state.leaveSaid || 0 }; },
     codaAudit: function () {
@@ -52691,7 +52768,7 @@ export function createSystems(game) {
       if (musWorldEnv < 0.005) musWorldEnv = 0;
     }
     if (musSideG && ac && ac.state === 'running') {
-      const sideWant = 1 - sysMUS_SIDE.depth * musWorldEnv;
+      const sideWant = 1 - (sysScoreForeground() ? 0.25 : sysMUS_SIDE.depth) * musWorldEnv;
       sysAudioSet(musSideG.gain, sideWant, ac.currentTime,
                   sideWant < musSideLast ? sysMUS_SIDE.in : sysMUS_SIDE.out);
       musSideLast = sideWant;
@@ -52897,7 +52974,7 @@ export function createSystems(game) {
       // struck notes over the world, not a bigger pad. The intensity's own
       // flow share (sysFLOW_MUS) stays: that is the plucks' density and the
       // filter, which is the score going with you; this is its LEVEL.
-      const flowPad = 1 - sysMUS_SIDE.flowPad * clamp(sysFlowNow, 0, 1);
+      const flowPad = 1 - (sysScoreForeground() ? 0 : sysMUS_SIDE.flowPad) * clamp(sysFlowNow, 0, 1);
       sysAudioSet(musPad.gain, Math.max(0.0001, musPal.bus * voiceBusK * padUp *
         (1 - clamp(calmLean, 0, 1) * sysMUS_CALM_PAD * calmYield) * musBreath *
         (1 + skyRain * sysMUS_SKY_BUS) * (1 - 0.18 * musSpeak) * musPadSpecK * stingK * sleepK * flowPad),

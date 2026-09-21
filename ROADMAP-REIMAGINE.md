@@ -2,8 +2,35 @@
 
 Started 21 September 2026 on `codex/redesign-delight`, from `2fd9afa`.
 Lead: the current Codex task. The user authorised autonomous redesign,
-parallel agents, commits, pushes and milestone updates for a 48-hour
-iteration window, ending 23 September 2026 at approximately 11:32 UTC.
+parallel agents, commits, pushes and milestone updates. At 12:55 UTC the user
+reduced the original 48-hour plan to twelve hours total: stop 21 September
+2026 at 23:32 UTC (22 September 09:32 Sydney). No new features after 22:32 UTC.
+
+## Twelve-hour priority cut
+
+The existing programme below remains a backlog, not a promise to implement
+every item. Choose work by visible player benefit per hour, with no busywork
+to fill the window. Current critical path:
+
+1. Finish and push the character/audio checkpoint already under validation.
+2. Camera agency: preserve orientation during short stops and interactions;
+   keep cinematic resting views only after deliberate stillness. Verify
+   manual control, occlusion, vehicles, photo mode and reduced motion.
+3. Visible beauty: compose the opening and a few contrasting route places,
+   prioritising landmark readability, architecture/foliage rhythm and a clear
+   animal silhouette. Carry successful shared fixes across places where safe.
+4. Journey delight: play the recommended route with real controls, improve
+   movement/interaction friction and unclear objectives, verify save/reload
+   and the ordinary earned homecoming. Fix narrow-screen blockers.
+5. Final hour: freeze scope, run full regression and fresh browser checks,
+   commit/push the verified state, record unresolved issues and hand off.
+
+Defer new currencies, broad upgrade redesign, large new encounter chains,
+nineteen bespoke art rebuilds, additional decorative systems and speculative
+musical rewrites. Keep the score-forward mix and regional melodic identity;
+do not spend the shorter window inflating instrumentation without evidence.
+Use smaller companion models for bounded scouts/reviews. Recheck weekly quota
+at milestones; the timebox does not override account limits or safety gates.
 
 ## The direction
 
@@ -182,6 +209,24 @@ Preserve synthesis and the existing compositions. Audio timing and bus
 measurements require trusted input and a real clock. Perceptual listening
 remains an explicitly named validation limit when unavailable.
 
+F1 lowers the overlapping continuous beds, preserves player rush/scrape
+feedback, removes walking's pad attenuation and halves the world sidechain
+depth. `noQuiet` or governor rung one restores the inherited mix. A theme
+statement takes a further 45% from noise beds; release is four seconds.
+Actual final-music and coherent bed taps replace misleading master aliases.
+Do not equate the pre-SFX-filter bed reading with final audible balance.
+
+F2 classifies incidental speech at its origin. Unclassified/action/traveller
+dialogue is protected. Incidental voiced lines share a six-per-minute budget,
+including both sides of admitted exchanges; audio rejection preserves accepted
+text. A soft two-incidental-bubble cap never evicts protected speech. Teaching
+and recent reward receipts take priority. Keep the inherited behavior on cut.
+
+F3 first addresses harmony blurred by crossfades exceeding statement chord
+duration. Inspect bank scheduling and apply a bounded transition without
+rewriting the authored progression, tempo or chord rows. Further composition
+changes require evidence beyond a bus-level meter.
+
 ### G — integration and player evidence
 
 Run representative natural routes, all-chapter arrivals, replay,
@@ -219,12 +264,16 @@ work. A green static suite is necessary and never a claim of perfection.
 
 ## Current wave
 
-- Lead: roadmap, baseline/tooling coordination, integration.
-- A builder: tutorial continuity and partial-finale correctness,
-  `src/systems.js` and specifically named new A regression instruments.
-- Visual investigator: read-only art/composition and renderer audit.
-- Harness investigator: establish isolated browser QA capability and
-  baseline measurement method; do not alter game source.
+- Lead: integrate F1/F2/F3/E3, live Kyoto audio regression and checkpoint
+  gates. Main owns all released source; no simultaneous NPC/systems edits.
+- E3 accepted after twelve paired fixtures and a second eye-clearance pass.
+  Unified head/chin replaces the forehead-only prototype. Agent released files.
+- F2 complete: thirteen behavioral groups and a fresh Sydney browser pass.
+  F3: 13,439 scheduler assertions, including 672 live flag/governor returns
+  and 280 bass-walk handoffs. Independent review fixes are verified; no
+  further concrete issues reported. Not a perceptual OST-quality claim.
+- Read-only Luna scout: map idle camera thresholds and priority hazards for
+  E2. No new camera code until this checkpoint's audio/art gates finish.
 
 ## Checkpoint log
 
@@ -280,3 +329,64 @@ work. A green static suite is necessary and never a claim of perfection.
   intermittent browser throttling, not a reproduced game defect. A longer
   observation window passed with no forced loaf or manual simulation. Parent
   inspected the final ledger. Independent B/E1 diff review found no blocker.
+- B/C1/E1 pushed: `62315ad`, 29 suite checks, zero failed. Public master is
+  unchanged. F1 and E3 are the next uncommitted prototypes.
+- Run configuration: user requested GPT-6 Astra Medium; same-task continuation
+  sent with that explicit model/effort. Keep the existing goal and deadline.
+- Usage baseline, 21 Sep 12:23:16 UTC: account-wide Codex weekly quota 6%
+  used, 94% remaining, reset 28 Sep 08:17:49 UTC. No five-hour bucket was
+  supplied. No earlier usage snapshot exists, so active-loop burn rate is
+  unknown. Recheck at a later milestone before predicting exhaustion; do
+  not convert the goal's token accounting into quota percentages.
+- F1 hardware comparison: two fresh Sydney 60-second runs, trusted walking,
+  no runtime errors/hidden/paused/suspended samples. Coherently summed beds
+  measured -44.16 dBFS resting and -40.43 walking, versus inherited -31.54
+  and -33.33. Final score minus those pre-SFX-filter beds: +24.06/+14.30 dB,
+  not a final audible ratio. Stochastic arrangements differ between runs;
+  this is not a controlled causal gain measurement. Maximum limiter reduction
+  .036 dB foreground/.062 inherited. Ten live control checks pass (including
+  same-on mix changes, governor restoration, mute and Pause). 52 shipped-writer
+  target assertions pass. Independent Luna review found no concrete F1 defect.
+- E3 first contour inspected by lead in front, quarter, profile and gameplay
+  views. It improves the forehead slightly but leaves the separate muzzle/jaw
+  looking like a faceplate. A stronger unified craniofacial hull is in progress;
+  do not treat the first 881 changed gameplay pixels as the aesthetic target.
+- F2 now in behavioral/browser validation: classified incidental origins,
+  protected replies, shared voice budget and softer screen competition.
+  Source ownership stays sequential with the next systems change.
+- F2 validated: thirteen shipped-function groups. A 60.8-second Sydney run
+  produced one incidental admission, 32 distance suppressions and eleven
+  total babble calls including protected replies; incidental bubbles stayed
+  at two or fewer and the six-voice budget held. Zero runtime errors. This
+  stochastic run is not a causal A/B; protected bubbles can still overlap.
+- E3 accepted: unified upper head and rounded hinged chin, six meshes/416
+  triangles become two/312. Front eyes initially buried; crown narrowed and
+  lowered, then twelve fresh paired fixtures passed with zero runtime errors.
+  Lead inspected corrected front, quarter and gameplay views. Gameplay mask:
+  2,133 changed of 2,851 affected pixels. Exact inherited geometry returns on
+  cut/rung one, with coat, mouth, wet state and headwear preserved. Gate-only
+  CPU p95 .000023 ms flag / .000031 ms rung, excluding inherited update/GPU.
+- F3: statement crossfades now fit their chord dwell, wait for an unfinished
+  ambient bank fade, and resume unsaid events after stalls without collapsing
+  them. Tail-stall home-chord handoffs start on the resumed clock. Original
+  notes, roots, tempos and palette rows remain; `noPhraseClarity`/rung one
+  retains inherited scheduling. 4,251 assertions, 273 edge cases, 21 palettes.
+- Kyoto baseline: repeated street facades and weak distant focal hierarchy
+  remain art-direction targets. Trusted walking moved 2.49 metres, zero errors.
+  CPU tick median 12.1 ms/p95 15.3; rAF median 16.9 ms/p95 33.7. Not GPU timing.
+- Usage follow-up, 21 Sep about 12:52 UTC: weekly 9% used, 91% remaining.
+  Three rounded points in 29 minutes implies about 6 points/hour and roughly
+  15 hours remaining at this rate, account-wide, not a guarantee. Luna reserve
+  still reports 0% used. Do not promise the whole 48-hour window fits quota.
+- User narrowed the timebox to twelve hours total, ending 21 Sep 23:32 UTC.
+  Continuation prompt updated; scope freeze/final regression from 22:32 UTC.
+- F3 review found a live-return bank collision and stale bass-walk dwell.
+  Fixed both, preserving already queued events. Expanded 13,439 assertions
+  pass: 273 original edge cases, 672 flag/rung returns, 280 bass-walk cases.
+  Kyoto's hardware 40-second rest/walk capture delivered all twenty arrival
+  notes with zero runtime errors or hidden/paused/suspended-audio samples.
+- E3/F checkpoint gates: edited-source syntax, fresh one-file build and
+  33 suite checks pass with zero failures. The historical soak report remains
+  stale and is not counted as fresh browser coverage. First gate found an
+  unused shared geometry constant; restored its body-path use and updated
+  the extracted geometry fixture, then reran the full suite successfully.

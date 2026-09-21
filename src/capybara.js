@@ -695,18 +695,19 @@ function capyHullFit(zFrom, zTo) {
  * strip gets a second, smoothed normal set alongside the face one, and which
  * of the two the mesh carries is the round/flat A/B. See capySmoothNormals.
  */
-function capyHullGeo(rows, dw, dTop, dBot, smooth) {
-  const R = rows.length, N = capyHULL_N;
-  const px = capyHULL_PIVOT[0], py = capyHULL_PIVOT[1], pz = capyHULL_PIVOT[2];
+function capyHullGeo(rows, dw, dTop, dBot, smooth, section, pivot) {
+  const D = section || capyHULL_D, P = pivot || capyHULL_PIVOT;
+  const R = rows.length, N = section ? (D.length - 1) * 2 : capyHULL_N;
+  const px = P[0], py = P[1], pz = P[2];
   const ring = [], mid = [];
   for (let r = 0; r < R; r++) {
     const st = rows[r];
     const hw = st[1] + (dw || 0), top = st[2] + (dTop || 0), bot = st[3] + (dBot || 0);
     const a = [];
     for (let i = 0; i < N; i++) {
-      const j = i < capyHULL_D.length ? i : N - i;
-      const s = i < capyHULL_D.length ? 1 : -1;
-      const d = capyHULL_D[j];
+      const j = i < D.length ? i : N - i;
+      const s = i < D.length ? 1 : -1;
+      const d = D[j];
       a.push(s * d[0] * hw - px, bot + d[1] * (top - bot) - py, st[0] - pz);
     }
     ring.push(a);
@@ -866,6 +867,40 @@ function capyMuzzleGeo(w, h, d, cham, bevel, ramp) {
   g.computeVertexNormals();
   g.computeBoundingSphere();
   return g;
+}
+
+// REIMAGINE E3, second model. One continuous head from buried occiput to
+// blunt nose, instead of three boxes and two cheek beads. The top stays
+// broad under the brow sockets; the forehead rolls into the muzzle. The
+// first three stations KEEP the pad's measured support plane and chamfer.
+// The outer crown slopes below the catchlights, with no eye-anchor move.
+const capyHEAD_SECTION = [[0, 1], [0.60, 1], [0.86, 0.92], [1, 0.65],
+                          [1, 0.18], [0.94, 0], [0, 0]];
+const capyHEAD_ROWS = [
+  // z, half-width, crown, mouth seam (head-local metres)
+  [0.500, 0.1375, 0.055 - 0.035 * Math.tan(Math.PI / 6), -0.145],
+  [0.465, 0.1625, 0.055, -0.145],
+  [0.426, 0.1660, 0.055, -0.145],
+  [0.405, 0.1700, 0.079, -0.145],
+  [0.370, 0.1800, 0.117, -0.145],
+  [0.325, 0.1880, 0.166, -0.145],
+  [0.235, 0.1950, 0.190, -0.150],
+  [0.080, 0.1840, 0.180, -0.150],
+  [-0.180, 0.1700, 0.170, -0.140],
+];
+// The jaw's TOP is untouched, including its 7 mm overlap into the muzzle.
+// Only its underside draws up at the nose; the hinge and mouth stay put.
+const capyCHIN_SECTION = [[0, 1], [0.75, 1], [1, 1], [1, 0.72],
+                          [0.92, 0.20], [0.55, 0], [0, 0]];
+const capyCHIN_ROWS = [
+  [0.117, 0.135, 0.0425, 0.012],
+  [0.095, 0.150, 0.0425, -0.016],
+  [0.030, 0.150, 0.0425, -0.0425],
+  [-0.117, 0.150, 0.0425, -0.0425],
+];
+function capyHeadContourGeo(chin) {
+  return capyHullGeo(chin ? capyCHIN_ROWS : capyHEAD_ROWS, 0, 0, 0, true,
+    chin ? capyCHIN_SECTION : capyHEAD_SECTION, chin ? [0, 0, 0] : [0, 0.02, 0.07]);
 }
 
 /**
@@ -1356,10 +1391,11 @@ const _coatRGB = [1, 1, 1];
  * of fur-material parts that are not fur (a whisker, an eye's catchlight),
  * `{ limb: true }` for the legs, `{ nook: [x, y, z], to: [...] }` for a crease.
  */
-function capyPaintCoat(root, furMats) {
+function capyPaintCoat(root, furMats, only) {
   let painted = 0;
   root.traverse(function (o) {
     if (!o.isMesh || !o.geometry || !furMats.has(o.material)) return;
+    if (only && !only.has(o)) return;
     if (capyGeoShared.has(o.geometry)) o.geometry = o.geometry.clone();
     const pos = o.geometry.attributes.position;
     if (!pos) return;
@@ -3600,6 +3636,7 @@ export function createCapybara(game) {
   // Deep enough (rear face at local z = -0.18) that it buries itself inside the
   // saddle/barrel: from behind there is no seam and no dark wedge at the join.
   const skullBox = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.32, 0.50), mFur);
+  skullBox.name = 'capySkull';
   skullBox.position.set(0, 0.02, 0.07);
   skullBox.castShadow = true;
   head.add(skullBox);
@@ -3620,6 +3657,7 @@ export function createCapybara(game) {
   // the snout) and gives the eyes a corner to sit in. Its top edge stands 0.01
   // above the skull, so the sun leaves a brow shadow across the eyes.
   const brow = capyAddPart(head, new THREE.BoxGeometry(0.375, 0.14, 0.08), mFur, 0, 0.12, 0.295);
+  brow.name = 'capyBrowBridge';
   wetParts.push({ m: brow, dry: mFur, wet: mFurWet });
 
   // NOSE PAD — a marking, not a box bolted to the face. Tapered 4-sided prism
@@ -3730,6 +3768,7 @@ export function createCapybara(game) {
   // the muzzle into a skull and a snout, which is the shape of a head.
   const cheekL = capyAddPart(head, capyGeoLive, mFur, 0.150, 0.045, 0.235, 0.048, 0.050, 0.090);
   const cheekR = capyAddPart(head, capyGeoLive, mFur, -0.150, 0.045, 0.235, 0.048, 0.050, 0.090);
+  cheekL.name = 'capyCheekL'; cheekR.name = 'capyCheekR';
   wetParts.push({ m: cheekL, dry: mFur, wet: mFurWet });
   wetParts.push({ m: cheekR, dry: mFur, wet: mFurWet });
 
@@ -3885,6 +3924,7 @@ export function createCapybara(game) {
   jawHinge.position.set(0, -0.138, 0.262);
   head.add(jawHinge);
   const jawBox = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.085, 0.234), mDark);
+  jawBox.name = 'capyChin';
   jawBox.position.set(0, -0.0425, 0.117);
   jawBox.castShadow = true;
   jawHinge.add(jawBox);
@@ -3957,6 +3997,31 @@ export function createCapybara(game) {
   // once, at create, over the whole animal in its rest pose — the wardrobe is
   // built below and wears `mat()` materials, so it is correctly skipped.
   const capyCoated = capyPaintCoat(capyModel, capyFurMats);
+
+  // Cache the INHERITED head, not the first forehead-only prototype. Both
+  // coats are painted in the same rest pose. The union hides four pieces;
+  // dry/wet materials, eye/ear sockets and wardrobe anchors never move.
+  const capyHeadParts = [skullBox, brow, snout, jawBox, cheekL, cheekR];
+  const capyHeadBase = capyHeadParts.map(function (o) { return o.geometry; });
+  const capyHeadVisible = capyHeadParts.map(function (o) { return o.visible; });
+  const capyHeadRound = capyHeadBase.slice();
+  capyHeadRound[0] = capyHeadContourGeo(false);
+  capyHeadRound[3] = capyHeadContourGeo(true);
+  skullBox.geometry = capyHeadRound[0]; jawBox.geometry = capyHeadRound[3];
+  capyPaintCoat(capyModel, capyFurMats, new Set([skullBox, jawBox]));
+  let capyHeadOn = true;
+  function capyHeadApply(on) {
+    const pair = on ? capyHeadRound : capyHeadBase;
+    for (let i = 0; i < capyHeadParts.length; i++) {
+      const o = capyHeadParts[i];
+      o.geometry = pair[i];
+      o.visible = on ? (i === 0 || i === 3) : capyHeadVisible[i];
+      const normals = o.geometry.userData;
+      if (normals.nRound) o.geometry.setAttribute('normal', capyRoundOn ? normals.nRound : normals.nFlat);
+    }
+    capyHeadOn = on;
+  }
+  capyHeadApply(!game.state.noHeadContour && (game.state.perfRung | 0) < 1);
 
   // ---- ROUND OR FLAT, LIVE (G5) --------------------------------------------
   // `game.state.noRound` is polled once a frame (capyUpdate) and applied on
@@ -4902,6 +4967,18 @@ export function createCapybara(game) {
     group: capyRoot,
     body,
     mouthAnchor,
+    headContourAudit() {
+      return { on: capyHeadOn, revision: 2,
+               geometries: capyHeadParts.map(function (o) { return o.geometry.id; }),
+               visible: capyHeadParts.map(function (o) { return o.visible; }),
+               coated: capyHeadParts.every(function (o) { return !!o.geometry.attributes.color; }),
+               smooth: [skullBox, jawBox].every(function (o) {
+                 return o.geometry.attributes.normal === o.geometry.userData.nRound;
+               }),
+               triangles: capyHeadParts.reduce(function (n, o) {
+                 return n + (o.visible ? (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3 : 0);
+               }, 0) };
+    },
     // G5's probe: which way the animal is shaded right now, and what bound.
     roundInfo() {
       let smoothGeo = 0, flatMats = 0;
@@ -5917,6 +5994,8 @@ export function createCapybara(game) {
     if (dt <= 0) dt = 1 / 60;
     // G5's A/B, on the edge and before the helm's early return
     if (capyRoundOn === !!game.state.noRound) capyRoundApply(!game.state.noRound);
+    const headContour = !game.state.noHeadContour && (game.state.perfRung | 0) < 1;
+    if (capyHeadOn !== headContour) capyHeadApply(headContour);
     // ---- THE TRACKS AGE (V6) ------------------------------------------
     // Before the helm's early return, so a trail left on the apron fades
     // while the animal drives the ferry rather than freezing for the trip.

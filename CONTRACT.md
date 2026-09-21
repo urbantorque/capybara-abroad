@@ -1,3 +1,44 @@
+## REIMAGINE E3/F — ONE FACE, ROOM FOR THE SCORE (21 Sep 2026)
+
+E3 replaces the capybara's stacked skull/brow/muzzle/cheeks with one continuous
+upper head and a rounded hinged chin. Six rendered meshes and 416 triangles
+become two and 312. Existing eye, nose, ear, mouth and wardrobe anchors stay;
+the first version buried the eyes and was rejected. Corrected geometry passes
+twelve paired front/quarter/profile/gameplay, wet, mouth and headwear fixtures.
+Lead inspected the corrected face and gameplay silhouette. `noHeadContour`
+or rung one restores the exact inherited cached geometry and visibility.
+Coat and `noRound` apply to both variants. Cut-gate CPU p95 .000023 ms
+(flag), .000031 ms (rung); this excludes inherited update and GPU execution.
+
+F1 makes the music foreground by reducing overlapping air, weather and noise
+beds, removing walking's pad attenuation and reducing world-sidechain depth.
+Noise beds yield further during a statement and return over four seconds.
+Placed musical instruments, rush and scrape feedback keep their own envelopes.
+`noQuiet` or rung one restores inherited mix targets. New read-only taps expose
+actual final score/SFX/master nodes; coherent bed measurements are explicitly
+pre-SFX-filter and are not presented as final audible balance. Sydney paired
+60-second hardware captures and ten live mute/pause/flag/governor controls pass.
+Stochastic performances differ; numerical readings are not a listening verdict.
+
+F2 classifies incidental speech at its origin. Idle/weather/local chat and
+passive greetings use six voiced admissions per rolling minute, fourteen-metre
+earshot, softer volume and at most two incidental bubbles. Paired exchanges
+reserve both voices; abandoned reservations expire. Action, traveller and
+unclassified dialogue remains protected. Tutorial/receipt priority suppresses
+incidental speech, not direct replies. Audio rejection preserves accepted text.
+`noQuiet`/rung one restores inherited behavior. Thirteen behavioral groups and
+a 60-second Sydney browser pass hold budgets without errors. Protected bubbles
+can still overlap; this checkpoint does not claim the whole HUD is resolved.
+
+F3 keeps original notes, roots, tempos and palette rows. Statement chord fades
+fit their dwell, entry waits for an unfinished ambient fade, and stalled clocks
+resume unsaid events at their authored spacing. Late home-chord handoffs use
+the resumed clock. Returning from inherited scheduling waits for its longer
+fade before scheduling the remainder. `noPhraseClarity`/rung one uses inherited
+scheduling; already queued events are never rewritten. Real scheduler/voice
+fixtures cover all twenty-one palettes, while a hardware Kyoto run delivered
+all twenty arrival notes with zero runtime errors. No new save fields.
+
 ## REIMAGINE B/C1/E1 — A SHORTER JOURNEY, A QUIETER LAWN (21 Sep 2026)
 
 The recommended journey is Sydney, Quay, Pasto, Kyoto, Palawan, Pantanal,

@@ -31,6 +31,10 @@ const ASSERTS = [
   ['qa/reimagine-journey.mjs', 'authored route choices and stable chapter/task identities'],
   ['qa/reimagine-route-integration.mjs', 'open travel, legacy memories and earned-place coda'],
   ['qa/reimagine-stamina.mjs', 'non-worsening boons and a bounded stamina bank'],
+  ['qa/reimagine-mix.mjs', 'foreground score, inherited cut mix and essential feedback'],
+  ['qa/reimagine-phrasing.mjs', 'phrase timing, bank clearance and stall-safe harmonic handoffs'],
+  ['qa/reimagine-speech.mjs', 'incidental voice budgets and protected dialogue priority'],
+  ['qa/reimagine-head.mjs', 'finite head contours with preserved anatomical extents', ['--static']],
   ['qa/strip-test.mjs',   'the comment stripper: 16 cases plus every source file re-parsed'],
   ['qa/p6-static.cjs',    'CHAPTERS and TASKS: acts, notes, arrivals, the souvenir exception'],
   ['qa/xmodule.mjs',      'cross-module contract: imports, exports, name collisions'],
@@ -115,17 +119,17 @@ const REPORTS = [
   ['qa/soak-diff.mjs',    'the soak against its last three rows'],
 ];
 
-function run(file) {
+function run(file, args = []) {
   if (!existsSync(file)) return { missing: true };
   const t0 = Date.now();
-  const r = spawnSync(process.execPath, [file], { encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [file, ...args], { encoding: 'utf8' });
   return { code: r.status, out: (r.stdout || '') + (r.stderr || ''), ms: Date.now() - t0 };
 }
 
 let failed = 0, ran = 0;
 console.log('--- asserting ---');
-for (const [f, what] of ASSERTS) {
-  const r = run(f);
+for (const [f, what, args] of ASSERTS) {
+  const r = run(f, args);
   ran++;
   if (r.missing) { console.log('MISSING  ' + f); failed++; continue; }
   const ok = r.code === 0;

@@ -1577,7 +1577,98 @@ export function createNPCs(game) {
     return n;
   }
   game.bubblesLive = npcBubblesLive;
-  function sayBubble(npcRec, text) {
+  // F2: only named incidental origins enter this budget. A missing purpose
+  // means authored/action dialogue; the reused synth options carry none of it.
+  const npcSpeechIdle = { category: 'idle' };
+  const npcSpeechWeather = { category: 'weather' };
+  const npcSpeechGreeting = { category: 'greeting' };
+  const npcSpeechTokens = [], npcSpeechRows = [], npcSpeechCounts = {};
+  function npcSpeechOn() {
+    return !game.state.noQuiet && (game.state.perfRung | 0) < 1;
+  }
+  function npcSpeechHeld() {
+    return !!(game.hud && game.hud.incidentalQuiet && game.hud.incidentalQuiet());
+  }
+  function npcSpeechDistance(rec) {
+    const p = rec && (rec.group ? rec.group.position : rec.anchor && rec.anchor.group.position);
+    const c = game.capy && game.capy.position;
+    return p && c ? (p.x - c.x) ** 2 + (p.z - c.z) ** 2 : Infinity;
+  }
+  function npcSpeechAudit(speech, surface, reason) {
+    const category = speech ? speech.category : 'protected';
+    const key = surface + ':' + category + ':' + reason;
+    npcSpeechCounts[key] = (npcSpeechCounts[key] || 0) + 1;
+    npcSpeechRows.push({ t: game.state.time || 0, category, surface, reason });
+    if (npcSpeechRows.length > 96) npcSpeechRows.shift();
+  }
+  game.speechAudit = function () {
+    return { counts: { ...npcSpeechCounts }, rows: npcSpeechRows.map(r => ({ ...r })),
+      tokens: npcSpeechTokens.map(t => ({ at: t.at, pending: t.pending })),
+      bubbles: bubbles.filter(b => b.owner && b.t < b.life).map(b => ({
+        text: b.txt.textContent, incidental: !!b.incidental, remaining: b.life - b.t })) };
+  };
+  function npcSpeechPair(a, b, category) {
+    if (a.trav || b.trav) return null;
+    return { category, pair: { a, b, started: false, token: null }, reply: false };
+  }
+  function npcSpeechReply(speech) {
+    return speech ? { category: speech.category, pair: speech.pair, reply: true } : null;
+  }
+  function npcSpeechVoice(rec, speech) {
+    if (!npcSpeechOn()) return true;
+    if (!speech) { npcSpeechAudit(null, 'voice', 'protected'); return true; }
+    const now = game.state.time || 0;
+    const reject = reason => { npcSpeechAudit(speech, 'voice', reason); return false; };
+    if (npcSpeechHeld()) return reject('guidance');
+    // Test earshot before touching tokens, including the other half of a pair.
+    const pair = speech.pair;
+    if (npcSpeechDistance(rec) > 14 * 14 || (pair && !speech.reply &&
+        (npcSpeechDistance(pair.a) > 14 * 14 || npcSpeechDistance(pair.b) > 14 * 14))) return reject('distance');
+    for (let i = npcSpeechTokens.length - 1; i >= 0; i--) {
+      const t = npcSpeechTokens[i];
+      if (now - t.at >= (t.pending ? 8 : 60)) npcSpeechTokens.splice(i, 1);
+    }
+    if (pair && speech.reply) {
+      if (!pair.started || !pair.token || !npcSpeechTokens.includes(pair.token)) return reject('unreserved-reply');
+      // Date the answer when it sounds, not when its place was reserved.
+      pair.token.at = now; pair.token.pending = false; pair.token = null;
+    } else {
+      const need = pair ? 2 : 1;
+      if (npcSpeechTokens.length + need > 6) return reject('budget');
+      npcSpeechTokens.push({ at: now, pending: false });
+      if (pair) {
+        pair.started = true;
+        pair.token = { at: now, pending: true };
+        npcSpeechTokens.push(pair.token);
+      }
+    }
+    npcSpeechAudit(speech, 'voice', 'accepted');
+    return true;
+  }
+  function npcSpeechSlot(npcRec, speech) {
+    const incidental = !!speech;
+    if (incidental && npcSpeechHeld()) { npcSpeechAudit(speech, 'bubble', 'guidance'); return null; }
+    let same = null, free = null, far = null, oldest = null, count = 0;
+    for (let i = 0; i < BUB; i++) {
+      const b = bubbles[i], live = b.owner && b.t < b.life;
+      if (!live) { if (!free) free = b; continue; }
+      if (b.owner === npcRec) same = b;
+      if (!oldest || b.t > oldest.t) oldest = b;
+      if (b.incidental) {
+        count++;
+        if (!far || npcSpeechDistance(b.owner) > npcSpeechDistance(far.owner)) far = b;
+      }
+    }
+    if (!incidental) return same || free || far || oldest;
+    // A fresh idle remark never replaces a live task line, even on its owner.
+    if (same && !same.incidental) { npcSpeechAudit(speech, 'bubble', 'protected-owner'); return null; }
+    if (same) return same;
+    if (count < 2 && free) return free;
+    if (far && npcSpeechDistance(npcRec) < npcSpeechDistance(far.owner)) return far;
+    npcSpeechAudit(speech, 'bubble', 'capacity');
+    return null;
+  }
+  function sayBubble(npcRec, text, speech) {
     // ---- NOBODY TALKS OVER THE TITLE CARD (T1) ---------------------------
     // The locals do not know the game has not started. Measured 5 Sep 2026 at
     // 1920x1080: three bubbles standing in the wash behind the title card,
@@ -1598,9 +1689,11 @@ export function createNPCs(game) {
     // HUD. Two up at once for the first ten seconds; the rest is dropped, and
     // a crowd that talks less on the first frame is still a crowd.
     if (npcStartAt < 0) npcStartAt = game.state.time;
-    if (game.state.time - npcStartAt < npcFIRST_T && npcBubblesLive() >= npcFIRST_CAP) return;
-    let slot = null;
-    for (let i = 0; i < BUB; i++) {
+    const quiet = npcSpeechOn();
+    if (!quiet && game.state.time - npcStartAt < npcFIRST_T && npcBubblesLive() >= npcFIRST_CAP) return;
+    let slot = quiet ? npcSpeechSlot(npcRec, speech) : null;
+    if (quiet && !slot) return;
+    for (let i = 0; !slot && i < BUB; i++) {
       if (bubbles[i].owner === npcRec) { slot = bubbles[i]; break; }
     }
     if (!slot) for (let i = 0; i < BUB; i++) { if (!bubbles[i].owner) { slot = bubbles[i]; break; } }
@@ -1610,6 +1703,8 @@ export function createNPCs(game) {
       slot = best;
     }
     slot.owner = npcRec;
+    slot.incidental = !!speech;
+    if (quiet) npcSpeechAudit(speech, 'bubble', 'accepted');
     slot.t = 0;
     slot.ox = 0;
     slot.side = 0; slot.cside = 0;  // a new line has not chosen a side yet (V3)
@@ -1689,13 +1784,15 @@ export function createNPCs(game) {
       if (sp && !ws) words++;
       sp = ws;
     }
+    if (!npcSpeechVoice(npcRec, speech)) return;
+    const voiceVol = quiet && speech ? 0.164 : 0.26;
     if (words >= 2) {
       npcSayOpt.line = text;
       npcSayOpt.q = text.indexOf('?') >= 0;
       npcSayOpt.low = !!npcRec.authority;
       npcSayOpt.slow = npcRec.role === 'the storyteller';
-      sfx('babble', npcRec, 0.26, 1, words, npcSayOpt);
-    } else sfx('blip', npcRec, 0.26, 1, text.length < 22 ? 2 : 3);
+      sfx('babble', npcRec, voiceVol, 1, words, npcSayOpt);
+    } else sfx('blip', npcRec, voiceVol, 1, text.length < 22 ? 2 : 3);
   }
 
   // =========================================================================
@@ -3931,7 +4028,7 @@ export function createNPCs(game) {
         (o.y !== undefined ? o.y : (g ? g.position.y : 0)) + 1.35,
         o.z !== undefined ? o.z : (g ? g.position.z : 0)) }, lastLine: '' },
     };
-    rec.anchor.speak = function (t) { sayBubble(rec.anchor, t); };
+    rec.anchor.speak = function (t, speech) { sayBubble(rec.anchor, t, speech); };
     // ---- A LOCAL IS A PERSON, AND A PERSON IS SOLID --------------------------
     // addBody() below is called from exactly one place, the boot spawn loop, so
     // its 32 bodies belong to Sydney and are removed from the world with it. The
@@ -4093,7 +4190,7 @@ export function createNPCs(game) {
     return pick;
   }
 
-  function localLine(rec, arr) {
+  function localLine(rec, arr, speech) {
     const pool = localResolve(arr, rec);
     if (!pool.length) return;
     const sig = pool.length + '' + pool[0];
@@ -4126,7 +4223,7 @@ export function createNPCs(game) {
     npcEchoPush(line);
     rec.last = line;
     rec.gest = 1.5 + line.length * 0.045;   // as long as the bubble, near enough
-    rec.anchor.speak(line);
+    rec.anchor.speak(line, speech);
   }
   function localsSay(kind, payload) {
     // The wheek reaches everybody in earshot, which is a wider circle than the
@@ -7795,7 +7892,7 @@ export function createNPCs(game) {
           // not also remark on the leaves.
           if (wxMotes && !wxRain && r.cd <= 0 && Math.random() < 0.34) {
             r.cd = r.cool * rand(0.9, 1.6);
-            localLine(r, npcSay(r, 'drift'));
+            localLine(r, npcSay(r, 'drift'), r.trav ? null : npcSpeechWeather);
           }
         }
         const looking = wxMotes && r.lookT <= 0 && wxRain < 0.25;
@@ -7810,7 +7907,7 @@ export function createNPCs(game) {
         r.wetWas = raining;
         if (r.cd <= 0 && Math.random() < 0.5) {
           r.cd = r.cool * rand(0.8, 1.5);
-          localLine(r, npcSay(r, raining ? 'drizzle' : 'clearing'));
+          localLine(r, npcSay(r, raining ? 'drizzle' : 'clearing'), r.trav ? null : npcSpeechWeather);
         }
       }
       const chilly = wxCold > 0 && wxGustS > npcLOC_CHILL_G;
@@ -7818,7 +7915,7 @@ export function createNPCs(game) {
         r.chillWas = chilly;
         if (chilly && r.cd <= 0 && Math.random() < 0.3) {
           r.cd = r.cool * rand(1.0, 1.8);
-          localLine(r, npcSay(r, 'chill'));
+          localLine(r, npcSay(r, 'chill'), r.trav ? null : npcSpeechWeather);
         }
       }
       // ---- the flinch, which is a spring ---------------------------------
@@ -8425,7 +8522,8 @@ export function createNPCs(game) {
       if (near && !r.was && r.cd <= 0 && r.lines) {
         r.cd = r.cool * rand(0.8, 1.4);
         const bowTie = game.capy && game.capy.worn === 'bow-tie';
-        localLine(r, (bowTie && r.praise) ? r.praise : r.lines);
+        localLine(r, (bowTie && r.praise) ? r.praise : r.lines,
+          r.trav || (bowTie && r.praise) ? null : npcSpeechGreeting);
       }
       r.was = near;
       // ---- THE BAG (L8, F2): the fifteen new cameos stay hidden until
@@ -8511,6 +8609,7 @@ export function createNPCs(game) {
   // owed from a later frame so that the pair are not both talking at once.
   // =======================================================================
   let locChatT = rand(3, 8);
+  let locChatSpeech = null;
   let locChatRec = null, locChatWhen = 0;
 
   // =======================================================================
@@ -8552,6 +8651,7 @@ export function createNPCs(game) {
   const locCoPairs = {};         // 'i:j' -> game time it last fired
   const locCoRows = [];          // the audit's ring of recent pairs
   let locCoReply = null, locCoWhen = 0;
+  let locCoSpeech = null;
   function localsCompany(dt) {
     const on = !game.state.noCompany && ((game.state.perfRung | 0) < 1);
     if (locCoReply) {
@@ -8560,7 +8660,8 @@ export function createNPCs(game) {
         const b = locCoReply; locCoReply = null;
         if (on && b.biome === (game.biome && game.biome.current) && b.fl > -0.02) {
           npcSayOpt.line = 'mm hm.'; npcSayOpt.q = false; npcSayOpt.low = !!b.authority; npcSayOpt.slow = false;
-          sfx('babble', b, npcLOC_CO_VOL, 1, randInt(2, 3), npcSayOpt);
+          if (npcSpeechVoice(b, locCoSpeech))
+            sfx('babble', b, npcSpeechOn() && locCoSpeech ? 0.126 : npcLOC_CO_VOL, 1, randInt(2, 3), npcSayOpt);
           b.gest = 1.2;
         }
       }
@@ -8594,9 +8695,12 @@ export function createNPCs(game) {
         a.chatYaw = Math.atan2(b.x - a.x, b.z - a.z); a.chatT = npcLOC_CO_LOOK;
         b.chatYaw = Math.atan2(a.x - b.x, a.z - b.z); b.chatT = npcLOC_CO_LOOK;
         npcSayOpt.line = 'so then, well.'; npcSayOpt.q = Math.random() < 0.4; npcSayOpt.low = !!a.authority; npcSayOpt.slow = false;
-        sfx('babble', a, npcLOC_CO_VOL, 1, randInt(3, 5), npcSayOpt);
+        const speech = npcSpeechPair(a, b, 'company');
+        if (npcSpeechVoice(a, speech))
+          sfx('babble', a, npcSpeechOn() && speech ? 0.126 : npcLOC_CO_VOL, 1, randInt(3, 5), npcSayOpt);
         a.gest = 1.4;
         locCoReply = b; locCoWhen = rand(1.1, 1.7);
+        locCoSpeech = npcSpeechReply(speech);
         locCoN++;
         locCoRows.push({ t: +now.toFixed(1), a: ia, b: ib, d: +Math.sqrt(d2).toFixed(2), x: +a.x.toFixed(1), z: +a.z.toFixed(1) });
         if (locCoRows.length > 24) locCoRows.shift();
@@ -8619,7 +8723,7 @@ export function createNPCs(game) {
           // The chapter's `passing` for the reply too (L7, E6): a second
           // observation, not an answer. The echo ring keeps it from being
           // the opener said back.
-          localLine(b, npcSay(b, 'chatBack') || npcSayFor(b.biome, 'passing') || npcLOC_CHAT.back);
+          localLine(b, npcSay(b, 'chatBack') || npcSayFor(b.biome, 'passing') || npcLOC_CHAT.back, locChatSpeech);
         }
       }
       return;
@@ -8659,7 +8763,9 @@ export function createNPCs(game) {
         // people say to each other when nothing has happened — and only
         // then the ten shared lines. Measured before this: Venice 5 of 13
         // bubbles in 90 s were Venice's, Marrakech 0 of 4.
-        localLine(a, npcSay(a, 'chatOpen') || npcSayFor(live, 'passing') || npcLOC_CHAT.open);
+        const speech = npcSpeechPair(a, b, 'chat');
+        localLine(a, npcSay(a, 'chatOpen') || npcSayFor(live, 'passing') || npcLOC_CHAT.open, speech);
+        locChatSpeech = npcSpeechReply(speech);
         locChatRec = b;
         locChatWhen = rand(1.4, 2.3);
         locChatT = rand(11, 28);     // ...and now the long one, so it is not a chorus
@@ -8721,7 +8827,7 @@ export function createNPCs(game) {
   // but neither is consulted for the pick any more; the bag's own opening
   // guard and the ring between them cover both.
   // =======================================================================
-  function pickLine(npcRec, key) {
+  function pickLine(npcRec, key, speech) {
     const raw = npcLINES[key];
     if (!raw) return;
     const pool = localResolve(raw, npcRec);
@@ -8753,7 +8859,7 @@ export function createNPCs(game) {
     npcEchoPush(line);
     npcRec.lastLine = line;
     npcLastGlobal[key] = line;
-    npcRec.speak(line);
+    npcRec.speak(line, speech);
   }
 
   // ------------------------------------------------------------ photo flash
@@ -9509,7 +9615,7 @@ export function createNPCs(game) {
       // sayBubble, which is the one place every line in this file goes
       // through, so the arm cannot get out of step with the bubble.
       gest: 0,
-      speak(t) { sayBubble(rec, t); },
+      speak(t, speech) { sayBubble(rec, t, speech); },
       update(dt) { stepHuman(rec, dt); },
     };
     // ---- THE GAIT, from the figure's own seed (ROADMAP-WOW2 V2.1) -------
@@ -10468,7 +10574,7 @@ export function createNPCs(game) {
       if (st === 'seated') {
         if (rec.talkCd <= 0 && Math.random() < 0.35) {
           rec.talkCd = rand(10, 26);
-          pickLine(rec, 'diner');
+          pickLine(rec, 'diner', npcSpeechIdle);
         }
       } else if (st !== 'resit' && rec.stateT > 2.2) {
         setState(rec, 'resit');       // wherever the fright took him, lunch is waiting
@@ -10483,7 +10589,7 @@ export function createNPCs(game) {
         if (rec.stateT > 9) { rec.serveI = (rec.serveI + 1) % 16; rec.stateT = 0; rec.served = 0; }
         else if (rec.talkCd <= 0 && Math.random() < 0.2) {
           rec.talkCd = rand(11, 24);
-          pickLine(rec, 'serve');
+          pickLine(rec, 'serve', npcSpeechIdle);
         }
       }
       return;
@@ -10497,7 +10603,7 @@ export function createNPCs(game) {
         if (rec.stateT > 2.4) { setState(rec, 'busk'); pickLine(rec, rec.robbed ? 'buskSad' : 'busk'); }
       } else if (rec.talkCd <= 0 && Math.random() < 0.3) {
         rec.talkCd = rand(9, 22);
-        pickLine(rec, 'busk');
+        pickLine(rec, 'busk', npcSpeechIdle);
       }
       return;
     }
@@ -10592,7 +10698,7 @@ export function createNPCs(game) {
         lookAtCapy(rec);
         if (rec.talkCd <= 0 && Math.random() < 0.6) {
           rec.talkCd = rand(8, 20);
-          pickLine(rec, hot ? 'wary' : 'laugh');
+          pickLine(rec, hot ? 'wary' : 'laugh', hot ? null : npcSpeechGreeting);
         }
         return;
       }
@@ -10673,7 +10779,7 @@ export function createNPCs(game) {
     if (st === 'calm' && rec.stateT > 1.5) setState(rec, 'idle');
     if (st === 'idle' && rec.talkCd <= 0 && Math.random() < 0.12) {
       rec.talkCd = rand(12, 30);
-      pickLine(rec, 'idle');
+      pickLine(rec, 'idle', npcSpeechIdle);
     }
   }
 
@@ -11698,7 +11804,7 @@ export function createNPCs(game) {
             if (!rec.served && rec.stateT > 0.55) {
               rec.served = 1;
               sfx('pop', rec, 0.26, rand(1.5, 1.9));
-              if (rec.talkCd <= 0) { rec.talkCd = rand(11, 24); pickLine(rec, 'serve'); }
+              if (rec.talkCd <= 0) { rec.talkCd = rand(11, 24); pickLine(rec, 'serve', npcSpeechIdle); }
               // ...and the pair at this table look up. Nothing else on that
               // terrace has ever reacted to anything but the capybara.
               for (let k = 0; k < game.npcs.length; k++) {
@@ -12569,7 +12675,7 @@ export function createNPCs(game) {
     rec.target.set(x, 0, z);
     rec.bestD = 1e9; rec.stallT = 0; rec.stallN = 0; rec.detT = 0;
   }
-  function paSay(rec, key) { if (key && rec.speak) pickLine(rec, key); }
+  function paSay(rec, key, speech) { if (key && rec.speak) pickLine(rec, key, speech); }
 
   /**
    * Blocked, too steep to be worth the dignity, or THE ANIMAL IS THERE.
@@ -13087,7 +13193,7 @@ export function createNPCs(game) {
             rec.noticeCd <= 0 && paSeeCapy(rec) > 0.30) {
           rec.noticeCd = rand(6, 12) * (1 - hHere * npcHEAT_AGAIN);
           paLookCapy(rec);
-          if (rec.talkCd <= 0) { rec.talkCd = rand(9, 20); paSay(rec, 'paNotice'); }
+          if (rec.talkCd <= 0) { rec.talkCd = rand(9, 20); paSay(rec, 'paNotice', npcSpeechGreeting); }
         }
       }
       // Nobody stands at a trestle table for five minutes without touching it.
@@ -13151,7 +13257,7 @@ export function createNPCs(game) {
           paDistToCapy(rec) < 8 * (1 + hHere * (npcHEAT_LOOK - 1)) && paSeeCapy(rec) > 0.30) {
         rec.noticeCd = rand(8, 16) * (1 - hHere * npcHEAT_AGAIN);
         paLookCapy(rec);
-        if (rec.talkCd <= 0) { rec.talkCd = rand(10, 24); paSay(rec, 'paChurch'); }
+        if (rec.talkCd <= 0) { rec.talkCd = rand(10, 24); paSay(rec, 'paChurch', npcSpeechGreeting); }
       }
       // The same missing exclusion as the farmer above, failing the other way
       // round: a churchgoer standing in `pray` whose timer is not up falls to
@@ -15338,6 +15444,7 @@ export function createNPCs(game) {
   // reply slots, and these records carry no .biome of their own the way a local
   // does — so without this the reply was owed by a person, not by a place.
   let chatReplyRec = null, chatReplyT = 0, chatReplyKey = '', chatReplyBiome = '';
+  let chatReplySpeech = null;
 
   /** Openers and replies, per chapter. Sydney and Pasto have their own. */
   function chatKeys() {
@@ -15359,7 +15466,7 @@ export function createNPCs(game) {
         // coordinate with nobody standing on it.
         if (r.group && npcCHAT_CALM[r.state] && r.dejected <= 0 &&
             chatReplyBiome === ((game.biome && game.biome.current) || '')) {
-          pickLine(r, chatReplyKey);
+          pickLine(r, chatReplyKey, chatReplySpeech);
         }
       }
       return;
@@ -15404,7 +15511,9 @@ export function createNPCs(game) {
         b.lookX = a.group.position.x; b.lookZ = a.group.position.z;
         a.chatCd = rand(20, 55);
         b.chatCd = rand(20, 55);
-        pickLine(a, K[0]);
+        const speech = npcSpeechPair(a, b, 'chat');
+        pickLine(a, K[0], speech);
+        chatReplySpeech = npcSpeechReply(speech);
         chatReplyRec = b;
         chatReplyKey = K[1];
         chatReplyT = rand(1.5, 2.4);
