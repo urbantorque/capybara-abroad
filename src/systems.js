@@ -5110,6 +5110,26 @@ const sysMUS_MOTIF = {
 };
 const sysMUS_MOTIF_GAP = 4;      // s between two of the same name
 const sysMUS_SWELL_VEL = 0.10;   // the home swell's level on the pad's filter, against pad voices at 0.058–0.15
+// ---- THE ARC (ROADMAP-SCORE, M5) --------------------------------------------
+// The three progress gates become an arrangement. The second voice keeps
+// its 0.15 entry (L6 measured a naive hour at chapProg 0.17 — an answer
+// that starts later is one most players never hear) and from a third of
+// the chapter its ROLE changes: a chord tone below becomes the third below
+// the note just played, in the palette's scale — a countermelody rather
+// than an echo. The pulse at a half is kept. From two thirds the bass
+// WALKS: a struck root on each chord change and its fifth at half the
+// dwell, on the bass's own filter and gain (the sustained sine's walk
+// under it is untouched), velocity 0.4 against the sine's 0.5. The full
+// statement at done is M3's. The nap's wake is A at half tempo on the
+// ocarina alone with the room's tail at 1.5× while it plays (a term in
+// musRoomSet, the wet gain's one writer). The finale's coda is the tune
+// completed (see sysFinaleCoda). `noArc` puts the three gates back as
+// they were and the coda back to the eight.
+const sysMUS_LAYER_COUNTER = 1 / 3;
+const sysMUS_LAYER_WALK    = 2 / 3;
+const sysMUS_WALK_VEL      = 0.4;
+const sysMUS_WALK_DEC      = 1.4;    // s the struck bass note rings
+const sysMUS_WAKE_WET      = 1.5;    // the room under the wake statement
 // THE MUSICIAN (L7, F2): the tune, played from a POSITION by a bed-class
 // mover instead of on the non-diegetic pad. One beat here is 0.6 s (the
 // theme's own eight notes, weighted by sysMUS_THEME_DUR, run about 8.4 s —
@@ -18413,7 +18433,11 @@ export function createSystems(game) {
     if (musRoomFor !== live) { musRoomLoad(live); return; }
     // ...and THE BREATH opens the room, which is most of why the return lands:
     // the hush is not a gap, it is the same music further away.
-    const w = musRoomWant * (1 + (1 - musBreath) * sysMUS_BREATH_WET);
+    // ...and the nap's wake opens it further (ROADMAP-SCORE, M5): A alone on
+    // the ocarina into a room half again as long, for the statement's own
+    // length; a term here, because this line is the wet gain's one writer.
+    const wakeK = (musStmt && musStmt.kind === 'wake' && !(game.state && game.state.noArc)) ? sysMUS_WAKE_WET : 1;
+    const w = musRoomWant * (1 + (1 - musBreath) * sysMUS_BREATH_WET) * wakeK;
     musRoomSlot[musRoomCur].wet.gain
       .setTargetAtTime(Math.max(0.0001, w), ac.currentTime, 0.9);
   }
@@ -18634,6 +18658,34 @@ export function createSystems(game) {
       act.g.gain.linearRampToValueAtTime(0, when + fade);
       v.active = 1 - v.active;
     }
+    // ---- THE WALKING BASS (ROADMAP-SCORE, M5): past two thirds of the
+    // chapter, a struck root on the change and the fifth at half the dwell
+    // — on the pad palettes, awake, not under a breath's floor.
+    if (musBassIn && !musPal.band && musSleep < 0.5 && musBreath > 0.6 &&
+        musProg >= sysMUS_LAYER_WALK && !(game.state && game.state.noArc)) {
+      musWalkNote(when, rootMidi, sysMUS_WALK_VEL);
+      if (musDwellNow > 2.5) musWalkNote(when + musDwellNow * 0.5, rootMidi + 7, sysMUS_WALK_VEL * 0.8);
+      musWalkN++;
+    }
+  }
+  // A struck bass note into the bass's own filter (M5): a sine with a
+  // fast attack and a triangle an octave up for the small speaker, the
+  // way the sustained pair is built — through bassLp, so musBassGain's
+  // one writer still owns the level.
+  let musBassIn = null, musWalkN = 0;
+  function musWalkNote(when, midi, vel) {
+    const hz = sysMidiHz(midi);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0006, musVel(vel)), when + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + sysMUS_WALK_DEC);
+    const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = hz;
+    const o2 = ac.createOscillator(); o2.type = 'triangle'; o2.frequency.value = hz * 2;
+    const g2 = ac.createGain(); g2.gain.value = sysMUS_VOICE.bass2;
+    o.connect(g); o2.connect(g2); g2.connect(g);
+    g.connect(musBassIn);
+    o.start(when); o2.start(when);
+    o.stop(when + sysMUS_WALK_DEC + 0.05); o2.stop(when + sysMUS_WALK_DEC + 0.05);
   }
 
   // Chapter change. Nothing stops and nothing restarts: the palette pointer swaps,
@@ -18781,6 +18833,19 @@ export function createSystems(game) {
     const p = pal || musPal;
     const sc = sysMUS_SCALES[scale || (p && p.scale)] || sysMUS_SCALES.major;
     return sc[((d % 7) + 7) % 7] + 12 * Math.floor(d / 7);
+  }
+  // The scale-wise third under `midi` in the palette's scale (M5): the
+  // nearest scale step to the note, two steps down, in the same register.
+  let musCounterN = 0;
+  function musThirdBelow(midi, pal) {
+    const p = pal || musPal;
+    const sc = sysMUS_SCALES[p && p.scale] || sysMUS_SCALES.major;
+    const tonicPc = ((((p && p.roots) ? p.roots[0] : 38) % 12) + 12) % 12;
+    const rel = (((midi - tonicPc) % 12) + 12) % 12;
+    let di = 0, best = 99;
+    for (let i = 0; i < 7; i++) { const e = Math.abs(sc[i] - rel); if (e < best) { best = e; di = i; } }
+    const d2 = di - 2;
+    return midi - rel + sc[((d2 % 7) + 7) % 7] + 12 * Math.floor(d2 / 7);
   }
   // THE WHOLE TUNE, as [degree, beats] pairs (M1): A, or A + B + tag.
   function musThemeNotes(kind) {
@@ -22649,8 +22714,19 @@ export function createSystems(game) {
           // A CHORD TONE BELOW the note just played, folded into the same
           // register the lift uses, so it can never collide with the bass or
           // disappear over the top of the pad.
+          // ...AND FROM A THIRD OF THE CHAPTER, THE THIRD BELOW IT (ROADMAP-
+          // SCORE, M5): the note the walk just played is ch[musMelDeg] (the
+          // walk left its degree there), and the answer is a scale-wise
+          // third under it — a countermelody, not an echo. Under `noArc`
+          // the answer is the chord tone it always was.
           const bi = randInt(0, ch.length - 1);
-          const m2 = musFold(ch[bi] + (sec.oct || 0), sysMUS_LIFT_LO, sysMUS_LIFT_HI);
+          let m2;
+          if (musProg >= sysMUS_LAYER_COUNTER && !(game.state && game.state.noArc)) {
+            const L = ch.length;
+            const lastMidi = ch[musMelDeg % L] + 12 * Math.floor(musMelDeg / L) + 12;
+            m2 = musFold(musThirdBelow(lastMidi) + (sec.oct || 0), sysMUS_LIFT_LO, sysMUS_LIFT_HI);
+            musCounterN++;
+          } else m2 = musFold(ch[bi] + (sec.oct || 0), sysMUS_LIFT_LO, sysMUS_LIFT_HI);
           const gap2 = rand(sec.gapA === undefined ? 0.6 : sec.gapA,
                             sec.gapB === undefined ? 1.2 : sec.gapB);
           musLiftNote(sec.inst || 'pluck', musPluckAt + gap2, m2,
@@ -23168,6 +23244,7 @@ export function createSystems(game) {
     bassLp.type = 'lowpass'; bassLp.frequency.value = sysMUS_VOICE.bassLp; bassLp.Q.value = 0.4;
     musBassGain = ac.createGain(); musBassGain.gain.value = 0.26;
     bassLp.connect(musBassGain); musBassGain.connect(musDry);
+    musBassIn = bassLp;   // the walking bass strikes into it (ROADMAP-SCORE, M5)
     musBassV = musMakeVoice(33, 0.5, 'sine', [0, 5], bassLp);
     musBass2V = musMakeVoice(45, sysMUS_VOICE.bass2, 'triangle', [0, 5], bassLp);
 
@@ -37251,6 +37328,39 @@ export function createSystems(game) {
     }
     return sysMUS_THEME.length - 1;
   }
+  // ...AND THE CODA IS THE TUNE COMPLETED (ROADMAP-SCORE, M5). The nineteen
+  // keepsakes carry the first nineteen notes of A + B + tag — one each, on
+  // its chapter's lead, in Sydney's key, at the tune's own rhythm
+  // (sysFIN_CODA_BEAT a beat) — and the twentieth, the held do' that ends
+  // the tag, is the ocarina's, with no keepsake to name: the one that came
+  // home. The pad walks the progression under it (musCodaChords) and the
+  // hush follows as before. Under `noArc` the coda is the eight, as L6 left
+  // it. `sysFinCodaPitch` is the MIDI list as played, for the audits.
+  const sysFIN_CODA_BEAT = 0.22;      // s a beat: 36 beats ≈ 7.9 s, near the old 19 × 0.34
+  const sysFinCodaPitch = [];
+  function musCodaChords(t0, beat) {
+    if (!ac || !musCurChord) return;
+    const n = musPalN;
+    const notes = musThemeNotes('full');
+    const nA = sysMUS_THEME.length, nB = sysMUS_THEME_B.length, nT = sysMUS_THEME_TAG.length;
+    const chAt = [];
+    for (let j = 0; j < sysMUS_THEME_CH.length; j++) chAt.push([sysMUS_THEME_CH[j], 'prog', j]);
+    for (let j = 0; j < sysMUS_THEME_B_CH.length; j++) chAt.push([nA + sysMUS_THEME_B_CH[j], 'prog', 4 + j]);
+    const L = musProgLen(n, 'tag');
+    for (let j = 0; j < L; j++) chAt.push([nA + nB + Math.round(j * (nT - 1) / Math.max(1, L - 1)), 'tag', j]);
+    let end = 0;
+    for (let c = 0; c < chAt.length; c++) {
+      const pc = musProgChord(n, chAt[c][1], chAt[c][2]);
+      const nx = c + 1 < chAt.length ? musProgChord(n, chAt[c + 1][1], chAt[c + 1][2]) : pc;
+      const tA = musStmtNoteT(notes, chAt[c][0], beat);
+      const tB = c + 1 < chAt.length ? musStmtNoteT(notes, chAt[c + 1][0], beat) : musStmtNoteT(notes, notes.length, beat);
+      musDwellNow = tB - tA;
+      musSetChordTo(pc.chord, pc.root, nx.root, t0 + tA, Math.min(musPal.xfade, Math.max(0.4, (tB - tA) * 0.8)));
+      end = t0 + tB;
+    }
+    // the walk is parked past the hush; nothing follows the coda but the ledger
+    musChordAt = end + 60;
+  }
   function sysFinaleCoda() {
     let t = 0.4;
     const chord = musCurChord;
@@ -37258,7 +37368,12 @@ export function createSystems(game) {
     const ph = game.physics;
     sysFinCodaN = 0;
     sysFinCodaTune.length = 0;
+    sysFinCodaPitch.length = 0;
     const base = musThemeBase(0);
+    const arc = !(game.state && game.state.noArc);
+    const notes = arc ? musThemeNotes('full') : null;
+    const canPlay = !!(ac && chord && chord.length && musVol && !musMuted);
+    if (arc && canPlay) { try { musCodaChords(musSnap(now + t), sysFIN_CODA_BEAT); } catch (e) { /* the pad stays where it is */ } }
     for (let k = 1; k <= chapMax; k++) {
       const def = chapterDef(k);
       if (!def) continue;
@@ -37266,10 +37381,12 @@ export function createSystems(game) {
       const inst = (pal && pal.lead && pal.lead !== 'none') ? pal.lead : 'pluck';
       const ll = sysROUTE_LL[def.biome];
       const pan = ll ? clamp(ll[0] / 180, -1, 1) * 0.8 : 0;
-      if (ac && chord && chord.length && musVol && !musMuted) {
-        const ti = sysFinCodaIdx(k, chapMax);
-        const midi = base + musThemeOff(ti);
-        try { musLiftNote(inst, musSnap(now + t), midi, pan, 0.14, sysFIN_NOTE_GAP * 1.6); sysFinCodaN++; sysFinCodaTune.push(ti); } catch (e) { /* one voice missing */ }
+      // the note's index and its length: the tune's own (M5), or the eight
+      const ti = arc ? Math.min(k - 1, notes.length - 1) : sysFinCodaIdx(k, chapMax);
+      const gapK = arc ? notes[ti][1] * sysFIN_CODA_BEAT : sysFIN_NOTE_GAP;
+      if (canPlay) {
+        const midi = arc ? base + musDegOff(notes[ti][0]) : base + musThemeOff(ti);
+        try { musLiftNote(inst, musSnap(now + t), midi, pan, 0.14, gapK * 1.6); sysFinCodaN++; sysFinCodaTune.push(ti); sysFinCodaPitch.push(midi); } catch (e) { /* one voice missing */ }
       }
       (function (biome, delay, name, keep) {
         setTimeout(function () {
@@ -37289,7 +37406,16 @@ export function createSystems(game) {
           } catch (e) { /* a caption */ }
         }, delay * 1000);
       })(def.biome, t, def.name, def.keep);
-      t += sysFIN_NOTE_GAP;
+      t += gapK;
+    }
+    // ...and the twentieth (M5): the tag's held do', on the ocarina, named
+    // for nobody — the caption stays on the last keepsake
+    if (arc && canPlay && notes.length > chapMax) {
+      const ti = notes.length - 1;
+      const midi = musOcaBase() + musDegOff(notes[ti][0]);
+      const gapK = notes[ti][1] * sysFIN_CODA_BEAT;
+      try { musLiftNote('ocarina', musSnap(now + t), midi, 0, sysMUS_OCA_VEL, gapK * 1.6); sysFinCodaN++; sysFinCodaTune.push(ti); sysFinCodaPitch.push(midi); } catch (e) { /* the pipe is optional */ }
+      t += gapK;
     }
     // the hush, at the last note's tail
     const hushAt = t + 0.6;
@@ -42379,6 +42505,13 @@ export function createSystems(game) {
                  compTake: musMotifEv.compTake, compClimb: musMotifEv.compClimb, compHome: musMotifEv.compHome,
                  absence: musMotifEv.absence, sydneyOpen: musMotifEv.sydneyOpen },
       motifDropped: musMotifDropped, motifCut: musMotifCut, absenceArm: musAbsenceArm,
+      // THE ARC (M5): the layers live by progress, and their counts
+      layers: { counter: musProg >= sysMUS_LAYER_COUNTER && !!sysMUS_2ND[musPalN] && !(game.state && game.state.noArc),
+                pulse: musProg >= sysMUS_LAYER_PULSE && !(musPal && musPal.band),
+                walk: musProg >= sysMUS_LAYER_WALK && !(musPal && musPal.band) && !(game.state && game.state.noArc),
+                ost: musOstArmed && musProg >= sysMUS_LAYER_OSTINATO },
+      counterN: musCounterN, walkN: musWalkN, pulseN: musPulseN, ostN: musOstN,
+      coda: { n: sysFinCodaN, tune: sysFinCodaTune.slice(), pitches: sysFinCodaPitch.slice() },
       restT: +musStmtRestT.toFixed(1), restGap: +musStmtRestGap.toFixed(0),
       chordAt: +(musChordAt - (ac ? ac.currentTime : 0)).toFixed(2),
       idx: musIdx, pal: musPalN, scale: (musPal && musPal.scale) || 'major', tonic: musPal && musPal.roots ? musPal.roots[0] : null,
@@ -45236,7 +45369,11 @@ export function createSystems(game) {
       for (let i = 0; i < sysMUS_THEME.length; i++) if (seen[i]) hit++;
       return { notes: sysFinCodaN, hushed: sysFinHushed, running: sysFinCodaT >= 0, yaw: +sysFinCodaYaw.toFixed(2),
                music: musVol ? +musVol.gain.value.toFixed(4) : null, closing: sysFinClosing, done: sysFinDone,
-               tune: sysFinCodaTune.slice(), tuneHit: hit, tuneComplete: hit === sysMUS_THEME.length };
+               tune: sysFinCodaTune.slice(), tuneHit: hit, tuneComplete: hit === sysMUS_THEME.length,
+               // M5: the pitches as played, and whether they are A + B + tag in order
+               pitches: sysFinCodaPitch.slice(),
+               whole: sysFinCodaTune.length === sysMUS_THEME.length + sysMUS_THEME_B.length + sysMUS_THEME_TAG.length &&
+                      sysFinCodaTune.every(function (v, i) { return v === i; }) };
     },
     finaleClose: function () { sysFinaleClose(); },
     moveAudit: function () { return { earned: mvEarned, at: Object.assign({}, mvAt), air: +mvAir.toFixed(2), clings: mvClings,
