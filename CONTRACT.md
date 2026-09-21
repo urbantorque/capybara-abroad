@@ -1,3 +1,25 @@
+## REIMAGINE D5 — THE WAY ON STAYS VISIBLE (21 Sep 2026)
+
+At-helm paper compacts only with an actual marquee ID. A fresh real-key
+Quay passage now leaves the Manly way-on row visible at the helm after docking;
+signature, supports and memory survive reload. The lead inspected the frame.
+
+Only unnamed incident/scene captions yield to an earned card or live encore.
+Named chains, other moment cards and protected toast/lesson paths remain on
+their inherited paths. One moment visibility writer retains the authored
+2.6s lifetime and 8s deferral watchdog; hidden captions expire, never queue
+for later. `noEarnedSpace` or rung one reveals only unexpired content. Meter,
+score, sounds and save shape are unchanged.
+
+487 extracted-function checks cover visibility, timers, deferred ownership,
+publisher opt-in and helm gating. Controlled 1280/390px hardware-browser
+fixtures pass real expiry and protected replacement. Separate held-timer
+pixel comparisons isolate the moment layer with world/other HUD hidden:
+162114/106333 changed pixels, zero outside its bounds plus the inherited
+96px shadow reserve; rung and restoration are pixel-exact. Full-HUD frames
+were inspected. Detached steady-state writer p95 .000020ms for flag/rung,
+excluding layout, transition work and GPU. No full-frame cost claim.
+
 ## REIMAGINE D4/G — ROOM FOR THE REWARD SHOT (21 Sep 2026)
 
 Signature completion uses a compact earned card rather than the arrival's

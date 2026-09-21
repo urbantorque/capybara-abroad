@@ -1275,6 +1275,9 @@ function sysEarnedLive(id, ownerBiome, biome, done, sameChapter, line, age, cut,
 function sysEarnedCardLive(requested, cut, rung) {
   return !!requested && !cut && (rung | 0) < 1;
 }
+function sysMomentVisible(wanted, incidental, earnedCard, encore, cut, rung) {
+  return !!wanted && !(incidental && (earnedCard || encore) && !cut && (rung | 0) < 1);
+}
 const hkROOF_HINT = 30;          // m: above this in Hong Kong you are on the roof (X2)
 // ---- THE MIX, MEASURED (S2). See qa/s1-spectrum.js and qa/s1-sfx.js. ------
 // ---- ...AND THE LID, LIFTED (L7, E1 / audio #4) -----------------------------
@@ -26106,7 +26109,7 @@ export function createSystems(game) {
       todoEl.classList.toggle('away', want);
     }
     // the marquee's own state (L4, E4): see the .marq rule
-    const wantMarq = !busy && !want && (wowLiveOn || wowEarnedOn || !!(game.capy && game.capy.atHelm));
+    const wantMarq = !busy && !want && (wowLiveOn || wowEarnedOn || !!(marqId && game.capy && game.capy.atHelm));
     if (wantMarq !== todoMarq) { todoMarq = wantMarq; todoEl.classList.toggle('marq', wantMarq); }
     if (want) {
       const top = taskRec[todoTopId];
@@ -29544,6 +29547,14 @@ export function createSystems(game) {
   momentEl.appendChild(momentNote);
   hudRoot.appendChild(momentEl);
   let momentTimer = 0;
+  let momentWanted = false, momentIncidental = false, momentVisible = false;
+  // Generic incident captions yield their remaining lifetime to the earned
+  // shot. Keep the timer running: a stale caption is not a queued lesson.
+  function momentVisibilityTick() {
+    const visible = sysMomentVisible(momentWanted, momentIncidental, placeEarned && showPlaceLast,
+      wowEarnedOn, game.state.noEarnedSpace, game.state.perfRung);
+    if (visible !== momentVisible) { momentVisible = visible; momentEl.classList.toggle('show', visible); }
+  }
   /**
    * THE CARD. `note` is a third line under the big one and is optional (Q1):
    * THE REPERTOIRE puts the name in `text` and the chain’s own sentence here,
@@ -29560,24 +29571,27 @@ export function createSystems(game) {
   const sysMOMENT_DEFER = 8.0;
   let sysMomentDefer = null;
   function sysMomentTick() {
+    momentVisibilityTick();
     if (!sysMomentDefer) return;
     if (wowLiveOn && sysWall() - sysMomentDefer.at < sysMOMENT_DEFER) return;
     const m = sysMomentDefer;
     sysMomentDefer = null;
-    showMomentNow(m.kicker, m.text, m.note);
+    showMomentNow(m.kicker, m.text, m.note, m.incidental);
   }
-  function showMoment(kicker, text, note) {
-    if (wowLiveOn) { sysMomentDefer = { kicker: kicker, text: text, note: note, at: sysWall() }; return; }
-    showMomentNow(kicker, text, note);
+  function showMoment(kicker, text, note, incidental) {
+    if (wowLiveOn) { sysMomentDefer = { kicker: kicker, text: text, note: note, incidental: !!incidental, at: sysWall() }; return; }
+    showMomentNow(kicker, text, note, incidental);
   }
-  function showMomentNow(kicker, text, note) {
+  function showMomentNow(kicker, text, note, incidental) {
     momentKick.textContent = kicker || '';
     momentText.textContent = text || '';
     momentNote.textContent = note || '';
     momentNote.style.display = note ? '' : 'none';
-    momentEl.classList.add('show');
+    momentWanted = true;
+    momentIncidental = !!incidental;
     if (momentTimer) clearTimeout(momentTimer);
-    momentTimer = setTimeout(function () { momentEl.classList.remove('show'); }, sysMOMENT_CARD);
+    momentTimer = setTimeout(function () { momentWanted = false; momentVisibilityTick(); }, sysMOMENT_CARD);
+    momentVisibilityTick();
   }
 
   // ---- THE FRAME WAS SILENT (D6) -----------------------------------------
@@ -45617,7 +45631,7 @@ export function createSystems(game) {
     chapRecap: function (n) { return chapRecap(n); },
     showDone: function (n, sub, kicker) { showDone(n, sub, kicker); },
     // the moment card, for the harness (L6, E4): it defers under a marquee
-    showMoment: function (k, t, n) { showMoment(k, t, n); },
+    showMoment: function (k, t, n, incidental) { showMoment(k, t, n, incidental); },
     /** The toast machinery's window (L6, E4): what waits, and who has the floor. */
     toastAudit: function () {
       return { queued: sysToastQ.length, held: sysToastHeld.length, live: wowLiveOn,
@@ -47769,9 +47783,10 @@ export function createSystems(game) {
     // showed — no empty slot, no dash, nothing to notice.
     const named = repName(x, z);
     const sentence = pool[randInt(0, pool.length - 1)];
+    // A named chain is its own reward; only the generic caption yields space.
     showMoment(tier === 2 ? 'A SCENE' : 'AN INCIDENT',
                named ? named.name : sentence,
-               named ? sentence : '');
+               named ? sentence : '', !named);
     punch(tier === 2 ? 0.12 : 0.09);
     // ...and the people say the one thing they only say when it has been three
     // in a row. npc.js owns what that sounds like; this owns when.

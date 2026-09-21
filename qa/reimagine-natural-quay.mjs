@@ -102,6 +102,16 @@ try {
   await sailTo({ x: 108, z: -500 }, { radius: 18 });
   await sailTo({ x: 118, z: -544 }, { final: true, radius: 30, maxMs: 50000 });
   await h.page.waitForFunction(() => window.__capy.taskDone('manly-voyage'), null, { timeout: 12000 });
+  await h.page.waitForTimeout(200);
+  report.navigationCard = await h.page.evaluate(() => {
+    const paper=document.querySelector('.capyui-todo');
+    const way=document.querySelector('.capyui-way:not(.capyui-trav):not(.capyui-shop)');
+    const r=way.getBoundingClientRect();let visible=r.width>0&&r.height>0;
+    for(let p=way;p;p=p.parentElement){const s=getComputedStyle(p);visible&&=s.display!=='none'&&s.visibility!=='hidden'&&Number(s.opacity)>.01;}
+    return {compact:paper.classList.contains('marq'),way:way.textContent,visible,atHelm:window.__capy.quay.boat.atHelm};
+  });
+  assert.ok(report.navigationCard.atHelm&&!report.navigationCard.compact&&report.navigationCard.visible,
+    'completed voyage shows way on while still at helm');
   const end = await sample('natural Manly arrival');
   await h.screenshot(name + '-manly');
   assert.ok(end.tasks['take-helm'] && end.tasks['to-quay'] && end.tasks['under-bridge'] && end.tasks['manly-voyage']);

@@ -84,6 +84,18 @@ the existing bounded moment deferral for active earned presentation; preserve
 protected guidance and eventual delivery. Name and measure any new flag before
 implementation. These are observed clarity issues, not shipped fixes.
 
+D5 implementation boundary: compact helm paper requires a real marquee ID,
+so finishing the ferry signature returns the ordinary way-on card. For visual
+priority, explicitly tag only the generic incident/scene moment as incidental.
+`noEarnedSpace`/rung one restores its inherited visibility; while an earned
+card or encore is live, its existing lifetime runs behind that presentation.
+Other moment cards and all protected toast/lesson paths stay unchanged. This
+supersedes broad extra deferral: a later incident caption can be misleading,
+and extending the existing single-slot hold could replace protected content.
+Use one visibility writer, retain the authored timer and preserve incident
+meter, scoring, sounds and save shape. Verify mid-card cuts, timer expiry,
+ordinary/protected moment priority and the natural post-voyage navigation.
+
 ## Seven standards
 
 1. **Identity.** Trouble, wonder and belonging have different rhythms.
@@ -631,3 +643,20 @@ work. A green static suite is necessary and never a claim of perfection.
   40 suite checks pass, zero failed. Independent lifecycle review found no
   concrete regression; expiry-callback/reuse coverage was added. Historical
   soak remains stale and is not counted as fresh runtime evidence.
+- D5: actual marquee ownership fixes empty post-voyage paper. Fresh real-key
+  Quay arrival now shows the Manly way-on row while still at helm; tasks and
+  memory survive reload, zero errors. Lead inspected the arrival frame.
+- D5: generic incident cards yield, named/protected feedback retains its path.
+  487 actual-function checks pass. 1280/390px controlled real-clock expiry and
+  fallback checks pass. Separate isolated-layer images change 162114/106333
+  pixels, zero outside the card plus inherited-shadow mask; rung/restoration
+  exact. Full-HUD frames inspected. Early fixtures exposed reload save-flush
+  and unrelated timed-layer/shadow effects; corrected setup, not game logic.
+  One browser attempt crashed; fresh desktop and phone repeats pass with zero
+  errors. Detached class-writer cut p95 .000020ms, excludes layout/GPU.
+- Next high-value acceptance: Kyoto's natural Uji run plus pond swim and
+  matcha support, checking steering, river continuity and saved memory. Stop
+  adding minor HUD refinements unless real play exposes a blocking problem.
+- D5 checkpoint: edited JavaScript syntax, fresh single-file build and 41
+  suite checks pass, zero failed. Independent diff review found no concrete
+  regression. Historical soak data remains stale, not fresh runtime coverage.
