@@ -277,6 +277,121 @@ one. Item 3's mud is real but not eye-provable at the render angles this
 agent found; a different chapter or a taller/less-oblique camera might
 read it more clearly for whoever revisits it.
 
+### W2 — shipped (21 Sep 2026)
+
+Items 4, 6, 7, 8 — far.js's truss primitive and hanoi.js/kowloon.js's
+call sites, weather.js's jacaranda gust and environment.js's parallel
+canopy list, systems.js's compHOME table, and capybara.js's minimal
+nap-forcing hook. Four commits, `81ef293` (D6), `77f0b5b` (D4), `7b0ad9e`
+(D7), `03892d3` (D8).
+
+- **4, a truss for Hanoi, a decision for Kowloon — built and
+  re-confirmed.** `farTruss()` (far.js): a bay-loop primitive, thin
+  quads not boxes, ~12 triangles a bay — a truss reads end-on (the one
+  place the deck's own lens ever stands) BECAUSE it is mostly the air
+  between its members, which a wedge's solid silhouette profile has no
+  way to be. `farBundle()` gained a fourth optional slot, `truss`, static
+  like `layer` and counted the same way in the tris/calls audit — no new
+  cut flag, the existing `noFar`/rung-park convention already covers it.
+  hanoi.js's far bundle now runs 14 bays (168 triangles, under the
+  200-tri cap) from the deck's own end (z 250) to z 460. Verified: the
+  chapter ARRIVAL lens still sees 0% of it (expected — the lens is 53°
+  off the bridge axis, ROADMAP-WOW2's own prior finding, not a
+  regression, re-confirmed fresh via `qa/wow3-d4-hanoi-far.js`); from the
+  deck camera V3's own instrument used (`qa/wow3-d4-hanoi-bridge.js`),
+  pct 6.0% -> 6.23%, tris 92 -> 260 (56 wedge + 168 truss + 36 train,
+  exact). `qa/wow3-d4-hanoi-crop.js`'s crop of the raw deck render shows a
+  receding row of small Xs converging toward the vanishing point, gaps
+  visible between members — read by eye as a truss, not the abandoned
+  build's solid grey pyramid. Kowloon: left as built, not relocated — the
+  street frontage has zero sky in frame and no geometry fix changes that;
+  Lion Rock is not orphaned regardless, the helicopter's own furthest
+  ring already sees it (`qa/wow3-d4-kowloon-air.js` re-measured 14.68%,
+  V3's own 14.7%, tris still 88, nothing drifted).
+- **6, Sydney's jacaranda gust — built.** `envDAPPLE_JAC`
+  (environment.js): a second, PARALLEL canopy list (all fifteen
+  `envJAC_SPOTS`, r 4.4), not folded into `envDAPPLE_FIGS` (already at
+  grain()'s own eight-circle shading cap) and not baked through grain()
+  at all — registration only, exported since this wave owns weather.js
+  too. `wxStepJacStrip(dt)` (weather.js): Sydney-only, the same
+  nearest-canopy/0.84-peak-gate shape as the existing gust-strip half of
+  `wxStepStrip`, its own cooldown (`wxJacCd`) so it fires independently
+  of the figs' green gust, in `PALETTE.petalPurple`, into the shared
+  `moteQuad` pool — never the separate `skitMesh` the ground-petal
+  skitter already owns, so the two are categorically distinct regardless
+  of shared hue. Verified live (`qa/wow3-d6-jacaranda.js`): gust forced
+  constant past the gate, 31 purple instances landed 4.07-4.69 m from the
+  jacaranda centre (matches the crown radius exactly) at y 2.47-3.55 m
+  airborne, while 19 green (fig) instances landed near a different fig
+  spot in the same window — two independently-sourced, differently-
+  located bursts from one forced gust. `qa/wow3-d6-jacaranda-shot.js`
+  caught a frame with 14 live slots: small coloured motes visible
+  scattered in the air above the crown, a higher, separate cluster from
+  the ground-level petal/decal scatter beside the neighbouring tree in
+  the same shot.
+- **7, the companion's per-kind landing spot — built.** `compHOME`
+  (systems.js, beside `compTRAITS`): six coordinates, x/z only, copied
+  (read, not imported) from each kind's own `from` chapter's already-
+  built landmark — `venCAMPANILE` (venice), `gorPLAZA` (goreme, the cats'
+  own wander bounds), `manGULL_HOME` (manly, already named for this),
+  `antCOLONY` (antarctic), `kyoHERON_A` (kyoto, "the near shallows"), and
+  Sydney's rubbish-bin stand (environment.js's own `binX`/`binZ`, copied
+  not exported). `compLeave(capy, 'home')` now snaps the drop point to
+  the named spot instead of wherever the animal was standing, then walks
+  the same short distance further IN — deeper toward its own place —
+  rather than back out toward the player; every other reason (`told`,
+  `far`) is untouched. Verified live (`qa/wow3-d7-homecoming.js`, W6's
+  own save-forced-stow pattern, one reload per kind): 6/6 kinds caught
+  mid walk-off, `stowDebug()`'s x/z within 0.3 m of `compHOME` every
+  time. `qa/wow3-d7-eye.js` then screenshot each spot through the game's
+  own settled camera: heron's shot is the strongest — pond shallows,
+  reeds, and a "got close enough to make the heron leave" toast, proving
+  the wild heron critter genuinely lives at that exact coordinate; cat's
+  shot is the honest miss — numerically correct (gorPLAZA is real and
+  cats do wander its bounds) but this vantage showed Goreme's balloon
+  field instead of anything recognisable as a plaza; the other three
+  (pigeon, gull, gentoo, ibis) read as fitting general areas without the
+  single specific landmark object square in frame.
+- **8, N4's real opening — the nap and the bag built, the walk-off
+  still not.** `capybara.js:capyForceNap(v)` overrides ONLY the
+  per-frame OUTPUT of `capyNap`/`capyLoaf`, never `capyRestT`/`capyBusy`
+  underneath, so releasing it hands the pose back to the ordinary damp —
+  the nap's own wake-up beat, reused rather than re-animated. First
+  confirmed the pre-start rendering question was moot: `game.tick` runs
+  every module regardless of `started`, and `startGame` itself sets
+  `game.state.started = true` well before the opening fires, so the
+  roadmap's own fallback ("first frame after Begin") was already true by
+  construction. `sysOpeningPlay` (systems.js) now calls
+  `capyForceNap(1)` and shows a two-box rucksack
+  (`sysBagBuild`, PALETTE.capyPouch/khaki) beside the animal the moment
+  the beat starts, and releases/hides both in `finish()` (skip or
+  timeout, same path). No new cut flag — the whole sequence is already
+  behind the pre-existing `noOpen`. STILL NOT BUILT: the traveller's own
+  visible walk-off — genuinely blocked the same way N4.1 found it, the
+  figure is npc.js's (`addTraveller`, the N2 glimpse pattern) and npc.js
+  is this wave's explicit do-not-touch. The bag disappearing at the same
+  moment stands in for the carry-off without showing it. Verified live
+  (`qa/wow3-d8-opening.js`, a genuinely fresh file): by 2.34 s
+  `capy.nap`/`capy.loaf` both 1, the bag visible beside the animal, the
+  model visibly lower than its pre-nap Y; a key press mid-beat drops nap
+  to 0 within 400 ms and both fields settle to 0 with the bag gone 1.5 s
+  later, "the lawn is yours" toast up as normal.
+
+**Budget, all four items:** none needed a new `game.state.noX` flag —
+each reuses an existing one (`noFar`, `noStrip`) or sits entirely behind
+one that already gates it (`noOpen`); `compHOME` adds no per-frame term
+at all. New static geometry: 168 triangles (Hanoi's truss, one-time
+build, no per-frame cost) + 24 (the opening's bag, shown at most once a
+session). No new mote-pool contention (the jacaranda gust shares
+`moteQuad`/`wxMOTE_MAX` on the same terms the fig gust always has). A
+combined frame-time A/B across every WOW3 flag together is W5's own
+closeout item, not repeated per-wave here.
+
+**Miss, named plainly:** item 8's traveller walk-off and item 7's cat
+landing (numerically correct, not eye-confirmed as "a plaza" from the
+camera angle tried) are the two honest misses this wave found; both are
+named above with the reason, not rounded up.
+
 ## Part H — needs a human, not an agent (not built by this pass's agents)
 
 Two numbers from ROADMAP-WOW2's own Closed section that no bot can supply.
