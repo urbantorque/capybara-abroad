@@ -1702,15 +1702,28 @@ export function lensFadeUniform() { return _lensFadeU; }
 const _lensCapA = { value: new THREE.Vector3(0, -9999, 0) };   // the eye
 const _lensCapB = { value: new THREE.Vector3(0, -9999, 0) };   // the chest
 const _lensCapR = { value: 0 };                                // 0 = off
+const _lensClearView = { value: 0 };                           // inherited cylinder when cut
 const _lensCapOnW = { value: 1 };                              // the world's materials
 const _lensCapOff = { value: 0 };                              // the animal's
+// REIMAGINE E5: the old 0.8 ceiling leaves three Bayer pixels in every sixteen
+// across the animal. A fully open core removes that screen door. Keep the
+// broad world-space aperture: the projected-cone prototype exposed the head
+// but hid the feet and walking space. Only the outer 10 cm retain a fringe.
+// Shared by colour and the EXISTING custom depth path; no new shadow hooks.
+const _LENS_CAP_CUT = `float lensCapCut(float d, float t, float radius) {
+  if (uLensClearView > 0.5) {
+    return 1.0 - smoothstep(radius - 0.10, radius, d);
+  }
+  return 0.8 * (1.0 - smoothstep(radius - 0.25, radius, d));
+}`;
 /** Write the capsule for this frame. r <= 0 switches it off. */
-export function lensCapTick(ax, ay, az, bx, by, bz, r) {
+export function lensCapTick(ax, ay, az, bx, by, bz, r, clearView = false) {
   _lensCapA.value.set(ax, ay, az);
   _lensCapB.value.set(bx, by, bz);
   _lensCapR.value = r > 0 ? r : 0;
+  _lensClearView.value = clearView ? 1 : 0;
 }
-export function lensCapInfo() { return { r: _lensCapR.value, a: _lensCapA.value, b: _lensCapB.value }; }
+export function lensCapInfo() { return { r: _lensCapR.value, a: _lensCapA.value, b: _lensCapB.value, clearView: _lensClearView.value > 0 }; }
 /**
  * The same test in a DEPTH material, so a faded canopy does not cast: the
  * only custom depth material in the game is swayMesh's, and a canopy over
@@ -1722,6 +1735,7 @@ function _lensCapDepth(shader) {
   shader.uniforms.uLensCapA = _lensCapA;
   shader.uniforms.uLensCapB = _lensCapB;
   shader.uniforms.uLensCapR = _lensCapR;
+  shader.uniforms.uLensClearView = _lensClearView;
   shader.vertexShader = shader.vertexShader
     .replace('#include <common>', '#include <common>\nvarying vec3 vCapW;')
     .replace('#include <project_vertex>', [
@@ -1734,7 +1748,7 @@ function _lensCapDepth(shader) {
       '}',
       '#include <project_vertex>'].join('\n'));
   shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', '#include <common>\nvarying vec3 vCapW;\nuniform vec3 uLensCapA;\nuniform vec3 uLensCapB;\nuniform float uLensCapR;')
+    .replace('#include <common>', '#include <common>\nvarying vec3 vCapW;\nuniform vec3 uLensCapA;\nuniform vec3 uLensCapB;\nuniform float uLensCapR;\nuniform float uLensClearView;\n' + _LENS_CAP_CUT)
     .replace('#include <clipping_planes_fragment>', [
       '#include <clipping_planes_fragment>',
       'if (uLensCapR > 0.0) {',
@@ -1743,7 +1757,7 @@ function _lensCapDepth(shader) {
       '  float cT = dot(vCapW - uLensCapA, cAB) / cL2;',
       '  if (cT > 0.0 && cT < max(0.85, 1.0 - 0.9 * inversesqrt(cL2))) {',
       '    float cD = length(vCapW - (uLensCapA + cAB * cT));',
-      '    float cK = 0.8 * (1.0 - smoothstep(uLensCapR - 0.25, uLensCapR, cD));',
+      '    float cK = lensCapCut(cD, cT, uLensCapR);',
       '    vec2 lp = floor(mod(gl_FragCoord.xy, 4.0));',
       '    vec2 l2 = mod(lp, 2.0);',
       '    vec2 l4 = floor(lp * 0.5);',
@@ -2271,6 +2285,8 @@ uniform vec3 uLensCapA;
 uniform vec3 uLensCapB;
 uniform float uLensCapR;
 uniform float uLensCapOn;
+uniform float uLensClearView;
+${_LENS_CAP_CUT}
 ${_CLOUD_GLSL}`;
 // ADDED TO outgoingLight, NOT to diffuseColor. Multiplying the diffuse would
 // make the rim take the object's own colour and its own lighting, which is a
@@ -2294,7 +2310,7 @@ const _RIM_FS_OUT = `{
     float cEnd = max(0.85, 1.0 - 0.9 * inversesqrt(cL2));
     if (cT > 0.0 && cT < cEnd && !(rN.y > 0.7 && vRimW.y < uLensCapB.y + 0.3)) {
       float cD = length(vRimW - (uLensCapA + cAB * cT));
-      lensK = max(lensK, 0.8 * (1.0 - smoothstep(uLensCapR - 0.25, uLensCapR, cD)));
+      lensK = max(lensK, lensCapCut(cD, cT, uLensCapR));
     }
   }
   if (lensK > 0.001) {
@@ -2442,6 +2458,7 @@ function _rimInjectWith(kU, cU, capOnU) {
     shader.uniforms.uLensCapA = _lensCapA;
     shader.uniforms.uLensCapB = _lensCapB;
     shader.uniforms.uLensCapR = _lensCapR;
+    shader.uniforms.uLensClearView = _lensClearView;
     shader.uniforms.uLensCapOn = capOnU;
     shader.uniforms.uShadowSky = _skyOcc;
     shader.uniforms.uShadeC = _shadeC;

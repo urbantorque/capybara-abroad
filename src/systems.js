@@ -50079,7 +50079,8 @@ export function createSystems(game) {
     // frame the player has composed on purpose, and it gets what it sees.
     lensCapTick(camera.position.x, camera.position.y, camera.position.z,
                 r.x, r.y + sysLENS_CAP_CHEST, r.z,
-                (started && !transBusy && photoLens < 0.5 && !game.state.noLensCap) ? sysLENS_CAP_R : 0);
+                (started && !transBusy && photoLens < 0.5 && !game.state.noLensCap) ? sysLENS_CAP_R : 0,
+                !game.state.noClearView && (game.state.perfRung | 0) < 1);
     sysCamInfo.capR = (started && !transBusy && photoLens < 0.5 && !game.state.noLensCap) ? sysLENS_CAP_R : 0;
     // ---- THE CAMERA (L4, F1a): the orbit, over everything above ----------
     photoTick(game.state.rawDt || 0.016);

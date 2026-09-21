@@ -1,3 +1,29 @@
+## REIMAGINE E5 — CLEAR FOREGROUND (21 Sep 2026)
+
+The inherited lens aperture retained three of sixteen foreground pixels over
+the animal. E5 fully opens its core, retaining a ten-centimetre feather inside
+the same .70m cylinder. A projected-cone prototype was rejected because it
+showed the torso while hiding feet and walking space. Wider alternatives cut
+more canopy without improving readability. Existing floor/self exemptions,
+endpoints, photo/transition gates, geometry and shadow hooks stay unchanged.
+`noClearView` or rung one restores the inherited profile through the existing
+single writer. No new save fields.
+
+Quay natural foliage and controlled-blocker comparisons were inspected; hidden
+tree batches are only a coarse reference. Kyoto, Kowloon and Sahara pass exact
+cut/restore pixels and flag/rung/photo checks, zero runtime errors. Their natural
+views are unobstructed; covered architectural passages remain unverified.
+7,801 shipped-math/shader/writer assertions pass. The hollow canopy silhouette
+remains a tradeoff, not a claim of invisible occlusion handling.
+
+Hardware GPU queries compare the extracted helper with its inherited return.
+In an isolated 640x380 context with sixteen layers, 48 paired disabled samples
+cost +.0404 ms mean, .0731 ms p95, confidence half-width .0064 ms. Cut/legacy
+pixels match, live differs, zero disjoints. Actual uniform writer averages
+.000045 ms. This meets the .1ms gate in that workload; it is not a whole-game
+upper bound. Forty paired full-scene samples were too noisy to resolve .1ms
+(confidence half-width 1.658ms), so no whole-frame budget claim is made.
+
 ## REIMAGINE C2/D2/E2/E4 — CONTROL, DIRECTIONS, STREET RHYTHM (21 Sep 2026)
 
 E2 requires six continuous undisturbed seconds before unsolicited idle camera

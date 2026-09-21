@@ -52,6 +52,20 @@ reversal must name the old rule, the player problem, the replacement and
 the evidence. Historical roadmaps remain records, not files to rewrite
 into apparent successes. Numerical tuning is a hypothesis until played.
 
+## Next clarity repair
+
+Next bounded clarity repair (D3): Sydney's completed concert still offers an
+eight-second encore, but completing its task hides the live countdown. Add an
+explicit display-only continuation opt-in for this publisher, preserving task
+navigation and musical live-state semantics. Reuse the existing marquee and
+.7-second publisher watchdog; no save fields or second countdown clock.
+`noEarnedFocus`/rung one must restore the inherited presentation immediately.
+Verify earned first completion, successful/missed encore, leaving the stage,
+transition, pause/resume and mid-countdown fallback. An ordinary completed-task
+publisher must remain hidden. Stationary and narrow-screen screenshots must
+show the action without the checklist's tuck logic losing it. This is planned,
+not shipped; E5 validation remains the current source-edit checkpoint.
+
 ## Seven standards
 
 1. **Identity.** Trouble, wonder and belonging have different rhythms.
@@ -182,6 +196,21 @@ Evidence: normal and narrow screenshots, real actions and visible
 reactions, concurrency of messages, recovery and repeatability.
 
 ### E — a deliberate visual leap
+
+E5 clear foreground: the inherited safety cylinder leaves three of sixteen
+Bayer pixels over the animal even at full strength. Its constant world radius
+also produces a large stippled patch on near-camera foliage. Test a projected
+aperture with a clear core and narrow fringe, keeping floors, the animal,
+photo composition and existing collision escape exempt. `noClearView`/rung one
+restores the exact inherited shader calculation through the existing single
+capsule writer. No added geometry, textures, lights or transparent sorting.
+Acceptance needs pinned Quay/Sydney foliage, contrasting architecture, masks
+against a hidden-occluder reference, cut/photo recovery and real-browser costs.
+The projected cone was rejected in actual Quay frames: it exposed the head
+through a peephole while hiding feet and walking space. The second candidate
+retains the inherited world-space radius, fully clears the core and narrows
+the fringe to ten centimetres. Compare three radii in the same frozen frame;
+do not mistake a clean pixel centre for a better composition.
 
 E2 camera agency reverses the inherited 1.0-second rest crane, 1.1-second
 idle yaw and 2.0-second far-glance entry during ordinary exploration. Those
@@ -475,7 +504,61 @@ work. A green static suite is necessary and never a claim of perfection.
   clears as authored. Recovery wording exists in the folded task clue and the
   visible failure toast; the marquee hides the pinned clue. No persistent
   stale-line defect reproduced. Six fixture cases pass again, zero errors.
+- C2/D2/E2/E4 pushed: `ffc4045`, 37 suite checks, zero failed. Public master
+  remains unchanged. E5 clear-view aperture is the next visual prototype.
+- E5 first projected cone rejected by lead: a clear torso inside a small hole
+  is worse than a useful view of feet, shadow and route. Constant-radius .70m
+  with .10m fringe accepted as the next visual direction; .805/.91m alternatives
+  cut more foliage without helping character readability. Quay v3 live/cut/
+  restore and photo checks pass, zero errors. Hidden-tree reference is coarse
+  (whole instance batches disappear); controlled-plane character-box error
+  drops 18.21 to .30. UI-free cut/restored images match exactly. Cross-biome and
+  budget checks remain, and the hollow-canopy silhouette is still a tradeoff.
+- G first natural Sydney run: concert earned around 18 game seconds, then
+  sandwich getaway and swim around 53, with no task/body/clock/input seeding.
+  Driver uses authored waypoint knowledge, so this is not novice completion
+  time. A straight-line attempt hit the garden hedge; route corrected around
+  its end. A later repeat was displaced back across it during the theft route;
+  carried-state telemetry and a real sprinting getaway are under validation.
+- E5 first GPU diagnostic: timer queries available, inherited cut pixel hashes
+  match a compiled helper with the new branch removed. However the live hash
+  also matched (no active obstruction in that stochastic frame), and sequential
+  GPU timings drifted 22–24ms. Do not treat it as a live-cost or .1ms cut-budget
+  proof. Pin the known occluding Quay pose and balance paired shader samples.
 - Usage follow-up, 21 Sep about 13:40 UTC: weekly 13% used, 87% remaining;
   Luna reserve remains 0%. Rounded readings imply roughly five to six weekly
   points per hour, account-wide. The remaining twelve-hour-window work fits
   that estimate, but rate is variable and no completion quota is guaranteed.
+- E5 paired full-scene GPU diagnostic: fixed occluding Quay pose, forty
+  alternating pairs, zero disjoints/runtime errors. Cut and legacy shader
+  hashes match; live differs. Cut-minus-legacy mean -.776 ms, median +.046 ms,
+  95% confidence half-width 1.658 ms. This variance does not resolve the .1 ms
+  cut budget; the negative mean is not evidence that the layer is free.
+- G Sydney save/reload extension remains open. A second theft attempt used
+  real sprinting, but the nearest-water target led the driver into the Opera
+  House after displacement. The next fixture uses the open western quay;
+  neither prior three-action success nor this navigation failure establishes
+  save/reload coverage or first-time-player usability.
+- E5 isolated hardware helper: actual extracted GLSL versus inherited return,
+  second WebGL2 context, 640x380, sixteen layers, forty-eight paired rounds.
+  Disabled overhead mean .0404 ms, p95 .0731 ms, 95% confidence half-width
+  .0064 ms; zero disjoints/errors. Old/cut hashes match, live differs. Actual
+  writer averages .000045 ms/call over 20,000 calls. This meets the .1 ms gate
+  in the isolated workload, not a whole-game upper bound. Full-scene timing
+  remains too noisy to resolve that bound.
+- E5 Kyoto/Kowloon/Sahara contrasts pass: flag/rung/photo and exact cut/restore
+  pixels, zero errors. Natural views have no intervening obstruction and stay
+  unchanged; they are regression checks, not covered-passage proof. Controlled
+  blockers reduce character-box error 15.29 to .64, 20.63 to 1.90, and 17.70
+  to .38 respectively. Lead inspected the natural captures. Quay remains the
+  natural foliage case; dense architectural passage coverage is outstanding.
+- G Sydney earned save/reload now passes: concert at 17.8 game seconds,
+  sprinted theft/getaway at 37.9, western-edge swim/memory at 56.9. Fresh
+  profile, real trusted keys, no task/body/clock/input-state seeding. Autosave
+  contains all three tasks, Sydney memory qualifies, Quay is recommended;
+  reload preserves the actions and memory. Zero runtime errors. Scripted
+  waypoint knowledge still excludes novice pacing or a complete-route claim.
+- E5/G checkpoint: source/instrument syntax, fresh single-file build and
+  38 suite checks pass, zero failed. Independent source review found no new
+  concrete regression. Historical soak staleness remains informational and
+  does not count as fresh runtime coverage.
