@@ -114,7 +114,7 @@ const manifest={route,sources:[...drivers.values(),home].map(d=>d.manifest),
   traps:['One fresh browser/context only; each injected driver close is a no-op.',
     'Driver reloads retain the same storage; wrapper start only starts an unstarted page.',
     'Palawan leaves the journal open; a real Escape closes it before the next chapter.',
-    'Pasto flight instruments condor.update diagnostically; reload before pastry support removes that observer.',
+    'Pasto flight restores its exact condor.update observer and removes diagnostic timers/listeners before leaving the driver.',
     'Public hud.cross chapter transitions are fixtures, not naturally opened travel doors.',
     'Waypoint and physics telemetry assist play; this is not novice/unguided enjoyment proof.']};
 if(prepare){console.log(JSON.stringify({prepared:true,browserLaunched:false,...manifest},null,2));process.exit(0);}
@@ -240,8 +240,13 @@ try {
   const completed=[];
   for(const {n,chapter} of route) {
     if(completed.length)await closeTravelCard();
-    await execute(drivers.get(chapter),chapter,chapter==='pasto'?['chain','--flap']:[]);
-    if(chapter==='pasto')await empanadaSupport();
+    await execute(drivers.get(chapter),chapter,chapter==='pasto'?['chain','--flap','--steer']:[]);
+    if(chapter==='pasto') {
+      const memory=await root.page.evaluate(()=>window.__capy.gateInfo(2));
+      if(!memory.enough)await empanadaSupport();
+      else report.stages.at(-1).supportChoice={alreadyEarned:true,experience:memory.experience,
+        note:'The actual condor flight also earned sufficient authored support actions; no extra task imposed.'};
+    }
     await closeTravelCard();completed.push(n);await gateSnapshot(chapter+' earned and persisted',completed);
   }
   await execute(home,'homecoming');await gateSnapshot('ending survived reload and repeat rest',data.JOURNEY);
@@ -249,6 +254,8 @@ try {
   report.finishedAt=new Date().toISOString();report.pass=true;await root.result(prefix,report);
   console.log(JSON.stringify({pass:true,artifact:prefix+'.json.png',stages:report.stages.map(s=>s.stage),fin:1}));
 }catch(error){report.failure={stage:current,error:String(error.stack||error)};
-  try{report.lastSave=await root.page.evaluate(()=>JSON.parse(localStorage.getItem('capy3.journey.v1')||'{}'));await root.screenshot(prefix+'-failure');await root.result(prefix+'-failure',report);}catch{}
+  try{report.lastSave=await root.page.evaluate(()=>JSON.parse(localStorage.getItem('capy3.journey.v1')||'{}'));}catch{}
+  try{await root.screenshot(prefix+'-failure');}catch{}
+  await root.result(prefix+'-failure',report);
   throw error;
 }finally{await root.close();}

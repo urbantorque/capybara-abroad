@@ -45,17 +45,123 @@ async page => {
   await page.keyboard.press('Shift'); // trusted input unlocks synthesized audio
   await page.waitForTimeout(3000);
   const started = await page.evaluate(() => !!(window.__capy && window.__capy.state.started));
+  // Read the authored controller/solver rows; a changed row cannot silently
+  // leave the fall classifier using an obsolete acceleration allowance.
+  const fallPhysics = await page.evaluate(async () => {
+    async function source(file) {
+      const r = await fetch(file); if (!r.ok) throw Error('fall source unavailable: ' + file);
+      return r.text();
+    }
+    const capy = await source('src/capybara.js'), main = await source('src/main.js');
+    function value(text, name) {
+      const m = text.match(new RegExp('const ' + name + '\\s*=\\s*([\\d.]+)(?:\\s*/\\s*([\\d.]+))?\\s*;'));
+      if (!m) throw Error('fall physics row unavailable: ' + name);
+      return Number(m[1]) / (m[2] ? Number(m[2]) : 1);
+    }
+    return { run: value(capy, 'capyRUN'), accel: value(capy, 'capyACCEL') * value(capy, 'capyAIR_CONTROL'),
+      step: value(main, 'STEP') };
+  });
   const names = ['sydney', 'pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland',
                  'sahara', 'drift', 'venice', 'kowloon', 'palawan', 'goreme',
                  'manly', 'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi'];
   const res = {};
   for (const n of names) {
-    res[n] = await page.evaluate(async ([name, fuzzSec]) => {
+    res[n] = await page.evaluate(async ([name, fuzzSec, speedCap, fallPhysics]) => {
       function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+      // FUZZ_FALL_BEGIN: pure, source-extracted by reimagine-fuzz-fall.mjs.
+      function fuzzFallClassifier(cap, physics) {
+        let previous = null, anchor = null, lastCertified = false;
+        const out = { maxObservedSpeed: 0, maxUnexplainedSpeed: 0, unexplainedFrames: 0,
+          certifiedFallFrames: 0, certifiedFallPeak: 0, unexplainedPolls: 0, certifiedPolls: 0,
+          releases: 0, invalidations: {}, violations: [] };
+        function invalidate(reason) {
+          if (anchor) out.invalidations[reason] = (out.invalidations[reason] || 0) + 1;
+          anchor = null; lastCertified = false; return reason;
+        }
+        function sample(s) {
+          const finite = s.p.length === 3 && s.v.length === 3 && s.frame.length === 2 && s.motion.length === 3 &&
+            [...s.p, ...s.v, ...s.frame, ...s.motion, s.t, s.wall, s.tick, s.gravity, s.steps, s.worldStep].every(Number.isFinite);
+          const speed = finite ? Math.hypot(...s.v) : Infinity, h = finite ? Math.hypot(s.v[0], s.v[2]) : Infinity;
+          const carried = s.carried || s.mounted, dt = previous ? s.t - previous.t : 0;
+          let reason = 'no observed release', certified = false;
+          const continuous = previous && s.tick === previous.tick + 1 && dt >= 0 && dt <= .05 &&
+            s.wall >= previous.wall && s.wall - previous.wall <= 100 && s.steps >= 0 &&
+            s.steps <= Math.ceil(dt / physics.step) + 1 && Number.isInteger(s.steps) &&
+            s.worldStep - previous.worldStep === s.steps;
+          const unsafe = !finite ? 'nonfinite' : s.blocked ? 'paused/hidden' :
+            !continuous ? 'sampling gap' : s.contacts ? 'contact' : s.grounded ? 'grounded' :
+            // Exponential platform decay never reaches exact zero.
+            s.swimming ? 'swimming' : Math.hypot(...s.frame) > 1e-6 ? 'moving frame' :
+            s.gravity <= 0 || (previous && s.gravity !== previous.gravity) ? 'gravity changed' : '';
+          if (unsafe) reason = invalidate(unsafe);
+          else if (carried) reason = invalidate('carried');
+          else {
+            // Sum actual solver velocity * fixed step. Two centimetres is a
+            // whole-flight residual allowance, never a fresh allowance per tick.
+            if (anchor) for (let i = 0; i < 3; i++) anchor.expected[i] += s.motion[i];
+            const motionError = s.p.some((x, i) => Math.abs(x - previous.p[i] - s.motion[i]) > .02) ||
+              (anchor && s.p.some((x, i) => Math.abs(x - anchor.expected[i]) > .02));
+            if (motionError) reason = invalidate('position jump');
+            else if (!anchor && previous.condorCarrier && previous.speed <= cap && speed <= cap && h <= cap &&
+              !previous.blocked && !previous.contacts && !previous.grounded && !previous.swimming &&
+              previous.impulseT === s.impulseT) {
+              anchor = { p: s.p.slice(), expected: s.p.slice(), v: s.v.slice(), speed, h, t: s.t, gravity: s.gravity, impulseT: s.impulseT };
+              out.releases++; reason = 'release anchor';
+            }
+            if (anchor) {
+              const g = s.gravity, elapsed = s.t - anchor.t;
+              // One solver step of phase error, not a per-sample energy budget.
+              const tolerance = 2 * g * Math.abs(s.v[1]) * physics.step + (g * physics.step) ** 2 + .05;
+              const energy = anchor.speed ** 2 + 2 * g * (anchor.p[1] - s.p[1]);
+              const horizontal = Math.min(cap, Math.max(anchor.h, physics.run)) + .05;
+              if (elapsed > 8) reason = invalidate('stale anchor');
+              else if (s.impulseT !== anchor.impulseT) reason = invalidate('external impulse');
+              else if (h > horizontal || h - previous.h > physics.accel * dt + .05) reason = invalidate('horizontal acceleration');
+              else if (s.v[1] < anchor.v[1] - g * (elapsed + physics.step) - .05 ||
+                s.v[1] < previous.v[1] - g * (dt + physics.step) - .05 ||
+                s.v[1] > previous.v[1] + .05) reason = invalidate('vertical impulse');
+              else if (speed ** 2 > energy + tolerance) reason = invalidate('energy gain');
+              else if (s.v[1] < 0 && s.p[1] <= anchor.p[1]) { certified = true; reason = 'certified release fall'; }
+              else reason = 'not descending below release';
+            }
+          }
+          out.maxObservedSpeed = Math.max(out.maxObservedSpeed, speed);
+          if (speed > cap && certified) {
+            out.certifiedFallFrames++; out.certifiedFallPeak = Math.max(out.certifiedFallPeak, speed);
+          } else {
+            out.maxUnexplainedSpeed = Math.max(out.maxUnexplainedSpeed, speed);
+            if (speed > cap) {
+              out.unexplainedFrames++;
+              if (out.violations.length < 12) out.violations.push({ t: s.t, speed, p: s.p.slice(), v: s.v.slice(), reason });
+            }
+          }
+          previous = { ...s, p: s.p.slice(), v: s.v.slice(), carried, speed, h };
+          lastCertified = speed > cap && certified;
+          return { certified: lastCertified, reason };
+        }
+        function poll(s) {
+          const speed = Math.hypot(...s.v);
+          if (!(speed > cap)) return;
+          const matches = previous && s.observerActive && s.t === previous.t && s.worldStep === previous.worldStep &&
+            s.wall >= previous.wall && s.wall - previous.wall <= 100 &&
+            s.p.every((x, i) => x === previous.p[i]) && s.v.every((x, i) => x === previous.v[i]) &&
+            s.frame.every((x, i) => x === previous.frame[i]) && s.gravity === previous.gravity &&
+            !!(s.carried || s.mounted) === !!previous.carried && s.condorCarrier === previous.condorCarrier &&
+            s.grounded === previous.grounded && s.swimming === previous.swimming &&
+            s.blocked === previous.blocked && s.impulseT === previous.impulseT;
+          if (matches && lastCertified) { out.certifiedPolls++; return; }
+          out.unexplainedPolls++; out.maxUnexplainedSpeed = Math.max(out.maxUnexplainedSpeed, speed);
+          if (out.violations.length < 12) out.violations.push({ t: s.t, speed, p: s.p.slice(), v: s.v.slice(), reason: 'uncertified poll' });
+          invalidate('uncertified poll');
+        }
+        return { sample, poll, report: () => out };
+      }
+      // FUZZ_FALL_END
       const g = window.__capy;
       const errs = [];
       const oe = console.error;
       console.error = function (...a) { errs.push(a.map(x => (x && x.stack) || String(x)).join(' ')); oe.apply(console, a); };
+      try {
       const KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'KeyE', 'KeyQ', 'ShiftLeft'];
       const down = c => window.dispatchEvent(new KeyboardEvent('keydown', { code: c, bubbles: true }));
       const up = c => window.dispatchEvent(new KeyboardEvent('keyup', { code: c, bubbles: true }));
@@ -73,6 +179,32 @@ async page => {
       const held = new Set();
       const saves0 = g.state.solverSaves || 0;     // cumulative; see the header
       const t0 = performance.now();
+      const fall = fuzzFallClassifier(speedCap, fallPhysics), rawTick = g.tick;
+      let fallTick = 0, fallContacts = false, fallSteps = 0;
+      const fallMotion = [0, 0, 0];
+      const fallContact = () => {
+        fallSteps++;
+        fallMotion[0] += cb.velocity.x * fallPhysics.step;
+        fallMotion[1] += cb.velocity.y * fallPhysics.step;
+        fallMotion[2] += cb.velocity.z * fallPhysics.step;
+        for (const contact of g.world.contacts || []) if (contact.bi === cb || contact.bj === cb) fallContacts = true;
+      };
+      function fallState() {
+        return { tick: fallTick, t: g.state.time, wall: performance.now(), steps: fallSteps,
+          worldStep: g.world.stepnumber, motion: fallMotion.slice(),
+          p: cb.position.toArray(), v: cb.velocity.toArray(), frame: [g.capy.frameVX ?? 0, g.capy.frameVZ ?? 0],
+          gravity: -g.world.gravity.y, grounded: !!g.capy.grounded, swimming: !!g.capy.swimming,
+          carried: !!g.capy.carriedBy, mounted: !!g.condor?.mounted,
+          condorCarrier: !!g.condor && (g.condor.mounted || g.capy.carriedBy === g.condor), contacts: fallContacts,
+          impulseT: g.capy.impulseT ?? null, blocked: !!g.state.paused || !!g.state.renderHold || document.hidden };
+      }
+      g.world.addEventListener('postStep', fallContact);
+      function fallTickObserver(...args) {
+        fallContacts = false; fallSteps = 0; fallMotion.fill(0);
+        try { return rawTick.apply(this, args); } finally { fallTick++; fall.sample(fallState()); }
+      }
+      g.tick = fallTickObserver;
+      try {
       while (performance.now() - t0 < fuzzSec * 1000) {
         if (rnd() < 0.09) {
           const k = KEYS[(rnd() * KEYS.length) | 0];
@@ -97,6 +229,7 @@ async page => {
         if (p.y < (terr === terr ? terr : 0) - 8) belowVoid++;
         if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
         const spd = Math.hypot(v.x, v.y, v.z); if (spd > maxSpeed) maxSpeed = spd;
+        if (spd > speedCap) fall.poll({ ...fallState(), p: p.toArray(), v: v.toArray(), observerActive: g.tick === fallTickObserver });
         if (g.capy.grounded) groundMax = Math.max(groundMax, spd); else airMax = Math.max(airMax, spd);
         // Keep the cause visible when a ceiling trips: a released bird fall
         // and a grounded collision runaway need different repairs.
@@ -110,6 +243,12 @@ async page => {
         if (Math.hypot(p.x - lastX, p.z - lastZ) < 0.004 && held.size) stuckFrames++;
         lastX = p.x; lastZ = p.z;
       }
+      } finally {
+        g.tick = rawTick; g.world.removeEventListener('postStep', fallContact);
+        for (const k of held) up(k);
+      }
+      const fallSpeed = fall.report();
+      maxSpeed = Math.max(maxSpeed, fallSpeed.maxObservedSpeed);
       for (const k of held) up(k);
       const saves1 = g.state.solverSaves || 0;     // read BEFORE the keepsake teleport
       // ---- ...AND THE THREE THINGS BATCH ONE ADDED (v23) -----------------
@@ -235,7 +374,7 @@ async page => {
       console.error = oe;
       return {
         biome: g.biome.current, started: g.state.started,
-        peakState, groundMax, airMax,
+        peakState, groundMax, airMax, fallSpeed,
         keepHover, keepRescues,
         hiddenNow, stuckHidden,
         roomFor: room ? room.biome : 'n/a', roomWet: room ? +room.wet.toFixed(3) : 'n/a',
@@ -254,7 +393,8 @@ async page => {
         end: [+g.capy.position.x.toFixed(1), +g.capy.position.y.toFixed(1), +g.capy.position.z.toFixed(1)],
         errs: errs.slice(0, 6), lastError: g.state.lastError || null,
       };
-    }, [n, sysFUZZ_SEC]);
+      } finally { console.error = oe; }
+    }, [n, sysFUZZ_SEC, sysFUZZ_SPEED_BY[n] || sysFUZZ_SPEED_MAX, fallPhysics]);
     console.log('fuzz ' + n + ' ' + JSON.stringify({ started: res[n].started,
       maxSpeed: res[n].maxSpeed, nan: res[n].nanFrames, void: res[n].belowVoid }));
   }
@@ -271,7 +411,9 @@ async page => {
     if (r.biome !== n) fail.push(n + ': biome read ' + r.biome);
     if (!(r.maxSpeed >= 1)) fail.push(n + ': maxSpeed ' + r.maxSpeed + ' < 1 (no input reached the animal)');
     const speedCap = sysFUZZ_SPEED_BY[n] || sysFUZZ_SPEED_MAX;
-    if (r.maxSpeed > speedCap) fail.push(n + ': maxSpeed ' + r.maxSpeed + ' > ' + speedCap + ' (something launched the animal)');
+    if (r.fallSpeed.unexplainedFrames || r.fallSpeed.unexplainedPolls || r.fallSpeed.maxUnexplainedSpeed > speedCap)
+      fail.push(n + ': maxSpeed ' + r.maxSpeed + ', unexplained ' + r.fallSpeed.maxUnexplainedSpeed + ' > ' + speedCap +
+        ' (' + r.fallSpeed.unexplainedFrames + ' observed frames, ' + r.fallSpeed.unexplainedPolls + ' polls not certified release falls)');
     if (r.nanFrames) fail.push(n + ': nanFrames ' + r.nanFrames);
     if (r.camNaN) fail.push(n + ': camNaN ' + r.camNaN);
     if (r.belowVoid) fail.push(n + ': belowVoid ' + r.belowVoid);

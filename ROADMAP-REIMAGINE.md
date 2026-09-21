@@ -1026,3 +1026,102 @@ work. A green static suite is necessary and never a claim of perfection.
   Both after-traces finish with zero runtime errors; full regression pending.
   Syntax, the 7002.2 KB single-file build and 49 suite checks pass, zero failed.
   The cumulative journey instrument passes preparation only at this checkpoint.
+- G speed classification after D12: isolated Pasto reaches 34.60 m/s, with
+  downward velocity 33.65 m/s, negligible external shove and no contacts in the
+  preceding recorded fall. It released the condor near y=21 before descending
+  to y=-2.94; the kinetic rise fits the actual 24 m/s² gravity/height loss.
+  Grounded peak is 25.01 m/s, no NaN/void frames or solver saves. A fresh Rio
+  replay passes at 26.76 m/s, grounded 11.96, with 835 mounted samples and zero
+  NaN/void frames. This classifies the new isolated Pasto episode, not the old
+  full-soak episodes retrospectively. A conservative observed-release energy
+  check is being evaluated in QA; game flight and general speed caps stay put.
+- G cumulative journey attempts one/two stop in the Sydney driver's geometry:
+  first an Opera stair cheek, then the terminal façade on the wider route.
+  Lead inspected both failure images. Use the actual water stair at x=-22.1
+  through the open forecourt, preserving scenery and colliders. Earlier
+  standalone success did not prove this route robust to crowd nudges.
+- G cumulative attempt three earns Sydney and Quay on the same save, then
+  the unsteered condor hits the map boundary and releases after 11.3 seconds.
+  The driver was flapping without steering. A fresh real-key steered flight
+  earns the twelve-second signature and passes held-release checks, with zero
+  runtime errors; lead inspected its flight image. The chain now uses that
+  option. Attempt four stops earlier after a gardener carries it behind the
+  Sydney hedge: retain that failure and make the driver recover through the
+  hedge's existing harbour opening. No scenery or flight parameters change.
+- G cumulative attempt five earns Sydney, Quay and the condor ride. Pasto's
+  incidental market chaos already supplies the second authored support, so
+  its memory is complete. The driver unnecessarily continues to a pastry
+  selected before walking there, then finds no grabbable food at that stale
+  position. Preserve the failure. The chain now accepts any actually earned
+  authored support combination and only seeks pastry when Pasto still needs
+  support; it never awards or seeds a task to advance.
+- D13 candidate: the live Pasto pastry capture shows the generic incident
+  card over the animal, stall and NPC speech. Reuse its existing element as a
+  compact upper-right annotation, with a narrow-screen right column below
+  lessons. Named moments retain their authored central treatment. Preserve
+  every string, the 2600 ms lifetime, defer slot, protected feedback ordering
+  and D5/D8 visibility decisions. `noIncidentPeripheral` and governor rung
+  one restore the exact inherited layout, including a mid-card cut. One
+  edge-triggered class writer inside the existing moment tick; no new timer,
+  DOM node or save state. Budget: cut CPU at most 0.1 ms, zero idle writes.
+  Require desktop/320/390/landscape fit and protected-lesson clearance,
+  pinned masked pixel proof, exact fallback and real-clock expiry before
+  acceptance. Reject if it merely relocates the obstruction onto guidance.
+- G runtime evidence: the first fall-classifier browser attempt requests the
+  wrong source URL and stops before fuzzing. Correct it to the actual `src/`
+  module paths. The fresh Pasto rerun passes at 27.66 m/s, observes four safe
+  release anchors, zero unexplained samples/polls and zero NaN/void frames.
+  It does not exercise an above-cap certified fall. The pure classifier suite
+  passes 196 checks, including solver-motion continuity, condor-only releases,
+  missing observations and an unmatched smaller launch after a larger valid
+  fall. Raw speed history remains intact; full nineteen-place soak is pending.
+- G cumulative attempts six/seven crash Edge during Sydney/Quay reloads.
+  Six loses its detailed report because the old sink depended on the dead page;
+  seven is retained by the new Node-side sink. Browser crash events now also
+  capture CDP status/error code for future diagnosis. No crash is counted as
+  a journey pass. Twelve full-fidelity Sydney reloads and twelve Quay reloads
+  subsequently pass in separate fresh contexts, with zero runtime errors and
+  no forced GC or browser flags. Heap/DOM counts rise and then fall under
+  ordinary collection; these readings do not establish a GPU-memory cause,
+  absence of leaks, or a repair of the intermittent crash.
+- D13 rejected for this timebox. The 1280 px desktop presentation passes its
+  masked pixel, exact flag/rung restoration, eight-caption fit and real-clock
+  expiry checks. At 320 px, fallback differs by two edge pixels at one colour
+  level despite identical DOM bounds; this discrepancy remains unresolved.
+  The 640 px touch landscape card overlaps the map by 10016.78 square CSS
+  pixels. That fails protected-control clearance. Restore production and the
+  existing unit suite exactly; do not ship a desktop-only cosmetic win that
+  obstructs touch play. Remove the candidate-only instruments, which depend
+  on the rejected helper; retain their local screenshots/results and this
+  rejection record. Prioritise the cumulative journey and soak.
+- G cumulative attempt eight stops before Sydney's theft pays: the sandwich
+  is actually grabbed, then lost during escape. The driver waits for success
+  while carrying nothing. Retain that failure and allow at most three real
+  attempts at the live prop, recording the actual getaway audit. Every retry
+  still requires a real pickup and the production task award; no task is seeded.
+- G cumulative attempt nine passes Sydney after a genuinely failed first
+  theft and successful second pickup/getaway, then passes Quay and both
+  reloads. Pasto releases early: from y=7.02 at pickup it climbs to y=10.9,
+  then descends into the market near x=24/z=21.5 and releases after 3.27 s.
+  Keep the failed trace and compare it with the successful steered run before
+  assigning a physics cause. The diagnostic condor wrapper, interval and key
+  listeners now have explicit cleanup, including when pastry is unnecessary.
+- G full hardware soak on unchanged production `7ede665` passes in 23.7 minutes:
+  all nineteen random-play chapters, the offline single-file/audio probe and
+  both nineteen-transition laps. Zero runtime errors, NaN or below-world
+  frames. Raw speeds stay inside their existing caps; no fall exception is
+  used. Pasto peaks at 28.60 m/s and Rio at 29.90. Keep the history row and
+  staged-probe hashes. Largest post-reveal frame is 150 ms in Goreme; the
+  governor reaches rung two during sustained transitions. This is broad
+  regression evidence, not maximum-quality frame-time or complete-journey
+  acceptance. Existing solver recoveries and earlier failed history remain.
+- G isolated `contact-v1` reproduces the early flight loss and records its
+  first actual Cannon contact: bird against the solid bunting post at
+  x=22.5/z=17, collider top 11.4 m, bird y=10.81, normal impact 7.87 m/s.
+  It is not a stale chapter body or an established aerodynamic stall. Compare
+  a longer pickup-clearance horizon against successful launch traces before
+  changing production. Preserve solid posts, flight forces and authored timing.
+- G checkpoint gates: every edited script parses, the single-file build stays
+  7002.2 KB with 8453 top-level declarations/no collisions, and all 50 suite
+  checks pass. The full soak is green; cumulative journey acceptance remains
+  outstanding. No rejected D13 source or candidate-only instrument is staged.

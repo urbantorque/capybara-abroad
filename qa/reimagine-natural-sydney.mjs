@@ -16,6 +16,7 @@ async function sample(label) {
     const g = window.__capy;
     return { label, t: g.state.time, wall: performance.now(),
       pos: g.capy.position.toArray(), held: g.capy.heldProp?.type || null,
+      carried: !!g.capy.carriedBy, getaway: g.physics.getawayAudit(),
       stage: g.env.concertAudit(), hidden: document.hidden, paused: g.state.paused,
       tasks: Object.fromEntries(['opera-stage', 'picnic-thief', 'swim'].map(id => [id, g.taskDone(id)])) };
   }, label);
@@ -29,11 +30,21 @@ async function go(target, radius = 1.1, maxMs = 35000, run = false) {
         const g = window.__capy, p = g.capy.position;
         const q = typeof target === 'string' ? g.hintTarget(target) : target;
         return { p: p.toArray(), target: q, yaw: g.input.camYaw, t: g.state.time,
-          carried: g.capy.carriedBy?.kind || null, velocity:g.capy.body.velocity.toArray() };
+          carried: !!g.capy.carriedBy, carrier: g.capy.carriedBy?.kind || null,
+          velocity:g.capy.body.velocity.toArray() };
       }, target);
       assert.ok(s.target, 'actual waypoint exists: ' + target);
-      const dx = s.target.x - s.p[0], dz = s.target.z - s.p[2], d = Math.hypot(dx, dz);
-      report.navigation.push({ ...s, distance: d });
+      // An escort can put it on the other side of the garden hedge. Recover
+      // through its open harbour end, using keys rather than the stale line.
+      let aim = s.target;
+      if (s.p[2] > 12.5 && s.target.x >= 20 && s.p[0] < 19)
+        aim = { x: Math.min(s.p[0], 12), z: 10 };
+      else if (s.p[2] > 12.5 && s.target.x <= 12 && s.p[0] > 14)
+        aim = { x: Math.max(s.p[0], 21), z: 10 };
+      const d = Math.hypot(s.target.x - s.p[0], s.target.z - s.p[2]);
+      const dx = aim.x - s.p[0], dz = aim.z - s.p[2];
+      report.navigation.push({ ...s, aim, distance: d });
+      if (s.carried) { await release(); best = Infinity; progressAt = Date.now(); await h.page.waitForTimeout(160); continue; }
       if (d < radius) return;
       if (d < best - .35) { best = d; progressAt = Date.now(); }
       const x = dx * Math.cos(s.yaw) - dz * Math.sin(s.yaw);
@@ -66,17 +77,26 @@ try {
   await sample('natural stage'); await h.screenshot(name + '-stage');
   // The eastern hedge starts at z14. Walk around its harbour end rather
   // than treating a straight arrow as a path through a solid garden hedge.
-  await go({ x: 12, z: 10 }); await go({ x: 30, z: 10 });
-  await go('picnic-thief', .7, 35000, true);
-  await h.page.keyboard.press('e');
-  await h.page.waitForTimeout(300);
-  assert.equal((await sample('sandwich grabbed')).held, 'sandwich');
-  await go({ x: 30, z: 10 }, 1.1, 35000, true); await go({ x: 12, z: 10 }, 1.1, 35000, true);
-  await h.page.waitForFunction(() => window.__capy.taskDone('picnic-thief'), null, { timeout: 20000 });
+  // A gardener can take the sandwich back before the getaway pays. Retry
+  // the live prop, at most three times; losing it is not a completed theft.
+  let stolen = false;
+  for (let attempt = 1; attempt <= 3 && !stolen; attempt++) {
+    await go({ x: 12, z: 10 }); await go({ x: 30, z: 10 });
+    await go('picnic-thief', .7, 35000, true);
+    await h.page.keyboard.press('e');
+    await h.page.waitForTimeout(300);
+    assert.equal((await sample('sandwich grabbed, attempt ' + attempt)).held, 'sandwich');
+    await go({ x: 30, z: 10 }, 1.1, 35000, true); await go({ x: 12, z: 10 }, 1.1, 35000, true);
+    await h.page.waitForFunction(() => window.__capy.taskDone('picnic-thief') ||
+      window.__capy.capy.heldProp?.type !== 'sandwich', null, { timeout: 20000 });
+    stolen = (await sample('getaway result, attempt ' + attempt)).tasks['picnic-thief'];
+  }
+  assert.equal(stolen, true, 'actual theft succeeds within three live attempts');
   await sample('natural getaway');
-  // Take the open western quay edge; the central arrow can lead into the
-  // Opera House itself after a crowd nudge changes its nearest-edge x.
-  await go({ x: -30, z: 10 }); await go({ x: -30, z: -14 }, 1.5);
+  // Cross the open forecourt, then use the actual water stair at x=-22.1.
+  // This clears both the Opera stair cheeks and the terminal wall at x<-26.6.
+  await go({ x: 12, z: 14 }); await go({ x: -22.1, z: 14 });
+  await go({ x: -22.1, z: -14 }, 1.5);
   await h.page.waitForFunction(() => window.__capy.taskDone('swim'), null, { timeout: 12000 });
   const end = await sample('natural memory');
   assert.ok(Object.values(end.tasks).every(Boolean), 'signature plus two support actions earned');

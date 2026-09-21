@@ -58,6 +58,8 @@ export async function openHarness({ url = 'http://localhost:5188/',
     await page.waitForFunction(() => !!window.__capy && !!document.querySelector('.capyui-go'));
     await page.bringToFront();
     const cdp = await browser.newBrowserCDPSession();
+    cdp.on('Target.targetCrashed', event => errors.push({ kind: 'targetcrashed', ...event }));
+    await cdp.send('Target.setDiscoverTargets', { discover: true });
     const system = await cdp.send('SystemInfo.getInfo');
     const renderer = await page.evaluate(() => {
       const gl = window.__capy.renderer.getContext();
@@ -92,11 +94,11 @@ export async function openHarness({ url = 'http://localhost:5188/',
     const screenshot = name => page.screenshot({ path: resolve(ROOT, 'qa', artifactName(name) + '.png') });
     const result = async (name, data) => {
       artifactName(name);
-      const response = await page.evaluate(async ({ name, data }) => {
-        const response = await fetch('/shot?name=' + encodeURIComponent(name + '.json'), {
-          method: 'POST', body: btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2)))) });
-        return { ok: response.ok, status: response.status };
-      }, { name, data });
+      // The evidence must survive a crashed page. The same local QA sink is
+      // reached from the driver, without depending on a live renderer process.
+      const response = await fetch(new URL('/shot?name=' + encodeURIComponent(name + '.json'), origin), {
+        method: 'POST', body: Buffer.from(JSON.stringify(data, null, 2), 'utf8').toString('base64'),
+        signal: AbortSignal.timeout(20000) });
       if (!response.ok) throw new Error('QA sink failed: ' + response.status);
     };
     return { browser, context, page, metadata, hold, start, arrive, screenshot, result,

@@ -1,3 +1,39 @@
+## REIMAGINE G — NINETEEN PLACES, FULL REGRESSION (21 Sep 2026)
+
+The 23.7-minute hardware soak passes on production `7ede665`: nineteen
+random-play chapters, the offline single-file/audio probe and both nineteen-
+transition laps. Zero runtime errors, NaN or below-world frames. Every raw
+speed remains inside its unchanged cap; no fall exception is used. Pasto
+peaks at 28.60 m/s, Rio at 29.90. Preserve the thirteen solver recoveries and
+earlier failed history. Largest post-reveal frame is Goreme's 150 ms; sustained
+transitions reach governor rung two. This is not a maximum-quality benchmark.
+Syntax, the unchanged 7002.2 KB build and all 50 suite checks pass.
+
+QA observes each simulation tick and solver substep before certifying a
+gravity-driven fall after an observed condor release. Contacts, impulses,
+teleports, missing observations and unmatched polls revoke that proof. Raw
+peaks remain alongside unexplained peaks; general 30/34/50 m/s caps stay put.
+The pure fixture passes 196 checks. Runtime observes release anchors, but an
+above-cap certified fall has not been exercised live. Staged probe hashes
+are now retained in soak history. No production frame work or new game flag.
+
+Crash evidence writes through the local sink from Node, so a dead browser page
+cannot erase the accumulated report. CDP crash status is recorded. Twelve
+Sydney and twelve Quay reloads pass separately; that does not explain or repair
+the two earlier cumulative-run crashes. The cumulative journey is still open.
+Real-key Sydney theft now retries an actually recovered sandwich, bounded to
+three attempts. Pasto's diagnostic observers are removed before the next stop.
+
+A fresh contact-instrumented Pasto flight identifies the early descent: the
+condor hits a solid bunting post at x=22.5/z=17 near y=10.81, impact 7.87 m/s.
+The first full journey has not passed; keep this failure for the next bounded
+repair rather than changing flight forces without evidence.
+
+D13's peripheral incident card is rejected. Desktop checks pass, but touch
+landscape overlaps the map and the 320 px fallback has a two-pixel discrepancy.
+Production and the existing earned-space test are restored exactly. Retain the
+roadmap's rejection record and local captures, not the candidate-only scripts.
+
 ## REIMAGINE D12/G — REVEAL WHEN READY (21 Sep 2026)
 
 Chapter fades previously counted submitted draws, not completed GPU commands.

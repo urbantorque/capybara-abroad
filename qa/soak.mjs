@@ -34,6 +34,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, sta
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import http from 'node:http';
+import { createHash } from 'node:crypto';
 import { openHarness } from './reimagine-harness.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -148,6 +149,7 @@ try {
   for (const [name, src, json] of PROBES) {
     if (SKIP.has(name)) { log('skip  ' + name); results[name] = { skipped: true }; continue; }
     const file = stage(src);
+    const probeHash = createHash('sha256').update(readFileSync(file)).digest('hex');
     const since = Date.now();
     log('running ' + name + '  ' + new Date().toISOString());
     let r;
@@ -161,7 +163,7 @@ try {
     } else r = pw(['run-code', '--filename=' + file]);
     const data = fresh(json, since) ? readJson(json) : null;
     const threw = /Error|error:/i.test(r.out) && r.code !== 0;
-    results[name] = { code: r.code, threw, data, stale: !data };
+    results[name] = { code: r.code, threw, data, stale: !data, probeHash };
     log((r.code === 0 && data ? 'pass  ' : 'FAIL  ') + name.padEnd(6) + src.padEnd(16) +
         ((Date.now() - since) / 1000).toFixed(0) + ' s' + (data ? '' : '  (no fresh ' + json + ')'));
     if (r.code !== 0) log(r.out.split('\n').filter(Boolean).slice(-6).map(l => '        ' + l).join('\n'));
@@ -178,6 +180,9 @@ const fz = results.fuzz && results.fuzz.data;
 if (fz && fz.res) for (const n in fz.res) {
   const r = fz.res[n];
   chapters[n] = Object.assign(chapters[n] || {}, { maxSpeed: r.maxSpeed, saves: r.solverSaves, nan: r.nanFrames, void: r.belowVoid });
+  // Preserve raw peaks and the continuous proof separately; old history stays
+  // unchanged, and an explained fall never erases a smaller unexplained launch.
+  if (r.fallSpeed) chapters[n].fallSpeed = r.fallSpeed;
 }
 const ld = results.load && results.load.data;
 if (ld && ld.rows) for (const r of ld.rows) {
@@ -199,6 +204,8 @@ const row = {
   },
   skipped: Array.from(SKIP),
   runner: harness ? 'direct' : 'cli', browser: browserMetadata,
+  probes: Object.fromEntries(Object.entries(results).map(([name, r]) => [name,
+    { skipped: !!r.skipped, sha256: r.probeHash || null, code: r.code ?? null, stale: r.stale ?? null }])),
   chapters,
 };
 appendFileSync(HISTORY, JSON.stringify(row) + '\n');
