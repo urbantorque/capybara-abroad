@@ -5069,6 +5069,23 @@ const sysMUS_OCA = { cutK: 1.6, cutMin: 1400, oct2: 0.18,
 // (the roadmap's "0.5"); the theme sits ABOVE them, not timidly under. The
 // bus is W2's; the voice itself is not shy.
 const sysMUS_OCA_VEL = 0.105;
+// ---- STATEMENT AND DRIFT (ROADMAP-SCORE, M3) --------------------------------
+// A statement is the tune over sysMUS_PROG at the palette's own tempo; the
+// drift is the walk; they hand over on a chord. The beat comes from
+// `dwellA` — Sydney's 9 s is 0.6 s a beat, the eight notes of A ran ~8.4 s
+// that way under the busker (sysMUS_TUNE_BEAT) — clamped so Pasto's 4.4 is
+// not a sprint and the Drift's 15 is not a dirge; a band's beat is the
+// band's own crotchet, snapped to its bar. `arriveIn` is seconds after the
+// arrival phrase (which stays: it is the rhythm the tune is built on);
+// `restA..B` the quiet between statements at rest; `restPill` the seconds a
+// tick pill keeps one off. Statements never overlap and a moment during one
+// is dropped, not queued — the one exception is `done` replacing a pending
+// lift tag, because the ceremony fires both on one frame and the chapter
+// closing outranks the marquee that closed it. `noTheme` cuts every
+// statement; the arrival phrase and the ostinato stay as they were.
+const sysMUS_STMT = { beatK: 0.6 / 9, beatLo: 0.42, beatHi: 0.9, arriveIn: 6,
+                      restA: 240, restB: 360, restPill: 6,
+                      wakeK: 2, wakeVel: 0.6, restVel: 0.85, cmLate: 1 };
 // THE MUSICIAN (L7, F2): the tune, played from a POSITION by a bed-class
 // mover instead of on the non-diegetic pad. One beat here is 0.6 s (the
 // theme's own eight notes, weighted by sysMUS_THEME_DUR, run about 8.4 s —
@@ -18520,6 +18537,13 @@ export function createSystems(game) {
   function musSetChord(idx, when, xf) {
     const chord = musPal.chords[idx];
     { const nxA = musPal.next[idx] || musPal.next[0]; musNextIdx = nxA[randInt(0, nxA.length - 1)]; }
+    musSetChordTo(chord, musPal.roots[idx], musPal.roots[musNextIdx >= 0 ? musNextIdx : (idx + 1) % musPal.roots.length], when, xf);
+  }
+  // ...the pad and the bass onto ANY chord (ROADMAP-SCORE, M3): the drift
+  // hands a table row through the wrapper above; a statement hands the
+  // progression's own chord and root, and the root it is walking toward.
+  // Same voice-leading, same crossfade, same bass walk — one path.
+  function musSetChordTo(chord, rootMidi, nextRoot, when, xf) {
     const fade = xf || sysMUS_XFADE;
     musPrevChord = musCurChord;
     musCurChord = chord;
@@ -18556,7 +18580,7 @@ export function createSystems(game) {
       const v = bv === 0 ? musBassV : musBass2V;
       if (!v) continue;
       const oct = bv === 0 ? 0 : 12;
-      let n = musPal.roots[idx] + oct;
+      let n = rootMidi + oct;
       v.note = n;
       const idle = v.banks[1 - v.active];
       const act = v.banks[v.active];
@@ -18574,8 +18598,6 @@ export function createSystems(game) {
         const walkK = musPal.bassWalk !== undefined ? musPal.bassWalk : (sysMUS_BASSWALK[musPalN] || 0);
         if (walkK > 0 && musDwellNow > 4) {
           const t5 = when + musDwellNow * 0.5;
-          const nextIdx = musNextIdx >= 0 ? musNextIdx : (idx + 1) % musPal.roots.length;
-          const nextRoot = musPal.roots[nextIdx];
           const appr = nextRoot - 2 + oct;
           f.setValueAtTime(hz, t5 - 0.02);
           f.setValueAtTime(sysMidiHz(n + 7), t5);
@@ -18600,6 +18622,14 @@ export function createSystems(game) {
     musPal = pal;
     musPalN = sysMUS_PAL.indexOf(pal);
     musPadSpectrum(pal.pad || (sysMUS_PAD_OF[musPalN] || null));
+    // A statement belongs to the chapter being left (ROADMAP-SCORE, M3):
+    // its remaining notes are dropped, its request forgotten, and the new
+    // palette waits for its own arrival. The count of statements said here
+    // starts again — the ostinato reads it.
+    if (musStmt) musStmtEnd(true);
+    musStmtReq = null;
+    musStmtChapN = 0;
+    musOstArmed = false;
     // A lift still sounding belongs to the chapter being left: its release
     // runs out at sysMUS_LIFT_XRUN from here (L7, E1 / audio #9). The rate is
     // read by the lift's clock in the frame writer, and only in the release.
@@ -18791,6 +18821,194 @@ export function createSystems(game) {
     const p = pal || musPal;
     const tonicPc = ((((p && p.roots && p.roots.length) ? p.roots[0] : 38) % 12) + 12) % 12;
     return sysMUS_OCA.lo + (((tonicPc - sysMUS_OCA.lo) % 12) + 12) % 12;
+  }
+
+  // =========================================================================
+  // THE STATEMENT (ROADMAP-SCORE, M3)
+  //
+  // `musStatement(kind, moment, delay, scale)` asks for one: 'full' is A + B
+  // + tag, 'A' the first phrase, 'wake' A at half tempo, 'tag' the three
+  // closing notes over the cadence (the marquee's lift ends on them). One
+  // request slot and one live statement; the request is taken on the
+  // scheduler's own clock (musStmtTick, at the top of musTickBody), which
+  // builds the event list ONCE — chord changes at the phrase's own turns,
+  // the tune on the ocarina, the countermelody a beat late on the second
+  // voice's instrument, the roots on the bass — and then feeds it to the
+  // same two-second lookahead the drift uses, so musCurChord moves when the
+  // pad does and a sting fired mid-statement is still in key. The drift's
+  // chord clock is parked at the statement's end; at the end the pad is
+  // handed the palette's home chord (a `mode` row) or is already on a table
+  // chord (an `own` row) and the walk continues from there. Never a cut.
+  // =========================================================================
+  let musStmt = null;          // the live one: { kind, moment, t0, end, ev, i, lastIdx, own, beat, n }
+  let musStmtReq = null;       // the pending one: { kind, moment, at, scale }
+  let musStmtRestT = 0;        // s since the last statement began (game clock)
+  let musStmtRestGap = 0;      // s the rest waits; drawn afresh after each
+  let musStmtChapN = 0;        // statements completed in this palette (the ostinato waits for one)
+  let musAbsenceArm = false;   // the return N3 armed: the next arrival says A in the parallel minor
+  // ...and the counters musThemeAudit publishes
+  const musStmtN = { full: 0, A: 0, wake: 0, tag: 0 };
+  const musStmtMoment = { arrive: 0, lift: 0, done: 0, wake: 0, rest: 0, absence: 0 };
+  let musStmtDropped = 0, musStmtCut = 0, musStmtCmN = 0, musStmtLast = null;
+  function musStatement(kind, moment, delay, scale) {
+    if (game.state && game.state.noTheme) { musStmtCut++; return false; }
+    if (!ac) return false;
+    if (musStmt) { musStmtDropped++; return false; }
+    if (musStmtReq) {
+      // the chapter closing outranks the marquee that closed it
+      if (kind === 'full' && musStmtReq.kind === 'tag') musStmtReq = null;
+      else { musStmtDropped++; return false; }
+    }
+    musStmtReq = { kind: kind, moment: moment || 'rest', at: ac.currentTime + (delay > 0 ? delay : 0), scale: scale || null };
+    return true;
+  }
+  /** The beat a statement takes here: from dwellA, or the band's own crotchet. */
+  function musStmtBeat() {
+    let b;
+    if (musPal.band && musBeatLen > 0) b = musBeatLen > 0.8 ? musBeatLen * 0.5 : musBeatLen;
+    else b = sysMUS_STMT.beatK * (musPal.dwellA || 9);
+    return clamp(b, sysMUS_STMT.beatLo, sysMUS_STMT.beatHi);
+  }
+  function musStmtStart(req, now) {
+    const n = musPalN, pal = musPal, row = sysMUS_PROG[n] || sysMUS_PROG[0];
+    const kind = req.kind;
+    let beat = musStmtBeat();
+    if (kind === 'wake') beat *= sysMUS_STMT.wakeK;
+    const scale = req.scale || null;
+    // the notes, as [deg, beats]
+    let notes;
+    if (kind === 'tag') {
+      notes = [];
+      for (let i = 0; i < sysMUS_THEME_TAG.length; i++) notes.push([sysMUS_THEME_TAG[i], sysMUS_THEME_TAG_DUR[i]]);
+    } else notes = musThemeNotes(kind === 'full' ? 'full' : 'A');
+    const nA = sysMUS_THEME.length, nB = sysMUS_THEME_B.length, nT = sysMUS_THEME_TAG.length;
+    // the chord change points: note index -> [part, k]
+    const chAt = [];
+    if (kind === 'tag') {
+      const L = musProgLen(n, 'tag');
+      for (let j = 0; j < L; j++) chAt.push([Math.round(j * (nT - 1) / Math.max(1, L - 1)), 'tag', j]);
+    } else {
+      for (let j = 0; j < sysMUS_THEME_CH.length; j++) chAt.push([sysMUS_THEME_CH[j], 'prog', j]);
+      if (kind === 'full') {
+        for (let j = 0; j < sysMUS_THEME_B_CH.length; j++) chAt.push([nA + sysMUS_THEME_B_CH[j], 'prog', 4 + j]);
+        const L = musProgLen(n, 'tag');
+        for (let j = 0; j < L; j++) chAt.push([nA + nB + Math.round(j * (nT - 1) / Math.max(1, L - 1)), 'tag', j]);
+      }
+    }
+    const t0 = musSnap(now + 0.15);
+    const ev = [];
+    const base = musOcaBase(pal);
+    const sec = sysMUS_2ND[n];
+    const cmInst = sec ? (sec.inst || 'pluck') : ((pal.lead && pal.lead !== 'none') ? pal.lead : null);
+    const cmBase = musThemeBase(sec ? (sec.oct || 0) : 0, pal);
+    const velK = (kind === 'wake' ? sysMUS_STMT.wakeVel : 1) * (req.moment === 'rest' ? sysMUS_STMT.restVel : 1);
+    let t = 0, lastIdx = 0, lastChordT = t0, ci = 0;
+    const midis = [];
+    for (let i = 0; i < notes.length; i++) {
+      const deg = notes[i][0], dur = notes[i][1];
+      // a chord turns here?
+      while (ci < chAt.length && chAt[ci][0] === i) {
+        const pc = musProgChord(n, chAt[ci][1], chAt[ci][2], scale);
+        // the root the bass leans toward: the next change's, or home
+        const nx = ci + 1 < chAt.length ? musProgChord(n, chAt[ci + 1][1], chAt[ci + 1][2], scale) : musProgChord(n, 'tag', 99, scale);
+        // how long this chord holds: to the next change, or to the end
+        const tNext = ci + 1 < chAt.length ? musStmtNoteT(notes, chAt[ci + 1][0], beat) : musStmtNoteT(notes, notes.length, beat);
+        ev.push({ t: t0 + t, kind: 'chord', chord: pc.chord, root: pc.root, next: nx.root, dwell: tNext - t, idx: pc.idx });
+        lastIdx = pc.idx; lastChordT = t0 + t;
+        ci++;
+      }
+      const midi = base + musDegOff(deg, pal, scale);
+      midis.push(midi);
+      ev.push({ t: t0 + t, kind: 'note', midi: midi, gap: dur * beat,
+                vel: sysMUS_OCA_VEL * velK * (dur >= 3 ? 1 : 0.9) });
+      // the countermelody, a beat late, under the long notes: a third below,
+      // a sixth under the held ones (kind 'wake' is the ocarina alone)
+      if (cmInst && dur >= 2 && kind !== 'wake') {
+        const cd = deg - (dur >= 3 ? 5 : 2);
+        ev.push({ t: t0 + t + beat * sysMUS_STMT.cmLate, kind: 'cm', inst: cmInst,
+                  midi: musFold(cmBase + musDegOff(cd, pal, scale), sysMUS_LIFT_LO, sysMUS_LIFT_HI),
+                  gap: Math.max(0.3, (dur - 1) * beat), pan: (i % 2 ? -0.35 : 0.35),
+                  vel: 0.115 * (sec && sec.vel !== undefined ? sec.vel : 0.5) * sysMUS_2ND_GAIN });
+      }
+      t += dur * beat;
+    }
+    ev.sort(function (a, b) { return a.t - b.t; });
+    musStmt = { kind: kind, moment: req.moment, t0: t0, end: t0 + t, ev: ev, i: 0, lastIdx: lastIdx,
+                own: !!row.own, beat: beat, n: n, lastChordT: lastChordT, scale: scale || pal.scale || 'major',
+                midis: midis, ended: false };
+    // the drift's chord clock parks PAST the lookahead beyond the end, so
+    // the walk cannot queue a chord under the last note; musStmtEnd sets
+    // the real one when it hands over
+    musChordAt = musStmt.end + sysMUS_LOOK + 2;
+    musStmtN[kind] = (musStmtN[kind] || 0) + 1;
+    musStmtMoment[req.moment] = (musStmtMoment[req.moment] || 0) + 1;
+    musStmtRestT = 0;
+    musStmtRestGap = rand(sysMUS_STMT.restA, sysMUS_STMT.restB);
+    musStmtLast = { kind: kind, moment: req.moment, pal: n, scale: musStmt.scale, tonic: pal.roots[0], beat: +beat.toFixed(3),
+                    len: +t.toFixed(2), notes: midis.slice(), t0: +t0.toFixed(2) };
+  }
+  /** Seconds from a statement's start to note `i` (or its end, at i = length). */
+  function musStmtNoteT(notes, i, beat) {
+    let t = 0;
+    for (let k = 0; k < i && k < notes.length; k++) t += notes[k][1] * beat;
+    return t;
+  }
+  /**
+   * The hand-over: the walk continues from the progression's last chord.
+   * Two steps on the scheduler's clock — the chord is handed inside the
+   * lookahead (a second before the end, so a `mode` row's home voicing is
+   * scheduled AT the end and not late), and the slot is freed at the end.
+   */
+  let musOstArmed = false;   // the ostinato may start: a statement has ended here with the chapter done
+  function musStmtEnd(cut) {
+    const s = musStmt;
+    if (!s) return;
+    if (cut) { musStmt = null; musStmtCut++; return; }   // a border: musSetPalette has already set chord 0
+    if (s.handed) { musStmt = null; return; }
+    s.handed = true;
+    musStmtChapN++;
+    if (musProg >= sysMUS_LAYER_OSTINATO) musOstArmed = true;
+    musNextIdx = -1;                     // the lean was the statement's; the walk picks its own
+    const dw = rand(musPal.dwellA, musPal.dwellB);
+    if (s.own) {
+      // already on a table chord: the walk moves on from it after its dwell
+      musIdx = s.lastIdx;
+      musChordAt = Math.max(s.lastChordT + dw, s.end + 0.5);
+    } else {
+      // a built chord: voice-lead onto the palette's own home voicing at the
+      // end, and the walk moves on from home after a dwell
+      musIdx = 0;
+      musChordStart = s.end;
+      musSetChord(0, s.end, musPal.xfade);
+      musChordAt = s.end + dw;
+    }
+    musDwellNow = musChordAt - (s.own ? s.lastChordT : s.end);
+  }
+  /** Called at the top of musTickBody: take a request, feed the lookahead. */
+  function musStmtTick(now, horizon) {
+    if (musStmtReq && !musStmt && now >= musStmtReq.at && musCurChord && musCurChord.length) {
+      const r = musStmtReq; musStmtReq = null;
+      musStmtStart(r, now);
+    }
+    const s = musStmt;
+    if (!s) return;
+    let guard = 0;
+    while (s.i < s.ev.length && s.ev[s.i].t < horizon && guard++ < 24) {
+      const e = s.ev[s.i++];
+      const when = Math.max(e.t, now + 0.01);
+      if (e.kind === 'chord') {
+        musChordStart = when;
+        musDwellNow = e.dwell;
+        musSetChordTo(e.chord, e.root, e.next, when, musPal.xfade);
+      } else if (e.kind === 'note') {
+        musLiftNote('ocarina', when, e.midi, 0, musVel(e.vel), e.gap);
+      } else if (e.kind === 'cm') {
+        musLiftNote(e.inst, when, e.midi, e.pan, musVel(e.vel), e.gap);
+        musStmtCmN++;
+      }
+    }
+    if (s.i >= s.ev.length && !s.handed && now >= s.end - 1.0) musStmtEnd(false);
+    if (s.handed && now >= s.end - 0.3) musStmtEnd(false);
   }
 
   // The default character, for a palette that has not been given one. Nothing
@@ -19231,6 +19449,11 @@ export function createSystems(game) {
         t += g;
       }
       musLiftTails++;
+      // ---- ...AND THE TAG LANDS AFTER IT (ROADMAP-SCORE, M3) --------------
+      // The figure keeps its shape and its instrument; the tune's three
+      // closing notes follow on the ocarina over the cadence, so the lift
+      // becomes the tag's last bar. Dropped if a statement is already up.
+      musStatement('tag', 'lift', t + 0.09);
     }
     // The pad leans in underneath it too — wider and brighter — but that is NOT
     // written here. musPad.gain and musFilt.frequency have exactly one writer,
@@ -22084,6 +22307,10 @@ export function createSystems(game) {
     if (musChordAt < now) musChordAt = now + 0.05;
     if (musPluckAt < now) musPluckAt = now + 0.2;
     const horizon = now + sysMUS_LOOK;
+    // THE STATEMENT (ROADMAP-SCORE, M3): a pending one is taken here and a
+    // live one is fed to the same lookahead; while it runs, musChordAt sits
+    // past its end and the walk below has nothing to do.
+    musStmtTick(now, horizon);
     let guard = 0;
     while (musChordAt < horizon && guard++ < 8) {
       const nx = musPal.next[musIdx] || musPal.next[0];
@@ -22142,9 +22369,16 @@ export function createSystems(game) {
     // five band palettes (their lead is 'none', and a mallet playing a verse
     // over a bateria is a fourteenth percussionist); never asleep, never on
     // the breath's floor. musProg resets on arrival, which is what stops it.
+    // ...AND IT WAITS FOR THE STATEMENT (ROADMAP-SCORE, M3): a chapter done
+    // gets the full tune first (musStatement 'done', from the ceremony) and
+    // the ostinato after — never under one, and not before a statement has
+    // ENDED here with the chapter done (musOstArmed: the done statement, or
+    // the arrival's on a return to a finished place). Under `noTheme` the
+    // gate is as it was.
     {
       const oInst = (musPal.lead && musPal.lead !== 'none') ? musPal.lead : null;
-      if (oInst && musProg >= sysMUS_LAYER_OSTINATO && musSleep < 0.5 && musBreath > 0.6) {
+      const oGate = !musStmt && ((game.state && game.state.noTheme) || musOstArmed);
+      if (oInst && oGate && musProg >= sysMUS_LAYER_OSTINATO && musSleep < 0.5 && musBreath > 0.6) {
         const oph = sysMUS_PHRASE[musPalN];
         const ogap = sysMUS_STING.arrive.gap * (oph && oph.gap > 0 ? oph.gap : 1);
         if (musOstAt < now - 1) { musOstAt = musSnap(now + 0.2); musOstI = 0; }
@@ -22182,7 +22416,11 @@ export function createSystems(game) {
     // by hand in the writer, so this gate opening is not the first note.
     const brK = (musBreath < 0.995
       ? clamp((musBreath - sysMUS_BREATH_DIP) / (1 - sysMUS_BREATH_DIP), 0, 1) : 1) *
-      (1 - clamp(musSleep * 2, 0, 1));
+      (1 - clamp(musSleep * 2, 0, 1)) *
+      // ...and under a statement the walk steps back (M3): the lead is
+      // saying the countermelody, and a random line beside the tune is
+      // clutter. A third of the plucks, not none — the place is still here.
+      (musStmt ? 0.35 : 1);
     while (musPluckAt < horizon && guard++ < 12) {
       // ---- THE PAN OF THE NOTE THIS PASS PLAYED, AND WHETHER IT PLAYED ONE
       //
@@ -37046,6 +37284,10 @@ export function createSystems(game) {
     // sounding. The cheer still lands half a second later; what changed is that
     // the thing under it is now the only sound in the game that means FINISHED.
     if (!musSting('done', 1.25)) sfx('chime', { volume: 1.0, pitch: 1.2 });
+    // ...and the tune, whole (ROADMAP-SCORE, M3): the full statement after
+    // the resolve and the cheer, replacing the lift's tag the swell above
+    // just asked for; the ostinato waits for it (see musTickBody).
+    musStatement('full', 'done', 2.4);
     setTimeout(function () { sfx('cheer', { volume: 0.8 }); }, 520);
     // ---- TWO BURSTS, AND NEITHER OF THEM IS BIGGER THAN THE RING ----------
     // This asked for 34 scraps out of a pool of sysCONF_MAX (26) and confHead
@@ -42006,6 +42248,37 @@ export function createSystems(game) {
     };
   };
   /**
+   * THE TUNE, COUNTED (ROADMAP-SCORE, M3–M5). Everything here is what the
+   * SCHEDULER decided, never what was heard: a headless context may be
+   * suspended, and a count of scheduled notes is the same number either
+   * way (`ac` says which state it was in). Statements by kind and moment;
+   * the live one; the last one's palette, key and notes; the motifs by name
+   * and by the event that fired them (M4); the layers by progress (M5); the
+   * ocarina's notes; the coda's pitches (M5).
+   */
+  game.musThemeAudit = function () {
+    const s = musStmt;
+    return {
+      ac: ac ? ac.state : null,
+      stmts: { full: musStmtN.full, A: musStmtN.A, wake: musStmtN.wake, tag: musStmtN.tag },
+      moments: { arrive: musStmtMoment.arrive, lift: musStmtMoment.lift, done: musStmtMoment.done,
+                 wake: musStmtMoment.wake, rest: musStmtMoment.rest, absence: musStmtMoment.absence },
+      dropped: musStmtDropped, cut: musStmtCut, chapN: musStmtChapN,
+      live: s ? { kind: s.kind, moment: s.moment, pal: s.n, i: s.i, of: s.ev.length,
+                  left: +(s.end - (ac ? ac.currentTime : 0)).toFixed(2) } : null,
+      pending: musStmtReq ? { kind: musStmtReq.kind, moment: musStmtReq.moment,
+                              in: +(musStmtReq.at - (ac ? ac.currentTime : 0)).toFixed(2) } : null,
+      last: musStmtLast,
+      cmN: musStmtCmN, ocaN: musOcaN,
+      restT: +musStmtRestT.toFixed(1), restGap: +musStmtRestGap.toFixed(0),
+      chordAt: +(musChordAt - (ac ? ac.currentTime : 0)).toFixed(2),
+      idx: musIdx, pal: musPalN, scale: (musPal && musPal.scale) || 'major', tonic: musPal && musPal.roots ? musPal.roots[0] : null,
+      prog: +musProg.toFixed(3),
+      flags: { noTheme: !!(game.state && game.state.noTheme), noOcarina: !!(game.state && game.state.noOcarina),
+               noMotif: !!(game.state && game.state.noMotif), noArc: !!(game.state && game.state.noArc) },
+    };
+  };
+  /**
    * POISON THE RIG, ONCE. A TEST HOOK, and never a verb — the same rule and
    * the same wording as `forceHeat` in npc.js.
    *
@@ -44530,6 +44803,8 @@ export function createSystems(game) {
      * `inChord` is the honest one: each note against the progression chord
      * actually sounding under it, long notes weighted by their beats.
      */
+    /** Ask for a statement (M3) — a QA door; the moments in src call musStatement. */
+    statement: function (kind, moment, delay, scale) { return musStatement(kind || 'full', moment || 'rest', delay || 0, scale || null); },
     /** One ocarina note, now (M2) — for W2's bus measurement and nothing in src. */
     ocarina: function (midi, gap, vel) {
       if (!ac || !musVol || ac.state !== 'running') return false;
@@ -52068,8 +52343,24 @@ export function createSystems(game) {
       // a loaded one) is not a deferral, it is the sting not being possible
       // yet. The cap is for the lift.
       if (ac && ac.state === 'running') musArrivePendT += dt;
-      if (musLiftNow() <= 0.02 && musSting('arrive', 1) > 0) musArrivePend = false;
+      let said = false;
+      if (musLiftNow() <= 0.02 && musSting('arrive', 1) > 0) { musArrivePend = false; said = true; }
       else if (musArrivePendT > sysMUS_ARRIVE_WAIT) musArrivePend = false;
+      // ---- ...AND THE TUNE FOLLOWS THE PHRASE (ROADMAP-SCORE, M3) ---------
+      // The full statement, six seconds after the phrase that opened it —
+      // or a second after a wait that ran out, because the statement is the
+      // thing every arrival must have. The absence mode (M4): a return the
+      // regulars noticed (palAwayArm) says A alone, in the parallel minor.
+      if (!musArrivePend) {
+        if (musAbsenceArm) {
+          musAbsenceArm = false;
+          if (!(game.state && game.state.noMotif)) {
+            const sc = musPal && musPal.scale;
+            musStatement('A', 'absence', said ? sysMUS_STMT.arriveIn : 1,
+                         (sc === 'major' || !sc) ? 'minor' : null);
+          } else musStatement('full', 'arrive', said ? sysMUS_STMT.arriveIn : 1);
+        } else musStatement('full', 'arrive', said ? sysMUS_STMT.arriveIn : 1);
+      }
     }
     // The flow leans the band in beside the chaos, on the same writer and for
     // the opposite reason: chaos is the score reacting to trouble, the flow is
@@ -52104,8 +52395,24 @@ export function createSystems(game) {
           try {
             musLiftNote(lead, tw + 0.05, musFold(musMelPick(musCurChord) + 12, 64, 88), 0, sysMUS_SLEEP_UP, 0.4);
           } catch (e) { /* one voice missing; the chord still comes */ }
-          musChordAt = tw + 0.42;
+          // ...unless a statement holds the harmony (M3): its chords are
+          // its own, and pulling the walk's next chord under them would
+          // put the drift back on top of the tune.
+          if (!musStmt) musChordAt = tw + 0.42;
           musPluckAt = Math.max(musPluckAt, tw + 0.9);
+        }
+        // ...and the tune, waking (ROADMAP-SCORE, M3 / M5): A alone, on the
+        // ocarina, at half tempo, after the upbeat and the chord it pulls
+        musStatement('wake', 'wake', 1.2);
+      }
+      // ---- THE REST (M3): nothing said for four to six minutes, the animal
+      // grounded, no tick pill fresh, not asleep — A alone.
+      if (started && !musStmt && !musStmtReq) {
+        musStmtRestT += dt;
+        if (musStmtRestT > (musStmtRestGap || sysMUS_STMT.restA) && musSleep < 0.5 &&
+            game.capy && game.capy.grounded && !game.capy.carriedBy &&
+            game.state.time - sysTickLastAt > sysMUS_STMT.restPill) {
+          musStatement('A', 'rest', 0);
         }
       }
       const sleepWant = musSleepOn ? 1 : 0;
