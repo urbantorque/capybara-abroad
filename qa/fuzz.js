@@ -68,6 +68,7 @@ async page => {
       let s = 1234567 ^ name.length * 7919;
       const rnd = () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s >>> 0) % 100000) / 100000; };
       let nanFrames = 0, belowVoid = 0, minY = 1e9, maxY = -1e9, maxSpeed = 0;
+      let peakState = null, groundMax = 0, airMax = 0;
       let camNaN = 0, stuckFrames = 0, lastX = 0, lastZ = 0;
       const held = new Set();
       const saves0 = g.state.solverSaves || 0;     // cumulative; see the header
@@ -96,6 +97,16 @@ async page => {
         if (p.y < (terr === terr ? terr : 0) - 8) belowVoid++;
         if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
         const spd = Math.hypot(v.x, v.y, v.z); if (spd > maxSpeed) maxSpeed = spd;
+        if (g.capy.grounded) groundMax = Math.max(groundMax, spd); else airMax = Math.max(airMax, spd);
+        // Keep the cause visible when a ceiling trips: a released bird fall
+        // and a grounded collision runaway need different repairs.
+        if (!peakState || spd > peakState.speed) peakState = {
+          speed: spd, t: g.state.time, p: p.toArray(), v: v.toArray(), terrain: terr,
+          grounded: !!g.capy.grounded, swimming: !!g.capy.swimming, carried: !!g.capy.carriedBy,
+          frame: [g.capy.frameVX, g.capy.frameVZ], bird: g.condor && {
+            state: g.condor.state, mounted: g.condor.mounted,
+            p: g.condor.body?.position.toArray(), v: g.condor.body?.velocity.toArray() }
+        };
         if (Math.hypot(p.x - lastX, p.z - lastZ) < 0.004 && held.size) stuckFrames++;
         lastX = p.x; lastZ = p.z;
       }
@@ -224,6 +235,7 @@ async page => {
       console.error = oe;
       return {
         biome: g.biome.current, started: g.state.started,
+        peakState, groundMax, airMax,
         keepHover, keepRescues,
         hiddenNow, stuckHidden,
         roomFor: room ? room.biome : 'n/a', roomWet: room ? +room.wet.toFixed(3) : 'n/a',

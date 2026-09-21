@@ -30,6 +30,7 @@ const ASSERTS = [
   ['qa/reimagine-trust.mjs', 'guidance continuity, explicit skip/replay and earned finale staging'],
   ['qa/reimagine-journey.mjs', 'authored route choices and stable chapter/task identities'],
   ['qa/reimagine-route-integration.mjs', 'open travel, legacy memories and earned-place coda'],
+  ['qa/reimagine-crossing-ready.mjs', 'nonblocking destination readiness, bounded hold and sync cleanup'],
   ['qa/reimagine-route-hints.mjs', 'crossing direction and delivery recovery targets'],
   ['qa/reimagine-stamina.mjs', 'non-worsening boons and a bounded stamina bank'],
   ['qa/reimagine-mix.mjs', 'foreground score, inherited cut mix and essential feedback'],

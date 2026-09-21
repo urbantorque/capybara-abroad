@@ -41420,7 +41420,50 @@ export function createSystems(game) {
   // it here and MAIN_HOLD_MAX_MS clears it in main.js.
   const sysWARM_MAX_MS = 8000;
   const sysWARM_POLL_MS = 12;
+  // A fence answers whether the already-submitted destination frame and its
+  // preceding commands completed on the GPU. `clientWaitSync(..., 0, 0)` never
+  // stalls the thread; the owner token protects a newer crossing from late polls.
+  function sysCrossFence(gl, state, activeOwner, now, deadline) {
+    const drop = function () {
+      if (!state || !state.sync) return;
+      try { if (gl && typeof gl.deleteSync === 'function') gl.deleteSync(state.sync); } catch (_) {}
+      state.sync = null;
+    };
+    if (!state || state.owner !== activeOwner) {
+      if (state) { drop(); state.done = true; state.result = 'stale'; }
+      return 'stale';
+    }
+    if (state.done) return state.result || 'done';
+    if (now >= deadline) {
+      drop(); state.done = true; state.result = 'timeout'; return state.result;
+    }
+    if (!gl || typeof gl.fenceSync !== 'function' || typeof gl.clientWaitSync !== 'function' ||
+        typeof gl.deleteSync !== 'function' || typeof gl.flush !== 'function' ||
+        (typeof gl.isContextLost === 'function' && gl.isContextLost())) {
+      drop(); state.done = true; state.result = 'unsupported'; return state.result;
+    }
+    if (!state.sync) {
+      try {
+        state.sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+        if (!state.sync) { state.done = true; state.result = 'unsupported'; return state.result; }
+        gl.flush();
+      } catch (_) {
+        drop(); state.done = true; state.result = 'unsupported'; return state.result;
+      }
+      return 'pending';
+    }
+    let status = null;
+    try { status = gl.clientWaitSync(state.sync, 0, 0); }
+    catch (_) { drop(); state.done = true; state.result = 'unsupported'; return state.result; }
+    if (status === gl.ALREADY_SIGNALED || status === gl.CONDITION_SATISFIED) {
+      drop(); state.done = true; state.result = 'done'; return state.result;
+    }
+    if (status === gl.TIMEOUT_EXPIRED) return 'pending';
+    drop(); state.done = true; state.result = 'unsupported'; return state.result;
+  }
   let biomeWarmN = 0;               // which warm is live; a new cross supersedes
+  let sysFenceN = 0;
+  let sysFenceActive = 0;
   // traverse() is what compile() prepares materials from. traverseVisible()
   // is what it gathers LIGHTS from — from the target scene AND from its
   // first argument — and the chapter's roots are already in the target
@@ -41574,6 +41617,8 @@ export function createSystems(game) {
     const bio = game.biome;
     if (!bio || bio.isActive(name)) return false;
     transBusy = true;
+    const fenceOwner = ++sysFenceN;
+    sysFenceActive = fenceOwner;
     biomePre = name;   // (L7, F2) the J-cut: cleared once biomeGo actually lands, below
     // ---- THE PLACE ANSWERS BACK (L7, E6 / writing B) --------------------
     // Measured HERE, before the crossing: biome:enter marks the chapter seen
@@ -41635,7 +41680,12 @@ export function createSystems(game) {
       // tab still finishes its crossing, and capped so a hold that never
       // clears cannot keep the card up for ever.
       const heldAt = performance.now(), frames0 = game.state.frames | 0;
+      const fenceDeadline = heldAt + sysFADE_HOLD_MAX;
+      const fenceState = { owner: fenceOwner, sync: null, done: false, result: '' };
+      let fenceGL = null;
+      let fenceStarted = false;
       const release = function () {
+        if (sysFenceActive === fenceOwner) sysFenceActive = 0;
         fadeEl.classList.remove('on');
         transBusy = false;
         // The palette was swapped by biome:enter inside the hold, so this is
@@ -41673,10 +41723,30 @@ export function createSystems(game) {
         if (onArrive) setTimeout(onArrive, 600);
       };
       const wait = function () {
+        if (sysFenceActive !== fenceOwner) {
+          // A late timer can survive the hand-off; let the helper delete its
+          // sync before abandoning this crossing's poll.
+          if (!fenceState.done) sysCrossFence(fenceGL, fenceState, sysFenceActive, 0, Infinity);
+          return;
+        }
         const held = performance.now() - heldAt;
         const drawn = (game.state.frames | 0) - frames0;
-        const ready = !game.state.renderHold && drawn >= 2;
-        if ((held >= sysFADE_HOLD && ready) || held >= sysFADE_HOLD_MAX) release();
+        const floorReady = !game.state.renderHold && drawn >= 2;
+        if (floorReady && !fenceStarted) {
+          fenceStarted = true; // one fence per crossing, after the existing draw floor
+          try { fenceGL = renderer && typeof renderer.getContext === 'function' ? renderer.getContext() : null; }
+          catch (_) { fenceGL = null; }
+        }
+        let fenceReady = !fenceStarted;
+        if (fenceStarted) {
+          const status = sysCrossFence(fenceGL, fenceState, fenceOwner, performance.now(), fenceDeadline);
+          fenceReady = status !== 'pending';
+        }
+        if ((held >= sysFADE_HOLD && floorReady && fenceReady) || held >= sysFADE_HOLD_MAX) {
+          if (held >= sysFADE_HOLD_MAX && !fenceState.done)
+            sysCrossFence(fenceGL, fenceState, fenceOwner, fenceDeadline, fenceDeadline);
+          release();
+        }
         else setTimeout(wait, 16);
       };
       setTimeout(wait, sysFADE_HOLD);

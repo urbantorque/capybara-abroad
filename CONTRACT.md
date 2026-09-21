@@ -1,3 +1,37 @@
+## REIMAGINE D12/G — REVEAL WHEN READY (21 Sep 2026)
+
+Chapter fades previously counted submitted draws, not completed GPU commands.
+A nonblocking diagnostic fence remained pending after Pasto and Quay revealed,
+including their largest 298/690 ms rAF gaps. No shader programs appeared after
+the reveal in that trace. The existing crossing now waits for one GPU fence
+after its two-draw floor. The 460 ms minimum, 10-second deadline, authored fade
+animation and shader warmup remain unchanged. Unsupported/failed contexts
+fall back safely; success, timeout and supersession dispose their sync. No
+steady-game polling, new save field, visual layer or optional bug flag.
+
+Hardware after-trace observes completion before all three reveals. A second
+trace without diagnostic fences records post-reveal maxima of 68/112/75 ms
+for Pasto/Quay/Sydney; the earlier plain trace recorded 393/745/131 ms. These
+are fresh-run rAF observations, not GPU timer results or a controlled speedup
+benchmark. Extracted production helper/wait tests pass 17 scenarios and 68
+assertions, including nonblocking waits, thrown calls, context loss, one-time
+cleanup, independent draw/hold gates and a zero-draw deadline. The release
+body is a counted test stub; actual transitions are checked in the browser.
+Syntax, the 7002.2 KB single-file build and all 49 suite checks pass, zero
+failed. The seven-stop cumulative-save instrument compiles but has not yet
+completed its live run; it is not counted as journey acceptance here.
+
+The full 02243fd soak remains honestly red: all nineteen chapters start,
+audio and 38 crossings pass, with zero runtime errors/NaN/below-world frames,
+but Pasto 32.5 and Rio 30.1 m/s exceed the unchanged speed gate. Peak-state
+telemetry is added for classification; no general velocity clamp or raised
+threshold is hidden inside this readiness repair.
+
+The Andes geometry study is rejected. It passes its geometry invariants but
+the flight image adds bands to the same giant needles rather than giving a
+stronger landscape. Pasto production source is restored exactly. Keep the
+isolated study and the roadmap's rejection evidence, not the proposed effect.
+
 ## REIMAGINE D10/D11/G — RELEASE AND REBOUND (21 Sep 2026)
 
 Interrupted touch controls release through shared event-only helpers. Pause,

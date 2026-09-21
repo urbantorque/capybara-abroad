@@ -979,3 +979,50 @@ work. A green static suite is necessary and never a claim of perfection.
   The history row explicitly skips fuzz/load; reporting now prints "skipped"
   rather than mislabelling those unrun probes as failures. This partial rerun
   does not replace the still-pending full post-repair soak.
+- E10 bounded Andes study: the earned condor-flight image exposes oversized,
+  unbroken triangular far peaks. Prototype incised shoulders and unequal summit
+  ridges inside their inherited cone envelopes, with snow clipped to the actual
+  supporting faces. Preserve all authored placements, heights, palette/gains,
+  random draws, playable Galeras and colliders. One cached geometry swap behind
+  `noAndesContour`, inherited geometry at governor rung one and above; budget
+  one existing draw, at most 900 triangles and 100 KB added cache, cut gate
+  at most 0.1 ms. This remains a candidate until four pinned views, masked
+  pixel comparisons, exact fallback restoration and hardware cut timing pass.
+  Reject it if the flight composition is not visibly stronger.
+  Rejected after the first earned-flight A/B: 146,945 changed backdrop pixels,
+  zero outside-mask changes, but the added facets read as bands on the same
+  giant needles. Exact restoration also differed by one pixel, so the visual
+  gate was not a pass. Lead inspected both frames and restored Pasto source
+  byte-for-byte to 02243fd. The isolated geometry study remains reproducible
+  (23,934 checks); no E10 production term or runtime-dependent test ships.
+- G post-repair full soak on 02243fd: all nineteen fuzz chapters start, with
+  zero NaN/below-world frames. Pasto 32.5 and Rio 30.1 m/s fail the unchanged
+  30 m/s gate; neither failure is classified yet. The full 23.8-minute run
+  passes audio, both nineteen-place crossing laps and zero runtime errors.
+  Quay retains a 383 ms first-lap post-fade hitch. New peak telemetry separates grounded speed, airborne speed,
+  carrier state and external shove without changing the acceptance threshold.
+- G cumulative journey acceptance: retain one fresh browser save through the
+  authored Sydney, Quay, Pasto, Kyoto, Palawan, Pantanal and Hanoi memories and
+  the homecoming. Reuse real-key route drivers and their reload checks; public
+  chapter crossings remain a declared fixture. No seeded tasks or ending.
+  This checks accumulated progress and persistence, not unguided navigation.
+- D12 crossing readiness candidate: a diagnostic nonblocking GPU fence remains
+  pending after the fade clears in Pasto and Quay, including their largest
+  298/690 ms rAF gaps. Completion is observed 341/852 ms after fade-off; no new
+  shader programs appear in those windows. This is evidence of unfinished
+  submitted work, not an exact GPU timer or proof of every hitch's cause.
+  Gate the existing reveal on completion of submitted destination frames,
+  retaining the existing two-frame floor, 460 ms minimum, 10,000 ms deadline
+  and fade animation. Poll only during crossing, never block the thread, and
+  dispose syncs on success, failure, timeout or supersession. Unsupported
+  contexts retain the old readiness behavior. No new save field or visual
+  layer; this is transition-readiness correctness, not a new effect.
+  Acceptance: actual helper/wait tests pass 17 scenarios and 68 assertions.
+  Hardware diagnostic fences complete before all three reveals. A second
+  trace without diagnostic fences records 68/112/75 ms post-reveal maxima
+  (Pasto/Quay/Sydney); the earlier plain trace recorded 393/745/131 ms.
+  These are fresh-run wall-clock observations, not a controlled benchmark.
+  First-second after-reveal maxima in the new plain trace are 42/98/63 ms.
+  Both after-traces finish with zero runtime errors; full regression pending.
+  Syntax, the 7002.2 KB single-file build and 49 suite checks pass, zero failed.
+  The cumulative journey instrument passes preparation only at this checkpoint.
