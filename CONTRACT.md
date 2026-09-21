@@ -1,3 +1,27 @@
+## REIMAGINE A — GUIDANCE AND HOMECOMING (21 Sep 2026)
+
+ROADMAP-REIMAGINE.md supersedes the old pass's feature scope. The user
+authorised a 48-hour autonomous design pass, with tested checkpoints on
+`codex/redesign-delight`. Existing art identity, save compatibility and
+measured budgets remain constraints; old pacing decisions may change.
+
+Pause and control help preserve the guided walk. Explicit skip and replay
+are available in Pause; merely timing out does not mark an action learned.
+An unfinished Sydney save can restart the walk. A valid zero-task save now
+offers Carry On, so leaving before the first completed task does not discard
+the opening state or an explicit tutorial choice. No save field was added.
+
+The finale stages earned keepsakes using the same predicate as eligibility,
+including partial-completion journeys. Pantanal's earned empty place remains
+empty on the shelf and in the final ring. Completionist eligibility remains.
+
+New behavioral tests run real extracted functions and UI callbacks with
+small doubles. They join `npm test`; live browser instruments separately
+exercise controls, persistence and real souvenir staging. The new isolated
+headful QA harness records the GPU, uses trusted keys, and leaves the
+player's browser profile untouched. CPU tick timing is labelled as such,
+never reported as GPU execution time. No new visual/audio term or flag in A.
+
 ## THE THIRTEENTH LIFT — THE DEBTS PAID, THE WORLD REMEMBERED, AND THE STILL FRAME CLOSED (L13 — 21 Sep 2026)
 
 Twenty commits, ROADMAP-WOW3.md, four waves against twelve named debts

@@ -6493,9 +6493,9 @@ const sysLEGEND_TOUCH = [
 // thing the player happened to do. Eight beats in Sydney's gardens, one pill
 // at a time in the gardener's voice, each waiting for the player's OWN action
 // and moving on at sysTUT_BEAT_T if it never comes. Not a mode — the world
-// runs and the animal can wander off. Skipped whole by Esc or by the control
-// fold being opened; never on a file with a tick on it, never on a restore;
-// `tut: 1` on the save the moment it ends or is skipped. See tutTick.
+// runs and the animal can wander off. Pause and help hold the lesson; only
+// the named skip button dismisses it. `tut: 1` means all eight actions were
+// demonstrated or the player explicitly skipped. An unfinished save can retry.
 //
 // The lines name the KEY and the NOUN and nothing else. `key` is the verb
 // the bot performs (qa/wow2-tutorial.js reads the pill, not this table); the
@@ -24433,6 +24433,9 @@ export function createSystems(game) {
   // tally on the grid come out of it.
   const jrFile = saveRead();
   const jrFileCount = jrFile && jrFile.tasks ? jrFile.tasks.length : 0;
+  // A walk can be saved before its first tick. Its tutorial choice, position
+  // and elapsed time still belong to the player when they return.
+  const jrHasFile = !!jrFile;
   // task id -> true, for the per-chapter tallies below
   const jrFileDone = Object.create(null);
   if (jrFile && jrFile.tasks) {
@@ -24448,7 +24451,7 @@ export function createSystems(game) {
     for (let i = 0; i < jrFile.seen.length; i++) jrFileSeen[jrFile.seen[i]] = true;
   }
 
-  if (jrFileCount > 0) {
+  if (jrHasFile) {
     const cd = chapterDef(chapterOf(jrFile.biome || 'sydney'));
     // A REAL BUTTON, NOT A DIV WEARING ITS NAME. A div with role="button" and a
     // tabindex is focusable and announces itself as a button, and then does
@@ -24481,7 +24484,7 @@ export function createSystems(game) {
   // TILE on the far side of it that quietly wiped the file. The page turns; the
   // label now says so, and starting over is its own control on page two.
   goEl.appendChild(sysEl('b', null,
-    jrFileCount > 0 ? 'Go somewhere else' : 'Choose a place'));
+    jrHasFile ? 'Go somewhere else' : 'Choose a place'));
   // TWO FILLED ACCENT BUTTONS ON ONE CARD IS NO HIERARCHY AT ALL, and as of T2
   // this one is ALWAYS the outline: on a fresh file the filled button above it
   // is Begin, and on a file it is Carry on. There is no longer a state in
@@ -24511,7 +24514,7 @@ export function createSystems(game) {
   // Fresh file:  BEGIN (filled) then Choose a place (outline).
   // With a file: Carry on (filled, above) then Go somewhere else (outline).
   // Never two filled — that is what .alt was written for.
-  if (jrFileCount === 0) {
+  if (!jrHasFile) {
     const beginEl = sysEl('button', 'capyui-go');
     beginEl.type = 'button';
     beginEl.appendChild(sysEl('b', null, 'Begin'));
@@ -24604,7 +24607,7 @@ export function createSystems(game) {
   // where every place is on show at once.
   {
     const st = sysEl('span', 'capyui-p2stat');
-    if (jrFileCount > 0) {
+    if (jrHasFile) {
       let placesSeen = 0;
       for (let n = 1; n <= CHAPTERS.length; n++) {
         const ids = tasksInChapter(n);
@@ -24730,7 +24733,7 @@ export function createSystems(game) {
     // equals, and the hero tile was the only thing saying it was the door.
     // A soft eyebrow on the rest, gone the moment there is anything on the
     // file, so the shelf reads as one door and eighteen places behind it.
-    if (!hero && jrFileCount === 0) body.appendChild(sysEl('em', 'capyui-pickeyebrow soft', 'after Sydney'));
+    if (!hero && !jrHasFile) body.appendChild(sysEl('em', 'capyui-pickeyebrow soft', 'after Sydney'));
     body.appendChild(sysEl('b', null, d.name));
     body.appendChild(sysEl('i', null, d.hint));
     // The hero is the only one with room for a third line, and there is
@@ -24814,7 +24817,7 @@ export function createSystems(game) {
     el.setAttribute('aria-label', d.name + ', chapter ' + d.n +
       (d.key ? ', key ' + d.key : '') +
       (done > 0 ? ', ' + done + ' of ' + ids.length + ' done' : '') +
-      (jrFileCount > 0 ? ', carry on from here' : ''));
+      (jrHasFile ? ', carry on from here' : ''));
     // stopPropagation, or the card's own catch-all listener starts Sydney first
     el.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
     el.addEventListener('click', function (e) {
@@ -24834,7 +24837,7 @@ export function createSystems(game) {
       // behaviour and the one every part of this tile already implied.
       // Starting over is still possible and is its own clearly-labelled
       // control, below the shelf, and it asks first.
-      startGame(d.biome, jrFileCount > 0);
+      startGame(d.biome, jrHasFile);
     });
     // ---- THE CARD LEANS TOWARDS WHATEVER YOU ARE LOOKING AT ---------------
     // Resting on a tile warms the whole screen in that chapter's own colour —
@@ -25041,7 +25044,7 @@ export function createSystems(game) {
   //
   // It only exists when there is something to lose. On a fresh file there is
   // nothing to start over FROM and the row is not built at all.
-  if (jrFileCount > 0) {
+  if (jrHasFile) {
     const overEl = sysEl('div', 'capyui-over');
     const overBtn = sysEl('button', 'capyui-overbtn', 'start over — wipe this journey');
     overBtn.type = 'button';
@@ -25345,6 +25348,14 @@ export function createSystems(game) {
     jrKeys.open = true;
     jrShow(false);
     if (from && from !== document.body) jrReturnFocus = from;
+  });
+  // Guidance belongs to the player. Help and Pause never dismiss a lesson;
+  // these named choices are the only way to skip or start the walk again.
+  const pauseTutReplay = pauseBtn('', 'replay the guided walk', function () {
+    tutReplay(); pauseHide();
+  });
+  const pauseTutSkip = pauseBtn('', 'skip the guided walk', function () {
+    tutSkip('skip'); pauseHide();
   });
   // ---- A SIXTH DOOR: THE SHELF (L7, E5 / play 2). Fifteen minutes in, the
   // fresh player could not leave and was not told how: the board's rows were
@@ -25884,7 +25895,8 @@ export function createSystems(game) {
     if (pauseShown) return;
     pauseShown = true;
     pausePre = !!pre;
-    if (!pausePre) tutSkip('esc');    // the first walk stands down (ROADMAP-WOW2, T)
+    pauseTutReplay.hidden = pausePre || tutLive() || !game.biome || game.biome.current !== 'sydney';
+    pauseTutSkip.hidden = pausePre || !tutLive();
     pauseGo.textContent = pausePre ? 'back' : 'resume';
     pauseHead.textContent = pausePre ? 'Settings' : 'Paused';
     // ...and the footer names the button that is actually there: BACK, not
@@ -37097,7 +37109,11 @@ export function createSystems(game) {
     for (let i = 0; i < held.length; i++) {
       const k = held[i];
       const sp = sysShelfSlot(i + 1);   // slot by EARN RANK, not by chapter number (X1a)
-      try { ph.stageKeep(chapterDef(k).biome, sp.x, sp.z, sp.y); } catch (e) { /* one shelf slot is not worth the sentence */ }
+      const def = chapterDef(k);
+      // Pantanal earns its place, but deliberately leaves that place empty.
+      if (def && !def.keepNone) {
+        try { ph.stageKeep(def.biome, sp.x, sp.z, sp.y); } catch (e) { /* one shelf slot is not worth the sentence */ }
+      }
       if (!sysShelfSpoken[k]) { sysShelfSpoken[k] = true; grew.push(k); }
     }
     sysShelfCount = held.length;
@@ -37215,7 +37231,7 @@ export function createSystems(game) {
   let sysFinT = 0;                      // how long we have been sat in the middle
   let sysFinClosing = false;
 
-  /** Every chapter ticked. A projection, like chapComplete — never a counter. */
+  /** Every keepsake earned. Optional boxes are not part of coming home. */
   function sysFinaleAll() {
     for (let k = 1; k <= chapMax; k++) if (!keepHeld(k)) return false;
     return true;
@@ -37256,10 +37272,11 @@ export function createSystems(game) {
     sysFinOpen = open;
     game.state.finaleOn = true;         // the gardener stands down; npc.js reads it (L6, E5)
     for (let k = 1; k <= chapMax; k++) {
-      if (!chapComplete(k)) continue;
+      const def = chapterDef(k);
+      if (!keepHeld(k) || !def || def.keepNone) continue;
       const a = open + sysFIN_GAP / 2 + ((k - 1) / n) * span;
       try {
-        ph.stageKeep(chapterDef(k).biome,
+        ph.stageKeep(def.biome,
                      sysFIN_X + Math.cos(a) * sysFIN_R,
                      sysFIN_Z + Math.sin(a) * sysFIN_R);
       } catch (e) { /* one souvenir is not worth the ending */ }
@@ -37794,9 +37811,9 @@ export function createSystems(game) {
   // place card has gone, saved beside the slide's so it is never said twice.
   let paperEver = false, paperT = 0;
   // ---- THE FIRST WALK (ROADMAP-WOW2, T). See sysTUT_LINES. ---------------
-  // `tutEver` is on the save: walked or skipped, never again on this file.
-  // `tutArm` is set by startGame — a fresh file, not a restore, nothing
-  // ticked, and the harness has not said noTut — and is the only way in.
+  // `tutEver` is on the save: all actions demonstrated or explicitly skipped.
+  // `tutArm` is set by startGame or the pause card's replay button. An unfinished
+  // Sydney restore starts again; the save has no per-lesson position to resume.
   // `tutBeat` is 1..8 while a pill is up, 0 before the first and between
   // pills (`tutWait` counts the gap), and the chain is over when `tutDone`.
   // Everything a beat measures is measured FROM THE BEAT'S START: the walk,
@@ -37813,21 +37830,32 @@ export function createSystems(game) {
   /** The walk is coming or is under way: the slide prompt and the paper's
    *  own explainer stand aside while this is true. */
   function tutLive() { return tutArm && !tutDone; }
-  /** Over, one way or the other. `how` is for the audit; the save takes 1. */
+  /** Over for this session. An offer timing out is not a learned action. */
   function tutEnd(how) {
     if (tutDone) return;
     tutDone = true; tutOn = false; tutArm = false;
-    tutSkipped = how === 'esc' || how === 'legend';
+    tutSkipped = how === 'skip';
     tutHow = how;
     tutEndAt = tutT;
     if (tutEl) { sysToastOut(tutEl); tutEl = null; }
     tutAim = null; tutSay = ''; tutSayT = 0;
-    tutEver = true;
+    tutEver = tutSkipped || (how === 'walked' && tutHitN === sysTUT_LINES.length);
+    saveSoon();
+  }
+  /** A deliberate retry, from the beginning, without changing any task. */
+  function tutReplay() {
+    if (!started || !game.biome || game.biome.current !== 'sydney') return;
+    if (tutEl) { sysToastOut(tutEl); tutEl = null; }
+    tutEver = false; tutArm = true; tutOn = false; tutDone = false; tutSkipped = false;
+    tutBeat = 0; tutBeatT = 0; tutT = 0; tutWait = 0;
+    tutAim = null; tutBench = null; tutSay = ''; tutSayT = 0;
+    tutWalk = 0; tutRunT = 0; tutYaw = 0; tutYawLast = NaN;
+    tutEndAt = -1; tutPill = ''; tutHow = ''; tutHitN = 0;
     saveSoon();
   }
   /** Beat `n` begins: the counters it measures from, its arrow, its pill. */
   function tutBeatStart(n) {
-    if (n > sysTUT_LINES.length) { tutEnd('walked'); return; }
+    if (n > sysTUT_LINES.length) { tutEnd(tutHitN === sysTUT_LINES.length ? 'walked' : 'offered'); return; }
     tutBeat = n; tutBeatT = 0; tutWait = 0; tutOn = true;
     tutWalk = 0; tutRunT = 0; tutYaw = 0; tutYawLast = NaN;
     tut0 = { wheek: tutWheekN, grab: tutGrabN, yuzu: tutYuzuN, tab: tutTabN, bump: tutBumpN };
@@ -37852,9 +37880,9 @@ export function createSystems(game) {
     // counts as a borrowed word — this is Sydney's, in Sydney
     if (hit) { tutHitN++; sfx('pop', { volume: 0.22, pitch: 1.38 }); }
     if (tutBeat === 5 && tutBumpN > tut0.bump) tutSay = sysTUT_SHOP;
-    if (tutBeat >= sysTUT_LINES.length) tutEnd('walked');
+    if (tutBeat >= sysTUT_LINES.length) tutEnd(tutHitN === sysTUT_LINES.length ? 'walked' : 'offered');
   }
-  /** Esc, or the control fold: the player has asked for the whole table. */
+  /** Only the explicit skip button dismisses unfinished guidance. */
   function tutSkip(how) { if (tutLive()) tutEnd(how); }
   /** One pill, in the gardener's voice, attributed the way an overheard line
    *  is (E4, roman). Direct to toastNow: the walk's line is not a remark the
@@ -37889,9 +37917,8 @@ export function createSystems(game) {
   // The two answers that arrive as events rather than as state.
   game.events.on('capy:wheek', function () { if (tutOn) tutWheekN++; });
   game.events.on('capy:grab', function () { if (tutOn) tutGrabN++; });
-  // ...and the control fold: opened by H, ?, the pause card's button or the
-  // summary itself, it is the player asking for the whole table at once.
-  jrKeys.addEventListener('toggle', function () { if (jrKeys.open) tutSkip('legend'); });
+  // The control fold lives in a paused journal. Its ordinary pause holds the
+  // current beat and counters; closing help returns to that same lesson.
   /** Read-only, for the bot (qa/wow2-tutorial.js). */
   game.tutAudit = function () {
     return { beat: tutBeat, done: tutDone, skipped: tutSkipped, how: tutHow, hits: tutHitN,
@@ -38317,7 +38344,9 @@ export function createSystems(game) {
       slipEver = !!jrFile.slip;
       paperEver = !!jrFile.paper;
       puffEver = !!jrFile.puff;
-      tutEver = !!jrFile.tut;
+      // Pre-tutorial files never asked for this walk. Grandfather that choice
+      // into the next save too; writing zero would re-arm it one reload later.
+      tutEver = jrFile.tut !== 0;
       // ...and THE GLIMPSE (N2): a chapter-keyed set, checked field by
       // field the way `owned`'s allowlist is, since a bogus key here would
       // otherwise sit in npc.js's set for ever.
@@ -38396,9 +38425,10 @@ export function createSystems(game) {
     // THE FIRST MINUTE (L4, E3): a file with nothing on it. See sysFreshT.
     sysFresh = doneCount === 0 && findCount() === 0;
     sysFreshT = 0;
-    // THE FIRST WALK (ROADMAP-WOW2, T): a fresh file, begun and not carried
-    // on, with nothing ticked, in Sydney. `noTut` is the harness's cut.
-    tutArm = !restore && !tutEver && doneCount === 0 && !game.state.noTut &&
+    // Incomplete guidance survives a save. Old files without a tutorial bit
+    // are left alone; their player can request the walk from Pause.
+    tutArm = !tutEver && ((!restore && doneCount === 0) ||
+             (restore && jrFile && jrFile.tut === 0)) && !game.state.noTut &&
              (where || 'sydney') === 'sydney';
     tutT = 0;
     // THE OPENING, TEN SECONDS (ROADMAP-WOW2, N4.1): the same fresh-file
@@ -38554,7 +38584,7 @@ export function createSystems(game) {
    * wipe a journey — starting over is one control, on page two, and it asks.
    */
   function startResume() {
-    if (jrFileCount > 0) startGame(jrFile.biome || 'sydney', true);
+    if (jrHasFile) startGame(jrFile.biome || 'sydney', true);
     else startGame('sydney');
   }
   // Catch-all: anywhere on the card that is not a ticket. With a journey on
@@ -38647,7 +38677,7 @@ export function createSystems(game) {
       // click listener — this was the second door into the same data loss and
       // it was the quicker one.
       const pick = sysPickFromKey(c);
-      if (pick > 0) { startGame(CHAPTERS[pick - 1].biome, jrFileCount > 0); return; }
+      if (pick > 0) { startGame(CHAPTERS[pick - 1].biome, jrHasFile); return; }
       // THE PAGE TURNS BOTH WAYS FROM THE KEYBOARD. Escape is the one key
       // every player already tries when a screen has gone somewhere they did
       // not mean, and it did nothing at all on this card until now.
