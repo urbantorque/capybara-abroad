@@ -8,6 +8,7 @@ const css=s=>s.match(/function sysBuildCSS\([^]*?\n\}/)[0];
 // M2a adds only a lesson subtree and prevents horizontal title scrolling.
 // Keep the historical whole-sheet comparison outside these named additions.
 const withoutLearning = css(source)
+  .replace(/\/\* HOMECOMING opening paper:[^]*?\/\* HOMECOMING opening paper end\. \*\/\r?\n/, '')
   .replace("'.capyui-homevisit .capyui-jrled{min-height:44px;letter-spacing:.04em;text-transform:none;}',\n", '')
   .replace("'.capyui-homevisit .capyui-jrled{min-height:44px;letter-spacing:.04em;text-transform:none;}',\r\n", '')
   .replace(/\/\* HOMECOMING title:[^]*?\/\* HOMECOMING title end\. \*\/\r?\n/, '')

@@ -957,6 +957,38 @@ coherent candidate; this focused proof does not replace that gate.
 No save change, effect or flag. Ownership work occurs on existing discrete
 prop-return actions, not a new frame loop. Weekly allowance: 41% remaining.
 
+### M3g: opening composition and lesson timing
+
+The ten-second opening now clears task, arrival, wallet and map paper while
+retaining the animal, world animation, touch controls and independent P-key
+preference. The guided walk and stamina explanation wait until the scene
+releases control. Skip, pause, timeout and replay restore the paper. The delayed
+title-fade callback also declines to start after pause or travel. No save field.
+`noOpeningQuiet` restores inherited paper/timing for comparison. This is core
+UI suppression, not an added GPU term; it applies at every quality rung with
+constant boolean checks and event-driven class changes.
+
+Evidence: 29 lifecycle checks; desktop and emulated-touch v4 each pass 15 live
+checks. Both screenshots inspected. Pinned compositor v2 changes 661,994 pixels
+inside named paper masks, zero outside, and restores with zero pixel difference.
+The v1 mask failed because CDP captured at 1.5x CSS coordinates; the corrected
+instrument scales pixel centres into CSS space. This is composition proof,
+not real-device or novice testing. All 69 suite gates pass.
+
+### M1l: nonblocking render timer evidence
+
+`qa/homecoming-gpu.mjs` samples WebGL2 elapsed queries around post.render,
+excluding simulation, with bounded pending queries and disjoint/context/focus
+checks. No production timing hook. Hanoi render-only Pretty p95 across
+still/walk/rest is 19.30/18.09/19.18ms; Fast is 15.72/15.51/16.13ms. Both arms
+pass, with at least 172 samples per phase and no disjoint/context loss. These
+are fresh-browser diagnostic routes, not matched causal A/B or GPU-busy/FPS
+certification. Earlier ownership-fixed-tag queries enclosed simulation and
+are not valid render-cost attribution; retained for traceability.
+
+Weekly allowance: 40% remaining. Full-world fuzz after the souvenir ownership
+repair, cumulative earned journey, map practice and release gates remain open.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

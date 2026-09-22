@@ -9866,6 +9866,9 @@ function sysBuildCSS() {
 /* the on-screen stick is display-driven and its children opt back into the
    pointer themselves, so it goes out of the layout rather than to zero alpha */
 '#hud.bare .capyui-touch{display:none !important;}',
+/* HOMECOMING opening paper: controls and the player's P key stay independent. */
+'#hud.opening-quiet :is(.capyui-todo,.capyui-map,.capyui-maplegend,.capyui-wallet,.capyui-item,.capyui-stam,.capyui-stamlbl,.capyui-pips,.capyui-place,.capyui-moment,.capyui-home,.capyui-fly,.capyui-perf){visibility:hidden !important;opacity:0 !important;pointer-events:none !important;}',
+/* HOMECOMING opening paper end. */
 
 /* ---------- K: THE POSTCARD (v22) ----------
    Photo mode. Built ON TOP of `bare` rather than beside it — the furniture
@@ -38545,12 +38548,14 @@ export function createSystems(game) {
   //   itself is hidden the instant the beat ends (skip or timeout) instead
   //   of being carried off in view — standing in for the traveller's own
   //   exit without showing it, which is honest about what it is not.
-  let sysOpenArm = false, sysOpenT = -1;
+  let sysOpenArm = false, sysOpenPending = false, sysOpenT = -1;
   let sysOpenFinish = null;
   const sysOPEN_HOLD = 10.0;
   function sysOpeningPlay(after) {
+    sysOpenPending = false;
     if (sysOpenFinish) sysOpenFinish();
     sysOpenT = sysOPEN_HOLD;
+    hudRoot.classList.toggle('opening-quiet', !game.state.noOpeningQuiet);
     try {
       game.frameShot({ yaw: 0.35, dist: 8.6, pitch: 0.20, raise: 0.7, hold: sysOPEN_HOLD });
     } catch (e) { /* the beat is not worth the exception */ }
@@ -38578,6 +38583,7 @@ export function createSystems(game) {
       done = true;
       sysOpenT = -1;
       sysOpenFinish = null;
+      hudRoot.classList.remove('opening-quiet');
       clearTimeout(timer);
       // Release only this beat's lens, never a newer reward or arrival shot.
       if (shotReq === openingShot) game.frameShot(null);
@@ -39008,6 +39014,7 @@ export function createSystems(game) {
     // ten-second beat either way, so the two never fight over the screen.
     sysOpenArm = !restore && doneCount === 0 && !game.state.noOpen &&
                  (where || 'sydney') === 'sydney';
+    sysOpenPending = sysOpenArm;
     titleEl.classList.add('gone');
     todoEl.classList.add('show');
 
@@ -39131,6 +39138,9 @@ export function createSystems(game) {
       // N4.1: the opening plays first, and "be a menace." — the animal's
       // whole life until now, one sentence — waits for it.
       setTimeout(function () {
+        // The title fade is not ownership of a later pause or crossing.
+        sysOpenPending = false;
+        if (!started || game.state.paused || transBusy || game.biome.current !== 'sydney') return;
         sysOpeningPlay(function () { toast((landed && cdef.open) || 'be a menace.'); });
       }, 700);
     } else {
@@ -51936,7 +51946,8 @@ export function createSystems(game) {
       const stamT = 'scaleX(' + s.toFixed(3) + ')';
       if (stamT !== sysStamLast) { sysStamLast = stamT; stamFill.style.transform = stamT; }
       if (s > 0.999 && !capy.blown) stamFullT += dt; else stamFullT = 0;
-      const want = started && stamFullT < 1.2;
+      const want = started && stamFullT < 1.2 &&
+        (game.state.noOpeningQuiet || (!sysOpenPending && sysOpenT < 0));
       if (want !== stamShown) {
         stamShown = want;
         stamEl.classList.toggle('show', want);
@@ -52048,7 +52059,8 @@ export function createSystems(game) {
       else if (!inSyd) tutEnd('left');              // the walk is the gardens'
       else if (tutT > sysTUT_TOTAL_T) tutEnd('time');
     }
-    if (tutLive() && started && capy && !game.state.paused && !transBusy) {
+    if (tutLive() && started && capy && !game.state.paused && !transBusy &&
+        (sysOpenT < 0 || game.state.noOpeningQuiet)) {
       tutT += dt;
       if (!tutOn) {
         // Before the first pill, and in the gap between two: the place card
