@@ -1526,11 +1526,42 @@ const monTOWN = [
   [214, 100, 18, 18, 38, 0.0, 'rose'],
 ];
 
+// A terrace cannot occupy the circuit. Several authored footprints crossed
+// its centreline, trapping walkers and hiding the rail-driven cars in walls.
+// Reserve the full road width plus the block's quarter-metre plinth. This is
+// build-time layout only; drawing, collision, windows and NPC avoidance agree.
+function monTownRoadClear(t) {
+  const c = Math.cos(t[5]), s = Math.sin(t[5]);
+  const hx = t[2] * 0.5 + monTRACK_HALF + 0.25;
+  const hz = t[3] * 0.5 + monTRACK_HALF + 0.25;
+  for (let i = 0; i < monTRACK.length; i++) {
+    const a = monTRACK[i], b = monTRACK[(i + 1) % monTRACK.length];
+    const ax = (a[0] - t[0]) * c - (a[1] - t[1]) * s;
+    const az = (a[0] - t[0]) * s + (a[1] - t[1]) * c;
+    const dx = (b[0] - a[0]) * c - (b[1] - a[1]) * s;
+    const dz = (b[0] - a[0]) * s + (b[1] - a[1]) * c;
+    let lo = 0, hi = 1;
+    if (Math.abs(dx) < 1e-9) { if (Math.abs(ax) > hx) continue; }
+    else {
+      const u = (-hx - ax) / dx, v = (hx - ax) / dx;
+      lo = Math.max(lo, Math.min(u, v)); hi = Math.min(hi, Math.max(u, v));
+    }
+    if (Math.abs(dz) < 1e-9) { if (Math.abs(az) > hz) continue; }
+    else {
+      const u = (-hz - az) / dz, v = (hz - az) / dz;
+      lo = Math.max(lo, Math.min(u, v)); hi = Math.min(hi, Math.max(u, v));
+    }
+    if (lo <= hi) return false;
+  }
+  return true;
+}
+
 function monBuildTown(game, root) {
   const K = monMerger();
   const body = monPoolBody(game);
   for (let i = 0; i < monTOWN.length; i++) {
     const t = monTOWN[i];
+    if (!monTownRoadClear(t)) continue;
     monBlockOf(K, t[0], t[1], t[2], t[3], t[4], t[5], t[6]);
     monPoolBox(body, t[0], monTerrain(t[0], t[1]) + t[4] * 0.5, t[1],
                t[2], t[4] + 2.4, t[3], t[5]);

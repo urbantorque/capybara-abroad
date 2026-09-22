@@ -1022,6 +1022,32 @@ Weekly allowance: 39% remaining. Next: real-input later-act memories and a
 cumulative earned journey. Optional narrative/visual rollout stays behind its
 performance and human-preference gates; no public master update yet.
 
+### M1n: Monaco's town leaves the circuit clear
+
+Real-key later-act rehearsal repeatedly stopped at the house centred on
+(-40, 20), then exposed another overlap on the casino climb. A build-only
+oriented footprint/corridor check excludes eleven of the forty-five town
+rows from both the merged mesh and pooled colliders, including their window
+and navigation registrations. Thirty-four authored buildings remain, still
+one merged draw. No track, terrain, spawn, material or save row changes.
+This is a core layout repair at all quality rungs, not an optional visual
+layer: no effect flag or per-frame cost is added.
+
+The actual town-builder regression fails on 50083ad (45 versus 34) and passes
+on the repaired builder. The independent corridor test covers all authored
+footprints. A sequential headful baseline/working comparison, layout-v2,
+finds 21,987 changed pixels, zero outside projected removed-building masks.
+Geometry-only diagnostic and normal-world screenshots were inspected; the
+diagnostic disables lighting and other scenery, so it is not a beauty or
+frame-time comparison. Real keys now traverse the previously blocked western
+quay and casino climb. The subsequent casino task route remains in rehearsal;
+two fixture failures targeted the shop counter and then missed the interior
+arch. Neither was treated as a production defect or a completed memory.
+
+Syntax, build and all 71 repository gates pass. Weekly allowance: 36%
+remaining. Next: complete the later-act real-input routes and cumulative
+earned journey; retain the separate performance/release gates.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
