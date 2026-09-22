@@ -397,7 +397,7 @@ function rioBuildCar(game, root) {
   const x0 = rioAVE_X0 - 14, x1 = rioAVE_X1 + 14;
   const span = x1 - x0;
   rioCarMover = makeMover({
-    body: cb, group: rioCar,
+    body: cb, group: rioCar, wrapSpan: span,
     at: function (t) {
       const u = ((t * rioCAR_V) % span + span) % span;
       const x = x0 + u;

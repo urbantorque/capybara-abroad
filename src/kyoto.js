@@ -229,7 +229,7 @@ function kyoBuildRickshaw(game, root) {
   const zLane = kyoGION_Z - 2.4;
   const span = kyoRICK_X * 2;
   kyoRickMover = makeMover({
-    body: cb, group: kyoRick,
+    body: cb, group: kyoRick, wrapSpan: span,
     at: function (t) {
       const u = ((t * kyoRICK_V) % span + span) % span;
       const x = -kyoRICK_X + u;

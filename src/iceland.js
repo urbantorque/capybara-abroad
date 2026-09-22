@@ -425,7 +425,7 @@ function iceBuildCar(game, root) {
   const zRoad = iceLANES[0] - 2.2;   // the near lane, not the middle of the road
   const span = iceCAR_X * 2;
   iceCarMover = makeMover({
-    body: cb, group: iceCar,
+    body: cb, group: iceCar, wrapSpan: span,
     // one way, wrapping outside the town
     at: function (t) {
       const u = ((t * iceCAR_V) % span + span) % span;

@@ -8438,10 +8438,19 @@ export function makeMover(opts) {
       if (dx * dx + dz * dz > 1e-8) lastYaw = Math.atan2(dx, dz);
     }
     if (body) {
-      body.velocity.set((tgt.x - prev.x) * inv,
-                        Math.max(-4, Math.min(4, (tgt.y - prev.y) * inv)),
-                        (tgt.z - prev.z) * inv);
+      const dx = tgt.x - prev.x, dz = tgt.z - prev.z;
+      // A declared straight route wraps offstage; it never drives backwards
+      // across the square in one frame. Reset interpolation at that seam.
+      const wrapped = opts.wrapSpan > 0 && dx * dx + dz * dz > opts.wrapSpan * opts.wrapSpan * 0.25;
+      if (wrapped) {
+        body.position.set(tgt.x, tgt.y, tgt.z);
+        body.interpolatedPosition.copy(body.position);
+        body.velocity.set(0, 0, 0);
+        body.aabbNeedsUpdate = true;
+      } else body.velocity.set(dx * inv,
+                        Math.max(-4, Math.min(4, (tgt.y - prev.y) * inv)), dz * inv);
       body.quaternion.setFromEuler(0, lastYaw, 0);
+      if (wrapped) body.interpolatedQuaternion.copy(body.quaternion);
       body.angularVelocity.set(0, 0, 0);
       body.previousPosition.copy(body.position);
       body.previousQuaternion.copy(body.quaternion);

@@ -211,9 +211,29 @@ async page => {
           impulseT: g.capy.impulseT ?? null, blocked: !!g.state.paused || !!g.state.renderHold || document.hidden };
       }
       g.world.addEventListener('postStep', fallContact);
+      const solverBodies = new Map();
+      let observedSaves = saves0;
       function fallTickObserver(...args) {
         fallContacts = false; fallSteps = 0; fallMotion.fill(0);
-        try { return rawTick.apply(this, args); } finally { fallTick++; fall.sample(fallState()); }
+        try { return rawTick.apply(this, args); } finally {
+          fallTick++; fall.sample(fallState());
+          const saves = g.state.solverSaves || 0;
+          if (saves > observedSaves) {
+            // Post-clamp candidates, not a claim of exact pre-solver cause.
+            // Only scan on an intervention; retain counts, not per-frame logs.
+            for (const b of g.world.bodies) {
+              const v = b.velocity;
+              if (Math.hypot(v.x, v.y, v.z) < 89.99) continue;
+              const old = solverBodies.get(b.id);
+              if (old) { old.count++; continue; }
+              const prop = g.props.find(p => p.body === b);
+              solverBodies.set(b.id, { id: b.id, count: 1, mass: b.mass, type: b.type,
+                p: b.position.toArray(), v: v.toArray(), shapes: b.shapes.map(s => s.type),
+                prop: prop ? { type: prop.type, biome: prop.biome, keep: prop.keep } : null });
+            }
+          }
+          observedSaves = saves;
+        }
       }
       g.tick = fallTickObserver;
       try {
@@ -401,6 +421,7 @@ async page => {
         // the fuzz's own clamps over the eight seconds, and the teleport's,
         // apart — the second column is the harness measuring itself
         solverSaves: saves1 - saves0,
+        solverCandidates: [...solverBodies.values()],
         keepSaves: (g.state.solverSaves || 0) - saves1,
         end: [+g.capy.position.x.toFixed(1), +g.capy.position.y.toFixed(1), +g.capy.position.z.toFixed(1)],
         errs: errs.slice(0, 6), lastError: g.state.lastError || null,

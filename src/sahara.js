@@ -407,7 +407,7 @@ function sahBuildHandcart(game, root) {
   const zRun = sahSQ_Z0 + 3.5;
   const span = sahCART_X * 2;
   sahCartMover = makeMover({
-    body: cb, group: sahCart,
+    body: cb, group: sahCart, wrapSpan: span,
     at: function (t) {
       const u = ((t * sahCART_V) % span + span) % span;
       const x = -sahCART_X + u;

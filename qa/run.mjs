@@ -34,6 +34,7 @@ const ASSERTS = [
   ['qa/homecoming-opening.mjs', 'opening skip, replay cleanup, input ownership and newer camera shots'],
   ['qa/homecoming-regional.mjs', 'calm regional arrangements, protected beat voices and active bypass'],
   ['qa/homecoming-warm.mjs', 'hidden global shader warm-up and actual first-frame readiness'],
+  ['qa/homecoming-mover-wrap.mjs', 'street route seams reset bodies without launch velocity'],
   ['qa/homecoming-story.mjs', 'alternative memories, earned act thresholds and no full-clear requirement'],
   ['qa/homecoming-atlas.mjs', 'five atlas folds and nineteen preserved chapter identities'],
   ['qa/homecoming-biome-parking.mjs', 'sleeping scene traversal, returning rigs and owner rollback'],

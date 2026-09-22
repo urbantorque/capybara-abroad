@@ -903,6 +903,32 @@ for full-world coverage now that a fresh Begin correctly gates Story travel.
 Their startup adapters are syntax checked; the full soak remains next work.
 All 67 suite gates pass. Weekly allowance is 46% remaining.
 
+### M1j: street-route seam repair; soak failure retained
+
+The 23.2-minute soak on bc57923 passes synthesized audio and two packaged
+travel laps, but fails the fuzz gate: Sahara records 2,338 solver saves during
+45 seconds of synthetic input, plus 571 in the separate keepsake fixture.
+All nineteen places start and move, with no reported NaN/void frames. This
+is a failed release gate, not a clean soak. Its history row is preserved.
+
+Three focused 45-second Sahara traces (public arrival, direct arrival and
+six-place travel prefix) do not reproduce sustained interventions. Each does
+identify one handcart seam spike: 709, 2,585 and 2,060 m/s. The shared mover
+mistook its offstage route wrap for physical displacement. Five straight
+looping street routes now declare their span; crossing the seam relocates
+the body and resets interpolation/velocity instead of launching it across
+the street. Normal movement, route clocks and continuous routes are unchanged.
+No new visual/audio term, save field or flag; constant arithmetic per existing
+mover, no allocation. The solver safeguard is unchanged.
+
+Twenty-four real-Cannon regression checks pass. The fresh 45-second direct
+Sahara trace after the fix has 2,237 observed steps, no focus loss, no errors
+and zero solver interventions. Evidence: homecoming-solver-sahara-wrap-fixed.
+This closes the demonstrated seam spike, not the unexplained sustained
+failure. Fuzz now records bounded post-clamp body candidates when its counter
+increases; these are candidates, not exact pre-solver attribution. Repeat
+the fuzz gate before release. Weekly allowance: 44% remaining at start.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

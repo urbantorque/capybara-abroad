@@ -427,7 +427,7 @@ function hkBuildTaxi(game, root) {
   const lane = -3.4;   // the empty lane the file already names
   const span = hkTAXI_Z1 - hkTAXI_Z0;
   hkTaxiMover = makeMover({
-    body: cb, group: hkTaxi,
+    body: cb, group: hkTaxi, wrapSpan: span,
     at: function (t) {
       // `t` is advanced by the caller and HELD at the red, so the stop is a
       // stop rather than a jump: see hkUpdateTaxi.
