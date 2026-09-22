@@ -1,5 +1,15 @@
 # HANDOFF — state of play, 21 Sep 2026
 
+## Resumed Homecoming mandate (22 Sep, newest)
+
+The user explicitly resumed autonomous work with a hard stop at 6% weekly
+Codex remaining, superseding all older 25% stop/20% reserve text below.
+Resumption reading: 25% remaining. Check live usage between milestones and
+leave checkpoint capacity before the floor. Return-visit work is parked;
+preserve shipped homecoming and saves, but do not build further variants.
+The continuation heartbeat is active with this scope. ROADMAP-HOMECOMING.md
+holds the current evidence and remaining work; master remains unchanged.
+
 ## Homecoming continuation (22 Sep, newer than the closed twelve-hour pass)
 
 M1g/M2e: shop rehearsal added to title/pause, with an isolated wallet and real

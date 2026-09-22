@@ -35,6 +35,11 @@ export async function openHarness({ url = 'http://localhost:5188/',
   const { chromium } = playwright();
   // A fresh Playwright profile never attaches to the player's browser/save.
   const browser = await chromium.launch({ channel, headless: false });
+  // Register crash evidence before navigation, including failures before __capy.
+  const metadata = { at: new Date().toISOString(), browser: browser.version(), channel,
+    headless: false, viewport: { width, height, deviceScaleFactor, hasTouch, isMobile },
+    errors: [], warnings: [], requests: [], startup: [] };
+  const stage = name => metadata.startup.push({ name, at: new Date().toISOString() });
   try {
     const origin = new URL(url).origin;
     const entries = { ...storage };
@@ -46,7 +51,7 @@ export async function openHarness({ url = 'http://localhost:5188/',
           value: typeof value === 'string' ? value : JSON.stringify(value) })) }] } });
     const page = await context.newPage();
     page.setDefaultTimeout(20000);
-    const errors = [], warnings = [], requests = [];
+    const { errors, warnings, requests } = metadata;
     page.on('pageerror', e => errors.push({ kind: 'pageerror', message: String(e.stack || e) }));
     page.on('crash', () => errors.push({ kind: 'crash', message: 'Owned browser page crashed' }));
     page.on('console', m => {
@@ -54,13 +59,17 @@ export async function openHarness({ url = 'http://localhost:5188/',
       if (m.type() === 'warning') warnings.push(m.text());
     });
     page.on('requestfailed', r => requests.push({ url: r.url(), error: r.failure()?.errorText }));
-    await page.goto(url, { waitUntil: 'load' });
-    await page.waitForFunction(() => !!window.__capy && !!document.querySelector('.capyui-go'));
-    await page.bringToFront();
     const cdp = await browser.newBrowserCDPSession();
     cdp.on('Target.targetCrashed', event => errors.push({ kind: 'targetcrashed', ...event }));
     await cdp.send('Target.setDiscoverTargets', { discover: true });
     const system = await cdp.send('SystemInfo.getInfo');
+    metadata.gpu = system.gpu;
+    stage('navigation');
+    await page.goto(url, { waitUntil: 'load' });
+    stage('loaded');
+    await page.waitForFunction(() => !!window.__capy && !!document.querySelector('.capyui-go'));
+    stage('game-ready');
+    await page.bringToFront();
     const renderer = await page.evaluate(() => {
       const gl = window.__capy.renderer.getContext();
       const ext = gl.getExtension('WEBGL_debug_renderer_info');
@@ -68,9 +77,7 @@ export async function openHarness({ url = 'http://localhost:5188/',
         renderer: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
         version: gl.getParameter(gl.VERSION), hidden: document.hidden };
     });
-    const metadata = { at: new Date().toISOString(), browser: browser.version(), channel,
-      headless: false, viewport: { width, height, deviceScaleFactor, hasTouch, isMobile }, renderer,
-      gpu: system.gpu, errors, warnings, requests };
+    metadata.renderer = renderer;
     const hold = async (key, ms = 350) => {
       if (ms < 1 || ms > 20000) throw new Error('Key hold must be 1–20000 ms.');
       await page.keyboard.down(key);
@@ -111,7 +118,10 @@ export async function openHarness({ url = 'http://localhost:5188/',
     };
     return { browser, context, page, metadata, hold, start, arrive, screenshot, result,
       close: () => browser.close() };
-  } catch (error) { await browser.close(); throw error; }
+  } catch (error) {
+    error.harnessMetadata = metadata;
+    await browser.close(); throw error;
+  }
 }
 
 export async function snapshot(page) {

@@ -37,6 +37,7 @@ const ASSERTS = [
   ['qa/homecoming-opening.mjs', 'opening skip, replay cleanup, input ownership and newer camera shots'],
   ['qa/homecoming-map-practice.mjs', 'isolated map-symbol rehearsal, live legend and focus lifecycle'],
   ['qa/homecoming-memory-practice.mjs', 'isolated memory rehearsal, actual Story and legacy rules'],
+  ['qa/homecoming-action-practice.mjs', 'isolated movement, camera and interaction rehearsal'],
   ['qa/homecoming-monaco-clearance.mjs', 'town drawing and collision preserve the circuit corridor'],
   ['qa/homecoming-regional.mjs', 'calm regional arrangements, protected beat voices and active bypass'],
   ['qa/homecoming-warm.mjs', 'hidden global shader warm-up and actual first-frame readiness'],

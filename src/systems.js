@@ -6533,7 +6533,7 @@ const sysTUT_SHOP = 'the traveller’s stall buys things for yuzu.';
 // Reading a lesson never spends fruit, awards a task or changes the save.
 const sysLEARN = [
   { title: '1. Moving and looking',
-    line: 'W, A, S, D moves it. Shift runs; Space hops. Drag or C turns the view. The controls below list the current buttons.',
+    line: 'W, A, S, D moves it. Shift runs; Space hops. Drag or Z and X turn the view; C recentres it. The controls below list the current buttons.',
     touch: 'The movement stick steers it; push fully to run. HOP clears a low obstacle. The controls below show the touch camera gestures.',
     pad: 'The left stick steers it. RT runs; A hops. The controls below show the camera buttons.',
     try: 'In Sydney, replay the guided walk from Pause for a short practice route.' },
@@ -6596,6 +6596,13 @@ const sysLEARN_MAP = {
   wrong: 'That mark belongs to another place on the key.',
   done: 'Practice complete. The live map and journey are unchanged.',
   next: 'Next', reset: 'Reset practice',
+};
+const sysLEARN_ACTION = {
+  moveOpen: 'Try the movement diagram', moveStart: 'Practice diagram: guide it to the star with W, A, S, D or the buttons. Z and X turn this view; C recentres it. The real journey stays unchanged.', reached: ' The star is reached.',
+  left: 'left', right: 'right', forward: 'forward', back: 'back', turnLeft: 'turn left', turnRight: 'turn right',
+  moved: 'The marker moves with the view.', turned: 'The practice view turns.', reset: 'Reset practice',
+  interactionOpen: 'Try an interaction', approach: 'Approach the hat', pick: 'E · pick up', put: 'E · put down', wheek: 'Q · wheek',
+  near: 'The hat is near. E picks it up or puts it down.', held: 'The hat is held.', ground: 'The hat is on the ground.', answer: 'The nearby bird answers the WHEEK.'
 };
 const sysTUT_BENCHES = [
   [26, 14.5], [46.5, 33.5], [-30, -6.5], [-48, -6.5],
@@ -8915,6 +8922,13 @@ function sysBuildCSS() {
 '.capyui-learnshop,.capyui-learnmap,.capyui-learnmemory{margin:8px 0 16px;padding-top:8px;border-top:1px solid ' + rule + ';}',
 '.capyui-learnmemory button[aria-pressed="true"]{border-color:' + accentInk + ';font-weight:600;}',
 '.capyui-learn .capyui-mappractice-answer{display:inline-flex;align-items:center;gap:8px;}',
+'.capyui-learnpractice{margin:8px 0 16px;padding:8px 0;border-top:1px solid ' + rule + ';}',
+'.capyui-learnpractice-scene{height:180px;margin:8px 4px;border:1px solid ' + rule + ';background:' + paper + ';display:flex;align-items:center;justify-content:center;overflow:hidden;}',
+'.capyui-learnpractice-scene:focus-visible{outline:2px solid ' + accentInk + ';outline-offset:2px;}',
+'.capyui-learnpractice-board{position:relative;width:140px;height:140px;border:1px dashed ' + rule + ';flex-shrink:0;}',
+'.capyui-learnpractice-marker{position:absolute;left:50%;top:50%;width:20px;height:14px;margin:-7px 0 0 -10px;border-radius:45%;background:' + accentInk + ';}',
+'.capyui-learnpractice-star{position:absolute;left:calc(50% + 36px);top:calc(50% - 36px);width:20px;line-height:20px;text-align:center;margin:-10px 0 0 -10px;color:' + accentInk + ';}',
+'.capyui-learnpractice-controls{display:flex;flex-wrap:wrap;gap:4px;}',
 /* HOMECOMING learning reference end. */
 /* HOMECOMING atlas: the existing postcards, in five quiet folds. */
 '.capyui-act{grid-column:1/-1;min-width:0;border-bottom:1px solid ' + rule + ';}',
@@ -24779,6 +24793,81 @@ export function createSystems(game) {
     return host;
   }
 
+  // Local movement and lens rehearsal. The marker and view are deliberately
+  // fake: this fold never reaches the live input, camera, tick, or save.
+  function learnMovePractice() {
+    const host = sysEl('div', 'capyui-learnpractice capyui-learnmove');
+    const open = sysEl('button', 'capyui-movepractice-open', sysLEARN_ACTION.moveOpen);
+    open.type = 'button'; host.appendChild(open);
+    open.addEventListener('click', function () {
+      if (open.hidden) return;
+      const scene = sysEl('div', 'capyui-learnpractice-scene'); scene.tabIndex = 0;
+      scene.setAttribute('role', 'group');
+      scene.setAttribute('aria-label', sysLEARN_ACTION.moveStart);
+      const board = sysEl('div', 'capyui-learnpractice-board');
+      const marker = sysEl('span', 'capyui-learnpractice-marker');
+      board.setAttribute('aria-hidden', 'true');
+      const status = sysEl('p', 'capyui-movepractice-status', sysLEARN_ACTION.moveStart);
+      status.setAttribute('role', 'status');
+      const controls = sysEl('div', 'capyui-learnpractice-controls');
+      const state = { x: 0, z: 0, yaw: 0 };
+      function paint(action) {
+        marker.style.transform = 'translate(' + (state.x * 18) + 'px,' + (state.z * 18) + 'px)';
+        scene.dataset.view = String(state.yaw);
+        board.style.transform = 'rotate(' + state.yaw + 'deg)';
+        status.textContent = action + (state.x === 2 && state.z === -2 ? sysLEARN_ACTION.reached : '');
+      }
+      function act(code) {
+        const ix = (code === 'ArrowRight' || code === 'KeyD' ? 1 : code === 'ArrowLeft' || code === 'KeyA' ? -1 : 0);
+        const iz = (code === 'ArrowUp' || code === 'KeyW' ? -1 : code === 'ArrowDown' || code === 'KeyS' ? 1 : 0);
+        const rad = state.yaw * Math.PI / 180;
+        const dx = Math.round(Math.cos(rad) * ix + Math.sin(rad) * iz);
+        const dz = Math.round(-Math.sin(rad) * ix + Math.cos(rad) * iz);
+        if (ix || iz) { state.x = Math.max(-3, Math.min(3, state.x + dx)); state.z = Math.max(-3, Math.min(3, state.z + dz)); }
+        else if (code === 'KeyX') state.yaw = state.yaw === 90 ? 0 : 90;
+        else if (code === 'KeyZ') state.yaw = state.yaw === -90 ? 0 : -90;
+        else if (code === 'KeyC') state.yaw = 0;
+        else return;
+        paint(code === 'KeyC' || code === 'KeyZ' || code === 'KeyX' ? sysLEARN_ACTION.turned : sysLEARN_ACTION.moved);
+      }
+      const labels = [['ArrowLeft',sysLEARN_ACTION.left],['ArrowRight',sysLEARN_ACTION.right],['ArrowUp',sysLEARN_ACTION.forward],['ArrowDown',sysLEARN_ACTION.back],['KeyZ',sysLEARN_ACTION.turnLeft],['KeyX',sysLEARN_ACTION.turnRight]];
+      for (const row of labels) { const b = sysEl('button', null, row[1]); b.type = 'button'; b.dataset.action = row[0]; b.addEventListener('click', function () { act(row[0]); scene.focus(); }); controls.appendChild(b); }
+      board.appendChild(marker); board.appendChild(sysEl('span', 'capyui-learnpractice-star', '★'));
+      scene.appendChild(board); host.appendChild(scene); host.appendChild(controls); host.appendChild(status);
+      scene.addEventListener('keydown', function (e) { if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','KeyA','KeyD','KeyW','KeyS','KeyZ','KeyX','KeyC'].indexOf(e.code) < 0) return; e.preventDefault(); e.stopPropagation(); act(e.code); });
+      const reset = sysEl('button', 'capyui-movepractice-reset', sysLEARN_ACTION.reset); reset.type = 'button';
+      reset.addEventListener('click', function () { state.x = state.z = state.yaw = 0; paint(sysLEARN_ACTION.reset); scene.focus(); }); host.appendChild(reset);
+      open.hidden = true; scene.focus();
+    });
+    return host;
+  }
+
+  // A tiny local prop teaches approach, E, and the contextual WHEEK response.
+  function learnInteractionPractice() {
+    const host = sysEl('div', 'capyui-learnpractice capyui-learninteraction');
+    const open = sysEl('button', 'capyui-interactionpractice-open', sysLEARN_ACTION.interactionOpen); open.type = 'button'; host.appendChild(open);
+    open.addEventListener('click', function () {
+      if (open.hidden) return;
+      let near = false, held = false;
+      const status = sysEl('p', 'capyui-interactionpractice-status', sysLEARN_ACTION.approach); status.setAttribute('role', 'status');
+      const approach = sysEl('button', null, sysLEARN_ACTION.approach); approach.type = 'button';
+      const action = sysEl('button', null, sysLEARN_ACTION.pick); action.type = 'button'; action.disabled = true;
+      const wheek = sysEl('button', null, sysLEARN_ACTION.wheek); wheek.type = 'button'; wheek.disabled = true;
+      approach.addEventListener('click', function () { near = true; action.disabled = false; wheek.disabled = false; status.textContent = sysLEARN_ACTION.near; });
+      action.addEventListener('click', function () { if (!near) return; held = !held; action.textContent = held ? sysLEARN_ACTION.put : sysLEARN_ACTION.pick; status.textContent = held ? sysLEARN_ACTION.held : sysLEARN_ACTION.ground; });
+      wheek.addEventListener('click', function () { if (near) status.textContent = sysLEARN_ACTION.answer; });
+      // Bubble only from this practice's focused descendants, never the window.
+      host.addEventListener('keydown', function (e) {
+        if (e.code !== 'KeyE' && e.code !== 'KeyQ') return;
+        e.preventDefault(); e.stopPropagation();
+        if (!e.repeat) (e.code === 'KeyE' ? action : wheek).click();
+      });
+      host.appendChild(approach); host.appendChild(action); host.appendChild(wheek); host.appendChild(status);
+      const reset = sysEl('button', 'capyui-interactionpractice-reset', sysLEARN_ACTION.reset); reset.type = 'button'; reset.addEventListener('click', function () { near = held = false; action.disabled = wheek.disabled = true; action.textContent = sysLEARN_ACTION.pick; status.textContent = sysLEARN_ACTION.approach; approach.focus(); }); host.appendChild(reset); open.hidden = true; approach.focus();
+    });
+    return host;
+  }
+
   function learnGuide() {
     const guide = sysEl('div', 'capyui-learn');
     // Content is interactive reference, never the title backdrop's Begin.
@@ -24810,6 +24899,8 @@ export function createSystems(game) {
       });
       lesson.appendChild(body);
       lesson.appendChild(practice);
+      if (i === 0) lesson.appendChild(learnMovePractice());
+      if (i === 1) lesson.appendChild(learnInteractionPractice());
       if (i === 2) lesson.appendChild(learnMemoryPractice());
       if (i === 3) lesson.appendChild(learnShopPractice());
       if (i === 4) lesson.appendChild(learnMapPractice());

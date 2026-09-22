@@ -6,6 +6,23 @@ published game until a candidate passes its gates.
 
 ## Execution and usage budget
 
+### Resumed mandate (22 September, supersedes the quota rules below)
+
+The user explicitly resumed autonomous delivery with a hard stop at 6% weekly
+Codex remaining. The live account reads 25% remaining at resumption, allowing
+at most 19 further percentage points, including verification and checkpoint
+overhead. Check before and between bounded milestones; begin final handoff
+before reaching the floor. If usage is unavailable or reaches 6%, stop and
+pause the heartbeat. No credits, purchases or automatic restart after reset.
+The previous 25% operational stop and 20% reserve below are historical.
+
+Further return-visit work is parked by user instruction, including Kyoto and
+Hanoi variants. Preserve already shipped homecoming behaviour and saves.
+Prioritise startup/performance evidence, movement/interaction lessons, spacious
+score coverage, measured global visual refinements and release verification.
+Human listening, novice and unavailable-device gates remain explicitly open;
+quota permission does not turn automated checks into those approvals.
+
 User requests Astra Medium lead work and lower-tier agents for bounded tasks.
 Use Luna for source scouting, mechanical checks and small isolated edits;
 use stronger reasoning only for integration or a demonstrated hard problem.
@@ -1268,6 +1285,45 @@ Human listening/novice evaluation and real lower-power/mobile/browser coverage
 remain unavailable, not passed by these scripts. Hosted candidate verification
 and master promotion have not occurred. The five ignored audition files are
 ready for a listening review, but are neither loudness-normalised nor blind.
+
+### M2h / M1s: action rehearsal and early startup evidence
+
+Resumed with the user's 6% hard floor; return variants remain parked. The
+account reads 24% remaining after this bounded tranche. A Luna source scout
+and two-file builder handled the initial isolated lesson work; lead review
+corrected camera-relative rotation, actual Z/X/C controls, coordinate bounds,
+focus-scoped action keys and non-vacuous tests before verification.
+
+The first two guide folds now offer optional movement/view and interaction
+rehearsals, alongside the existing memory/shop/map practices. These are local
+DOM diagrams and contextual action examples, not live physics lessons. The
+movement diagram supports WASD/arrows, quarter-turn views, recenter and reset;
+the interaction example teaches proximity, E pick/drop and Q response. Native
+buttons preserve touch access. All state stays inside each builder; no save,
+wallet, task, live input, camera or recurring frame/timer work is added. Core
+instructional UI needs no decorative effect flag. Run/hop, real prop wind-up,
+gamepad rehearsal and novice success are not certified by these diagrams.
+
+The browser harness now subscribes to CDP crash events before navigation and
+attaches metadata to startup exceptions, including failures before __capy is
+available. The new cold-start driver writes evidence from the Node process
+even if the owned page has died, with six sequential fresh browser processes
+and no retries. Startup-resumed-v1 passes all six starts and trusted movement
+checks with zero errors. This precedes the final lesson camera-copy/key
+correction, which does not change the startup path. No crash cause or fix is
+claimed. The earlier resumed five-reload run also passed but overlapped lesson
+edits, so it is diagnostic evidence only, not a frozen-build release gate.
+
+Learning-v13 passes 145 desktop and 145 touch-sized assertions on the corrected
+keys, including title/pause access, inverse view rotation, native target sizes,
+E/Q input, resets and unchanged real save/start/pause state. Representative
+desktop and narrow screenshots were inspected. The isolated builder test also
+checks coordinate bounds, C recenter, repeated E suppression and native Tab.
+Syntax, the single-file build and all 77 repository checks pass. Soak history
+is still stale; no full current-build world sweep is implied by this checkpoint.
+Next: all-biome score coverage, budgeted global visual prototypes and broader
+current-build release checks. Human taste/device gates stay open. Do not repeat
+the same cold-start loop indefinitely without a new crash or diagnostic lead.
 
 ## Explicit cuts (scope)
 

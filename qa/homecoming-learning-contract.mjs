@@ -23,9 +23,13 @@ const q = vm.createContext({ sysEl: el, sysSay: s => s, mode: 'keyboard', homeco
   learnShopPractice: () => el('div', 'capyui-learnshop'),
   learnMapPractice: () => el('div', 'capyui-learnmap'),
   learnMemoryPractice: () => el('div', 'capyui-learnmemory'),
+  learnMovePractice: () => el('div', 'capyui-learnmove'),
+  learnInteractionPractice: () => el('div', 'capyui-learninteraction'),
   sysScheme: (keyboard, touch, pad) => q.mode === 'touch' ? touch : q.mode === 'pad' ? pad : keyboard });
 vm.runInContext(data[0] + '\n' + s.slice(at, end + 1), q);
 const guide = q.learnGuide();
+assert.equal(guide.children[0].children[3].cls, 'capyui-learnmove');
+assert.equal(guide.children[1].children[3].cls, 'capyui-learninteraction');
 assert.equal(guide.children[2].children[3].cls,'capyui-learnmemory','third lesson exposes the separately tested rehearsal');
 assert(guide.children[2].children[1].textContent.includes('quieter route'));
 q.homecomingArc = false; guide.children[2].events.toggle();

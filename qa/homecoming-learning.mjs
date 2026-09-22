@@ -5,6 +5,51 @@ const touch = process.argv.includes('--touch');
 const h = await openHarness(touch ? { width: 390, height: 844, hasTouch: true, isMobile: true } : {});
 const out = { touch, metadata: h.metadata, checks: 0 };
 function check(ok, why) { assert(ok, why); out.checks++; }
+async function actionPractice(guide) {
+  const snapshot = () => h.page.evaluate(() => ({ started: window.__capy.state.started,
+    paused: window.__capy.state.paused, save: localStorage.getItem('capy3.journey.v1') }));
+  const before = await snapshot();
+  const move = guide.locator('.capyui-learnlesson').nth(0);
+  if (await move.getAttribute('open') === null) await move.locator('summary').click();
+  await move.locator('.capyui-movepractice-open').click();
+  const scene = move.locator('.capyui-learnpractice-scene');
+  const marker = move.locator('.capyui-learnpractice-marker');
+  check(await scene.evaluate(el => el === document.activeElement), 'movement diagram receives focus');
+  await h.page.keyboard.press('d'); await h.page.keyboard.press('d');
+  await h.page.keyboard.press('w'); await h.page.keyboard.press('w');
+  check((await move.locator('.capyui-movepractice-status').textContent()).includes('star'), 'local target reached using real keys');
+  await move.locator('.capyui-movepractice-reset').click();
+  await move.locator('[data-action="KeyX"]').click();
+  const prior = await marker.boundingBox();
+  await h.page.keyboard.press('d');
+  const after = await marker.boundingBox();
+  check(after.x > prior.x && Math.abs(after.y - prior.y) < 2, 'right remains screen-right after view rotation');
+  const controls = move.locator('.capyui-learnpractice-controls button');
+  for (let i = 0; i < await controls.count(); i++) {
+    await controls.nth(i).scrollIntoViewIfNeeded();
+    const box = await controls.nth(i).boundingBox();
+    check(box.height >= 44 && box.x >= 0 && box.x + box.width <= (touch ? 390 : 1280), 'movement button fits touch target');
+  }
+  await h.screenshot('homecoming-move-practice-' + (before.started ? 'pause' : 'title') + '-' + (touch ? 'touch' : 'desktop'));
+  const interaction = guide.locator('.capyui-learnlesson').nth(1);
+  if (await interaction.getAttribute('open') === null) await interaction.locator('summary').click();
+  await interaction.locator('.capyui-interactionpractice-open').click();
+  const host = interaction.locator('.capyui-learninteraction');
+  const action = host.locator('button').filter({ hasText: /^E / });
+  check(await action.isDisabled(), 'prop begins out of reach');
+  await host.locator('button').nth(1).click();
+  check(!await action.isDisabled(), 'local approach exposes action');
+  await h.page.keyboard.press('e');
+  check((await action.textContent()).includes('put'), 'E picks local prop');
+  await h.page.keyboard.press('e');
+  check(!(await action.textContent()).includes('put'), 'second E drops local prop');
+  await h.page.keyboard.press('q');
+  check((await host.locator('.capyui-interactionpractice-status').textContent()).includes('answers'), 'Q produces local response');
+  await host.locator('.capyui-interactionpractice-reset').click();
+  check(await action.isDisabled(), 'interaction reset restores distance');
+  await h.screenshot('homecoming-interaction-practice-' + (before.started ? 'pause' : 'title') + '-' + (touch ? 'touch' : 'desktop'));
+  assert.deepEqual(await snapshot(), before); out.checks++;
+}
 async function rehearse(guide) {
   const lesson = guide.locator('.capyui-learnlesson').nth(3);
   if (await lesson.getAttribute('open') === null) await lesson.locator('summary').click();
@@ -97,6 +142,7 @@ try {
     check(box.height >= 44 && box.x >= 0 && box.x + box.width <= (touch ? 390 : 1280), 'usable summary target');
   }
   const body = await lessons.first().textContent();
+  await actionPractice(title.locator('.capyui-learn'));
   await rehearse(title.locator('.capyui-learn'));
   await memoryPractice(title.locator('.capyui-learn'));
   await mapPractice(title.locator('.capyui-learn'));
@@ -119,6 +165,7 @@ try {
     yuzu: document.querySelector('.capyui-wallet')?.textContent }));
   const before = await progress();
   const guide = p.locator('.capyui-jrkeys .capyui-learn');
+  await actionPractice(guide);
   await rehearse(guide);
   await memoryPractice(guide);
   await mapPractice(guide);
@@ -139,7 +186,7 @@ try {
   out.pass = true;
 } catch (e) { out.pass = false; out.failure = String(e.stack || e); process.exitCode = 1; }
 finally {
-  try { await h.result('homecoming-learning-v12-' + (touch ? 'touch' : 'desktop'), out); }
+  try { await h.result('homecoming-learning-v13-' + (touch ? 'touch' : 'desktop'), out); }
   finally { await h.close(); }
   console.log(JSON.stringify({ touch, checks: out.checks, pass: out.pass, failure: out.failure, errors: h.metadata.errors }));
 }
