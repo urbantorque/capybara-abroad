@@ -8,6 +8,17 @@ published game until a candidate passes its gates.
 
 ### Resumed mandate (22 September, supersedes the quota rules below)
 
+23 September model update: the user requests GPT-5.6 Sol at High effort for
+the remaining lead workflow, superseding Astra Medium. Bounded lower-complexity
+Luna delegation remains authorised. Quota and parked scope are unchanged.
+
+At that model handoff, fresh-v7 earned Sydney, Quay, Pasto, Pantanal and all
+three Kyoto tasks, then Edge crashed on immediate reload/start. Resumed-v8
+repeated that boundary; resumed-v9 read the exact Kyoto save, earned two Hanoi
+tasks, then failed a separate held-bowl assertion. See M1t below. None of
+these partial runs is a release gate. A Palawan sparkle-only water prototype
+was visually rejected after pinned A/B inspection; see M2i below.
+
 The user explicitly resumed autonomous delivery with a hard stop at 6% weekly
 Codex remaining. The live account reads 25% remaining at resumption, allowing
 at most 19 further percentage points, including verification and checkpoint
@@ -1324,6 +1335,47 @@ is still stale; no full current-build world sweep is implied by this checkpoint.
 Next: all-biome score coverage, budgeted global visual prototypes and broader
 current-build release checks. Human taste/device gates stay open. Do not repeat
 the same cold-start loop indefinitely without a new crash or diagnostic lead.
+
+### M1t: Kyoto reload crash reproduced and checkpointed
+
+Fresh-v7 earns and persists Sydney, Quay, Pasto and Pantanal, then earns all
+three Kyoto tasks. Edge crashes during the driver's immediate reload/start,
+before Kyoto's final cumulative gate snapshot. CDP records both the page crash
+and `Target.targetCrashed` with error code -2147483645. Resumed-v8 restores the
+exact last complete Pantanal gate and independently earns the same Kyoto tasks;
+the renderer crashes at the same reload/start boundary with the same code.
+There is no matching Windows Application Error/WER entry in the four-hour log.
+This establishes a repeatable boundary, not a production root cause.
+
+The cumulative driver now captures the exact save at each delegated result and
+screenshot, attaches the last available complete gate when a dead page cannot
+be queried, records which checkpoint source a resumed run used, and makes final
+browser cleanup best-effort so it cannot mask the primary failure. The v8 crash
+therefore preserves a full exact Kyoto save with 24 earned tasks. Resumed-v9
+loads that unmodified checkpoint in a fresh browser and reaches live Hanoi,
+showing the save itself is readable. It earns Hanoi crossing and pho raid, but
+the actual bowl held at the raid sample is absent 0.65 seconds later. The
+driver's assertion fails without another browser crash or runtime error. The
+cause is unproven; retain the detailed `qa/homecoming-journey-chain-resumed-v9-hanoi-reimagine-natural-hanoi-failure.json.png`.
+Earlier earned-v6 passed ten cross-session memories, but a current-build
+uninterrupted Story and the repeated reload boundary remain open.
+
+### M2i: a visual prototype rejected before rollout
+
+An optional shared shader uniform reduced only existing water sparkle emission
+by 38% (reflections, shoreline and wake untouched). The falsy-live flag and
+rung-one parking met the effect contract, and the shader scope test passed.
+One owned Edge browser captured fixed-camera A/B/B/A Palawan views. Repeated
+cut frames were pixel-identical, as were repeated live frames; in the closer
+water view the cut/live pair changed 2,266 of 243,200 sampled pixels by a
+total RGB delta of 10,821, and the water-mask mean RGB delta was 0.13. Images
+were essentially indistinguishable by eye, so this is not a meaningful beauty
+uplift. The prototype and temporary instruments were removed; no production
+visual change ships. Eight-second cut/live samples each held a 16.7 ms median
+frame interval and 17.9–18.1 ms p95, but that does not make an invisible
+effect worthwhile. Continue with composition, silhouette and grounding
+prototypes, preserving the admired reflections. No human visual preference
+panel or device coverage was obtained.
 
 ## Explicit cuts (scope)
 

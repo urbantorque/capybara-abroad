@@ -128,13 +128,15 @@ const manifest={route,sources:[...drivers.values(),home].map(d=>d.manifest),
 let resume=null;
 if(resumeTag){
   const file='homecoming-journey-chain-'+resumeTag+'-failure.json.png',raw=read(file),prior=JSON.parse(raw);
-  assert(prior.homecoming&&prior.lastSave&&prior.failure,'an actual failed earned Story checkpoint is required');
+  const priorSave=prior.lastSave||prior.gates?.at(-1)?.saved;
+  assert(prior.homecoming&&priorSave&&prior.failure,'an actual failed earned Story checkpoint is required');
   assert.equal(prior.manifest.sharedSha256,manifest.sharedSha256,'same progression authoring');
   for(const item of prior.manifest.supportSources.filter(s=>s.file.startsWith('../src/')))
     assert.equal(item.sha256,hash(read(item.file)),'same production source '+item.file);
-  assert.equal(prior.lastSave.arcV1,1);assert.equal(prior.lastSave.journeyMode,'story');assert(!prior.lastSave.fin);
-  for(const gate of prior.gates)assert((gate.saved.tasks||[]).every(id=>prior.lastSave.tasks.includes(id)),'checkpoint retains earlier earned tasks');
-  resume={file,sha256:hash(raw),save:prior.lastSave,priorGates:prior.gates,priorFailure:prior.failure};
+  assert.equal(priorSave.arcV1,1);assert.equal(priorSave.journeyMode,'story');assert(!priorSave.fin);
+  for(const gate of prior.gates)assert((gate.saved.tasks||[]).every(id=>priorSave.tasks.includes(id)),'checkpoint retains earlier earned tasks');
+  resume={file,sha256:hash(raw),save:priorSave,priorGates:prior.gates,priorFailure:prior.failure,
+    checkpointSource:prior.lastSave?'failure-capture':'last-complete-gate'};
   manifest.traps.push('Resumed mode restores the exact persisted save from a prior failed test; this is cross-session earned continuity, not a fresh single-context completion.');
 }
 if(prepare){console.log(JSON.stringify({prepared:true,browserLaunched:false,...manifest},null,2));process.exit(0);}
@@ -157,8 +159,11 @@ function harnessFor(stage) {
     assert.equal(stats.opens,1,'one wrapper request per driver');
     return {...root,start:async()=>{stats.starts++;if(await root.page.evaluate(()=>window.__capy.state.started))stats.startNoops++;else await root.start();},
       arrive:async chapter=>{stats.arrivals.push(chapter);await root.arrive(chapter);},close:async()=>{stats.closeNoops++;},
-      screenshot:async original=>{const artifact=prefix+'-'+stage+'-'+original;stats.artifacts.push(artifact+'.png');return root.screenshot(artifact);},
+      screenshot:async original=>{const artifact=prefix+'-'+stage+'-'+original;stats.artifacts.push(artifact+'.png');
+        try{report.lastSave=await root.page.evaluate(()=>JSON.parse(localStorage.getItem('capy3.journey.v1')||'{}'));}catch{}
+        return root.screenshot(artifact);},
       result:async(original,payload)=>{const artifact=prefix+'-'+stage+'-'+original;stats.artifacts.push(artifact+'.json.png');
+        try{report.lastSave=await root.page.evaluate(()=>JSON.parse(localStorage.getItem('capy3.journey.v1')||'{}'));}catch{}
         return root.result(artifact,{...payload,driverScope:payload.scope,
           scope:'Same cumulative context/save. '+manifest.traps.slice(-2).join(' '),chainStage:stage});}};
   };
@@ -324,7 +329,8 @@ try {
   console.log(JSON.stringify({pass:true,artifact:prefix+'.json.png',stages:report.stages.map(s=>s.stage),fin:1}));
 }catch(error){report.failure={stage:current,error:String(error.stack||error)};
   try{report.lastSave=await root.page.evaluate(()=>JSON.parse(localStorage.getItem('capy3.journey.v1')||'{}'));}catch{}
+  if(!report.lastSave&&report.gates.length)report.lastSave=report.gates.at(-1).saved;
   try{await root.screenshot(prefix+'-failure');}catch{}
   await root.result(prefix+'-failure',report);
   throw error;
-}finally{await root.close();}
+}finally{try{await root.close();}catch{}}
