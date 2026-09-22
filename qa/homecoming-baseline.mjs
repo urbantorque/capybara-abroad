@@ -5,12 +5,14 @@ const chapter = process.argv[2] || 'sydney';
 const mode = process.argv[3] || 'auto';
 const tag = process.argv[4] || 'before';
 const cut = process.argv[5] || 'none';
+const phaseSeconds = Number(process.argv[6] || 15);
+assert([15, 30].includes(phaseSeconds), '15-second baseline or 90-second route');
 assert(CHAPTERS.includes(chapter)); assert(['auto', 'pretty', 'fast'].includes(mode));
 assert(/^[\w-]+$/.test(tag));
 assert(['none', 'reflection', 'shadows', 'depth'].includes(cut));
 const h = await openHarness({ pinRung: false,
   storage: { 'capy3.prefs.v1': { v: 1, pf: ['auto', 'pretty', 'fast'].indexOf(mode) } } });
-const out = { chapter, mode, tag, cut, metadata: h.metadata, phases: [] };
+const out = { chapter, mode, tag, cut, phaseSeconds, metadata: h.metadata, phases: [] };
 try {
   await h.start(); await h.arrive(chapter);
   // Diagnostic cuts only, never production defaults or a new quality tier.
@@ -61,8 +63,8 @@ try {
       };
     });
     if (phase === 'walk') {
-      await h.hold('KeyW', 5000); await h.hold('KeyD', 5000); await h.hold('KeyS', 5000);
-    } else await h.page.waitForTimeout(15000);
+      for (const key of ['KeyW', 'KeyD', 'KeyS']) await h.hold(key, phaseSeconds * 1000 / 3);
+    } else await h.page.waitForTimeout(phaseSeconds * 1000);
     const data = await h.page.evaluate(() => {
       const g = window.__capy, p = g.__homeProbe;
       g.renderer.render = p.rawRender; g.renderer.shadowMap.render = p.rawShadow;

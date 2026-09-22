@@ -18371,8 +18371,12 @@ export function createSystems(game) {
   // gets the previous one's answering voice for a bar.
   let musPalN = 0;
   // HOMECOMING M1b: a phrase, its tail, then room to hear the place.
-  // Only the four audition palettes. Original chord and instrument rows stay.
-  const sysMUS_SPACE = { 0: 24, 4: 28, 7: 32, 20: 20 };
+  // M1d extends admission to non-band exploration. Frozen places breathe
+  // longest; coastal crossings retain Sydney's gap. Authored rows stay.
+  const sysMUS_SPACE = {
+    0: 24, 1: 28, 2: 24, 3: 24, 4: 28, 7: 32, 9: 40,
+    12: 32, 13: 30, 14: 24, 15: 34, 16: 40, 17: 42, 20: 20
+  };
   let musSpaceAt = 0, musSpaceEnd = 0, musSpaceStart = 0, musSpaceRole = '', musSpaceN = 0;
   function musSpaceRest() {
     if (!musPal || game.state.noSereneSpace || game.state.noSereneScore || musPal.band || musChaseT > 0) return 0;
@@ -18381,8 +18385,8 @@ export function createSystems(game) {
   function musSpaceCan(when, role) {
     if (!musSpaceRest()) return true;
     if (musStmt || musStmtReq || musSleep >= 0.5 || when < musSpaceAt) return false;
-    // Kyoto and Hanoi alternate lead and local colour, never race for a gap.
-    if ((musPal.shaku || musPal.tranh) && musSpaceRole === role) return false;
+    // Local colour gets a turn instead of racing the lead for every gap.
+    if ((musPal.shaku || musPal.tranh || musPal.bendir) && musSpaceRole === role) return false;
     return true;
   }
   function musSpaceHold(when, span, role) {
@@ -23041,11 +23045,13 @@ export function createSystems(game) {
       if (musBendirAt < now) musBendirAt = now + rand(4, 11);
       guard = 0;
       while (musBendirAt < horizon && guard++ < 4) {
+        if (!musSpaceCan(musBendirAt, 'colour')) { musBendirAt += 3; continue; }
         const bn = randInt(2, 3);
         for (let k = 0; k < bn; k++) {
           musBendir(musBendirAt + k * rand(0.42, 0.68),
                     rand(0.030, 0.052) * (0.8 + musIntensity * 0.35) * (k ? 0.7 : 1));
         }
+        musSpaceHold(musBendirAt, 6, 'colour');
         musBendirAt += rand(11, 24);
       }
     }

@@ -24,21 +24,22 @@ vm.runInContext(data + '\n' + ['musSpaceRest', 'musSpaceCan', 'musSpaceHold'].ma
 let checks = 0;
 const check = (ok, why) => { assert(ok, why); checks++; };
 function reset(pal, rung = 0) {
-  q.musPalN = pal; q.musPal = pal === 4 ? { shaku: true } : pal === 20 ? { tranh: true } : {};
+  q.musPalN = pal; q.musPal = pal === 4 ? { shaku: true } : pal === 20 ? { tranh: true } : pal === 13 ? { bendir: true } : {};
   q.game.state = { perfRung: rung };
   q.musSpaceAt = q.musSpaceEnd = q.musSpaceStart = q.musSpaceN = 0;
   q.musSpaceRole = ''; q.musStmt = q.musStmtReq = null; q.musChaseT = q.musSleep = 0;
 }
-for (const [pal, rest] of [[0, 24], [4, 28], [7, 32], [20, 20]]) {
+for (const [pal, rest] of [[0,24],[1,28],[2,24],[3,24],[4,28],[7,32],[9,40],
+  [12,32],[13,30],[14,24],[15,34],[16,40],[17,42],[20,20]]) {
   for (const rung of [0, 1, 2, 3]) {
     reset(pal, rung);
-    check(q.musSpaceRest() === rest, 'authored prototype rest at every rung');
+    check(q.musSpaceRest() === rest, 'exploration rest at every rung');
     check(q.musSpaceCan(10, 'lead'), 'first lead admitted');
     q.musSpaceHold(10, 8, 'lead');
     check(q.musSpaceEnd === 18 && q.musSpaceAt === 18 + rest, 'tail then full rest');
     check(!q.musSpaceCan(18 + rest - .001, 'colour'), 'no early colour');
     check(q.musSpaceCan(18 + rest, 'colour'), 'exact boundary admits colour');
-    check(q.musSpaceCan(18 + rest, 'lead') === (pal !== 4 && pal !== 20), 'local colour gets its turn');
+    check(q.musSpaceCan(18 + rest, 'lead') === (![4,13,20].includes(pal)), 'local colour gets its turn');
     q.musSpaceHold(18 + rest, 6, 'colour');
     check(q.musSpaceCan(q.musSpaceAt, 'lead'), 'lead returns after colour');
     check(q.musSpaceN === 2, 'count actual reservations');
@@ -55,7 +56,7 @@ for (const [pal, rest] of [[0, 24], [4, 28], [7, 32], [20, 20]]) {
     q.musChaseT = 1; check(q.musSpaceRest() === 0 && q.musSpaceCan(0, 'lead'), 'chase bypass');
   }
 }
-for (const pal of [1, 2, 3, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) {
+for (const pal of [5, 6, 8, 10, 11, 18, 19]) {
   reset(pal); check(q.musSpaceRest() === 0, 'other palettes unchanged');
 }
 reset(0); q.musPal.band = 'salsa'; check(q.musSpaceRest() === 0, 'band clock untouched');

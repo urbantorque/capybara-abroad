@@ -1,3 +1,31 @@
+## HOMECOMING M3c — FIRST MEMORY EARNED (22 Sep 2026)
+
+The real-key driver earns hat theft and picnic theft in 34.641 seconds and
+verifies Sydney's gentle memory opens only Quay and Manly. No task injection,
+position mutation or physics bypass. It follows authored internal pointers,
+so this is earned-mechanics evidence rather than novice discovery evidence.
+Previous failures remain retained: a held prop has no ground pointer, and
+direct steering can hit a hedge. The driver now finishes held-prop escape,
+releases the hat before the next theft and attempts bounded obstacle detours.
+It never changes the game to satisfy the test. No runtime errors in the pass.
+
+## HOMECOMING M1d — EXPLORATION PHRASE SPACE (22 Sep 2026)
+
+Extend the existing phrase-admission table to fourteen non-band palettes,
+including the separate Manly crossing. Coastal rests remain 24 seconds;
+Drift/Cave use 40 and Antarctica 42. The four prototype values are unchanged.
+Goreme's bendir shares the existing lead/colour reservation and alternates
+with its lead. No chord/root/dwell/instrument row, AudioParam writer, voice
+or save field is added. Existing noSereneSpace/noSereneScore cuts restore the
+inherited schedule. Subtractive admission stays active at every governor rung.
+
+979 scheduler checks pass. Real-clock Goreme and Antarctica probes observe
+two reserved phrases each, full tail/rest intervals and zero runtime/audio
+errors; Goreme includes both lead and colour. These are scheduler checks,
+not headphone listening approval. Six regional band arrangements, Pasto's
+existing rhythm and the title palette remain unchanged by this checkpoint.
+The single-file build and all 60 suite gates pass.
+
 ## HOMECOMING M2c — TITLE RESTRAINT (22 Sep 2026)
 
 Remove the slogan, explanatory sentence and duplicate mascot from the front

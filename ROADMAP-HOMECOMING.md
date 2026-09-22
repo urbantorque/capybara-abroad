@@ -633,6 +633,39 @@ camera and world are unchanged. All 60 gates, sixteen desktop title checks,
 seventeen phone-emulated title checks and 35 returning-atlas checks pass.
 Screenshots are inspected. No extra asset, save field or per-frame effect.
 
+### M1d: exploration phrase-space extension
+
+Fourteen non-band palettes now use the existing admission policy. Added
+rests: Pasto 28s; Quay/crossing/Manly 24s; Palawan 32s; Goreme 30s;
+Pantanal 34s; Cave/Drift 40s; Antarctica 42s. The original four values stay.
+Goreme's bendir reserves six seconds for strokes and tails, then yields to
+the lead. Existing cut flags and chase bypass remain; no new audio graph,
+authored harmonic row or save field. All governor rungs retain subtraction.
+979 boundary checks pass. Goreme and Antarctica each schedule two live
+phrases with complete reserved rests and no errors. Goreme alternates colour
+and lead. This is not listening approval; regional bands and Pasto rhythm
+still need arrangement review, and all-biome live audio coverage remains open.
+
+### M3c: first memory earned through controls
+
+Fresh Story earns hat theft and picnic theft in 34.641 seconds, then verifies
+Sydney's memory and exactly the coastal destinations unlocked. No task
+injection, teleport or physics mutation. The driver reads internal authored
+pointers; this does not validate novice discovery. Earlier failures remain.
+The instrument now follows held-prop escape through real keys and attempts
+bounded obstacle detours. No production rule was weakened. The build and
+all 60 suite gates also pass for the M1d/M3c checkpoint.
+
+### M0 extended performance sample
+
+The baseline instrument accepts 30-second phases for a 90-second observation.
+Hanoi Auto still/walk/rest p95: 23.7/22.2/25.5 ms; p99: 29.6/26/28.5 ms;
+CPU p95: 17.7/18.5/22.2 ms. One frame exceeds 50ms; none exceeds 100ms.
+All samples remain visible, focused and unpaused, with no runtime errors.
+The governor moves between zero and one. This misses the 20ms p95 target;
+it is a bounded stationary/key-route sample, not full task/ride or device
+coverage. No new rendering cut is justified by this run alone.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

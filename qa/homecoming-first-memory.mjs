@@ -13,24 +13,49 @@ try {
   await h.start(); const beginning = Date.now();
   for (const id of ['steal-hat', 'picnic-thief']) {
     const start = Date.now(), trace = []; let done = false;
+    let bestDistance = Infinity, movedAt = Date.now(), detours = 0;
+    if (id === 'picnic-thief' && await h.page.evaluate(() => window.__capy.capy.heldProp?.type === 'hat')) {
+      await h.page.keyboard.press('KeyE'); await h.page.waitForTimeout(400);
+    }
     await h.page.bringToFront();
     while (Date.now() - start < 60000) {
       const s = await h.page.evaluate(id => {
         const g = window.__capy, hint = g.hintTarget(id);
         if (g.taskDone(id)) return { done: true };
-        if (!hint) return null;
+        const held = g.capy.heldProp?.type || '';
+        const focused = document.hasFocus() && !document.hidden;
+        // Theft pointers leave the ground when picked up. Keep playing the
+        // escape instead of mistaking an armed task for a missing landmark.
+        if (!hint) return { missing: true, held, focused };
         const q = hint.position || hint.pos || hint, p = g.capy.body.position;
         const dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz);
         const v = new g.THREE.Vector3(); g.camera.getWorldDirection(v); v.y = 0; v.normalize();
         return { d, f: (dx * v.x + dz * v.z) / (d || 1), r: (-dx * v.z + dz * v.x) / (d || 1),
-          focused: document.hasFocus() && !document.hidden, held: g.capy.heldProp?.type || '' };
+          focused, held };
       }, id);
       if (s?.done) { done = true; break; }
-      assert(s && s.focused, 'live pointer and focused browser');
+      assert(s?.focused, 'focused browser');
+      if (s.held === (id === 'steal-hat' ? 'hat' : 'sandwich')) {
+        await keys(new Set(['KeyW', 'ShiftLeft']));
+        await h.page.waitForTimeout(220); continue;
+      }
+      assert(!s.missing, 'authored hint target available when no prop is held');
+      if (s.d < bestDistance - 1) { bestDistance = s.d; movedAt = Date.now(); }
+      if (s.d > 2 && Date.now() - movedAt > 3500) {
+        // Walk along an obstacle before trying the target again. Alternating
+        // sides bounds this simple driver; it is not a novice discovery test.
+        const side = detours++ % 2 ? -1 : 1;
+        const f = -s.r * side, r = s.f * side, bypass = new Set();
+        if (f > .25) bypass.add('KeyW'); else if (f < -.25) bypass.add('KeyS');
+        if (r > .25) bypass.add('KeyD'); else if (r < -.25) bypass.add('KeyA');
+        await keys(bypass); await h.page.keyboard.press('Space');
+        await h.page.waitForTimeout(2000); await keys(new Set());
+        bestDistance = Infinity; movedAt = Date.now(); continue;
+      }
       if (trace.length === 0 || Date.now() - trace.at(-1).at > 2000) trace.push({ at: Date.now(), ...s });
       const want = new Set();
       if (s.d > 1.5) {
-        if (s.f > .3) want.add('KeyW'); else if (s.f < -.6) want.add('KeyS');
+        if (s.f > .3) want.add('KeyW'); else if (s.f < -.3) want.add('KeyS');
         if (s.r > .25) want.add('KeyD'); else if (s.r < -.25) want.add('KeyA');
         if (s.d > 6) want.add('ShiftLeft');
       } else {
@@ -50,6 +75,6 @@ try {
 } catch (e) { out.pass = false; out.failure = String(e.stack || e); process.exitCode = 1; }
 finally {
   await keys(new Set()); await h.screenshot('homecoming-first-memory');
-  await h.result('homecoming-first-memory-v1', out); await h.close();
+  await h.result('homecoming-first-memory-v4', out); await h.close();
   console.log(JSON.stringify({ pass: out.pass, seconds: out.seconds, actions: out.actions.map(({ id, done, seconds }) => ({ id, done, seconds })), failure: out.failure }));
 }

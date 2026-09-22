@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { openHarness } from './reimagine-harness.mjs';
 const chapter = process.argv[2] || 'sydney';
-assert(['sydney', 'kyoto', 'iceland', 'hanoi'].includes(chapter));
+assert(['sydney', 'pasto', 'quay', 'kyoto', 'iceland', 'hanoi', 'drift',
+  'palawan', 'goreme', 'manly', 'pantanal', 'cave', 'antarctic'].includes(chapter));
 const h = await openHarness();
 const out = { chapter, metadata: h.metadata, events: [], samples: [] };
 try {
@@ -21,7 +22,7 @@ try {
       const prior = out.events.at(-1);
       if (prior) {
         assert(s.start >= prior.until, 'full phrase tail and rest respected');
-        if (chapter === 'kyoto' || chapter === 'hanoi') assert(s.role !== prior.role, 'local colour alternates');
+        if (['kyoto', 'hanoi', 'goreme'].includes(chapter)) assert(s.role !== prior.role, 'local colour alternates');
       }
       assert(s.until - s.end >= s.rest - .001, 'reserved silence after tail');
       out.events.push(s); last = s.phrases;
@@ -31,6 +32,10 @@ try {
     if (i % 30 === 29) console.log(JSON.stringify({ chapter, seconds: i + 1, phrases: out.events.length }));
   }
   assert(out.events.length >= 2, 'two phrases actually scheduled, not permanent silence');
+  if (['kyoto', 'hanoi', 'goreme'].includes(chapter)) {
+    assert(out.events.some(e => e.role === 'colour') && out.events.some(e => e.role === 'lead'),
+      'both foreground roles actually scheduled');
+  }
   out.theme = await h.page.evaluate(() => window.__capy.musThemeAudit());
   assert.equal(h.metadata.errors.length, 0);
   out.pass = true;

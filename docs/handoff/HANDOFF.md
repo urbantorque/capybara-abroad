@@ -9,6 +9,9 @@ roadmap, not the expired REIMAGINE loop. Weekly allowance was 57% remaining
 at approval, 55% at M1c; stop new work at 25% remaining and preserve the
 user's 20% reserve. Latest M2b reading is 54% remaining. Check the live account
 between milestones.
+Latest post-M1d reading: 53% remaining. Extended Hanoi Auto 90-second sample
+passes error/focus checks but misses the 20ms p95 target (23.7/22.2/25.5ms).
+One >50ms frame, none >100ms. Do not call performance complete.
 
 M2b replaces the displayed block title with live two-line serif lettering,
 narrows and straightens the first-page sheet, and moves the key chart into
@@ -26,10 +29,13 @@ ownership, plus the five-fold title atlas (M3a). The atlas preserves existing
 travel/save semantics. M3b adds fresh Story admission, one major/gentler
 experience plus one support per memory, two memories per act, and Free Roam.
 Legacy files retain their old rules. All 60 suite checks pass; story fixtures
-pass fourteen checks each on desktop/touch and seven legacy checks. Earned
-first-memory proof remains open: the real-key driver earned the hat but
-stopped on its subsequent pointer/focus assertion. Its desktop and
-touch-emulated browser runs pass 35 checks each; all 59 suite checks pass.
+pass fourteen checks each on desktop/touch and seven legacy checks. M3c now
+earns Sydney's gentle memory in 34.641 seconds through real keys, opening
+Quay/Manly without task injection. Internal pointers guide the driver; this
+is not novice discovery proof. Earlier failures remain retained. M1d extends
+spaced score admission to fourteen non-band palettes; 979 boundary checks
+and live Goreme/Antarctica checks pass. Regional bands/listening remain open.
+Atlas desktop/touch browser runs pass 35 checks each; all 60 suite gates pass.
 M1c runs all nineteen arrivals and two returns, with 58 suite
 checks passing. CPU matrix traversal is reduced; whole-frame targets remain
 unmet in some samples. Interactive practice, earned progression validation, opening,
