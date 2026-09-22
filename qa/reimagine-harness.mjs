@@ -31,7 +31,7 @@ export async function openHarness({ url = 'http://localhost:5188/',
   width = 1280, height = 760, deviceScaleFactor = 1,
   hasTouch = false, isMobile = false,
   channel = process.env.CAPY_QA_CHANNEL || 'msedge', storage = {},
-  pinRung = true } = {}) {
+  pinRung = true, story = false } = {}) {
   const { chromium } = playwright();
   // A fresh Playwright profile never attaches to the player's browser/save.
   const browser = await chromium.launch({ channel, headless: false });
@@ -77,7 +77,15 @@ export async function openHarness({ url = 'http://localhost:5188/',
       try { await page.waitForTimeout(ms); } finally { await page.keyboard.up(key); }
     };
     const start = async () => {
-      await page.evaluate(() => (document.querySelector('.capyui-carry') || document.querySelector('.capyui-go')).click());
+      await page.evaluate(story => {
+        const carry = document.querySelector('.capyui-carry');
+        const free = document.querySelector('.capyui-go[data-free]');
+        // World probes need open travel. Choose the actual Free Roam door;
+        // never seed fake progress or bypass the story travel policy.
+        if (!carry && free && !story) {
+          free.click(); document.querySelector('.capyui-pick.hero').click();
+        } else (carry || document.querySelector('.capyui-go')).click();
+      }, story);
       await page.waitForFunction(() => window.__capy.state.started === true);
       // Trusted input unlocks audio; an evaluated DOM click alone cannot.
       await hold('Shift', 30);

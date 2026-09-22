@@ -4311,6 +4311,57 @@ export const HOMECOMING_ACTS = [
   { title: 'What comes home', places: [18, 7, 17, 9] },
 ];
 
+// A place can be remembered through its big performance or a gentler visit.
+// Neither route counts arrival, and the supporting moment is always distinct.
+export const HOMECOMING_EXPERIENCES = {
+  1: { signature: 'opera-stage', alternative: 'picnic-thief', supports: ['steal-hat', 'swim', 'bin-chicken', 'photo-op'] },
+  2: { signature: 'condor-ride', alternative: 'carroza', supports: ['steal-empanada', 'whistle-condor', 'church-bell', 'ruana-thief'] },
+  3: { signature: 'manly-voyage', alternative: 'under-bridge', supports: ['take-helm', 'to-quay', 'ferry-salute', 'dolphin-escort'] },
+  4: { signature: 'uji-run', alternative: 'golden-swim', supports: ['matcha-raid', 'zen-ruin', 'bamboo-dash', 'the-bell'] },
+  5: { signature: 'chiva-mirador', alternative: 'gato-sit', supports: ['lulada', 'chiva-ride', 'puente-ortiz', 'cristo-rey'] },
+  6: { signature: 'fragata-ride', alternative: 'bondinho', supports: ['globo-biscuit', 'kiosk', 'bateria', 'calcadao', 'arpoador'] },
+  7: { signature: 'aurora', alternative: 'hot-spring', supports: ['organ', 'pylsa', 'the-whale', 'snowcat'] },
+  8: { signature: 'jetpack', alternative: 'caravan', supports: ['orange-cart', 'date-palm', 'snake-basket', 'fire-circle'] },
+  9: { signature: 'lantern', alternative: 'wander-isle', supports: ['puff-up', 'lampfly', 'updraft', 'cloud-dive'] },
+  10: { signature: 'acqua-alta', alternative: 'gondola-ride', supports: ['pigeon-storm', 'the-well', 'spritz-theft', 'rialto'] },
+  11: { signature: 'symphony', alternative: 'star-ferry', supports: ['egg-tart', 'ferry-horn', 'harbour-swim', 'bus-top'] },
+  12: { signature: 'the-manta', alternative: 'cathedral', supports: ['first-dive', 'jetty-jump', 'bait-ball', 'sea-turtle', 'the-bloom'] },
+  13: { signature: 'sunrise', alternative: 'aboard', supports: ['dovecote', 'the-tether', 'chimney-top', 'the-envelope'] },
+  14: { signature: 'all-the-way', alternative: 'bower-pool', supports: ['pine-cone', 'sandcastle', 'duck-dive', 'blue-groper', 'the-bommie'] },
+  15: { signature: 'the-crossing', alternative: 'the-locals', supports: ['cowbird', 'camalote', 'gather', 'macaw-nut'] },
+  16: { signature: 'the-column', alternative: 'the-doline', supports: ['first-echo', 'glow-trail', 'cave-pearl', 'blind-fish', 'cave-river'] },
+  17: { signature: 'orca-ride', alternative: 'spy-hop', supports: ['take-tiller', 'haul-out', 'station-mug', 'whale-bones', 'colony-chorus'] },
+  18: { signature: 'the-tunnel', alternative: 'piano-solo', supports: ['superyacht', 'black-tie', 'champagne', 'the-rock', 'high-dive'] },
+  19: { signature: 'pho-run', alternative: 'the-huc', supports: ['pho-raid', 'barber', 'shuttlecock', 'long-bien', 'ride-the-flow'] },
+};
+
+export function homecomingMemory(n, isDone) {
+  if (!Number.isInteger(n)) return null;
+  const def = HOMECOMING_EXPERIENCES[n];
+  if (!def) return null;
+  const signatureDone = !!isDone(def.signature), alternativeDone = !!isDone(def.alternative);
+  const supportOpen = def.supports.filter(function (id) { return !isDone(id); });
+  const supportDone = def.supports.length - supportOpen.length;
+  return { signature: def.signature, alternative: def.alternative,
+    signatureDone: signatureDone, alternativeDone: alternativeDone,
+    coreDone: signatureDone || alternativeDone, supports: def.supports.slice(),
+    supportOpen: supportOpen, supportDone: supportDone, supportMissing: supportDone ? 0 : 1,
+    enough: (signatureDone || alternativeDone) && supportDone > 0 };
+}
+
+// Pure projections of earned tasks. No unlock bit can get ahead of its save.
+export function homecomingProgress(isDone) {
+  const memories = HOMECOMING_ACTS.map(function (act) {
+    return act.places.filter(function (n) { return homecomingMemory(n, isDone).enough; });
+  });
+  const first = memories[0].indexOf(1) >= 0;
+  let actIndex = 0;
+  while (first && actIndex < HOMECOMING_ACTS.length - 1 && memories[actIndex].length >= 2) actIndex++;
+  const open = first ? HOMECOMING_ACTS.slice(0, actIndex + 1).flatMap(function (act) { return act.places; }) : [1];
+  return { actIndex: actIndex, memories: memories, open: open,
+    ready: first && memories.every(function (list) { return list.length >= 2; }) };
+}
+
 // A memory asks for the place's signature and two small things around it.
 // These are authored choices, not a fraction of a checklist. Arrival is
 // never one of them. Quay's to-quay is casting off under the player's hand,

@@ -236,6 +236,30 @@ Every pass must fit the P0 budget; spend measured savings, not hoped-for ones.
 
 ## P3: a wordless mission and a learnable opening
 
+### Title and menu art direction (user addition, 22 September)
+
+Keep the animated capybara, live environment and background animation. Replace
+the blocky cut-paper title lettering and reconsider the menu typography and
+composition. The four supplied references are visual direction, not assets to
+copy: Zelda contributes quiet menu hierarchy and room for the scene; Alba
+contributes warmth and openness; Olympia Soiree and Final Fantasy Tactics
+contribute graceful letter proportions and a distinctive title silhouette.
+
+Prefer an original, lightly calligraphic or softly serifed wordmark with
+balanced spacing and restrained contrast. Avoid oversized chiseled capitals,
+bevels, heavy outlines, copied franchise motifs and ornamental clutter.
+Retain accessible live heading text, readable menu type and clear focus states.
+Give Begin/Continue one obvious place, with Free Roam, Learn to Play and
+Settings subordinate. Keep the five-fold atlas as a separate selection view.
+Use the existing procedural/vector pipeline; no raster title or external font
+dependency. Compare several code-native letter treatments before choosing.
+
+Verify fresh/returning title states at desktop and narrow widths, keyboard,
+touch and reduced motion. Show the capybara clearly rather than hiding it under
+a larger card; preserve manual camera behaviour and the animated scene. Judge
+the title at real menu size, not only a close-up of its lettering. This is an
+additional roadmap item, not a replacement for the story/performance work.
+
 ### Narrative spine: make a place worth coming home to
 
 Opening proposal: an empty riverside picnic, a small travelling case and a
@@ -568,6 +592,21 @@ byte-identical. Desktop and phone-emulated screenshots are inspected;
 real-device coverage remains outstanding. No new save field,
 visual effect, per-frame work or audio writer is added.
 Syntax checks, the single-file build and all 59 suite checks pass.
+
+### M3b: story admission checkpoint
+
+Fresh Story begins in Sydney. A major or authored gentler experience plus
+one support earns a memory; two memories open the next act. Free Roam keeps
+all nineteen places available. The declared journeyMode and arcV1 fields
+separate admission from memory policy; switching modes preserves progress.
+Legacy saves retain their old rules without conversion.
+
+5,202 data cases, twelve integration checks and all 60 suite gates pass.
+Headful story fixtures pass fourteen checks each on desktop/touch emulation;
+seven legacy checks pass. Fixtures prove gates and saves, not earned play.
+The separate real-key driver earned the hat in 10.4 seconds but stopped at
+its next pointer/focus assertion; earned first-memory validation stays open.
+No new visual/audio term; cached progress avoids per-frame allocations.
 
 ## Explicit cuts (scope)
 

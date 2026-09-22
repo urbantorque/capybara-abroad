@@ -27,6 +27,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
 const ASSERTS = [
+  ['qa/homecoming-story.mjs', 'alternative memories, earned act thresholds and no full-clear requirement'],
   ['qa/homecoming-atlas.mjs', 'five atlas folds and nineteen preserved chapter identities'],
   ['qa/homecoming-biome-parking.mjs', 'sleeping scene traversal, returning rigs and owner rollback'],
   ['qa/homecoming-space.mjs', 'phrase-rest boundaries, alternating local colour and protected cues'],

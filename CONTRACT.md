@@ -1,3 +1,20 @@
+## HOMECOMING M3b — STORY ADMISSION (22 Sep 2026)
+
+Fresh journeys open Sydney first, then five acts at two memories per act.
+Each memory needs one authored major or gentler experience and one support.
+Free Roam retains all nineteen places. Legacy saves retain their old rules;
+new saves use the roadmap-declared journeyMode and arcV1 fields. Switching
+to Free Roam preserves the memory policy and all earned tasks.
+
+5,202 data checks, twelve shipped-function checks, fourteen headful story
+checks each on desktop/touch emulation and seven legacy checks pass. All
+60 suite gates pass. Story browser fixtures award tasks explicitly: they
+prove admission and persistence, not earned completion. A separate real-key
+driver earned the hat in 10.4 seconds, then stopped on a missing pointer or
+focus assertion before the picnic. Full earned first-memory proof remains
+open. No new visual/audio effect or per-frame allocation; progress is cached
+by completed-task count. Opening scenes and return episodes remain unbuilt.
+
 ## HOMECOMING M3a — FIVE-FOLD ATLAS (22 Sep 2026)
 
 HOMECOMING_ACTS groups the nineteen stable chapter ids into the five approved

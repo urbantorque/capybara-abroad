@@ -25,6 +25,7 @@ let checks = 0;
 function check(label, test) { test(); checks++; console.log('pass  ' + label); }
 
 const t = vm.createContext({
+  sysHOME_UI: vm.runInNewContext('(' + source.match(/const sysHOME_UI = (\{[^]*?\n\});/)[1] + ')'),
   started: true, restore: false, doneCount: 0, jrFile: null, where: 'sydney',
   game: { state: {}, biome: { current: 'sydney' } },
   tutEver: false, tutArm: true, tutOn: true, tutDone: false, tutSkipped: false,
@@ -36,7 +37,7 @@ const t = vm.createContext({
   sysTUT_SHOP: 'shop', sysToastOut: noop, saves: 0,
   saveSoon() { t.saves++; }, sfx: noop,
   pauseShown: false, pausePre: false, pauseSetOpen: false,
-  pauseTutReplay: element(), pauseTutSkip: element(), pauseGo: element(),
+  pauseTutReplay: element(), pauseTutSkip: element(), pauseFree: element(), pauseGo: element(),
   pauseHead: element(), pauseFoot: element(), pauseCard: element(), pauseJrBtn: element(),
   pauseQuitBtn: element(), pauseSub: element(), pauseEl: element(),
   sysScheme: x => x, pauseSetToggle: noop, chapterDef: () => ({ name: 'Sydney' }), chapterOf: () => 1,

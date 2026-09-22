@@ -12,7 +12,12 @@ user's 20% reserve. Check the live account between milestones.
 Pushed work covers subtractive score admission, four long-rest phrase
 prototypes, a five-lesson title/pause reference and sleeping scene-root
 ownership, plus the five-fold title atlas (M3a). The atlas preserves existing
-travel/save semantics; story admission is not implemented. Its desktop and
+travel/save semantics. M3b adds fresh Story admission, one major/gentler
+experience plus one support per memory, two memories per act, and Free Roam.
+Legacy files retain their old rules. All 60 suite checks pass; story fixtures
+pass fourteen checks each on desktop/touch and seven legacy checks. Earned
+first-memory proof remains open: the real-key driver earned the hat but
+stopped on its subsequent pointer/focus assertion. Its desktop and
 touch-emulated browser runs pass 35 checks each; all 59 suite checks pass.
 M1c runs all nineteen arrivals and two returns, with 58 suite
 checks passing. CPU matrix traversal is reduced; whole-frame targets remain

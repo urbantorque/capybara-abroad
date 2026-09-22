@@ -4,7 +4,7 @@ import * as THREE from 'three';
 // and the two shape-type constants it must ignore. See sysCamClear.
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount, rand, randInt, clamp, damp, lerp,
-         CHAPTERS, JOURNEY, HOMECOMING_ACTS, chapterExperience, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY, cloudSet,
+         CHAPTERS, JOURNEY, HOMECOMING_ACTS, homecomingMemory, homecomingProgress, chapterExperience, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY, cloudSet,
          rimTick, cloudTick, skyTick, fresnelTick, paleTick, triTick, mirrorTick, shadeTick, bounceSlots, bounceTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo, keyDomeTick, keyDomeInfo, skyDomeLit, sky2CloudTick, sky2SunTick, sky2Info,
@@ -4361,6 +4361,8 @@ const sysSAVE_BAD_KEY = 'capy3.journey.broken.v1';
 // not beside it because saveRead is called from the title card, above the
 // save block, where a `const` declared there would still be in its TDZ.
 const sysSAVE_SHAPE = {
+  journeyMode: 'string', // HOMECOMING: absent/unknown files retain free travel.
+  arcV1: 'number',       // Memory rules stay put when story changes to free roam.
   tasks: 'array', seen: 'array', finds: 'array',
   recs: 'object', recg: 'object', chapms: 'object', foundAt: 'object', inc: 'object',
   scn: 'object', pho: 'object', fed: 'object', pas: 'object', lin: 'object', err: 'object',
@@ -6551,6 +6553,13 @@ const sysLEARN = [
 // Sydney's benches, as environment.js plants them (envAddBench, merged into
 // one static mesh and published nowhere), so beat three can put the arrow on
 // the nearest. The seat's collider top is 1.0 m; the animal stands at 1.34.
+const sysHOME_UI = {
+  why: 'it is bringing a few things home. the rest can wait.',
+  begin: 'Begin the journey', free: 'Free roam', freeHint: 'all nineteen places, open from the start',
+  firstGate: 'a Sydney memory opens the coast', actGate: 'two memories open the next act',
+  ready: 'the way home is open', core: 'the big experience or the quieter route',
+  freeSwitch: 'free roam: open every place', freeSaid: 'Every place is open. Everything kept stays.',
+};
 const sysTUT_BENCHES = [
   [26, 14.5], [46.5, 33.5], [-30, -6.5], [-48, -6.5],
   [56.5, 52.0], [38.0, 60.5], [60.5, 40.0], [20.0, 60.0],
@@ -8869,6 +8878,8 @@ function sysBuildCSS() {
 '.capyui-act>summary small{display:block;margin:4px 0 0 16px;font-size:11px;line-height:1.5;color:' + inkSoft + ';}',
 '.capyui-act>summary:focus-visible{outline:2px solid ' + ink + ';outline-offset:-2px;}',
 '.capyui-actplaces{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:4px 2px 12px;}',
+'.capyui-act .capyui-pick:disabled{cursor:default;transform:none;box-shadow:none;}',
+'.capyui-act .capyui-pick:disabled .capyui-pickart{opacity:.6;}',
 '@media(min-width:640px){.capyui-actplaces{grid-template-columns:repeat(var(--act-cols,4),minmax(0,1fr));}}',
 /* HOMECOMING atlas end. */
 /* ---------- THE REPERTOIRE, ON THE JOURNAL (Q2) ----------
@@ -24627,7 +24638,7 @@ export function createSystems(game) {
   // lays nineteen of them on a lawn — and nothing ever said so. One line,
   // under the subtitle, in the game's own voice: the quest is the keepsakes.
   p1El.appendChild(sysEl('div', 'capyui-why',
-    'it is taking one thing from every place. it has not said why.'));
+    sysHOME_UI.why));
   {
     const orn = sysEl('div', 'capyui-orn');
     orn.appendChild(sysBuildCapyMark());
@@ -24642,6 +24653,9 @@ export function createSystems(game) {
   // A walk can be saved before its first tick. Its tutorial choice, position
   // and elapsed time still belong to the player when they return.
   const jrHasFile = !!jrFile;
+  let homecomingArc = !jrHasFile || jrFile.arcV1 === 1;
+  let journeyMode = homecomingArc && (!jrHasFile || jrFile.journeyMode === 'story') ? 'story' : 'free';
+  let homeProgressN = -1, homeProgressCache = null;
   // task id -> true, for the per-chapter tallies below
   const jrFileDone = Object.create(null);
   if (jrFile && jrFile.tasks) {
@@ -24690,7 +24704,11 @@ export function createSystems(game) {
   // TILE on the far side of it that quietly wiped the file. The page turns; the
   // label now says so, and starting over is its own control on page two.
   goEl.appendChild(sysEl('b', null,
-    jrHasFile ? 'Go somewhere else' : 'Choose a place'));
+    jrHasFile ? 'Go somewhere else' : sysHOME_UI.free));
+  if (!jrHasFile) {
+    goEl.dataset.free = '1';
+    goEl.appendChild(sysEl('i', null, sysHOME_UI.freeHint));
+  }
   // TWO FILLED ACCENT BUTTONS ON ONE CARD IS NO HIERARCHY AT ALL, and as of T2
   // this one is ALWAYS the outline: on a fresh file the filled button above it
   // is Begin, and on a file it is Carry on. There is no longer a state in
@@ -24723,7 +24741,7 @@ export function createSystems(game) {
   if (!jrHasFile) {
     const beginEl = sysEl('button', 'capyui-go');
     beginEl.type = 'button';
-    beginEl.appendChild(sysEl('b', null, 'Begin'));
+    beginEl.appendChild(sysEl('b', null, sysHOME_UI.begin));
     beginEl.addEventListener('pointerdown', function (e) {
       e.stopPropagation(); titleAudio();
     });
@@ -25024,6 +25042,10 @@ export function createSystems(game) {
           rd.label + ' ' + fileRecs[bestId].toFixed(rd.dp) + rd.unit));
       }
     }
+    const fileOpen = !jrHasFile || journeyMode !== 'story' ||
+      homecomingProgress(function (id) { return !!jrFileDone[id]; }).open.indexOf(d.n) >= 0;
+    el.disabled = !fileOpen;
+    if (!fileOpen) body.appendChild(sysEl('em', 'capyui-pickfirst', sysHOME_UI.actGate));
     el.setAttribute('aria-label', d.name + ', chapter ' + d.n +
       (d.key ? ', key ' + d.key : '') +
       (done > 0 ? ', ' + done + ' of ' + ids.length + ' done' : '') +
@@ -25047,7 +25069,7 @@ export function createSystems(game) {
       // behaviour and the one every part of this tile already implied.
       // Starting over is still possible and is its own clearly-labelled
       // control, below the shelf, and it asks first.
-      startGame(d.biome, jrHasFile);
+      startGame(d.biome, jrHasFile, 'free');
     });
     // ---- THE CARD LEANS TOWARDS WHATEVER YOU ARE LOOKING AT ---------------
     // Resting on a tile warms the whole screen in that chapter's own colour —
@@ -25213,7 +25235,7 @@ export function createSystems(game) {
   function pickList() {
     const l = [heroEl];
     const kids = picksEl.querySelectorAll('summary,.capyui-act[open] .capyui-pick');
-    for (let i = 0; i < kids.length; i++) l.push(kids[i]);
+    for (let i = 0; i < kids.length; i++) if (!kids[i].disabled) l.push(kids[i]);
     return l;
   }
   /**
@@ -25604,6 +25626,10 @@ export function createSystems(game) {
     location.reload();
   });
   const pauseQuitBtn = pauseBtn('warn', 'quit to the title', function () { pauseAskOpen(); });
+  const pauseFree = pauseBtn('', sysHOME_UI.freeSwitch, function () {
+    journeyMode = 'free'; game.state.journeyMode = journeyMode;
+    saveSoon(); todoRefresh(); pauseHide(); toast(sysHOME_UI.freeSaid);
+  });
   pauseSetBtn.setAttribute('aria-expanded', 'false');
   pauseCard.appendChild(pauseMenu);
 
@@ -26132,6 +26158,7 @@ export function createSystems(game) {
     pausePre = !!pre;
     pauseTutReplay.hidden = pausePre || tutLive() || !game.biome || game.biome.current !== 'sydney';
     pauseTutSkip.hidden = pausePre || !tutLive();
+    pauseFree.hidden = pausePre || game.state.journeyMode !== 'story';
     pauseGo.textContent = pausePre ? 'back' : 'resume';
     pauseHead.textContent = pausePre ? 'Settings' : 'Paused';
     // ...and the footer names the button that is actually there: BACK, not
@@ -30311,6 +30338,7 @@ export function createSystems(game) {
   // keepsake is enough. A hundred per cent still means what it meant — see
   // sysFinaleFull and the ledger's title.
   function keepHeld(n) {
+    if (game.state.homecomingArc) { const m = chapExperience(n); return !!(m && m.enough); }
     if (chapComplete(n)) return true;
     if (!chapEnough(n)) return false;
     const rec = chapRec[n];
@@ -31228,9 +31256,28 @@ export function createSystems(game) {
   function jrOpen(n) {
     // REIMAGINE B: memories are earned; travel is a choice. The title and
     // physical board now offer the same nineteen places, including returns.
-    return Number.isInteger(n) && n >= 1 && n <= chapMax;
+    if (!(Number.isInteger(n) && n >= 1 && n <= chapMax)) return false;
+    return game.state.journeyMode !== 'story' || journeyProgress().open.indexOf(n) >= 0;
+  }
+  function journeyProgress() {
+    // Tasks only move from open to done within a session. Rebuild on a tick,
+    // not for every door, journal row and finale query in every frame.
+    if (homeProgressN !== doneCount || !homeProgressCache) {
+      homeProgressN = doneCount;
+      homeProgressCache = homecomingProgress(function (id) { return !!(taskRec[id] && taskRec[id].done); });
+    }
+    return homeProgressCache;
   }
   function journeyNext(here) {
+    if (game.state.homecomingArc) {
+      const p = journeyProgress();
+      if (p.ready) return 1;
+      const choices = HOMECOMING_ACTS[p.actIndex].places;
+      for (let i = 0; i < choices.length; i++) {
+        if (choices[i] !== here && jrOpen(choices[i]) && !keepHeld(choices[i])) return choices[i];
+      }
+      return here;
+    }
     const at = JOURNEY.indexOf(here);
     for (let i = 1; i <= JOURNEY.length; i++) {
       const n = JOURNEY[(at + i) % JOURNEY.length];
@@ -31288,6 +31335,11 @@ export function createSystems(game) {
     const routeKept = JOURNEY.filter(function (n) { return keepHeld(n); }).length;
     jrCountPre = routeKept + ' of ' + JOURNEY.length + ' journey memories  ·  ' +
       'all tasks: ' + done + ' of ' + TASKS.length + '  ·  ';
+    if (game.state.homecomingArc) {
+      const p = journeyProgress();
+      jrCountPre = HOMECOMING_ACTS[p.actIndex].title + '  ·  ' +
+        (p.ready ? sysHOME_UI.ready : p.memories[p.actIndex].length + ' of 2 memories') + '  ·  ';
+    }
     // ...and the tier, on the same terms as the finds: nothing at all until
     // there is something to say (B14). This is the card the player opens to
     // decide where to go next, which is the one moment "somewhere else has
@@ -31352,13 +31404,16 @@ export function createSystems(game) {
       // fills up; this one is the last one that should.
       if (r.n === here && r.def.way) bits.unshift('the way on: ' + r.def.way);
       if (r.n === journeyNext(here)) bits.unshift('next on the journey');
-      else if (JOURNEY.indexOf(r.n) < 0) bits.unshift('a trip off the route');
+      else if (!game.state.homecomingArc && JOURNEY.indexOf(r.n) < 0) bits.unshift('a trip off the route');
       const open = jrOpen(r.n);
       // ---- A LOCKED ROW SAYS WHAT UNLOCKS IT (L7, E5 / play 2). The board
       // at 3 of 20 was nineteen dimmed rows and no word on the gate; the
       // frontier's own count is the answer for every row behind it.
       let gate = '';
-      if (!open && !full) {
+      if (!open && game.state.journeyMode === 'story') {
+        gate = keepHeld(1) ? sysHOME_UI.actGate : sysHOME_UI.firstGate;
+        bits.unshift(gate);
+      } else if (!open && !full) {
         for (let k = 1; k <= chapMax; k++) {
           if (chapEnough(k)) continue;
           const fr = chapRec[k];
@@ -33463,13 +33518,14 @@ export function createSystems(game) {
     return door ? Math.min(door, rec.ids.length) : Math.ceil(rec.ids.length * sysCHAP_ENOUGH);
   }
   function chapExperience(n) {
+    if (game.state.homecomingArc) return homecomingMemory(n, function (id) { return !!(taskRec[id] && taskRec[id].done); });
     return chapterExperience(n, function (id) { return !!(taskRec[id] && taskRec[id].done); });
   }
-  function chapNeed(n) { return chapExperience(n) ? 3 : chapLegacyNeed(n); }
+  function chapNeed(n) { return chapExperience(n) ? (game.state.homecomingArc ? 2 : 3) : chapLegacyNeed(n); }
   /** How many more rows the door out of chapter n wants (L7, E5). */
   function sysWayNeed(n) {
     const experience = chapExperience(n);
-    if (experience) return experience.supportMissing + (experience.signatureDone ? 0 : 1);
+    if (experience) return experience.supportMissing + ((experience.coreDone || experience.signatureDone) ? 0 : 1);
     const rec = chapRec[n];
     if (!rec || !rec.ids.length) return 1;
     let done = 0;
@@ -33478,6 +33534,7 @@ export function createSystems(game) {
   }
   function chapEnough(n) {
     const experience = chapExperience(n);
+    if (game.state.homecomingArc) return !!(experience && experience.enough);
     if (experience && experience.enough) return true;
     const rec = chapRec[n];
     if (!rec || !rec.ids.length) return false;
@@ -33722,6 +33779,10 @@ export function createSystems(game) {
       const choices = experience.supportMissing ? experience.supportOpen.slice(0, 2) : [];
       winIds = choices;
       if (!experience.signatureDone) winIds.push(experience.signature);
+      if (game.state.homecomingArc) {
+        winIds = experience.supportMissing ? experience.supportOpen.slice(0, 1) : [];
+        if (!experience.coreDone) winIds.push(experience.signature, experience.alternative);
+      }
       top = winIds[0] || '';
     }
     // ---- AND WHEN THERE IS NOTHING LEFT, THE DOOR IS THE NEXT THING --------
@@ -33901,6 +33962,11 @@ export function createSystems(game) {
         (experience.signatureDone ? 'signature done' : 'the signature') +
         (experience.supportMissing ? ' + ' + experience.supportMissing + ' small moments' : ' still to find'))
       : done + ' of ' + rec.ids.length + ' done');
+    if (game.state.homecomingArc && experience && !experience.enough) {
+      countEl.textContent = chapLabel(n) + '  ·  ' +
+        (experience.coreDone ? 'one small moment still to find' : sysHOME_UI.core +
+          (experience.supportMissing ? ' + one small moment' : ''));
+    }
     todoFindsLine(n);
     // THE YUZU (L8, F1): the wallet sits just under the paper, and the paper's
     // own height swings hard — a marquee in progress runs to six rows and a
@@ -34304,6 +34370,8 @@ export function createSystems(game) {
       // Nothing migrates — an old file simply carries a key nobody looks at.
       localStorage.setItem(sysSAVE_KEY, JSON.stringify({
         v: 1, tasks: tasks, seen: seen, recs: jrRecs, recg: jrRecGen(),
+        journeyMode: journeyMode,
+        arcV1: homecomingArc ? 1 : undefined,
         ms: jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0),
         chapms: jrChapMs, finds: finds, foundAt: findWhere,
         // ...and THE SHELF IN EARN ORDER (ROADMAP-WOW3, X1a), on exactly the
@@ -36328,6 +36396,7 @@ export function createSystems(game) {
       // while old quota-qualified journeys retain their musical arrival.
       p = chapEnough(n) ? 1 : ((experience.signatureDone ? 1 : 0) +
         Math.min(2, experience.supportDone)) / 3;
+      if (game.state.homecomingArc) p = ((experience.coreDone ? 1 : 0) + Math.min(1, experience.supportDone)) / 2;
     }
     musProg = clamp(p, 0, 1);
   }
@@ -37552,14 +37621,16 @@ export function createSystems(game) {
 
   /** Every keepsake earned. Optional boxes are not part of coming home. */
   function sysFinaleAll() {
+    if (game.state.homecomingArc) return journeyProgress().ready;
     for (let i = 0; i < JOURNEY.length; i++) if (!keepHeld(JOURNEY[i])) return false;
     return true;
   }
   /** Route memories first, then earned trips. Pantanal keeps an empty slot. */
   function sysFinaleKeeps() {
-    const list = JOURNEY.filter(function (n) { return keepHeld(n); });
+    const route = game.state.homecomingArc ? HOMECOMING_ACTS.flatMap(function (act) { return act.places; }) : JOURNEY;
+    const list = route.filter(function (n) { return keepHeld(n); });
     for (let n = 1; n <= chapMax; n++) {
-      if (JOURNEY.indexOf(n) < 0 && keepHeld(n)) list.push(n);
+      if (route.indexOf(n) < 0 && keepHeld(n)) list.push(n);
     }
     return list;
   }
@@ -38573,8 +38644,14 @@ export function createSystems(game) {
   }
 
   /** `where` is 'sydney' (default) or 'pasto' — whichever the player picked. */
-  function startGame(where, restore) {
+  function startGame(where, restore, mode) {
     if (started) return;
+    if (restore && jrFile && jrFile.arcV1 === 1 && jrFile.journeyMode === 'story' &&
+        homecomingProgress(function (id) { return !!jrFileDone[id]; }).open.indexOf(chapterOf(where || 'sydney')) < 0) return;
+    homecomingArc = !restore || !jrFile || jrFile.arcV1 === 1;
+    journeyMode = restore && jrFile ? (homecomingArc && jrFile.journeyMode === 'story' ? 'story' : 'free') : (mode === 'free' ? 'free' : 'story');
+    game.state.journeyMode = journeyMode;
+    game.state.homecomingArc = homecomingArc;
     // ---- put the file back, before a single frame is drawn ----------------
     // Silently: see completeTask's `silent` branch. The order matters — tasks
     // first so the tallies and the chapter gates are right, then the records
@@ -39024,7 +39101,7 @@ export function createSystems(game) {
       // click listener — this was the second door into the same data loss and
       // it was the quicker one.
       const pick = sysPickFromKey(c);
-      if (pick > 0) { startGame(CHAPTERS[pick - 1].biome, jrHasFile); return; }
+      if (pick > 0) { startGame(CHAPTERS[pick - 1].biome, jrHasFile, 'free'); return; }
       // THE PAGE TURNS BOTH WAYS FROM THE KEYBOARD. Escape is the one key
       // every player already tries when a screen has gone somewhere they did
       // not mean, and it did nothing at all on this card until now.
@@ -41688,6 +41765,7 @@ export function createSystems(game) {
   function biomeGo(name) {
     const bio = game.biome;
     if (!bio || bio.isActive(name)) return false;
+    if (!jrOpen(chapterOf(name))) return false;
     // Anything in the mouth belongs to the biome being left behind: it is about to
     // be pulled out of the physics world and hidden, and the capybara would spend
     // the rest of the game miming a hat it no longer has.
@@ -41761,6 +41839,7 @@ export function createSystems(game) {
     if (transBusy) return false;
     const bio = game.biome;
     if (!bio || bio.isActive(name)) return false;
+    if (!jrOpen(chapterOf(name))) return false;
     transBusy = true;
     const fenceOwner = ++sysFenceN;
     sysFenceActive = fenceOwner;
