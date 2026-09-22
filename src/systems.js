@@ -18315,6 +18315,30 @@ export function createSystems(game) {
   // object — and it has to move on the same line the object does or a chapter
   // gets the previous one's answering voice for a bar.
   let musPalN = 0;
+  // HOMECOMING M1b: a phrase, its tail, then room to hear the place.
+  // Only the four audition palettes. Original chord and instrument rows stay.
+  const sysMUS_SPACE = { 0: 24, 4: 28, 7: 32, 20: 20 };
+  let musSpaceAt = 0, musSpaceEnd = 0, musSpaceStart = 0, musSpaceRole = '', musSpaceN = 0;
+  function musSpaceRest() {
+    if (!musPal || game.state.noSereneSpace || game.state.noSereneScore || musPal.band || musChaseT > 0) return 0;
+    return sysMUS_SPACE[musPalN] || 0;
+  }
+  function musSpaceCan(when, role) {
+    if (!musSpaceRest()) return true;
+    if (musStmt || musStmtReq || musSleep >= 0.5 || when < musSpaceAt) return false;
+    // Kyoto and Hanoi alternate lead and local colour, never race for a gap.
+    if ((musPal.shaku || musPal.tranh) && musSpaceRole === role) return false;
+    return true;
+  }
+  function musSpaceHold(when, span, role) {
+    const rest = musSpaceRest();
+    if (!rest) return;
+    musSpaceStart = when;
+    musSpaceEnd = when + span;
+    musSpaceAt = musSpaceEnd + rest;
+    musSpaceRole = role;
+    musSpaceN++;
+  }
   // which palettes get which pad spectrum (see musPadSpectrum); the rest keep the saws
   const sysMUS_PAD_OF = { 0: 'felt', 2: 'felt', 3: 'felt', 12: 'felt', 14: 'felt', 18: 'felt',
                           13: 'reed', 20: 'reed', 8: 'reed',
@@ -18802,6 +18826,7 @@ export function createSystems(game) {
     if (musPal === pal) return;
     musPal = pal;
     musPalN = sysMUS_PAL.indexOf(pal);
+    musSpaceAt = 0; musSpaceEnd = 0; musSpaceStart = 0; musSpaceRole = '';
     musPadSpectrum(pal.pad || (sysMUS_PAD_OF[musPalN] || null));
     // A statement belongs to the chapter being left (ROADMAP-SCORE, M3):
     // its remaining notes are dropped, its request forgotten, and the new
@@ -19453,11 +19478,11 @@ export function createSystems(game) {
     return ch[d % L] + 12 * Math.floor(d / L);
   }
   /** A cell from where the walk is, on the palette's lead. Returns its length. */
-  function musMelCell(when, ch, inst, pan) {
+  function musMelCell(when, ch, inst, pan, stretch) {
     const c = sysMUS_CELLS[randInt(0, sysMUS_CELLS.length - 1)];
     const L = ch.length, hi = L * 2 - 1;
     const ph = sysMUS_PHRASE[musPalN];
-    const gap = sysMUS_STING.arrive.gap * (ph && ph.gap > 0 ? ph.gap : 1);
+    const gap = sysMUS_STING.arrive.gap * (ph && ph.gap > 0 ? ph.gap : 1) * (stretch || 1);
     const base = musMelDeg;
     let t = 0, last = base;
     // On a ten-second voice the cell is a chord, not a quote (L6, E3): the
@@ -22616,6 +22641,7 @@ export function createSystems(game) {
     // live one is fed to the same lookahead; while it runs, musChordAt sits
     // past its end and the walk below has nothing to do.
     musStmtTick(now, horizon);
+    if (musStmt && musSpaceRest()) musSpaceAt = Math.max(musSpaceAt, now + musSpaceRest());
     let guard = 0;
     while (musChordAt < horizon && guard++ < 8) {
       const nx = musPal.next[musIdx] || musPal.next[0];
@@ -22748,7 +22774,7 @@ export function createSystems(game) {
       let played = false;
       if (Math.random() < 0.7 * brK) {
         const ch = (musPluckAt < musChordStart && musPrevChord) ? musPrevChord : musCurChord;
-        if (ch) {
+        if (ch && musSpaceCan(musPluckAt, 'lead')) {
           pan = rand(-0.75, 0.75);
           played = true;
           const v = rand(0.028, 0.075) * (0.75 + musIntensity * 0.5);
@@ -22760,13 +22786,17 @@ export function createSystems(game) {
           }
           // THE MELODY (L3, F2): every fifth to eighth pluck is a cell
           musMelN++;
-          const cellNow = musMelN >= musMelNext && lead && lead !== 'none';
+          const cellNow = (musSpaceRest() || musMelN >= musMelNext) && lead && lead !== 'none';
           if (cellNow) {
             musMelN = 0; musMelNext = randInt(sysMUS_CELL_A, sysMUS_CELL_B);
             const ph = sysMUS_PHRASE[musPalN];
             const inst = (ph && ph.inst) ? ph.inst : lead;
             // ...and the plucks wait for it: the walk resumes after the phrase
-            musPluckAt += musMelCell(musPluckAt, ch, inst, pan) * 0.85;
+            const space = musSpaceRest();
+            const span = musMelCell(musPluckAt, ch, inst, pan, space ? 2 : 1);
+            // Eight seconds reserve the instrument and room tail, not notes.
+            musSpaceHold(musPluckAt, span + 8, 'lead');
+            musPluckAt += span * (space ? 1 : 0.85);
           } else if (lead === 'quena') {
             musQuena(musPluckAt, musFold(musMelPick(ch), sysMUS_QNA_LO, sysMUS_QNA_HI),
               rand(0.030, 0.058) * (0.8 + musIntensity * 0.4));
@@ -22904,6 +22934,7 @@ export function createSystems(game) {
       if (musShakuAt < now) musShakuAt = now + rand(3, 9);
       guard = 0;
       while (musShakuAt < horizon && guard++ < 4) {
+        if (!musSpaceCan(musShakuAt, 'colour')) { musShakuAt += 3; continue; }
         const ch = musCurChord;
         if (ch) {
           const n = randInt(2, 4);
@@ -22915,6 +22946,7 @@ export function createSystems(game) {
             t += rand(1.5, 2.6);
             m = musFold(ch[randInt(0, ch.length - 1)] + dir * 12 * (Math.random() < 0.4 ? 1 : 0), 62, 79);
           }
+          musSpaceHold(musShakuAt, t - musShakuAt + 4, 'colour');
           musShakuAt = t + rand(9, 19);
         } else musShakuAt += 6;
       }
@@ -22926,8 +22958,10 @@ export function createSystems(game) {
       if (musTranhAt < now) musTranhAt = now + rand(3, 8);
       guard = 0;
       while (musTranhAt < horizon && guard++ < 3) {
+        if (!musSpaceCan(musTranhAt, 'colour')) { musTranhAt += 3; continue; }
         musDanTranh(musTranhAt, musPal.roots[musIdx],
                     rand(0.55, 0.95) * (0.85 + musIntensity * 0.3));
+        musSpaceHold(musTranhAt, 8, 'colour');
         musTranhAt += rand(7, 16);
       }
       // ...and the clapper, which is the only pulse this palette has
@@ -22936,7 +22970,9 @@ export function createSystems(game) {
       while (musLoanAt < horizon && guard++ < 12) {
         // …and the clapper stops with the plucks. It is the only pulse this
         // palette has, and a pulse that keeps time through a hush cancels it.
-        if (brK > 0.06) musSongLoan(musLoanAt, (0.55 + musIntensity * 0.35) * brK);
+        if (brK > 0.06 && (!musSpaceRest() || (musSpaceRole === 'colour' && musLoanAt < musSpaceEnd))) {
+          musSongLoan(musLoanAt, (0.55 + musIntensity * 0.35) * brK);
+        }
         musLoanAt += 1.10;
       }
     }
@@ -42892,6 +42928,8 @@ export function createSystems(game) {
       skyRain: +skyRainNow.toFixed(3), skyCut: +skyCutNow.toFixed(1),
       second: !!sysMUS_2ND[musPalN], secondN: musSecondN,
       serene: !game.state.noSereneScore,
+      space: { rest: musSpaceRest(), until: musSpaceAt, start: musSpaceStart, end: musSpaceEnd,
+        role: musSpaceRole, phrases: musSpaceN },
       // THE PROGRESS LAYERS (L6, E3): the three gains as chapProg opens them —
       // the shimmer (continuous), the second voice (from sysMUS_2ND_AT, when
       // the palette has one), the pulse (from sysMUS_LAYER_PULSE, pad

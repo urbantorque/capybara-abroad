@@ -1,3 +1,23 @@
+## HOMECOMING M1b — FOUR PHRASE-SPACE PROTOTYPES (22 Sep 2026)
+
+Sydney, Kyoto, Iceland and Hanoi use an audio-clock admission window for
+ambient phrases: existing cells at twice their duration, their reserved tail,
+then 24/28/32/20 seconds without another ambient entrance. Kyoto/Hanoi
+alternate lead and local colour. Hanoi's incidental clapper only accompanies
+the colour window. Band rhythms, chase cues, statements and aurora choir are
+unchanged; this is not a claim that every possible musical role is exclusive.
+`noSereneSpace` cuts this prototype; `noSereneScore` also restores inherited
+density. No audio node, gain writer or save field is added. Core admission
+remains on at every governor rung, as ROADMAP-HOMECOMING permits.
+
+349 source-derived checks cover all rungs, exact rest boundaries, both cuts,
+chase/sleep/statement priority, all six melodic cells and unchanged pitch,
+instrument, pan and velocity. Four headful real-clock probes each observe two
+actual reservations, no early entrances, correct Kyoto/Hanoi alternation,
+running audio and zero runtime errors. Mean whole scheduler ticks are
+0.088–0.147 ms in these runs; this is not isolated feature cost or listening
+approval. The prototype remains subject to listening and longer-session QA.
+
 ## HOMECOMING M2a — LEARNING REFERENCE (22 Sep 2026)
 
 Five pooled reference lessons are reachable before Begin and from Pause.

@@ -26,9 +26,22 @@ try {
     await h.page.bringToFront();
     await h.page.evaluate(() => {
       const g = window.__capy, raw = g.tick;
+      const rawRender = g.renderer.render, rawShadow = g.renderer.shadowMap.render;
       const data = { frames: [], samples: [], last: performance.now(), lastSample: 0,
+        passes: { world: [], mirror: [], post: [], shadow: [] },
         music: g.musAudit(), theme: g.musThemeAudit() };
-      g.__homeProbe = { data, raw };
+      g.__homeProbe = { data, raw, rawRender, rawShadow };
+      g.renderer.render = function (scene, camera) {
+        const key = scene === g.scene ? (camera === g.camera ? 'world' : 'mirror') : 'post';
+        const start = performance.now();
+        try { return rawRender.apply(this, arguments); }
+        finally { data.passes[key].push(performance.now() - start); }
+      };
+      g.renderer.shadowMap.render = function () {
+        const start = performance.now();
+        try { return rawShadow.apply(this, arguments); }
+        finally { data.passes.shadow.push(performance.now() - start); }
+      };
       g.tick = function (...args) {
         const start = performance.now();
         const value = raw.apply(this, args);
@@ -52,6 +65,7 @@ try {
     } else await h.page.waitForTimeout(15000);
     const data = await h.page.evaluate(() => {
       const g = window.__capy, p = g.__homeProbe;
+      g.renderer.render = p.rawRender; g.renderer.shadowMap.render = p.rawShadow;
       g.tick = p.raw; delete g.__homeProbe;
       return { ...p.data, musicAfter: g.musAudit(), themeAfter: g.musThemeAudit(),
         state: { lastError: g.state.lastError, started: g.state.started }, perf: g.perfAudit() };
@@ -64,6 +78,11 @@ try {
       over50: intervals.filter(v => v > 50).length, over100: intervals.filter(v => v > 100).length,
       rung: data.perf.rung, hiddenOrPaused: data.samples.filter(s => s.hidden || s.paused).length,
       unfocused: data.samples.filter(s => !s.focused).length };
+    summary.passCpu = Object.fromEntries(Object.entries(data.passes).map(([key, values]) => {
+      values.sort((a, b) => a - b);
+      return [key, { calls: values.length, p95: values.length ? pct(values, .95) : null,
+        total: +values.reduce((sum, n) => sum + n, 0).toFixed(2) }];
+    }));
     out.phases.push({ summary, ...data });
     console.log(JSON.stringify(summary));
     assert(data.state.started && !data.state.lastError, 'live error-free game');

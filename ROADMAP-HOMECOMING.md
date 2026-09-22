@@ -473,6 +473,55 @@ over the older 33.4 ms baseline, but a repeated uncut Pretty run also records
 this evidence. Both probes preserve their >100ms outliers (one each in still
 or rest); no production rendering change has been made.
 
+### M1b prototype: phrase reservations
+
+Four audition palettes (Sydney, Kyoto, Iceland, Hanoi) reserve one ambient
+phrase plus its tail, followed by 24/28/32/20 seconds respectively. Kyoto's
+shakuhachi and Hanoi's dan tranh alternate with their lead rather than
+overlapping it. Existing melodic cells use a two-times duration overlay;
+authored notes, palette/chord/root/dwell/next/instrument rows remain unchanged.
+Hanoi's incidental clapper accompanies only its colour window. Arrival/reward
+statements, regional band clocks, chase cues and the aurora choir are preserved.
+Statements postpone the next ambient entrance. `noSereneSpace` cuts only
+this prototype; `noSereneScore` cuts both calm changes. This base admission
+correction stays active at every quality rung and adds no audio node, gain
+writer or saved state. Listening approval remains outstanding.
+
+349 source-derived checks pass, including the six actual melodic-cell
+schedules: stretch changes time alone, and omitted/default stretch preserves
+the inherited event list. Separate headful probes pass in all four places,
+observing two actual ambient entrances each, complete reserved rests, local
+colour alternation in Kyoto/Hanoi, running audio and no runtime errors.
+Whole scheduler means range 0.088–0.147 ms, not isolated feature-cost evidence.
+Syntax checks, the single-file build and all 57 suite checks pass.
+
+Hanoi Auto live baseline: still/walk/rest p95 23.2/24.9/24.4 ms, CPU p95
+19.9/21.5/21.3 ms, no >50 ms frames. Rungs move between zero and one. Drawing
+is the largest sampled module cost (13.72 ms at the final walking sample),
+426 calls and 765,813 triangles. Added per-pass CPU timing to the baseline
+instrument; world timing includes shadow timing and must not be summed with
+it. A fixed-camera paused A/B/B/A instrument isolates render cuts without
+claiming live-play frame-rate certification. No production render cut yet.
+
+Hanoi fixed-camera shadow A/B/B/A: CPU p95 8.3/5.6/5.4/7.4 ms;
+frame p95 16.8 ms in every arm. A separate 4x/2x/2x/4x antialiasing
+comparison gives frame p95 33.6/33.5/33.4/33.4 ms and CPU p95
+17.2/15.7/15.1/15.7 ms. The different baseline between experiments is
+retained; these tests do not justify calling either cut a frame-pacing fix.
+
+Pretty walking pass profile: frame p95 31.7 ms, CPU p95 26.3 ms; world
+render CPU p95 11.9 ms, mirror 6.9 ms. These are CPU submission timings,
+which may include waiting for prior GPU work, not isolated GPU execution.
+`qa/homecoming-cpu.mjs` adds a 15-second real-input sampling profile for
+the next attribution step, retaining the complete call tree in ignored QA
+evidence rather than guessing from draw-call counts.
+The Hanoi profile passes. Its largest named JavaScript self-time is
+`updateMatrixWorld` (556.9 ms across the 15-second sample), followed by draw
+submission/program selection/projectObject (353.6/346.2/344.2 ms). Native
+program/idle categories are larger and are not attributed to a specific
+effect. Next performance candidate: safely avoid redundant static transform
+work, verified against moving rigs and chapter transitions before shipping.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
