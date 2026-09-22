@@ -3476,7 +3476,8 @@ function monUpdateRide(game, dt) {
   // side many multiples of the car's own speed — measured 34-85 m/s, with
   // "hold on." as the only pill, because nothing named a shove. Any car
   // within 3 m that leaves the capybara faster than the car's own speed +
-  // 2 m/s gets the excess clamped to the car's speed + 4 m/s, and the
+  // 4 m/s gets the excess clamped to that same ceiling. The old +2 trigger
+  // accelerated animals between +2 and +4 instead of braking them. The
   // clamp is what names it: shove(0, 0, …) adds no velocity of its own,
   // it only sets capy.impulseSrc (see the src branch in capy.shove).
   if (capy.velocity) {
@@ -3490,7 +3491,7 @@ function monUpdateRide(game, dt) {
     if (cv) {
       const carSpd = Math.hypot(cv.x, cv.z);
       const mySpd = Math.hypot(capy.velocity.x, capy.velocity.z);
-      if (mySpd > carSpd + 2) {
+      if (mySpd > carSpd + 4) {
         const s = (carSpd + 4) / mySpd;
         capy.velocity.x *= s; capy.velocity.z *= s;
         if (typeof capy.shove === 'function') capy.shove(0, 0, capy.swimming ? 'the harbour' : 'the pack');

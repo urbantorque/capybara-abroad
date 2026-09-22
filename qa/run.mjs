@@ -27,6 +27,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
 const ASSERTS = [
+  ['qa/release-monaco-clamp.mjs', 'Monaco contact clamp never adds speed'],
   ['qa/reimagine-trust.mjs', 'guidance continuity, explicit skip/replay and earned finale staging'],
   ['qa/reimagine-journey.mjs', 'authored route choices and stable chapter/task identities'],
   ['qa/reimagine-route-integration.mjs', 'open travel, legacy memories and earned-place coda'],

@@ -1,5 +1,16 @@
 # HANDOFF — state of play, 21 Sep 2026
 
+## Pages integration (22 Sep)
+
+The user approved merging the redesign into master and checking the public
+game, including older reflection work. See ROADMAP-PAGES.md for this newer
+task and its evidence. All historic art branches are already ancestors; do
+not merge the unfinished score-w2-wip pad multiplier. Reflections survive;
+Pretty keeps them, Auto can park them, Fast parks them. Settings says so.
+A separately proven Monaco accelerating-clamp bug is fixed; the focused
+45-second rerun passes, but does not reproduce/close the prior soak warning.
+Hosted verification is pending at this pre-deployment checkpoint.
+
 ## Codex refinement update (21 Sep, closing twelve-hour pass)
 
 Read this update before the historical migration notes below. The current

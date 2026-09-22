@@ -25692,9 +25692,9 @@ export function createSystems(game) {
   // 1/20 s clock and the shadow map is drawn every other frame. A word on
   // the row is a promise; the sentence under it is what the promise costs.
   const sysPERF_SAY = [
-    'the game sheds pixels first, then the shadow map and the world’s steps, as the frame needs',
-    'everything drawn, whatever the frame costs',
-    'the world steps twice a frame, the shadow every other',
+    'reflections and fine detail rest when frames slow; pretty keeps them drawn',
+    'water reflections and all fine detail drawn, at a higher frame cost',
+    'reflections rest; the world steps twice a frame, the shadow every other',
   ];
   const pausePerfNote = sysEl('div', 'capyui-setnote under', '');
   pausePerfNote.id = 'capyui-perfnote';

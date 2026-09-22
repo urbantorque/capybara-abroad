@@ -1,3 +1,20 @@
+## PAGES A — REFLECTIONS RETAINED, CONTACT CLAMP (22 Sep 2026)
+
+ROADMAP-PAGES records the branch audit and public integration. No historic
+visual feature is missing from the redesign ancestry. Preserve the planar,
+underwater and rain-gated reflection work, and the rung-zero-only render
+contract. The Settings row now states which modes keep reflections.
+Local headful browser: 12 assertions pass; Kyoto's masked mirror contributes
+171,749 changed water pixels, and the screenshot visibly mirrors the pavilion.
+Movement, running audio, travel and save/reload pass without runtime errors.
+
+Monaco's proximity clamp must never accelerate: trigger and target both use
+car speed +4, not the previous +2 trigger. 16 scenarios/88 checks; focused
+45-second inherited fuzz passes at 15.1 m/s with two solver recoveries.
+Do not present that as reproducing or closing the earlier 33.1975 m/s peak.
+No new saves, flags or visual/audio terms; only Settings copy and a corrected
+comparison in an existing loop. Public browser verification pending.
+
 ## REIMAGINE G — CLOSING REGRESSION, MONACO OPEN (21 Sep 2026)
 
 The closing nineteen-place, 45-second-per-place random-play sweep fails one
