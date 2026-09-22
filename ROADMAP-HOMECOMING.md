@@ -1490,6 +1490,30 @@ one pass does not prove the pointer path safe on all browsers or cure their
 cause. No production audio or reload lifecycle changed. The title/start
 sequence and public-master promotion remain under the existing release gate.
 
+### M1y: current-build world sweep and Goreme pacing gap
+
+An optional one-lap mode on the existing travel instrument keeps its default
+two-lap resource test intact. On the current branch, one owned headful Edge
+context entered all 19 places in public Free Roam crossing fixtures, made
+short real W/S inputs, and returned to Sydney. All 19 checks found finite
+body position, foreground focus, an attached live scene root, zero sleeping
+scene roots attached, and no game/browser runtime error. These are 2-second
+timing windows and first-use resource counts, not full routes, earned tasks,
+GPU-memory bytes, a resource plateau or a Story release pass.
+
+Goreme had the highest short-window frame p95 (32.3 ms, 112 intervals) despite
+Auto rung three. A separate 90-second visible Auto route recorded still/walk/
+rest p95 21.8/19.2/18.5 ms, CPU tick p95 8.0/7.8/7.8 ms, and >100 ms frame
+counts 2/2/0. There were no >50 ms CPU ticks, no hidden/unfocused samples and
+no runtime error. The still phase misses the proposed 20 ms p95 target;
+isolated frame intervals remain unaccounted for. Separate GPU timer-query
+samples put the world pass p95 at 14.61/13.73/14.63 ms, post at about 0.83
+ms, no mirror pass, and effectively no shadow submission at rung three.
+Timer queries and CPU submission samples do not sum into GPU busy time or
+prove the cause of the >100 ms intervals. No production quality or authored
+scene term was cut on this evidence; further attribution requires a long
+frame-linked trace or another named device.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

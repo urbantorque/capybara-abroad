@@ -5,11 +5,11 @@
 import assert from 'node:assert/strict';
 import { openHarness, measureTicks, CHAPTERS } from './reimagine-harness.mjs';
 
-const tag = process.argv[2];
+const tag = process.argv[2], oneLap = process.argv.includes('--one-lap');
 assert(tag && /^[\w-]+$/.test(tag), 'usage: node qa/homecoming-travel-matrix.mjs <tag>');
 const name = 'homecoming-travel-matrix-' + tag;
 const h = await openHarness({ pinRung: false });
-const out = { metadata: h.metadata, tag, baseline: null, arrivals: [] };
+const out = { metadata: h.metadata, tag, oneLap, baseline: null, arrivals: [] };
 
 async function sample(chapter, lap, step, arrivalWallMs) {
   await h.hold('KeyW', 350);
@@ -64,7 +64,7 @@ try {
   assert.equal(out.baseline.lastError, null);
 
   let step = 0;
-  for (let lap = 1; lap <= 2; lap++) {
+  for (let lap = 1; lap <= (oneLap ? 1 : 2); lap++) {
     for (const chapter of [...CHAPTERS.slice(1), 'sydney']) {
       step++;
       const started = performance.now();
@@ -80,7 +80,7 @@ try {
         geometries: row.renderer.geometries, programs: row.renderer.programs }));
     }
   }
-  assert.equal(out.arrivals.length, 38);
+  assert.equal(out.arrivals.length, oneLap ? 19 : 38);
   assert.equal(h.metadata.errors.length, 0);
   out.pass = true;
 } catch (error) {
