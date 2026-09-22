@@ -41,7 +41,19 @@ async page => {
   await page.goto('http://localhost:5188/index.html');
   await page.waitForTimeout(6000);
   await page.waitForFunction(() => window.__capy && (document.querySelector('.capyui-carry') || document.querySelector('.capyui-go')));
-  await page.evaluate(() => (document.querySelector('.capyui-carry') || document.querySelector('.capyui-go')).click());
+  await page.evaluate(() => {
+    const free = document.querySelector('.capyui-go[data-free]');
+    if (free) {
+      free.click();
+      const hero = document.querySelector('.capyui-pick.hero');
+      if (!hero) throw new Error('free-roam Sydney door missing');
+      hero.click();
+    } else {
+      const door = document.querySelector('.capyui-carry') || document.querySelector('.capyui-go');
+      if (!door) throw new Error('start door missing');
+      door.click();
+    }
+  });
   await page.keyboard.press('Shift'); // trusted input unlocks synthesized audio
   await page.waitForTimeout(3000);
   const started = await page.evaluate(() => !!(window.__capy && window.__capy.state.started));

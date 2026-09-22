@@ -2,6 +2,8 @@
 import assert from 'node:assert/strict';
 import { openHarness, measureTicks, CHAPTERS } from './reimagine-harness.mjs';
 const all = process.argv.includes('--all');
+const tag = process.argv.slice(2).find(a => a !== '--all') || '';
+assert(!tag || /^[\w-]+$/.test(tag), 'safe result tag');
 const h = await openHarness();
 const out = { metadata: h.metadata, visits: [] };
 try {
@@ -56,4 +58,4 @@ try {
   assert.equal(h.metadata.errors.length, 0); out.pass = true;
   console.log(JSON.stringify(out.matrixABBA));
 } catch (e) { out.pass = false; out.failure = String(e.stack || e); process.exitCode = 1; console.error(out.failure); }
-finally { await h.result('homecoming-parking-live' + (all ? '-all' : ''), out); await h.close(); }
+finally { await h.result('homecoming-parking-live' + (all ? '-all' : '') + (tag ? '-' + tag : ''), out); await h.close(); }

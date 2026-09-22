@@ -25,7 +25,19 @@ async page => {
   }
   await page.waitForTimeout(1500)
   const tBegin = Date.now()
-  await page.evaluate(() => { const b = document.querySelector('.capyui-carry') || document.querySelector('.capyui-go'); if (b) b.click() })
+  await page.evaluate(() => {
+    const free = document.querySelector('.capyui-go[data-free]');
+    if (free) {
+      free.click();
+      const hero = document.querySelector('.capyui-pick.hero');
+      if (!hero) throw new Error('free-roam Sydney door missing');
+      hero.click();
+    } else {
+      const door = document.querySelector('.capyui-carry') || document.querySelector('.capyui-go');
+      if (!door) throw new Error('start door missing');
+      door.click();
+    }
+  })
   await page.keyboard.press('Shift')
   let tStarted = -1
   for (let i = 0; i < 80; i++) {

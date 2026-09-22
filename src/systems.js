@@ -41789,6 +41789,17 @@ export function createSystems(game) {
   // it here and MAIN_HOLD_MAX_MS clears it in main.js.
   const sysWARM_MAX_MS = 8000;
   const sysWARM_POLL_MS = 12;
+  function biomeWarmReady(pr) {
+    // A shared material may compile both instanced and ordinary variants.
+    // currentProgram is only the last one; every submitted variant must settle.
+    let ready = true;
+    const check = function (p) {
+      if (p && typeof p.isReady === 'function' && !p.isReady()) ready = false;
+    };
+    if (pr && pr.programs && typeof pr.programs.forEach === 'function') pr.programs.forEach(check);
+    else check(pr && pr.currentProgram);
+    return ready;
+  }
   // A fence answers whether the already-submitted destination frame and its
   // preceding commands completed on the GPU. `clientWaitSync(..., 0, 0)` never
   // stalls the thread; the owner token protects a newer crossing from late polls.
@@ -41912,8 +41923,7 @@ export function createSystems(game) {
       if (id !== biomeWarmN) return;
       mats.forEach(function (m) {
         const pr = props.get(m);
-        const p = pr && pr.currentProgram;
-        if (!p || typeof p.isReady !== 'function' || p.isReady()) mats.delete(m);
+        if (biomeWarmReady(pr)) mats.delete(m);
       });
       if (!mats.size || performance.now() - game.state.warmAt > sysWARM_MAX_MS) biomeWarmDone(id);
       else setTimeout(poll, sysWARM_POLL_MS);

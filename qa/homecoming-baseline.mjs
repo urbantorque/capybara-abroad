@@ -64,6 +64,8 @@ try {
             }
             data.hitches.push({ at: start, cpu: elapsed, modules,
               programsBefore, programsAfter: g.renderer.info.programs.length,
+              addedPrograms: g.renderer.info.programs.slice(programsBefore).map(p => ({
+                type:p.type, name:p.name, cacheKey:p.cacheKey.slice(0,1200) })),
               geometries: g.renderer.info.memory.geometries,
               position: g.capy.body.position.toArray(), contacts: g.world.contacts.length });
             const added = new Set(g.renderer.info.programs.slice(programsBefore));

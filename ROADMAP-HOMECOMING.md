@@ -844,6 +844,65 @@ or aesthetic acceptance gates. Syntax/build and all 67 suite gates pass.
 Next: broader current-build travel/resource coverage, then compose the opening
 and finish the remaining practice lessons within measured rendering budgets.
 
+### M1h: 38 current-build transitions, resource gate still open
+
+Two Auto laps through all nineteen places complete in one owned headful Edge
+session on 532a5e0. All 38 public crossing fixtures reach the expected place,
+with finite body positions, live roots attached, zero sleeping chapter roots
+attached, foreground checks and no runtime errors. These are short W/S parking
+movements, not full interaction routes or earned memories. Arrival wall times
+include the harness's fixed 9.5-second wait and are not loading-time results.
+
+At Sydney after lap one/two: geometries 2584/2794, textures 16/17, programs
+315/337, active bodies 177/177 and total props 411/411. Auto rung 2/0 makes
+the timing unequal-quality: CPU p95 7.6/13.1ms, frame p95 33.6/18.1ms. Larger
+second-visit geometry additions occur in Kyoto, Cali and Iceland; Antarctica
+adds 19 programs. Separate deferred quality variants from repeat allocations
+before calling this a leak or a stable resource plateau. Two laps are not a
+30-minute soak. No release approval from these counts.
+
+The first Kyoto timing window contains only one eligible interval (1016.6ms),
+despite a foreground check before sampling and hidden=false/paused=false at
+its end. That is insufficient for a useful percentile; preserve the anomaly
+and reproduce with the longer focus/readiness-aware baseline. The remaining
+short windows also cannot certify the P0 frame targets. Evidence is retained
+as homecoming-travel-matrix-checkpoint-532a5e0.json.png. Follow-up: attribute
+resource growth, add sample-wide focus/readiness coverage, run the long soak.
+
+### M1i: resource attribution and complete shader-variant readiness
+
+Two 90-second Kyoto follow-ups do not repeat the one-second interval. The
+first has one 83.6ms CPU event (79.6ms draw, programs 61->62); its frame p95
+is 28.3/31/33.1ms. The shader-metadata follow-up has no >50ms CPU event and
+no >100ms interval, but p95 31.9/34.2/25.6ms still misses P0. Both remain
+focused. The non-repeated hitch's shader type is not established; do not
+attribute it to a particular effect from these samples.
+
+Sixteen synthetic Fast/Pretty settings arms across Kyoto, Cali, Iceland and
+Antarctica pass. Repeated arms add no previously unseen geometry UUIDs after
+the first Fast arm, and no shader programs. GPU geometry counts may still
+rise as existing references first reach rendering (Kyoto stays 225; Cali
+359->361, Iceland 450->468, Antarctica 536->566). Textures alternate 15/17.
+This demonstrates cached reference reuse in the sampled quality switches;
+it does not prove every long-run allocator bounded or explain every earlier
+travel delta. Keep the full resource/UUID artifact for comparison.
+
+The warm poll previously checked currentProgram, only the last variant of
+a shared material. It now waits for every submitted program in that material's
+program map, retaining the existing deadline and single-program fallback.
+The extracted regression supplies a ready final variant and a pending sibling;
+the hold must remain. Eighteen warm checks pass. A live Sydney-Hanoi-Kyoto-
+Venice-Sydney-Hanoi route passes with no errors and sleeping roots detached.
+No new scene, audio, save field or effect flag; extra polling occurs only
+during the existing loading hold. This closes a demonstrated readiness gap,
+not a claim that the observed Kyoto hitch has been eliminated.
+
+The long fuzz, single-file string/audio and load probes now explicitly select
+Free Roam's Sydney door, keeping the older-build fallback. This is necessary
+for full-world coverage now that a fresh Begin correctly gates Story travel.
+Their startup adapters are syntax checked; the full soak remains next work.
+All 67 suite gates pass. Weekly allowance is 46% remaining.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
