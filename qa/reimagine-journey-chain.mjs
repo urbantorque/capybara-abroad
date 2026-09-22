@@ -10,8 +10,11 @@ import { stripComments } from '../strip-comments.mjs';
 const args=process.argv.slice(2),prepare=args.includes('--prepare'),homecoming=args.includes('--homecoming');
 const resumeArg=args.find(a=>a.startsWith('--resume='));
 const resumeTag=resumeArg?.slice(9);
+const stopArg=args.find(a=>a.startsWith('--stop-after='));
+const stopAfter=stopArg?.slice(13);
 if(resumeArg)assert(homecoming&&/^[\w-]+$/.test(resumeTag),'resume requires a safe Homecoming artifact tag');
-const labels=args.filter(a=>a!=='--prepare'&&a!=='--homecoming'&&a!==resumeArg);
+if(stopArg)assert(homecoming&&stopAfter==='kyoto','bounded earned-route diagnostic stops only after Kyoto');
+const labels=args.filter(a=>a!=='--prepare'&&a!=='--homecoming'&&a!==resumeArg&&a!==stopArg);
 assert.ok(labels.length<=1,'usage: node qa/reimagine-journey-chain.mjs [tag] [--prepare] [--homecoming]');
 const tag=labels[0]||'first';assert.match(tag,/^[\w-]+$/);
 const prefix=(homecoming?'homecoming':'reimagine')+'-journey-chain-'+tag;
@@ -322,11 +325,17 @@ try {
         note:'The actual condor flight also earned sufficient authored support actions; no extra task imposed.'};
     }
     await closeTravelCard();completed.push(n);await gateSnapshot(chapter+' earned and persisted',completed);
+    if(chapter===stopAfter)break;
   }
-  await execute(home,'homecoming');await gateSnapshot('ending survived reload and repeat rest',routeIds);
-  assert.equal(report.gates.at(-1).saved.fin,1);assert.deepEqual(root.metadata.errors,[]);
-  report.finishedAt=new Date().toISOString();report.pass=true;await root.result(prefix,report);
-  console.log(JSON.stringify({pass:true,artifact:prefix+'.json.png',stages:report.stages.map(s=>s.stage),fin:1}));
+  if(!stopAfter){
+    await execute(home,'homecoming');await gateSnapshot('ending survived reload and repeat rest',routeIds);
+    assert.equal(report.gates.at(-1).saved.fin,1);
+  }
+  assert.deepEqual(root.metadata.errors,[]);
+  report.finishedAt=new Date().toISOString();report.pass=true;report.partial=!!stopAfter;
+  await root.result(prefix,report);
+  console.log(JSON.stringify({pass:true,artifact:prefix+'.json.png',stages:report.stages.map(s=>s.stage),
+    fin:stopAfter?null:1,partial:!!stopAfter}));
 }catch(error){report.failure={stage:current,error:String(error.stack||error)};
   try{report.lastSave=await root.page.evaluate(()=>JSON.parse(localStorage.getItem('capy3.journey.v1')||'{}'));}catch{}
   if(!report.lastSave&&report.gates.length)report.lastSave=report.gates.at(-1).saved;

@@ -38,7 +38,7 @@ export async function openHarness({ url = 'http://localhost:5188/',
   // Register crash evidence before navigation, including failures before __capy.
   const metadata = { at: new Date().toISOString(), browser: browser.version(), channel,
     headless: false, viewport: { width, height, deviceScaleFactor, hasTouch, isMobile },
-    errors: [], warnings: [], requests: [], startup: [] };
+    errors: [], warnings: [], requests: [], startup: [], crashTrace: [] };
   const stage = name => metadata.startup.push({ name, at: new Date().toISOString() });
   try {
     const origin = new URL(url).origin;
@@ -49,12 +49,41 @@ export async function openHarness({ url = 'http://localhost:5188/',
       storageState: { cookies: [], origins: [{ origin, localStorage:
         Object.entries(entries).map(([name, value]) => ({ name,
           value: typeof value === 'string' ? value : JSON.stringify(value) })) }] } });
+    // Opt-in QA-only trace around a reload/start crash. Console events are
+    // delivered outside the renderer, so samples already sent survive it.
+    if (process.env.CAPY_QA_CRASH_TRACE === '1') await context.addInitScript(() => {
+      document.addEventListener('DOMContentLoaded', () => {
+        if (performance.getEntriesByType('navigation')[0]?.type !== 'reload') return;
+        let n = 0;
+        const sample = stage => {
+          const g = window.__capy, a = g?.hud?.audioBus?.().ac;
+          console.info('__CAPY_RELOAD_TRACE__' + JSON.stringify({ stage,
+            at: Math.round(performance.now()), ready: !!g, started: !!g?.state?.started,
+            chapter: g?.biome?.current, frames: g?.state?.frames,
+            renderHold: !!g?.state?.renderHold, warmMs: g?.state?.warmMs,
+            audio: a?.state || 'none', programs: g?.renderer?.info?.programs?.length ?? null,
+            geometries: g?.renderer?.info?.memory?.geometries ?? null }));
+        };
+        sample('domready');
+        document.addEventListener('pointerdown', e => {
+          if (e.target.closest?.('.capyui-go,.capyui-carry')) sample('start-pointerdown');
+        }, true);
+        document.addEventListener('click', e => {
+          if (e.target.closest?.('.capyui-go,.capyui-carry')) sample('start-click');
+        }, true);
+        const timer = setInterval(() => { sample('poll'); if (++n >= 120) clearInterval(timer); }, 100);
+        window.addEventListener('pagehide', () => sample('pagehide'));
+      });
+    });
     const page = await context.newPage();
     page.setDefaultTimeout(20000);
     const { errors, warnings, requests } = metadata;
     page.on('pageerror', e => errors.push({ kind: 'pageerror', message: String(e.stack || e) }));
     page.on('crash', () => errors.push({ kind: 'crash', message: 'Owned browser page crashed' }));
     page.on('console', m => {
+      if (m.text().startsWith('__CAPY_RELOAD_TRACE__')) {
+        try { metadata.crashTrace.push(JSON.parse(m.text().slice('__CAPY_RELOAD_TRACE__'.length))); } catch {}
+      }
       if (m.type() === 'error') errors.push({ kind: 'console', message: m.text() });
       if (m.type() === 'warning') warnings.push(m.text());
     });

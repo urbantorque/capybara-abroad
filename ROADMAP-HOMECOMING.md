@@ -1447,6 +1447,31 @@ speech and the narrow full-paper layout remain candidates for separate,
 measured composition work. The long-route reload crash above still blocks
 public-master promotion.
 
+### M1w: paired reload-boundary trace, intermittent risk remains
+
+A QA-only opt-in trace now records reload DOM readiness, title-start click,
+100 ms start samples, audio-context state, render hold, frame count and WebGL
+resource counters. The chain driver can stop after Kyoto for a bounded earned
+route. Neither change runs in the game or alters a save. The first fresh
+trace (boundary-v13) earned Sydney, Quay and Pasto, then its straight-line
+Pantanal driver stalled beside a bridge with no browser error. Resuming that
+exact earned save in fresh contexts completed Kyoto reload twice (v14/v15).
+Those are cross-session continuations, not long-context crash reproductions.
+
+Two further fresh, single-context traces (v16/v17) earned Sydney, Quay,
+Pasto, Pantanal and Kyoto in order, then completed Kyoto's immediate reload
+and restored the earned memory. Both passed with zero page/target errors;
+v16 held 22 saved tasks at the gate. On v16's last reload, the title was ready
+by about 1.1 s, the synthetic start click occurred at about 1.5 s, render
+hold cleared roughly 0.1 s after world start, audio became running later, and
+59 frames had drawn by 3.25 s. The trace samples surviving in the browser
+process confirm this successful sequence only. QA starts with a synthetic DOM
+click followed by a trusted key, so this does not cover a real pointer-down
+title-audio path. The earlier v7/v8/v10/v11 renderer crashes remain valid
+counterevidence. No production disposal, warm-up or audio change is justified
+by these passes, and public master remains held pending a bounded recovery or
+more decisive crash evidence.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
