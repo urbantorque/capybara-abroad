@@ -38,6 +38,7 @@ const t = vm.createContext({
   saveSoon() { t.saves++; }, sfx: noop,
   pauseShown: false, pausePre: false, pauseSetOpen: false,
   pauseTutReplay: element(), pauseTutSkip: element(), pauseFree: element(), pauseGo: element(),
+  pauseOpeningReplay: element(), sysOpenFinish: null, sysOpenT: -1,
   pauseHead: element(), pauseFoot: element(), pauseCard: element(), pauseJrBtn: element(),
   pauseQuitBtn: element(), pauseSub: element(), pauseEl: element(),
   sysScheme: x => x, pauseSetToggle: noop, chapterDef: () => ({ name: 'Sydney' }), chapterOf: () => 1,

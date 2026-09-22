@@ -6564,6 +6564,7 @@ const sysHOME_UI = {
   freeSwitch: 'free roam: open every place', freeSaid: 'Every place is open. Everything kept stays.',
   returnHome: 'Visit the garden shelf · Sydney',
   returnHint: 'The souvenirs have a place in the garden. A visit home leaves every onward route open.',
+  openingReplay: 'replay the opening',
 };
 const sysLEARN_SHOP = {
   open: 'Try a practice purchase', wallet: 'Practice wallet: {n} yuzu',
@@ -25733,6 +25734,9 @@ export function createSystems(game) {
   const pauseTutSkip = pauseBtn('', 'skip the guided walk', function () {
     tutSkip('skip'); pauseHide();
   });
+  const pauseOpeningReplay = pauseBtn('', sysHOME_UI.openingReplay, function () {
+    pauseHide(); sysOpeningPlay(function () {});
+  });
   // ---- A SIXTH DOOR: THE SHELF (L7, E5 / play 2). Fifteen minutes in, the
   // fresh player could not leave and was not told how: the board's rows were
   // locked and the title's "Choose a place" — which travels anywhere with a
@@ -26273,10 +26277,13 @@ export function createSystems(game) {
    */
   function pauseShow(pre) {
     if (pauseShown) return;
+    if (sysOpenFinish) sysOpenFinish();
     pauseShown = true;
     pausePre = !!pre;
     pauseTutReplay.hidden = pausePre || tutLive() || !game.biome || game.biome.current !== 'sydney';
     pauseTutSkip.hidden = pausePre || !tutLive();
+    pauseOpeningReplay.hidden = pausePre || tutLive() || game.state.noOpen ||
+      !game.biome || game.biome.current !== 'sydney' || sysOpenT >= 0;
     pauseFree.hidden = pausePre || game.state.journeyMode !== 'story';
     pauseGo.textContent = pausePre ? 'back' : 'resume';
     pauseHead.textContent = pausePre ? 'Settings' : 'Paused';
@@ -38539,8 +38546,10 @@ export function createSystems(game) {
   //   of being carried off in view — standing in for the traveller's own
   //   exit without showing it, which is honest about what it is not.
   let sysOpenArm = false, sysOpenT = -1;
+  let sysOpenFinish = null;
   const sysOPEN_HOLD = 10.0;
   function sysOpeningPlay(after) {
+    if (sysOpenFinish) sysOpenFinish();
     sysOpenT = sysOPEN_HOLD;
     try {
       game.frameShot({ yaw: 0.35, dist: 8.6, pitch: 0.20, raise: 0.7, hold: sysOPEN_HOLD });
@@ -38562,11 +38571,16 @@ export function createSystems(game) {
         bag.visible = true;
       }
     } catch (e) { /* the beat is not worth the exception */ }
-    let done = false;
+    const openingShot = shotReq;
+    let done = false, timer = 0;
     function finish() {
       if (done) return;
       done = true;
       sysOpenT = -1;
+      sysOpenFinish = null;
+      clearTimeout(timer);
+      // Release only this beat's lens, never a newer reward or arrival shot.
+      if (shotReq === openingShot) game.frameShot(null);
       // ---- AWAKE, BAG GONE — see the note above: this is where the
       // traveller's own carry-off would read, if this pass could build it.
       capyForceNap(-1);
@@ -38577,7 +38591,8 @@ export function createSystems(game) {
     }
     window.addEventListener('keydown', finish);
     window.addEventListener('pointerdown', finish);
-    setTimeout(finish, sysOPEN_HOLD * 1000);
+    sysOpenFinish = finish;
+    timer = setTimeout(finish, sysOPEN_HOLD * 1000);
   }
   /** Read-only, for the harness. */
   game.openAudit = function () { return { armed: sysOpenArm, t: sysOpenT < 0 ? null : +sysOpenT.toFixed(1) }; };
@@ -49152,6 +49167,12 @@ export function createSystems(game) {
     // wrapper at each of the two sites and no other reader changes: capybara.js
     // still sees a plain held boolean and cannot tell which way it was made.
     input.slide = sysHoldToggle ? sysLatch('slide', slideHeld) : slideHeld;
+
+    // Pads do not emit the DOM events that dismiss the opening. A held
+    // control also covers a key pressed before its delayed start.
+    if (sysOpenFinish && (ix || iz || runHeld || input.honk || input.action ||
+        input.jump || slideHeld || camHandT > 0 || game.state.paused ||
+        transBusy || (game.biome && game.biome.current !== 'sydney'))) sysOpenFinish();
 
     // ---- THE WARDROBE -------------------------------------------------------
     // One row per costume, and the whole rule is: you are in the chapter, and

@@ -823,6 +823,27 @@ The inherited CSS regression now excludes only the exact new scoped selector;
 all other inherited CSS still compares to its baseline. Syntax/build and all
 66 suite gates pass. Weekly allowance: 48% remaining.
 
+### M3f: existing opening, reliable ownership and replay
+
+Source review found an inherited ten-second nap-and-rucksack opening already
+present. It is not the proposed cup/postcard/picnic scene. Reuse precedes new
+assets: Sydney's pause menu now offers replay after guidance ends or is
+explicitly skipped. No new save field or automatic replay on restore.
+Keyboard/pointer skip cancels its timer, releases the nap and hides the bag;
+held movement/action controls, camera input, pause or travel also release it.
+Camera cleanup only clears the opening's own request, preserving a newer
+reward/arrival shot. Idle cost is one null guard in the existing input pass;
+no new audio or render term, inherited noOpen eligibility preserved.
+
+Nineteen extracted lifecycle/input checks and ten owned headful browser
+checks pass: fresh start, keyboard/pointer skip, replay, pause, timeout and
+restore. Controller input flags are covered in the extracted policy, not by
+a physical gamepad test. The screenshot shows the original scene with its
+existing HUD/arrival card; this does not close the composed wordless-opening
+or aesthetic acceptance gates. Syntax/build and all 67 suite gates pass.
+Next: broader current-build travel/resource coverage, then compose the opening
+and finish the remaining practice lessons within measured rendering budgets.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

@@ -31,6 +31,7 @@ const ASSERTS = [
   ['qa/homecoming-layout-reads.mjs', 'traveller world query avoids forced screen layout'],
   ['qa/homecoming-shop-practice.mjs', 'isolated purchase rehearsal, live price and no game mutation'],
   ['qa/homecoming-home-visit.mjs', 'optional home invitation, staged memories and legacy isolation'],
+  ['qa/homecoming-opening.mjs', 'opening skip, replay cleanup, input ownership and newer camera shots'],
   ['qa/homecoming-regional.mjs', 'calm regional arrangements, protected beat voices and active bypass'],
   ['qa/homecoming-warm.mjs', 'hidden global shader warm-up and actual first-frame readiness'],
   ['qa/homecoming-story.mjs', 'alternative memories, earned act thresholds and no full-clear requirement'],
