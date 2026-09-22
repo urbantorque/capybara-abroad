@@ -15,6 +15,10 @@ narrows and straightens the first-page sheet, and moves the key chart into
 Learn to Play. Animated capybara/world and title camera are unchanged.
 Touch gameplay controls hide until entry. No font downloads or raster assets.
 The public master version has not been changed by these Homecoming commits.
+M2c removes title slogans, duplicated mascot, button fill and paper shadow.
+The settings footnote moves into Learn to Play; portrait placement exposes
+the animated animal. All 60 suite gates and desktop/phone title plus returning
+atlas browser checks pass. Continue the remaining Homecoming work below.
 
 Pushed work covers subtractive score admission, four long-rest phrase
 prototypes, a five-lesson title/pause reference and sleeping scene-root

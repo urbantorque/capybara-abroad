@@ -1,3 +1,18 @@
+## HOMECOMING M2c — TITLE RESTRAINT (22 Sep 2026)
+
+Remove the slogan, explanatory sentence and duplicate mascot from the front
+page. Move the settings footnote into Learn to Play. Begin is a plain menu
+entry rather than a wide coloured form button; Free Roam retains its tooltip.
+Reduce the sheet width to 440px, remove its shadow/border, soften title tracking
+and move the portrait-phone sheet upward to expose the living animal below.
+Save totals remain in the atlas, not beside Carry on. No world/camera change,
+font fetch, save field or new per-frame term; no cut flag is needed.
+
+All 60 suite gates pass. Desktop title checks pass sixteen assertions, phone
+seventeen (including a new no-clutter assertion), returning atlas 35. Both
+title screenshots are inspected. This is an editorial reduction, not a claim
+of physical-device or subjective approval.
+
 ## HOMECOMING M2b — BOOK-FACE TITLE (22 Sep 2026)
 
 Replace the displayed angular stencil with a live two-line serif heading:

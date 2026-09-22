@@ -6555,7 +6555,7 @@ const sysLEARN = [
 // the nearest. The seat's collider top is 1.0 m; the animal stands at 1.34.
 const sysHOME_UI = {
   why: 'it is bringing a few things home. the rest can wait.',
-  begin: 'Begin the journey', free: 'Free roam', freeHint: 'all nineteen places, open from the start',
+  begin: 'Begin', free: 'Free roam', freeHint: 'all nineteen places, open from the start',
   firstGate: 'a Sydney memory opens the coast', actGate: 'two memories open the next act',
   ready: 'the way home is open', core: 'the big experience or the quieter route',
   freeSwitch: 'free roam: open every place', freeSaid: 'Every place is open. Everything kept stays.',
@@ -11434,30 +11434,38 @@ function sysBuildCSS() {
 '@media (max-height:520px){.capyui-task{font-size:10px;line-height:1.12;}}',
 /* HOMECOMING title: book lettering and a quieter first-page menu only. */
 '.capyui-title:not(.gone)~.capyui-touch{visibility:hidden;pointer-events:none;}',
-'.capyui-card:not(.two){max-width:520px;transform:none;border-radius:3px;',
-  'padding:clamp(24px,4vw,42px) clamp(24px,4vw,48px);background-image:none;',
-  'box-shadow:0 12px 42px ' + shadow2 + ';}',
+'.capyui-card:not(.two){max-width:440px;transform:none;border-radius:0;',
+  'padding:clamp(32px,4vw,52px) clamp(26px,4vw,44px);background-image:none;',
+  'border:0;box-shadow:none;}',
 '.capyui-card:not(.two):before{display:none;}',
 '.capyui-p1 .capyui-mast{display:flex;flex-direction:column;align-items:center;',
   'font-family:Georgia,"Times New Roman",serif;font-weight:400;line-height:1;',
   'margin:0;text-transform:none;letter-spacing:normal;}',
-'.capyui-word{font-size:clamp(45px,8.8vw,70px);letter-spacing:-.055em;',
+'.capyui-word{font-size:clamp(45px,8.8vw,62px);letter-spacing:-.035em;',
   'font-weight:400;line-height:1.12;}',
-'.capyui-abroad{font-size:clamp(18px,3.8vw,25px);letter-spacing:.35em;',
-  'text-transform:uppercase;margin:8px -.35em 0 0;font-weight:400;}',
+'.capyui-abroad{font-size:clamp(18px,3.8vw,22px);letter-spacing:.22em;',
+  'text-transform:uppercase;margin:10px -.22em 0 0;font-weight:400;}',
 '.capyui-p1 .capyui-sub{margin-top:22px;font-size:11px;line-height:1.6;',
   'letter-spacing:.08em;text-transform:none;font-weight:400;}',
 '.capyui-p1 .capyui-why{line-height:1.6;margin-top:6px;}',
 '.capyui-p1 .capyui-orn{margin:18px 0 4px;}',
-'.capyui-p1 .capyui-go,.capyui-p1 .capyui-carry{min-height:48px;border-radius:2px;}',
+'.capyui-p1 .capyui-go,.capyui-p1 .capyui-carry{min-height:48px;border-radius:0;',
+  'background:none;border-color:transparent;color:' + ink + ';transform:none;filter:none;}',
+'.capyui-p1 .capyui-mast+.capyui-go,.capyui-p1 .capyui-mast+.capyui-carry{margin-top:52px;}',
+'.capyui-p1 .capyui-go:hover,.capyui-p1 .capyui-carry:hover{background:' + veil2 + ';}',
+'.capyui-p1 .capyui-carryl b,.capyui-p1 .capyui-carryl i{color:' + ink + ';}',
+'.capyui-p1 .capyui-carryn{display:none;}',
+'.capyui-p1 .capyui-carry{justify-content:center;text-align:center;}',
 '.capyui-p1 .capyui-go b,.capyui-p1 .capyui-carryl b{',
   'font-family:Georgia,"Times New Roman",serif;font-size:18px;font-weight:400;}',
 '.capyui-p1 .capyui-go.alt{margin-top:6px;}',
 '.capyui-p1 .capyui-go i{font-size:10px;letter-spacing:.04em;text-transform:none;font-weight:400;}',
 '.capyui-p1 .capyui-more>summary{min-height:44px;display:flex;align-items:center;justify-content:center;}',
 '.capyui-p1 .capyui-title-keys{margin:16px auto;}',
-'@media (max-width:520px){.capyui-card:not(.two){padding:24px 22px;}',
+'@media (max-width:520px){.capyui-card:not(.two){padding:36px 22px;}',
   '.capyui-p1 .capyui-sub{margin-top:18px;}}',
+'@media (max-width:520px) and (orientation:portrait){',
+  '.capyui-card:not(.two){margin:clamp(24px,6vh,52px) auto auto;}}',
 /* HOMECOMING title end. */
 ''
   ].join('');
@@ -24654,19 +24662,7 @@ export function createSystems(game) {
     h1.appendChild(sysEl('span', 'capyui-abroad', 'Abroad'));
     p1El.appendChild(h1);
   }
-  p1El.appendChild(sysEl('div', 'capyui-sub',
-    'one capybara, ' + CHAPTERS.length + ' places, no supervision'));
-  // ---- THE SPINE, SAID ONCE (L3, E3) --------------------------------------
-  // Every chapter ends by putting one object at your feet and the finale
-  // lays nineteen of them on a lawn — and nothing ever said so. One line,
-  // under the subtitle, in the game's own voice: the quest is the keepsakes.
-  p1El.appendChild(sysEl('div', 'capyui-why',
-    sysHOME_UI.why));
-  {
-    const orn = sysEl('div', 'capyui-orn');
-    orn.appendChild(sysBuildCapyMark());
-    p1El.appendChild(orn);
-  }
+  // The living animal beside the menu is the illustration; no second mascot.
 
   // ---- WHAT IS ALREADY ON THE FILE ---------------------------------------
   // Read before anything is built: both the carry-on row and every per-chapter
@@ -24730,7 +24726,7 @@ export function createSystems(game) {
     jrHasFile ? 'Go somewhere else' : sysHOME_UI.free));
   if (!jrHasFile) {
     goEl.dataset.free = '1';
-    goEl.appendChild(sysEl('i', null, sysHOME_UI.freeHint));
+    goEl.setAttribute('title', sysHOME_UI.freeHint);
   }
   // TWO FILLED ACCENT BUTTONS ON ONE CARD IS NO HIERARCHY AT ALL, and as of T2
   // this one is ALWAYS the outline: on a fresh file the filled button above it
@@ -24833,7 +24829,7 @@ export function createSystems(game) {
   // every keyboard player looking for a control that cannot exist for them,
   // which is the one sin ROADMAP.md §3 was written about, committed by the
   // line that was supposed to answer it. Same door, three names for it.
-  p1El.appendChild(sysTitleFoot([],
+  p1El.querySelector('.capyui-more').appendChild(sysTitleFoot([],
     sysScheme('sound and settings are behind Esc, once you are in',
               'sound and settings are behind MENU, once you are in',
               'sound and settings are behind START, once you are in'),

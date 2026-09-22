@@ -623,6 +623,16 @@ lettering variants or physical devices have been evaluated.
 Validation: 60 suite gates, sixteen title assertions each on desktop/touch,
 35 returning-atlas assertions and 25 touch-reference assertions pass.
 
+### M2c: remove title-page clutter
+
+Remove the slogan, explanatory sentence, duplicate mascot and visible settings
+footnote. Keep the footnote inside Learn to Play. Plain menu entries replace
+the large filled button; the sheet is 440px wide with no shadow or border.
+Portrait placement leaves the animated capybara visible below it. The atlas,
+camera and world are unchanged. All 60 gates, sixteen desktop title checks,
+seventeen phone-emulated title checks and 35 returning-atlas checks pass.
+Screenshots are inspected. No extra asset, save field or per-frame effect.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
