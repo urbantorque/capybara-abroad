@@ -690,6 +690,31 @@ pass. Full nineteen-place and sustained release coverage remain outstanding.
 The build and all 61 suite gates pass, as do seventeen phone-title checks.
 Latest weekly allowance: 52% remaining; the 25% operational floor remains.
 
+### M2d / M3d: warmer title and earned Act II
+
+User refinement: retain a little decoration and relevant subtext rather than
+stripping the title to bare minimalism. Added one fine inset frame and the
+pooled line “Nineteen places. One unhurried capybara.” Serif lettering, plain
+menu controls and the living background remain. No additional scene effect,
+audio term, asset, save field or per-frame work. Nineteen headful title checks
+pass at both desktop and phone widths; both screenshots inspected.
+
+The first-act real-key driver earns Sydney's hat and picnic memory in 18.555s,
+then Quay's helm and bridge horn in 33.770s including travel. Act II opens
+exactly chapters 1,2,3,5,6,14,15 and remains open after reload. No task awards,
+teleports or physics edits. Travel uses the public crossing API, navigation
+uses authored coordinates; this is earned mechanics evidence, not novice
+discovery or an entirely UI-driven journey. Manly docking is not covered.
+
+Two prior runs failed at the picnic approach. Their traces and screenshots
+show the simple driver pushing against the garden hedge. The instrument now
+routes round the authored north end when crossing that bed, and expands
+bounded detours; production obstacles and rewards are unchanged. Evidence:
+qa/homecoming-first-act-v3.json.png; earlier failed v1/v2 files retained.
+Next: remaining performance routes and regional music arrangement, then the
+interactive learning/opening work. Full roadmap and release gates remain open.
+Syntax, build and all 61 suite gates pass. Weekly allowance remains 52%.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

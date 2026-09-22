@@ -2,6 +2,13 @@
 
 ## Homecoming continuation (22 Sep, newer than the closed twelve-hour pass)
 
+M2d follows the user's request for some tasteful decoration: one inset title
+frame and one italic travel line, preserving the live scene. Desktop/phone
+each pass nineteen title checks. M3d earns Sydney and Quay memories with real
+keys, opens Act II and verifies reload persistence. Two earlier driver runs
+hit a hedge; the driver now uses its north-end path. No production obstacle
+or task was weakened. See roadmap checkpoint for scope/evidence limitations.
+
 The user approved ROADMAP-HOMECOMING and autonomous milestone delivery.
 Work is on codex/homecoming; master stays published until a coherent release
 candidate passes hosted checks. The continuation heartbeat now tracks this

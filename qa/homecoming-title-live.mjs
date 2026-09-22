@@ -27,7 +27,12 @@ try {
   check(await p.locator('.capyui-touch').evaluate(el => getComputedStyle(el).visibility === 'hidden'), 'gameplay controls do not clutter title');
   check(await p.locator('.capyui-p1>.capyui-legend').count() === 0, 'reference off first page');
   check(!await p.locator('.capyui-title-keys').isVisible(), 'keys folded initially');
-  check(await p.locator('.capyui-p1>.capyui-sub,.capyui-p1>.capyui-why,.capyui-p1>.capyui-orn,.capyui-p1>.capyui-foot').count() === 0, 'opening contains no slogan, duplicated mascot or footer');
+  check(await p.locator('.capyui-p1>.capyui-why,.capyui-p1>.capyui-orn,.capyui-p1>.capyui-foot').count() === 0, 'no duplicated mascot or extra copy');
+  check(await p.locator('.capyui-p1>.capyui-sub').textContent() === 'Nineteen places. One unhurried capybara.', 'one relevant subtitle');
+  check(await p.locator('.capyui-card').evaluate(el => {
+    const s = getComputedStyle(el, '::before');
+    return s.display !== 'none' && parseFloat(s.borderTopWidth) > 0 && s.pointerEvents === 'none';
+  }), 'fine frame never blocks input');
   for (const selector of ['.capyui-p1 .capyui-go', '.capyui-p1 .capyui-more>summary']) {
     const r = await p.locator(selector).first().boundingBox();
     check(r.height >= 44 && r.y >= 0 && r.y + r.height <= (touch ? 844 : 760), 'menu target visible and usable');

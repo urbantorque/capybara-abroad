@@ -6554,6 +6554,7 @@ const sysLEARN = [
 // one static mesh and published nowhere), so beat three can put the arrow on
 // the nearest. The seat's collider top is 1.0 m; the animal stands at 1.34.
 const sysHOME_UI = {
+  subtitle: 'Nineteen places. One unhurried capybara.',
   why: 'it is bringing a few things home. the rest can wait.',
   begin: 'Begin', free: 'Free roam', freeHint: 'all nineteen places, open from the start',
   firstGate: 'a Sydney memory opens the coast', actGate: 'two memories open the next act',
@@ -11437,7 +11438,9 @@ function sysBuildCSS() {
 '.capyui-card:not(.two){max-width:440px;transform:none;border-radius:0;',
   'padding:clamp(32px,4vw,52px) clamp(26px,4vw,44px);background-image:none;',
   'border:0;box-shadow:none;}',
-'.capyui-card:not(.two):before{display:none;}',
+'.capyui-card:not(.two):before{display:block;content:"";position:absolute;inset:10px;',
+  'border:1px solid ' + ink + ';border-radius:0;opacity:.22;transform:none;z-index:0;animation:none;',
+  'background:none;box-shadow:none;pointer-events:none;}',
 '.capyui-p1 .capyui-mast{display:flex;flex-direction:column;align-items:center;',
   'font-family:Georgia,"Times New Roman",serif;font-weight:400;line-height:1;',
   'margin:0;text-transform:none;letter-spacing:normal;}',
@@ -11445,8 +11448,9 @@ function sysBuildCSS() {
   'font-weight:400;line-height:1.12;}',
 '.capyui-abroad{font-size:clamp(18px,3.8vw,22px);letter-spacing:.22em;',
   'text-transform:uppercase;margin:10px -.22em 0 0;font-weight:400;}',
-'.capyui-p1 .capyui-sub{margin-top:22px;font-size:11px;line-height:1.6;',
-  'letter-spacing:.08em;text-transform:none;font-weight:400;}',
+'.capyui-p1 .capyui-sub{margin:20px 0 26px;font-size:13px;line-height:1.6;',
+  'font-family:Georgia,"Times New Roman",serif;font-style:italic;',
+  'letter-spacing:normal;text-transform:none;font-weight:400;color:' + ink + ';}',
 '.capyui-p1 .capyui-why{line-height:1.6;margin-top:6px;}',
 '.capyui-p1 .capyui-orn{margin:18px 0 4px;}',
 '.capyui-p1 .capyui-go,.capyui-p1 .capyui-carry{min-height:48px;border-radius:0;',
@@ -24667,6 +24671,7 @@ export function createSystems(game) {
     h1.appendChild(document.createTextNode(' '));
     h1.appendChild(sysEl('span', 'capyui-abroad', 'Abroad'));
     p1El.appendChild(h1);
+    p1El.appendChild(sysEl('p', 'capyui-sub', sysHOME_UI.subtitle));
   }
   // The living animal beside the menu is the illustration; no second mascot.
 
