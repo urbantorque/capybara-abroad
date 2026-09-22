@@ -1472,6 +1472,24 @@ counterevidence. No production disposal, warm-up or audio change is justified
 by these passes, and public master remains held pending a bounded recovery or
 more decisive crash evidence.
 
+### M1x: trusted title pointer enters the earned route
+
+The QA harness now has an opt-in real Playwright click on the saved-file
+"Carry on" button. Unlike its normal synthetic DOM click, this fires the
+title's pointer-down audio path before restore. The 24-task Kyoto exact-save
+fixture passed two such reload/starts, its five rapid cross-place arrivals,
+and the final reload with ten checkpoints and no browser errors. This is a
+fast fixture, not earned play.
+
+One fresh, single-context Story route (pointer-v2) then earned Sydney, Quay,
+Pasto, Pantanal and Kyoto and restored Kyoto after the final reward. All five
+gates passed with 23 persisted tasks, four observed trusted title pointer-down
+events across route reloads, a running audio context after entry and no page
+or target errors. The earlier Chromium crashes were intermittent, and this
+one pass does not prove the pointer path safe on all browsers or cure their
+cause. No production audio or reload lifecycle changed. The title/start
+sequence and public-master promotion remain under the existing release gate.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

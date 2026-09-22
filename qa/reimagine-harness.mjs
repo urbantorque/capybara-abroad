@@ -113,7 +113,11 @@ export async function openHarness({ url = 'http://localhost:5188/',
       try { await page.waitForTimeout(ms); } finally { await page.keyboard.up(key); }
     };
     const start = async () => {
-      await page.evaluate(story => {
+      if (process.env.CAPY_QA_TRUSTED_START === '1' && await page.locator('.capyui-carry').count()) {
+        // A real pointer gesture exercises titleAudio before the carry click.
+        // Only the opt-in QA variant changes input; normal drivers stay exact.
+        await page.locator('.capyui-carry').click();
+      } else await page.evaluate(story => {
         const carry = document.querySelector('.capyui-carry');
         const free = document.querySelector('.capyui-go[data-free]');
         // World probes need open travel. Choose the actual Free Roam door;
