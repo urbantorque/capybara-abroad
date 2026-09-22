@@ -1377,6 +1377,42 @@ effect worthwhile. Continue with composition, silhouette and grounding
 prototypes, preserving the admired reflections. No human visual preference
 panel or device coverage was obtained.
 
+### M1u: all-place musical-space timing, not listening approval
+
+The 12 non-band locations (Sydney, Quay, Kyoto, Hanoi, Iceland, Drift,
+Palawan, Goreme, Manly, Pantanal, Cave and Antarctica) each scheduled two
+observed lead/colour phrases in a foreground headful browser. All 12 probes
+passed live AudioContext, focus, zero scheduler throws, full tail and reserved
+rest assertions; observed rests span 20–42 seconds. The seven regional-band
+locations (Pasto, Cali, Rio, Sahara, Venice, Kowloon, Monaco) retain their
+earlier two-window live audit, all passing. This covers all 19 places for
+clock/admission behaviour; it does not measure musical beauty, local cultural
+fit, subjective mix or headphone/laptop fatigue. Human listening is open.
+
+### M1v: long-route reload crash narrows, cause still open
+
+A QA-only exact-save fixture cold-started the 24-task Kyoto checkpoint, then
+reloaded, traversed Sydney/Quay/Pasto/Pantanal/Kyoto via the public chapter
+fixture and reloaded again in one Edge context. All ten checkpoints passed
+without a target crash; peak observed renderer counters were 534 resident
+geometries and 116 programs. These are WebGL counters, not VRAM bytes. Fast
+arrivals alone do not reproduce the failure.
+
+An earned-route retry from the Pantanal checkpoint (resumed-v10) completed
+Kyoto and reloaded successfully, then earned all three Hanoi tasks, including
+three actual bowl deliveries. The renderer crashed after Hanoi reload at the
+title start wait; 29 earned tasks were preserved. A second earned-route retry
+in headful Chrome 153 (chrome-v11) crashed at the Kyoto title start wait with
+24 earned tasks. Both are Chromium process crashes with the same CDP code
+-2147483645, not caught JavaScript exceptions. The Kyoto driver now writes
+pre-reload renderer/heap counters and an after-navigation marker. In the Chrome
+failure, navigation finished and the new title button existed; the crash
+followed the start attempt. The same saved state starts in a fresh context,
+so save corruption is not demonstrated. Exact cause, frequency, browser
+coverage beyond these builds, and a production fix remain open. Do not promote
+this candidate to public master while the repeated long-route reload crash
+has no safe resolution or bounded recovery.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

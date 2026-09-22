@@ -197,7 +197,22 @@ try {
   assert.equal(report.saved.gate.enough, true);
   report.keys = await h.page.evaluate(() => window.__naturalKeys);
   assert.ok(report.keys.length > 0 && report.keys.every(key => key.trusted), 'all controls were trusted keys');
-  await h.page.reload(); await h.start();
+  // If Edge dies at this boundary, keep a pre-reload resource row and an
+  // after-navigation marker. They distinguish navigation from start/click.
+  report.reload = { before: await h.page.evaluate(() => {
+    const g = window.__capy;
+    return { at: performance.now(), frames: g.state.frames, chapter: g.biome.current,
+      tasks: JSON.parse(localStorage.getItem('capy3.journey.v1') || '{}').tasks?.length,
+      renderer: { memory: { ...g.renderer.info.memory }, programs: g.renderer.info.programs.length },
+      heap: performance.memory?.usedJSHeapSize ?? null };
+  }) };
+  await h.result(name + '-pre-reload', report);
+  await h.page.reload({ waitUntil: 'load' });
+  report.reload.afterNavigation = await h.page.evaluate(() => ({
+    at: performance.now(), ready: !!window.__capy,
+    button: !!document.querySelector('.capyui-go, .capyui-carry') }));
+  await h.result(name + '-after-navigation', report);
+  await h.start();
   const resumed = await sample('earned Kyoto memory resumed');
   assert.ok(ids.every(id => resumed.tasks[id]) && resumed.gate.enough, 'route memory survives reload');
   assert.ok(report.steps.every(row => !row.hidden && !row.paused));
@@ -210,8 +225,10 @@ try {
   await release();
   try { await sample('failure'); } catch {}
   report.failure = String(error.stack || error);
-  if (!report.keys.length) report.keys = await h.page.evaluate(() => window.__naturalKeys || []);
+  if (!report.keys.length) {
+    try { report.keys = await h.page.evaluate(() => window.__naturalKeys || []); } catch {}
+  }
   try { await h.screenshot(name + '-failure'); } catch {}
   await h.result(name + '-failure', report);
   throw error;
-} finally { await h.close(); }
+} finally { try { await h.close(); } catch {} }
