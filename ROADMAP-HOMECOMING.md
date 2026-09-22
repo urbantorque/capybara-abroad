@@ -522,6 +522,32 @@ program/idle categories are larger and are not attributed to a specific
 effect. Next performance candidate: safely avoid redundant static transform
 work, verified against moving rigs and chapter transitions before shipping.
 
+### M1c: park sleeping scene roots
+
+The bundled Three.js always recurses through children in updateMatrixWorld;
+the old matrixWorldAutoUpdate=false root flag did not stop that traversal.
+Sleeping chapter roots are now removed from the scene and restored through
+the untagged add function. Visibility is retained, repeated detaches are
+idempotent, removed props are disowned, and a new parent is never stolen.
+Explicit off-scene matrix queries still work. Batched scene.add calls no
+longer duplicate ownership; body restoration also bypasses capture.
+
+17 tests execute the shipped owner against the bundled Three.js, including
+moving children, hidden effects, discard, reparenting and failed-build retry.
+Six headful visits across Sydney, Hanoi, Kyoto and Venice pass. A same-scene
+matrix A/B/B/A reduces visits from 2,097 to 933; median walk CPU is
+0.5/0.2/0.2/0.4 ms. This isolates matrix traversal, not whole-frame pacing.
+Reflections still draw in Hanoi and Kyoto; screenshots are inspected.
+The build and all 58 suite checks pass. All nineteen arrivals plus Sydney
+and Hanoi return visits pass with no attached sleeping roots, finite player
+positions and no runtime errors. The repeat matrix comparison is
+2,096/932/932/2,096 visits, median 0.6/0.2/0.2/0.5 ms. Late-loop frame
+p95 still reaches 63.3 ms in Cave and 50–55 ms in Antarctica/Monaco/Hanoi,
+before the last Hanoi return recovers to 27.2 ms. These three-second windows
+are lifecycle evidence, not a sustained smoothness pass; the variability
+remains open. No visual quality cut,
+save field or audio writer is added; no new per-frame feature or cut flag.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

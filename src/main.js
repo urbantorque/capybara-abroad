@@ -275,7 +275,7 @@ function mainMakeBiomes(game) {
 
   function setOf(name) {
     let s = sets.get(name);
-    if (!s) { s = { objects: [], bodies: [], vis: [], api: null, built: false }; sets.set(name, s); }
+    if (!s) { s = { objects: [], bodies: [], vis: [], parked: new Set(), api: null, built: false }; sets.set(name, s); }
     return s;
   }
 
@@ -284,7 +284,8 @@ function mainMakeBiomes(game) {
     const r = rawSceneAdd(...objs);
     if (captureTag) {
       const s = setOf(captureTag);
-      for (let i = 0; i < objs.length; i++) if (objs[i] && objs[i].isObject3D) s.objects.push(objs[i]);
+      // Object3D.add(a, b) calls this.add again for each argument.
+      for (let i = 0; i < objs.length; i++) if (objs[i] && objs[i].isObject3D && !s.objects.includes(objs[i])) s.objects.push(objs[i]);
     }
     return r;
   };
@@ -560,7 +561,7 @@ function mainMakeBiomes(game) {
     /** Manual tagging escape hatch for anything built outside scene.add. */
     claim(name, thing) {
       const s = setOf(name);
-      if (thing && thing.isObject3D) s.objects.push(thing);
+      if (thing && thing.isObject3D) { if (!s.objects.includes(thing)) s.objects.push(thing); }
       else if (thing) s.bodies.push(thing);
     },
     // ---- THE OPPOSITE OF CLAIM (L4) ---------------------------------------
@@ -583,6 +584,7 @@ function mainMakeBiomes(game) {
         const i = arr.indexOf(thing);
         if (i < 0) continue;
         arr.splice(i, 1);
+        if (obj) s.parked.delete(thing);
         if (obj && s.vis && s.vis.length > i) s.vis.splice(i, 1);
       }
     },
@@ -621,27 +623,25 @@ function mainMakeBiomes(game) {
         // back on the way in. Anything added to the set while the chapter was
         // away has no remembered value and correctly defaults to visible.
         if (on) {
+          // Restore only roots this owner removed. A carried/reparented object
+          // belongs to its new parent; a disowned prop must never return.
+          if (s.parked.delete(o) && !o.parent) rawSceneAdd(o);
           o.visible = (s.vis && s.vis[i] !== undefined) ? s.vis[i] : true;
         } else {
+          if (s.parked.has(o)) continue;
           if (!s.vis) s.vis = [];
           s.vis[i] = o.visible;
           o.visible = false;
+          if (o.parent === game.scene) {
+            game.scene.remove(o);
+            s.parked.add(o);
+          }
         }
-        // ...AND THE MATRIX WALK HAS TO BE TOLD SEPARATELY.
-        // `visible = false` takes a subtree out of the RENDER traversal and
-        // nothing else. Object3D.updateMatrixWorld() does not consult it: it
-        // recurses into every child whose matrixWorldAutoUpdate is true and
-        // re-composes the local matrix of anything with matrixAutoUpdate on.
-        // Measured with all nineteen chapters resident, the walk visited all
-        // 4,500 objects every frame, of which 4,262 belonged to the eighteen
-        // chapters nobody was looking at; setting this drops it to 239.
-        // The cost per object is small — this is hygiene that scales with the
-        // chapter count rather than a saving you can feel today.
-        // THE ONE RULE THIS CREATES: anything reading a DETACHED chapter's
-        // world matrices must force the update itself with
-        // obj.updateMatrixWorld(true). Nothing does at present, and that is
-        // the failure this line would cause if something ever started.
-        o.matrixWorldAutoUpdate = on;
+        // The bundled Three.js traverses children even when a root has
+        // matrixWorldAutoUpdate=false. Removing sleeping roots stops that
+        // work without freezing any live rig, reflection or moving vehicle.
+        // Keep automatic matrices on: an explicit off-scene query still works.
+        o.matrixWorldAutoUpdate = true;
       }
       // MEMBERSHIP ONCE, NOT ONCE PER BODY. This was a linear scan of
       // world.bodies inside a loop over the chapter's own bodies — a few
@@ -653,7 +653,7 @@ function mainMakeBiomes(game) {
       const inWorld = new Set(game.world.bodies);
       for (let i = 0; i < s.bodies.length; i++) {
         const b = s.bodies[i];
-        if (on) { if (!inWorld.has(b)) { game.world.addBody(b); inWorld.add(b); } }
+        if (on) { if (!inWorld.has(b)) { (rawAddBody || game.world.addBody.bind(game.world))(b); inWorld.add(b); } }
         else { if (inWorld.has(b)) { game.world.removeBody(b); inWorld.delete(b); } }
       }
     },
@@ -732,6 +732,7 @@ function mainMakeBiomes(game) {
             if (o && o.parent) o.parent.remove(o);
           }
           toSet.objects.length = 0;
+          toSet.parked.clear();
           toSet.bodies.length = 0;
           toSet.vis = null;
           biome.attach(from, true);

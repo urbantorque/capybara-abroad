@@ -27,6 +27,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
 const ASSERTS = [
+  ['qa/homecoming-biome-parking.mjs', 'sleeping scene traversal, returning rigs and owner rollback'],
   ['qa/homecoming-space.mjs', 'phrase-rest boundaries, alternating local colour and protected cues'],
   ['qa/homecoming-learning-contract.mjs', 'five reference lessons, live input wording and keyboard isolation'],
   ['qa/homecoming-serene.mjs', 'serene score admission, inherited cut and all quality rungs'],

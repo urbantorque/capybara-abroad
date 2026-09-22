@@ -1,5 +1,23 @@
 # HANDOFF — state of play, 21 Sep 2026
 
+## Homecoming continuation (22 Sep, newer than the closed twelve-hour pass)
+
+The user approved ROADMAP-HOMECOMING and autonomous milestone delivery.
+Work is on codex/homecoming; master stays published until a coherent release
+candidate passes hosted checks. The continuation heartbeat now tracks this
+roadmap, not the expired REIMAGINE loop. Weekly allowance was 57% remaining
+at approval, 55% at M1c; stop new work at 25% remaining and preserve the
+user's 20% reserve. Check the live account between milestones.
+
+Pushed work covers subtractive score admission, four long-rest phrase
+prototypes, a five-lesson title/pause reference and sleeping scene-root
+ownership. M1c runs all nineteen arrivals and two returns, with 58 suite
+checks passing. CPU matrix traversal is reduced; whole-frame targets remain
+unmet in some samples. Interactive practice, five-act progression, opening,
+returns, global art rollout and release validation remain work to do.
+Do not call reference lessons interactive practice, scheduler probes listening
+approval, or short arrival windows a sustained performance certification.
+
 ## Pages integration (22 Sep)
 
 The user approved merging the redesign into master and checking the public

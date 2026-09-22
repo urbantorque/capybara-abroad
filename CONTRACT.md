@@ -1,3 +1,19 @@
+## HOMECOMING M1c — SLEEPING SCENE OWNERSHIP (22 Sep 2026)
+
+Detach sleeping chapter roots instead of relying on matrixWorldAutoUpdate:
+the bundled Three.js traverses descendants even when that flag is false.
+Restore through the raw scene/body add methods, retaining hidden effects,
+disowned props, new parents and failed-build rollback. Batched scene additions
+are deduplicated. No quality cut, per-frame feature, save field or audio writer.
+
+17 real-Three ownership checks and all 58 suite gates pass. Headful travel
+through all nineteen places and two returns reports zero sleeping roots in
+the scene, finite player positions and zero runtime errors. A same-scene
+matrix A/B/B/A visits 2,096/932/932/2,096 objects; median CPU is
+0.6/0.2/0.2/0.5 ms. This is matrix-walk attribution, not a whole-frame claim.
+Late-loop frame p95 reaches 50–63.3 ms before recovering on return; that
+performance variability remains open. See ROADMAP-HOMECOMING M1c.
+
 ## HOMECOMING M1b — FOUR PHRASE-SPACE PROTOTYPES (22 Sep 2026)
 
 Sydney, Kyoto, Iceland and Hanoi use an audio-clock admission window for
