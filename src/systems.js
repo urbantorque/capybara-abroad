@@ -21515,6 +21515,12 @@ export function createSystems(game) {
     }
   }
 
+  // Calm arrangements remove accompaniment, never a bar or its beat clock.
+  // The inherited cut and active set-pieces retain the full authored band.
+  function musSereneBand(activity) {
+    return !game.state.noSereneScore && musChaseT <= 0 && musIntensity < 0.25 && !(activity > 0.35);
+  }
+
   /** One 6/8 bar of the rhythm section, on whichever chord is live at that time. */
   function musBar(t0, rh) {
     const chord = (t0 < musChordStart && musPrevChord) ? musPrevChord : musCurChord;
@@ -21522,6 +21528,7 @@ export function createSystems(game) {
     const lvl = 0.75 + musIntensity * 0.35;
     for (let i = 0; i < rh.length; i++) {
       const e = rh[i];
+      if (musSereneBand() && e.k !== 1 && e.t !== 0 && e.t !== 3) continue;
       const w = t0 + e.t * sysMUS_EIGHTH;
       const F = e.k === 1 ? sysMUS_F_KICK : sysMUS_F_COMP;
       if (e.k === 1) musBombo(musFeel(w, F.s, F.b), musVel(e.v * lvl));
@@ -21592,7 +21599,7 @@ export function createSystems(game) {
     // untouched, so `game.music.beats()` runs straight through it. Cali's
     // `salsa-dance` is scored on `game.music.off()` (capybara.js:4015) and a
     // break that moved the clock would fail the chapter's own task.
-    if (!brk)
+    if (!brk && !musSereneBand())
     for (let e = 0; e < sysMUS_SALSA_BAR; e += (chase ? 1 : 2)) {
       musCampana(musFeel(t0 + e * E, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b),
                  musVel((e % 4 === 0 ? 0.9 : e % 2 === 0 ? 0.55 : 0.42) * lvl)); musBandHits++;
@@ -21619,7 +21626,7 @@ export function createSystems(game) {
     //     something is actually going on. Sparse is the point — a section that
     //     plays every bar is a fanfare, not a band... until the mambo, where
     //     the section plays every bar, because that is what a mambo is.
-    if (chase || (half === 1 && (musIntensity > 0.25 || Math.random() < 0.22))) {
+    if (chase || (!musSereneBand() && half === 1 && (musIntensity > 0.25 || Math.random() < 0.22))) {
       musBrassStab(musFeel(t0 + (chase && half === 0 ? 3 : 6) * E, sysMUS_F_LEAD.s, sysMUS_F_LEAD.b), chord,
                    musVel((0.55 + musIntensity * 0.6) * lvl)); musBandHits++;
     }
@@ -21686,6 +21693,7 @@ export function createSystems(game) {
     // --- caixa, every sixteenth — and in the break, every thirty-second: the
     //     roll, with the accents where they were and the off-strokes under
     for (let e = 0; e < sysMUS_SAMBA_BAR; e++) {
+      if (musSereneBand() && e % 2) continue; // retain accented caixa, lose the busy off-strokes
       musCaixa(musFeel(t0 + e * S, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b),
                musVel(sysMUS_CAIXA[e] * lvl)); musBandHits++;
       if (chase) {
@@ -21708,7 +21716,7 @@ export function createSystems(game) {
       }
     }
     // --- agogo
-    for (let i = 0; i < sysMUS_AGOGO.length; i++) {
+    for (let i = 0; !musSereneBand() && i < sysMUS_AGOGO.length; i++) {
       const a = sysMUS_AGOGO[i];
       musAgogo(musFeel(t0 + a.t * S, sysMUS_F_HAND.s, sysMUS_F_HAND.b), a.h, musVel(a.v * lvl)); musBandHits++;
     }
@@ -22265,7 +22273,7 @@ export function createSystems(game) {
       }
     }
     // --- the ride, and the brushes under it
-    for (let i = 0; i < sysMUS_BOND_RIDE.length; i++) {
+    for (let i = 0; !musSereneBand(heat) && i < sysMUS_BOND_RIDE.length; i++) {
       const r = sysMUS_BOND_RIDE[i];
       musRide(musFeel(t0 + r.t * S, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b), musVel(r.v * lvl)); musBandHits++;
       // the chase doubles the ride: the skip on every beat, not two and four
@@ -22484,6 +22492,7 @@ export function createSystems(game) {
     // the harpsichord is what the water takes away
     if (tide < 0.92) {
       for (let i = 0; i < sysMUS_CEMBALO.length; i++) {
+        if (musSereneBand() && i > 0) continue; // one chord, then the cello has room
         const c = sysMUS_CEMBALO[i];
         if (tide > 0.35 && i > 1 && Math.random() < tide) continue;
         // A harpsichord has NO DYNAMIC — that is the note above musCembalo and
@@ -22534,6 +22543,7 @@ export function createSystems(game) {
       if (chase) { musHkSnare(t0 + (k.t - 1) * S, 0.35 * lvl); musBandHits++; }
     }
     for (let e = 0; e < sysMUS_HK_BAR; e++) {
+      if (musSereneBand(show) && e % 4) continue;
       const v = sysMUS_HK_HAT[e];
       if (v > 0) { musHkHat(t0 + e * S, v * lvl, e === 14); musBandHits++; }
       else if (chase || (show > 0.5 && e % 2 === 1)) { musHkHat(t0 + e * S, 0.3 * lvl * (chase ? 1 : show), false); musBandHits++; }
@@ -22547,6 +22557,7 @@ export function createSystems(game) {
       if (chase && b.o === 0) { musHkBass(t0 + (b.t + 1) * S, root + 12, 0.5 * lvl); musBandHits++; }
     }
     for (let e = 0; e < sysMUS_HK_BAR; e++) {
+      if (musSereneBand(show) && e % 4) continue; // keep the grid, leave room for guzheng
       const step = sysMUS_HK_ARP[(e + bar * 3) % sysMUS_HK_ARP.length];
       const midi = musFold(root + 24 + sysMUS_HK_YU[step], 62, 86);
       musHkArp(t0 + e * S, midi, musVel((e % 2 === 0 ? 1 : 0.62) * lvl), show); musBandHits++;
@@ -22625,7 +22636,7 @@ export function createSystems(game) {
                  root + sysMUS_GUEMBRI_P[gq.d], musVel(gq.v * lvl * open)); musBandHits++;
     }
     // --- the drum
-    for (let i = 0; i < sysMUS_TBEL.length; i++) {
+    for (let i = 0; !musSereneBand(build) && i < sysMUS_TBEL.length; i++) {
       const tb = sysMUS_TBEL[i];
       musTbel(musFeel(t0 + tb.t * P, sysMUS_F_KICK.s, sysMUS_F_KICK.b), musVel(tb.v * lvl * open)); musBandHits++;
       if (dbl > 0.45 && tb.t === 0) {
@@ -22634,7 +22645,7 @@ export function createSystems(game) {
       }
     }
     // --- and the hands, only when something is going on
-    if (build > 0.2) {
+    if (build > 0.2 && !musSereneBand(build)) {
       for (let i = 0; i < sysMUS_GNAWA_CLAP.length; i++) {
         // Hands scatter MORE than anything else in a band — a room clapping is
         // a dozen people, not one — so this is the one place the spread is

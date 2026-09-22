@@ -715,6 +715,45 @@ Next: remaining performance routes and regional music arrangement, then the
 interactive learning/opening work. Full roadmap and release gates remain open.
 Syntax, build and all 61 suite gates pass. Weekly allowance remains 52%.
 
+### M1f: regional accompaniment admission
+
+The earlier M1d checkpoint left regional arrangements unchanged. This pass
+deliberately extends calm admission to those arrangements and Pasto's rhythm,
+without changing authored note/chord/root/dwell/instrument rows. Pasto keeps
+both bombo beats and charango on the two dotted quarters; Cali keeps clave,
+congas, tumbao and montuno; Rio keeps surdo, tamborim, bass and cavaquinho.
+Venice gives the cello more space between harpsichord chords. Kowloon's
+kick/snare/bass grid and guzheng remain, with hats/arp reduced to quarter-note
+admissions. Monaco loses the ride in quiet passages; Sahara retains qraqeb
+and guembri while accompaniment waits for activity.
+
+The existing noSereneScore cut restores all events. Chase, intensity >=.25
+and relevant set-piece activity >.35 restore the full arrangement. Scheduling
+and gameplay beat clocks, nearby musician movers and all AudioParam writers
+are untouched. This subtractive policy adds no node and applies at all quality
+rungs; no additional flag or save field. Forty-seven deterministic checks
+execute the shipped seven arrangements: 14–45% fewer note events at rest,
+with protected instrument events and all chase/high-intensity events identical.
+These are admission measurements, not listening approval.
+
+Live A/B windows across all seven places pass with running audio, foreground
+focus and no errors. Six band clocks advance continuously. Hits per bar fall
+from 17.86 to 14.29 (Cali), 26.76 to 17 (Rio), 22 to 19 (Sahara), 9 to 7.4
+(Venice), 37 to 20 (Kowloon), and 19.5 to 17.71 (Monaco). Short sequential
+windows have differing world activity; they are not controlled listening
+comparisons. Pasto has no band counter and is covered by instrument-event
+tests plus live audio smoke. Syntax/build and all 62 suite gates pass.
+
+### Additional P0 routes
+
+Ninety-second Auto samples, focused reference Edge at 1280x760: Kyoto p95
+still/walk/rest 22.5/23.1/23.7ms, Kowloon 22.1/26.7/21.4ms, Monaco
+21.8/24.3/23.8ms. No >100ms intervals or runtime errors in those runs. Kyoto
+has one 51.7ms CPU event (48ms draw, no added program); Monaco one 69ms CPU
+event (44.4ms systems). All still miss the 20ms p95 target. These are fixed
+key routes, not full task/ride/contact coverage. Investigate the isolated
+systems hitch before attributing it to any particular UI or audio operation.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

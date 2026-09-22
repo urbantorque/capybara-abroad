@@ -2,6 +2,13 @@
 
 ## Homecoming continuation (22 Sep, newer than the closed twelve-hour pass)
 
+M1f extends quiet accompaniment admission to six regional bands and Pasto.
+Forty-seven event checks preserve core rhythm voices and chase/high-intensity
+arrangements. Seven headful audio visits pass; all six band clocks advance.
+No listening preference claim. Kyoto/Kowloon/Monaco 90-second Auto routes pass
+error/focus checks but miss 20ms p95. Monaco has an isolated systems hitch;
+qa/homecoming-profile.mjs is the next attribution diagnostic, not an FPS test.
+
 M2d follows the user's request for some tasteful decoration: one inset title
 frame and one italic travel line, preserving the live scene. Desktop/phone
 each pass nineteen title checks. M3d earns Sydney and Quay memories with real
