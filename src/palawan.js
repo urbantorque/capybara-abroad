@@ -2719,6 +2719,9 @@ function palBuildManta(root) {
   // palVC is shared by the buildings. Only this private standard Lambert
   // variant reads the skin's smooth normals; noRound uses the old material.
   palMantaSmoothMat = palVC(true); palMantaSmoothMat.flatShading = false;
+  // Auto may enter on a cheaper rung, then reveal the smooth skin later.
+  // Warm that dormant variant too: its first appearance otherwise links live.
+  mesh.userData.warmMaterials = [palMantaSmoothMat];
   register(mesh, bodyLive, bodyAnatomy);
   mesh.castShadow = true;
   palMantaGroup = new THREE.Group();

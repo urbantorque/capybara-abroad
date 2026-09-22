@@ -19,10 +19,15 @@ function el(tag, cls, text) {
     appendChild(child) { this.children.push(child); },
     addEventListener(name, fn) { this.events[name] = fn; } };
 }
-const q = vm.createContext({ sysEl: el, sysSay: s => s, mode: 'keyboard',
+const q = vm.createContext({ sysEl: el, sysSay: s => s, mode: 'keyboard', homecomingArc: true,
+  learnShopPractice: () => el('div', 'capyui-learnshop'),
   sysScheme: (keyboard, touch, pad) => q.mode === 'touch' ? touch : q.mode === 'pad' ? pad : keyboard });
 vm.runInContext(data[0] + '\n' + s.slice(at, end + 1), q);
 const guide = q.learnGuide();
+assert(guide.children[2].children[1].textContent.includes('quieter route'));
+q.homecomingArc = false; guide.children[2].events.toggle();
+assert(!guide.children[2].children[1].textContent.includes('Two memories'));
+q.homecomingArc = true;
 assert.equal(guide.children.length, 5);
 let checks = 1;
 for (const [i, lesson] of guide.children.entries()) {

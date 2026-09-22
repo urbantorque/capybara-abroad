@@ -5,6 +5,28 @@ const touch = process.argv.includes('--touch');
 const h = await openHarness(touch ? { width: 390, height: 844, hasTouch: true, isMobile: true } : {});
 const out = { touch, metadata: h.metadata, checks: 0 };
 function check(ok, why) { assert(ok, why); out.checks++; }
+async function rehearse(guide) {
+  const lesson = guide.locator('.capyui-learnlesson').nth(3);
+  if (await lesson.getAttribute('open') === null) await lesson.locator('summary').click();
+  const saved = () => h.page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('capy3.journey.v1') || 'null');
+    return s ? { yuzu:s.yuzu, owned:s.owned, tasks:s.tasks } : null;
+  });
+  const before = await saved(), started = await h.page.evaluate(() => window.__capy.state.started);
+  await lesson.locator('.capyui-practice-open').click();
+  const buy = lesson.locator('.capyui-practice-buy');
+  check(await buy.isDisabled(), 'practice price initially unaffordable');
+  await lesson.locator('.capyui-practice-collect').focus(); await h.page.keyboard.press('Enter');
+  check(!await buy.isDisabled(), 'practice collection makes real-price preview affordable');
+  await buy.click();
+  check(await lesson.locator('.capyui-practice-wallet').textContent() === 'Practice wallet: 0 yuzu', 'practice subtracts displayed price');
+  check(await buy.isDisabled(), 'no double purchase');
+  check((await lesson.locator('.capyui-practice-status').textContent()).includes('unchanged'), 'rehearsal clearly labelled');
+  await lesson.locator('.capyui-practice-reset').click();
+  check(await buy.isDisabled(), 'reset permits another rehearsal');
+  assert.deepEqual(await saved(),before); out.checks++;
+  check(await h.page.evaluate(() => window.__capy.state.started) === started, 'practice never starts the world');
+}
 try {
   const p = h.page;
   const title = p.locator('.capyui-more').filter({ hasText: 'learn to play' });
@@ -19,6 +41,7 @@ try {
     check(box.height >= 44 && box.x >= 0 && box.x + box.width <= (touch ? 390 : 1280), 'usable summary target');
   }
   const body = await lessons.first().textContent();
+  await rehearse(title.locator('.capyui-learn'));
   check(touch ? body.includes('movement stick') && !body.includes('W, A, S, D') : body.includes('W, A, S, D'), 'correct control scheme');
   check(!await p.evaluate(() => window.__capy.state.started), 'reading does not begin game');
   await lessons.first().locator('summary').focus();
@@ -38,7 +61,8 @@ try {
     yuzu: document.querySelector('.capyui-wallet')?.textContent }));
   const before = await progress();
   const guide = p.locator('.capyui-jrkeys .capyui-learn');
-  await guide.locator('summary').nth(3).click();
+  await rehearse(guide);
+  if (await guide.locator('.capyui-learnlesson').nth(3).getAttribute('open') === null) await guide.locator('summary').nth(3).click();
   await p.waitForTimeout(350);
   const lessonBody = await guide.locator('.capyui-learnlesson').nth(3).locator('p').first().boundingBox();
   check(lessonBody.y >= 0 && lessonBody.y + lessonBody.height <= (touch ? 844 : 760), 'opened lesson body enters viewport');
@@ -52,7 +76,7 @@ try {
   out.pass = true;
 } catch (e) { out.pass = false; out.failure = String(e.stack || e); process.exitCode = 1; }
 finally {
-  try { await h.result('homecoming-learning-v8-' + (touch ? 'touch' : 'desktop'), out); }
+  try { await h.result('homecoming-learning-v9-' + (touch ? 'touch' : 'desktop'), out); }
   finally { await h.close(); }
   console.log(JSON.stringify({ touch, checks: out.checks, pass: out.pass, failure: out.failure, errors: h.metadata.errors }));
 }

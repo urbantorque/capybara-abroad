@@ -390,6 +390,9 @@ let monTime = 0;
 
 // the sea and the basin
 let monSeaMesh = null, monSeaAttr = null, monSeaBase = null;
+let monSeaSinA = null, monSeaCosA = null;
+let monSeaSinB = null, monSeaCosB = null;
+let monSeaSinC = null, monSeaCosC = null;
 
 // the cars
 const monCarG = [];               // THREE.Group per car
@@ -1201,30 +1204,66 @@ function monBuildSea(root) {
   m.castShadow = false;
   monSeaMesh = m;
   monSeaAttr = g.attributes.position;
-  monSeaBase = new Float32Array(p.length / 3);
-  for (let i = 0, k = 0; i < p.length; i += 3, k++) {
-    const x = p[i], z = p[i + 2];
-    monSeaBase[k] = (x > monPORT.x0 - 4 && x < monPORT.x1 + 4 &&
-                     z > monPORT.z0 - 2 && z < monPORT.z1 + 4) ? 0.06 : 1.0;
-  }
+  const cache = monSeaBuildCache(p);
+  monSeaBase = cache.base;
+  monSeaSinA = cache.sinA; monSeaCosA = cache.cosA;
+  monSeaSinB = cache.sinB; monSeaCosB = cache.cosB;
+  monSeaSinC = cache.sinC; monSeaCosC = cache.cosC;
   root.add(m);
 }
 
-function monUpdateSea(dt) {
-  if (!monSeaAttr) return;
-  const a = monSeaAttr.array;
-  const t = monTime;
-  for (let i = 0, k = 0; i < a.length; i += 3, k++) {
-    const x = a[i], z = a[i + 2];
-    if (monSeaBase[k] < 0.1) {
-      a[i + 1] = monWATER + Math.sin(t * 1.35 + x * 0.14 + z * 0.09) * 0.035;
+function monSeaBuildCache(p) {
+  // The spatial phases never move. Keep their sin/cos in double precision so
+  // the per-frame Float32 write differs from the authored sum by less than a
+  // float ulp, while the temporal phase is paid once per frame.
+  const sinA = new Float64Array(p.length / 3);
+  const cosA = new Float64Array(p.length / 3);
+  const sinB = new Float64Array(p.length / 3);
+  const cosB = new Float64Array(p.length / 3);
+  const sinC = new Float64Array(p.length / 3);
+  const cosC = new Float64Array(p.length / 3);
+  const base = new Float32Array(p.length / 3);
+  for (let i = 0, k = 0; i < p.length; i += 3, k++) {
+    const x = p[i], z = p[i + 2];
+    const inPort = x > monPORT.x0 - 4 && x < monPORT.x1 + 4 &&
+                   z > monPORT.z0 - 2 && z < monPORT.z1 + 4;
+    base[k] = inPort ? 0.06 : 1.0;
+    const pa = inPort ? x * 0.14 + z * 0.09 : (x * 0.62 + z * 0.78) * 0.021;
+    const pb = inPort ? 0 : -(x * 0.30 - z * 0.95) * 0.048;
+    if (inPort) {
+      sinA[k] = Math.sin(pa); cosA[k] = Math.cos(pa);
     } else {
-      a[i + 1] = monWATER
-        + Math.sin(t * 0.62 + (x * 0.62 + z * 0.78) * 0.021) * 0.46
-        + Math.sin(t * 1.05 - (x * 0.30 - z * 0.95) * 0.048) * 0.17;
+      sinB[k] = Math.sin(pa); cosB[k] = Math.cos(pa);
+      sinC[k] = Math.sin(pb); cosC[k] = Math.cos(pb);
     }
   }
-  monSeaAttr.needsUpdate = true;
+  return { base, sinA, cosA, sinB, cosB, sinC, cosC };
+}
+
+function monUpdateSea(dt) {
+  if (!monSeaAttr || !monSeaBase || !monSeaSinA) return;
+  monSeaWrite(monSeaAttr, monTime, monSeaBase, monSeaSinA, monSeaCosA,
+              monSeaSinB, monSeaCosB, monSeaSinC, monSeaCosC, monWATER);
+}
+
+function monSeaWrite(attr, t, base, sinA, cosA, sinB, cosB, sinC, cosC, water) {
+  if (!attr || !attr.array || !base || !sinA) return false;
+  const out = attr.array;
+  const ta = t * 1.35, tb = t * 0.62, tc = t * 1.05;
+  const sa = Math.sin(ta), ca = Math.cos(ta);
+  const sb = Math.sin(tb), cb = Math.cos(tb);
+  const sc = Math.sin(tc), cc = Math.cos(tc);
+  for (let i = 0, k = 0; i < out.length; i += 3, k++) {
+    if (base[k] < 0.1) {
+      out[i + 1] = water + (sinA[k] * ca + cosA[k] * sa) * 0.035;
+    } else {
+      out[i + 1] = water
+        + (sinB[k] * cb + cosB[k] * sb) * 0.46
+        + (sinC[k] * cc + cosC[k] * sc) * 0.17;
+    }
+  }
+  attr.needsUpdate = true;
+  return true;
   // NO computeVertexNormals() HERE, AND THAT IS THE WHOLE POINT.
   // This sheet is 6,083 vertices and 11,856 triangles, and the material it
   // wears comes from mat(), which sets flatShading: true. With FLAT_SHADED

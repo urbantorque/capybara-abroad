@@ -754,6 +754,47 @@ event (44.4ms systems). All still miss the 20ms p95 target. These are fixed
 key routes, not full task/ride/contact coverage. Investigate the isolated
 systems hitch before attributing it to any particular UI or audio operation.
 
+### M1g / M2e: measured work removal and a safe shop rehearsal
+
+Monaco's 30-second sampled CPU trace attributes 1236ms to sea updates and
+535ms to bounds reads. The traveller was requesting the board's screen
+projection every frame while using only world coordinates. It now requests
+world-only data; no-argument harness callers keep their screen coordinates.
+The sea caches static spatial sin/cos phases (six Float64 arrays, 292KB for
+6083 vertices), leaving six temporal trig calls per frame. No material,
+geometry count, wave parameters, collider or water-height query changed.
+The shipped cache/write path passes 56,043 full-grid/boundary/time checks,
+including +/-1e6 seconds: maximum absolute Float32 error 5.96e-8 metres.
+This supersedes the preliminary copied-math proof; it is not a claim of
+bit-identical vertices at every possible time.
+
+The matched-duration follow-up profile records sea work 216ms and bounds
+reads 7.7ms. Sampling adds overhead and routes have live world variation;
+these are attribution measurements, not a certified frame-rate gain. The
+unprofiled Monaco sample has p95 23.5/24.9/21.7ms, no CPU hitches >50ms and
+no >100ms intervals, while Auto stays at rung zero and retains reflections.
+The prior sample often used cheaper rungs. The 20ms target remains unmet.
+
+Palawan's baseline reveals a 908.8ms CPU hitch, 898ms drawing a new smooth
+manta material program. A mesh may now declare dormant warmMaterials; the
+existing warm shim compiles each variant and restores ownership even on
+failure. Palawan declares its existing smooth skin. No extra drawable or
+per-frame scan. Eleven warm ownership/readiness checks pass. The corrected
+90-second run has no CPU hitch >50ms; p95 20.7/22.2/23.4ms. Three >100ms
+browser intervals remain outside measured >50ms game ticks. An earlier
+retry crashed during Sydney startup before travel; preserve that failed
+artifact and do not treat it as a clean stability pass.
+
+Learn to Play now includes a selectable purchase rehearsal on title and
+pause. It reads MORE PUFF's real price/effect, collects practice yuzu, rejects
+unaffordable/repeated purchases and resets locally. It cannot call the real
+wallet, task, upgrade or save writers. Twenty-four isolated checks and 41
+desktop plus 41 phone browser checks pass, including unchanged saved funds,
+owned items and tasks. The memory lesson now explains alternatives/two-memory
+acts on Homecoming files and retains legacy wording on old saves. Other
+interactive lessons and the wordless opening remain open. No new save fields.
+Syntax/build and all 65 suite gates pass. Latest weekly quota: 49% remaining.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

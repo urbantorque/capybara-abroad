@@ -6542,6 +6542,8 @@ const sysLEARN = [
     try: 'A loose hat, a bench and a nearby bird are enough for a first experiment.' },
   { title: '3. Tasks, memories and the journey',
     line: 'The star marks the big experience in a place. The smaller tasks around it help earn a memory. The journey card shows what is kept and what remains.',
+    story: 'A memory comes from the big experience or its quieter route, plus one small moment. Two memories turn the act page and open the next region.',
+    storyTry: 'In Sydney, the picnic sandwich and a small task can open the coast. The concert and the rest of the checklist can wait.',
     try: 'Start with one nearby task, then the star. The whole checklist does not need clearing before travelling onward.' },
   { title: '4. Yuzu and the traveller’s shop',
     line: 'Gold fruit adds yuzu to the wallet. The traveller sells upgrades, clothes and pocket items. Buying spends yuzu; owned upgrades travel with it.',
@@ -6560,6 +6562,13 @@ const sysHOME_UI = {
   firstGate: 'a Sydney memory opens the coast', actGate: 'two memories open the next act',
   ready: 'the way home is open', core: 'the big experience or the quieter route',
   freeSwitch: 'free roam: open every place', freeSaid: 'Every place is open. Everything kept stays.',
+};
+const sysLEARN_SHOP = {
+  open: 'Try a practice purchase', wallet: 'Practice wallet: {n} yuzu',
+  collect: 'Collect 5 practice yuzu', buy: 'Try buying {name} · {n} yuzu',
+  reset: 'Reset practice', ready: 'Collect the last few yuzu, then try the upgrade.',
+  bought: 'Practice complete. The journey’s wallet and upgrades are unchanged.',
+  held: 'Owned in this practice',
 };
 const sysTUT_BENCHES = [
   [26, 14.5], [46.5, 33.5], [-30, -6.5], [-48, -6.5],
@@ -8871,6 +8880,12 @@ function sysBuildCSS() {
 '.capyui-learnlesson[open]>summary::after{content:"−";}',
 '.capyui-learn p{font-size:' + tMd + ';line-height:1.6;letter-spacing:0;',
   'text-transform:none;margin:0 4px 12px;color:' + inkSoft + ';}',
+'.capyui-learn button{min-height:44px;max-width:100%;margin:4px;padding:8px 12px;',
+  'font:inherit;font-size:' + tMd + ';color:' + ink + ';background:' + paper + ';',
+  'border:1px solid ' + rule + ';border-radius:3px;cursor:pointer;}',
+'.capyui-learn button:disabled{opacity:.55;cursor:default;}',
+'.capyui-learn button:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
+'.capyui-learnshop{margin:8px 0 16px;padding-top:8px;border-top:1px solid ' + rule + ';}',
 /* HOMECOMING learning reference end. */
 /* HOMECOMING atlas: the existing postcards, in five quiet folds. */
 '.capyui-act{grid-column:1/-1;min-width:0;border-bottom:1px solid ' + rule + ';}',
@@ -24583,6 +24598,47 @@ export function createSystems(game) {
   document.head.appendChild(styleTag);
   sysTextApply();
 
+  // Local rehearsal only: no wallet, owned, task or save writer is reachable.
+  // Read the live shop row on demand, after systems construction has finished.
+  function learnShopPractice() {
+    const host = sysEl('div', 'capyui-learnshop');
+    const open = sysEl('button', 'capyui-practice-open', sysLEARN_SHOP.open);
+    open.type = 'button'; host.appendChild(open);
+    open.addEventListener('click', function () {
+      if (host.querySelector('.capyui-practice-wallet')) return;
+      const def = upgradeDef('puff'), price = def.tiers[0].price;
+      let wallet = Math.max(0, price - 5), bought = false;
+      const balance = sysEl('p', 'capyui-practice-wallet');
+      const effect = sysEl('p', null, def.name + ': ' + def.line);
+      const status = sysEl('p', 'capyui-practice-status');
+      status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+      function button(cls, label, action) {
+        const b = sysEl('button', cls, label); b.type = 'button';
+        b.addEventListener('click', action); host.appendChild(b); return b;
+      }
+      host.appendChild(effect); host.appendChild(balance);
+      const collect = button('capyui-practice-collect', sysLEARN_SHOP.collect, function () {
+        if (wallet < price && !bought) { wallet += 5; refresh(); }
+      });
+      const buy = button('capyui-practice-buy', '', function () {
+        if (!bought && wallet >= price) { wallet -= price; bought = true; refresh(); }
+      });
+      button('capyui-practice-reset', sysLEARN_SHOP.reset, function () {
+        wallet = Math.max(0, price - 5); bought = false; refresh();
+      });
+      host.appendChild(status);
+      function refresh() {
+        balance.textContent = sysLEARN_SHOP.wallet.replace('{n}', wallet);
+        buy.textContent = bought ? sysLEARN_SHOP.held : sysLEARN_SHOP.buy.replace('{name}', def.name).replace('{n}', price);
+        buy.disabled = bought || wallet < price;
+        collect.disabled = bought || wallet >= price;
+        status.textContent = bought ? sysLEARN_SHOP.bought : sysLEARN_SHOP.ready;
+      }
+      refresh(); open.hidden = true; collect.focus();
+    });
+    return host;
+  }
+
   function learnGuide() {
     const guide = sysEl('div', 'capyui-learn');
     // Content is interactive reference, never the title backdrop's Begin.
@@ -24601,6 +24657,9 @@ export function createSystems(game) {
       function refresh() {
         body.textContent = sysSay(sysScheme(row.line, row.touch || row.line, row.pad || row.line));
         practice.textContent = sysSay(row.try);
+        if (homecomingArc && row.story) {
+          body.textContent = sysSay(row.story); practice.textContent = sysSay(row.storyTry);
+        }
       }
       refresh();
       lesson.addEventListener('toggle', function () {
@@ -24611,6 +24670,7 @@ export function createSystems(game) {
       });
       lesson.appendChild(body);
       lesson.appendChild(practice);
+      if (i === 3) lesson.appendChild(learnShopPractice());
       guide.appendChild(lesson);
     }
     return guide;
@@ -33314,10 +33374,11 @@ export function createSystems(game) {
     return { x: r.left + (sysV3.x * 0.5 + 0.5) * r.width,
              y: r.top + (0.5 - sysV3.y * 0.5) * r.height };
   }
-  /** The live board's numbers, for the harness. Nothing in src reads it. */
-  game.exitBoard = function () {
+  /** World numbers for the traveller; screen projection only when requested.
+   *  Harness callers retain the original no-argument screen coordinates. */
+  game.exitBoard = function (screen) {
     if (!boardObj) return null;
-    const s = boardScreen();
+    const s = screen === false ? null : boardScreen();
     return { biome: boardFor, x: boardX, y: boardY, z: boardZ, yaw: boardYaw,
              faceY: boardObj.faceY, topY: boardObj.topY, hx: boardObj.hx, hz: boardObj.hz,
              rows: BOARD_ROWS, flaps: BOARD_FLAPS,
@@ -41749,10 +41810,21 @@ export function createSystems(game) {
   const biomeWarmShim = {
     objs: null,
     traverse: function (fn) {
+      function visit(o) {
+        fn(o);
+        const variants = o.userData && o.userData.warmMaterials;
+        if (!variants || !o.material) return;
+        const original = o.material;
+        try {
+          for (let i = 0; i < variants.length; i++) {
+            o.material = variants[i]; fn(o);
+          }
+        } finally { o.material = original; }
+      }
       // M1c detaches sleeping roots. Attached hidden globals are live-world
       // effects, including the beacon, and need warming before first use.
-      scene.traverse(fn);
-      const a = this.objs; for (let i = 0; i < a.length; i++) a[i].traverse(fn);
+      scene.traverse(visit);
+      const a = this.objs; for (let i = 0; i < a.length; i++) a[i].traverse(visit);
     },
     traverseVisible: function () {},
   };

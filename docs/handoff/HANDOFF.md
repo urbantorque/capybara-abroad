@@ -2,6 +2,16 @@
 
 ## Homecoming continuation (22 Sep, newer than the closed twelve-hour pass)
 
+M1g/M2e: shop rehearsal added to title/pause, with an isolated wallet and real
+catalogue price/effect; 41 desktop + 41 phone checks preserve the actual save.
+Monaco sea phase caching and world-only traveller board queries remove
+profiled work without altering waves or gameplay. Palawan's dormant smooth
+manta material is warmed before Auto reveals it, addressing a measured 0.9s
+shader hitch. See roadmap for remaining frame gaps and a startup crash.
+All performance targets are still open; next work is opening/home consequence,
+remaining interactive lessons and cumulative release coverage. Quota: 49%
+remaining at this checkpoint, above the 25% stop threshold.
+
 M1f extends quiet accompaniment admission to six regional bands and Pasto.
 Forty-seven event checks preserve core rhythm voices and chase/high-intensity
 arrangements. Seven headful audio visits pass; all six band clocks advance.

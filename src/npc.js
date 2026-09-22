@@ -3770,7 +3770,7 @@ export function createNPCs(game) {
       if (!r || !r.trav || !r.gateChap || r.biome !== live || !r.group) continue;
       if (!r.gSt) r.gSt = '';
       if (r.gSt === '') {
-        const board = (typeof game.exitBoard === 'function') ? game.exitBoard() : null;
+        const board = (typeof game.exitBoard === 'function') ? game.exitBoard(false) : null;
         if (!board || board.biome !== live) continue;
         const bdx = capy.x - board.x, bdz = capy.z - board.z;
         if (bdx * bdx + bdz * bdz >= npcTRAV_GLIMPSE_R * npcTRAV_GLIMPSE_R) continue;
