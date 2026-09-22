@@ -210,7 +210,9 @@ try {
   await h.page.reload({ waitUntil: 'load' });
   report.reload.afterNavigation = await h.page.evaluate(() => ({
     at: performance.now(), ready: !!window.__capy,
-    button: !!document.querySelector('.capyui-go, .capyui-carry') }));
+    button: !!document.querySelector('.capyui-go, .capyui-carry'),
+    frames: window.__capy?.state?.frames,
+    contextLost: window.__capy?.renderer?.getContext().isContextLost() }));
   await h.result(name + '-after-navigation', report);
   await h.start();
   const resumed = await sample('earned Kyoto memory resumed');

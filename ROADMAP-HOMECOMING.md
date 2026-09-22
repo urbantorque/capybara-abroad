@@ -1413,6 +1413,15 @@ coverage beyond these builds, and a production fix remain open. Do not promote
 this candidate to public master while the repeated long-route reload crash
 has no safe resolution or bounded recovery.
 
+A single QA-only trial stopped the old draw loop and called
+`renderer.dispose()` before Kyoto navigation (dispose-v12). Kyoto reloaded,
+but normal resumed-v10 also reloaded once, so this is not causal evidence.
+The later Hanoi crossing task timed out with no runtime error, before its
+reload. The disposal intervention was removed from the driver and was not
+added to production `pagehide`: it would add a fragile teardown beside save
+flushes without proof of benefit. The next crash experiment needs paired
+repeated routes or a renderer crash dump, not another unmeasured effect.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
