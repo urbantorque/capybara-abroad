@@ -27,6 +27,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
 const ASSERTS = [
+  ['qa/homecoming-serene.mjs', 'serene score admission, inherited cut and all quality rungs'],
   ['qa/release-monaco-clamp.mjs', 'Monaco contact clamp never adds speed'],
   ['qa/reimagine-trust.mjs', 'guidance continuity, explicit skip/replay and earned finale staging'],
   ['qa/reimagine-journey.mjs', 'authored route choices and stable chapter/task identities'],

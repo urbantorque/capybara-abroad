@@ -1,3 +1,24 @@
+## HOMECOMING M1a — SUBTRACTIVE SCORE (22 Sep 2026)
+
+ROADMAP-HOMECOMING is approved, under a 25%-remaining weekly working stop
+and a user-required 20% reserve. Work on codex/homecoming; do not equate a
+development checkpoint with publication or completion of the whole roadmap.
+
+`noSereneScore` restores the old progress-driven arrangement. Live mode
+withholds its struck bass, pulse, ostinato, second voice, street-musician
+score answer and progress acceleration. Incidental plucks stop during a
+statement. Existing pad harmony, band clocks, street tunes, chase pulses and
+reward statements remain. This subtractive base correction applies at every
+quality rung; it adds no audio node, parameter writer or save field.
+
+107 source-derived admission checks pass. A headful full-progress Sydney
+fixture observes old/new 30-second counts: second voice 8/0, pulse 18/0,
+ostinato 44/0, struck bass entries 3/0. Zero runtime errors. The first run
+failed because the street-musician answer also increments the second-voice
+counter; its evidence is retained and that additional answer is now gated.
+These fixtures inject completed tasks, not earned-play proof or listening
+approval. Longer phrase rests and regional score redesign remain open.
+
 ## PAGES A — REFLECTIONS RETAINED, CONTACT CLAMP (22 Sep 2026)
 
 ROADMAP-PAGES records the branch audit and public integration. No historic

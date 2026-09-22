@@ -17732,7 +17732,8 @@ export function createSystems(game) {
           // palette carries no second row (sysMUS_2ND[musPalN] is null for
           // most of them still) or nothing is sounding to answer against.
           const sec = sysMUS_2ND[musPalN];
-          if (sec && musCurChord && musCurChord.length) {
+          // The street musician keeps its tune; the score need not answer it.
+          if (game.state.noSereneScore && sec && musCurChord && musCurChord.length) {
             const midi2 = musFold(musThemeBase(sec.oct === undefined ? 12 : sec.oct) + musThemeOff(0),
                                    sysMUS_LIFT_LO, sysMUS_LIFT_HI);
             musLiftNote(sec.inst || 'pluck', now + sysMUS_TUNE_BEAT * 4, midi2, 0,
@@ -18732,7 +18733,7 @@ export function createSystems(game) {
     // ---- THE WALKING BASS (ROADMAP-SCORE, M5): past two thirds of the
     // chapter, a struck root on the change and the fifth at half the dwell
     // — on the pad palettes, awake, not under a breath's floor.
-    if (musBassIn && !musPal.band && musSleep < 0.5 && musBreath > 0.6 &&
+    if (game.state.noSereneScore && musBassIn && !musPal.band && musSleep < 0.5 && musBreath > 0.6 &&
         musProg >= sysMUS_LAYER_WALK && !(game.state && game.state.noArc)) {
       musWalkNote(when, rootMidi, sysMUS_WALK_VEL);
       if (musDwellNow > 2.5) musWalkNote(when + musDwellNow * 0.5, rootMidi + 7, sysMUS_WALK_VEL * 0.8);
@@ -22570,6 +22571,9 @@ export function createSystems(game) {
 
   // Lookahead scheduler on the AudioContext clock — never the render loop.
   function musTickBody() {
+    // HOMECOMING M1: progress keeps its ceremonies, not four extra layers.
+    // This removes work at every quality rung; the cut restores the old mix.
+    const serene = !game.state.noSereneScore;
     if (!ac || !musVol || ac.state !== 'running') return;
     const now = ac.currentTime;
     if (musChordAt < now) musChordAt = now + 0.05;
@@ -22618,7 +22622,7 @@ export function createSystems(game) {
     // place you have done half of has a heartbeat the arrival did not. Never
     // during a chase (that pulse is the same drum, faster and harder), never
     // asleep, never on the breath's floor.
-    if (!musPal.band && musDrum && musChaseT <= 0 && musSleep < 0.5 &&
+    if (!serene && !musPal.band && musDrum && musChaseT <= 0 && musSleep < 0.5 &&
         musProg >= sysMUS_LAYER_PULSE && musBreath > 0.6) {
       const pk = clamp((musProg - sysMUS_LAYER_PULSE) / (1 - sysMUS_LAYER_PULSE), 0, 1);
       const gap = sysMUS_PULSE_GAP - 0.8 * pk;
@@ -22645,7 +22649,7 @@ export function createSystems(game) {
     // gate is as it was.
     {
       const oInst = (musPal.lead && musPal.lead !== 'none') ? musPal.lead : null;
-      const oGate = !musStmt && ((game.state && game.state.noTheme) || musOstArmed);
+      const oGate = !serene && !musStmt && ((game.state && game.state.noTheme) || musOstArmed);
       if (oInst && oGate && musProg >= sysMUS_LAYER_OSTINATO && musSleep < 0.5 && musBreath > 0.6) {
         const oph = sysMUS_PHRASE[musPalN];
         const ogap = sysMUS_STING.arrive.gap * (oph && oph.gap > 0 ? oph.gap : 1);
@@ -22688,7 +22692,7 @@ export function createSystems(game) {
       // ...and under a statement the walk steps back (M3): the lead is
       // saying the countermelody, and a random line beside the tune is
       // clutter. A third of the plucks, not none — the place is still here.
-      (musStmt ? 0.35 : 1);
+      (musStmt ? (serene ? 0 : 0.35) : 1);
     while (musPluckAt < horizon && guard++ < 12) {
       // ---- THE PAN OF THE NOTE THIS PASS PLAYED, AND WHETHER IT PLAYED ONE
       //
@@ -22817,7 +22821,7 @@ export function createSystems(game) {
       // chapter, so it arrives the way the place fills in rather than switching
       // on at a threshold a player could locate.
       const sec = sysMUS_2ND[musPalN];
-      if (played && sec && musProg > sysMUS_2ND_AT && musCurChord && musCurChord.length) {
+      if (!serene && played && sec && musProg > sysMUS_2ND_AT && musCurChord && musCurChord.length) {
         const k = clamp((musProg - sysMUS_2ND_AT) / (1 - sysMUS_2ND_AT), 0, 1);
         // Not every pluck gets an answer, and which ones do is a coin weighted
         // by how far in you are. A reply to every single note is a delay line.
@@ -22856,7 +22860,7 @@ export function createSystems(game) {
       }
       musPluckAt += rand(musPal.pluckA, musPal.pluckB) *
                     (1 - musIntensity * 0.32) *
-                    (1 - (sec ? clamp((musProg - sysMUS_2ND_AT) /
+                    (1 - (!serene && sec ? clamp((musProg - sysMUS_2ND_AT) /
                           (1 - sysMUS_2ND_AT), 0, 1) * sysMUS_2ND_TIGHT : 0));
     }
     // ---- the sparse voices: one phrase, a long way apart --------------------
@@ -42810,6 +42814,7 @@ export function createSystems(game) {
       pal: musPalN, chapProg: +musProg.toFixed(3),
       skyRain: +skyRainNow.toFixed(3), skyCut: +skyCutNow.toFixed(1),
       second: !!sysMUS_2ND[musPalN], secondN: musSecondN,
+      serene: !game.state.noSereneScore,
       // THE PROGRESS LAYERS (L6, E3): the three gains as chapProg opens them —
       // the shimmer (continuous), the second voice (from sysMUS_2ND_AT, when
       // the palette has one), the pulse (from sysMUS_LAYER_PULSE, pad
@@ -42817,9 +42822,9 @@ export function createSystems(game) {
       // The fourth slot is the ostinato's gate (sysMUS_LAYER_OSTINATO), and
       // since F3 the tune plays on it: `ostN` counts its notes.
       layers: [+(musProg * 0.85).toFixed(3),
-               sysMUS_2ND[musPalN] ? +clamp((musProg - sysMUS_2ND_AT) / (1 - sysMUS_2ND_AT), 0, 1).toFixed(3) : 0,
-               (musPal && musPal.band) ? 0 : +clamp((musProg - sysMUS_LAYER_PULSE) / (1 - sysMUS_LAYER_PULSE), 0, 1).toFixed(3),
-               (musProg >= sysMUS_LAYER_OSTINATO && musPal && musPal.lead && musPal.lead !== 'none') ? 1 : 0],
+               game.state.noSereneScore && sysMUS_2ND[musPalN] ? +clamp((musProg - sysMUS_2ND_AT) / (1 - sysMUS_2ND_AT), 0, 1).toFixed(3) : 0,
+               (!game.state.noSereneScore || (musPal && musPal.band)) ? 0 : +clamp((musProg - sysMUS_LAYER_PULSE) / (1 - sysMUS_LAYER_PULSE), 0, 1).toFixed(3),
+               (game.state.noSereneScore && musProg >= sysMUS_LAYER_OSTINATO && musPal && musPal.lead && musPal.lead !== 'none') ? 1 : 0],
       pulseN: musPulseN,
       // THE TUNE (L6, F3): where it has been said, and by what
       ostN: musOstN, themeSaid: musThemeSaid, themeCells: musThemeCells, liftTails: musLiftTails,
