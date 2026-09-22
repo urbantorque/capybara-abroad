@@ -6562,6 +6562,8 @@ const sysHOME_UI = {
   firstGate: 'a Sydney memory opens the coast', actGate: 'two memories open the next act',
   ready: 'the way home is open', core: 'the big experience or the quieter route',
   freeSwitch: 'free roam: open every place', freeSaid: 'Every place is open. Everything kept stays.',
+  returnHome: 'Visit the garden shelf · Sydney',
+  returnHint: 'The souvenirs have a place in the garden. A visit home leaves every onward route open.',
 };
 const sysLEARN_SHOP = {
   open: 'Try a practice purchase', wallet: 'Practice wallet: {n} yuzu',
@@ -10478,6 +10480,7 @@ function sysBuildCSS() {
 '@media (hover:hover){.capyui-jrled:hover{background:' + veil2 + ';color:' + ink + ';}}',
 '.capyui-jrled:focus{outline:none;}',
 '.capyui-jrled:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
+'.capyui-homevisit .capyui-jrled{min-height:44px;letter-spacing:.04em;text-transform:none;}',
 
 /* ---------- THE PAUSE CARD (R4) ----------------------------------------
    The frame around the game, and until R4 there was none: Escape opened the
@@ -25615,6 +25618,18 @@ export function createSystems(game) {
   const jrSlots = [];
   jrCard.appendChild(jrShelf);
   jrCard.appendChild(jrShelfCap);
+  const jrHomeVisit = sysEl('div', 'capyui-homevisit');
+  jrHomeVisit.hidden = true;
+  const jrHomeBtn = sysEl('button', 'capyui-jrled', sysHOME_UI.returnHome);
+  jrHomeBtn.type = 'button';
+  jrHomeBtn.addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    // This named invitation is actionable even in the read-only journal.
+    jrDepart = true; jrTravel(1);
+  });
+  jrHomeVisit.appendChild(jrHomeBtn);
+  jrHomeVisit.appendChild(sysEl('p', 'capyui-shelfcap', sysHOME_UI.returnHint));
+  jrCard.appendChild(jrHomeVisit);
   jrCard.appendChild(sysEl('div', 'capyui-rule'));
   const jrRows = [];
   // THE CONTROLS LIVE HERE TOO, because this is the card that is still in the
@@ -31372,6 +31387,17 @@ export function createSystems(game) {
     }
     return homeProgressCache;
   }
+  function homeVisitOffered(here) {
+    if (!game.state.homecomingArc || here === 1) return false;
+    const p = journeyProgress();
+    if (p.ready || p.memories[0].length < 2) return false;
+    // An invitation, never a detour in the onward route. Session-local shelf
+    // staging clears it on return; a restored trip may offer it again.
+    for (let n = 2; n <= chapMax; n++) {
+      if (keepHeld(n) && !sysShelfSpoken[n]) return true;
+    }
+    return false;
+  }
   function journeyNext(here) {
     if (game.state.homecomingArc) {
       const p = journeyProgress();
@@ -31454,6 +31480,7 @@ export function createSystems(game) {
     jrCount.textContent = jrCountLast;
     const here = game.biome ? chapterOf(game.biome.current) : 1;
     // ---- the shelf ---------------------------------------------------------
+    jrHomeVisit.hidden = !homeVisitOffered(here);
     const kept = keepCount();
     for (let i = 0; i < jrSlots.length; i++) {
       const s = jrSlots[i];

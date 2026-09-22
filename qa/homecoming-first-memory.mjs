@@ -89,6 +89,19 @@ try {
     const expected = '1,2,3,5,6,14,15';
     assert.equal(out.actGates.filter(r => r.open).map(r => r.n).join(','), expected);
     assert(out.actGates.find(r => r.n === 3).enough, 'second earned memory');
+    await h.page.keyboard.press('Tab');
+    const invitation = h.page.locator('.capyui-homevisit');
+    assert(await invitation.isVisible(), 'earned coastal memories offer an optional home visit');
+    await h.screenshot('homecoming-home-invitation');
+    await invitation.locator('button').click();
+    await h.page.waitForFunction(() => window.__capy.biome.current === 'sydney', null, { timeout:45000 });
+    await h.page.waitForTimeout(9500);
+    out.shelf = await h.page.evaluate(() => window.__capy.shelfAudit());
+    assert.equal(out.shelf.shelf, 2, 'both earned memories staged at home');
+    await h.page.keyboard.press('Tab');
+    assert(!await invitation.isVisible(), 'home visit clears the invitation');
+    await h.page.keyboard.press('Escape');
+    assert.equal((await h.page.evaluate(() => window.__capy.gateInfo())).filter(r=>r.open).map(r=>r.n).join(','), expected, 'return never relocks onward routes');
     await h.page.waitForFunction(() => {
       const s = JSON.parse(localStorage.getItem('capy3.journey.v1') || '{}');
       return ['steal-hat','picnic-thief','take-helm','under-bridge'].every(id => s.tasks?.includes(id));
@@ -103,6 +116,6 @@ try {
 } catch (e) { out.pass = false; out.failure = String(e.stack || e); process.exitCode = 1; }
 finally {
   await keys(new Set()); await h.screenshot('homecoming-first-memory');
-  await h.result(firstAct ? 'homecoming-first-act-v3' : 'homecoming-first-memory-v5', out); await h.close();
+  await h.result(firstAct ? 'homecoming-first-act-v6' : 'homecoming-first-memory-v5', out); await h.close();
   console.log(JSON.stringify({ pass: out.pass, seconds: out.seconds, actions: out.actions.map(({ id, done, seconds }) => ({ id, done, seconds })), failure: out.failure }));
 }

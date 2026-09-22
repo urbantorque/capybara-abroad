@@ -795,6 +795,34 @@ acts on Homecoming files and retains legacy wording on old saves. Other
 interactive lessons and the wordless opening remain open. No new save fields.
 Syntax/build and all 65 suite gates pass. Latest weekly quota: 49% remaining.
 
+### M3e: the first optional visit home
+
+After two coastal memories, the journal offers a named visit to Sydney's
+garden shelf when an overseas souvenir has not yet been staged this session.
+It uses the existing physical shelf and gardener response, never replaces
+the onward recommendation, and never relocks a destination. The named button
+can travel from the otherwise read-only journal. At home it disappears; a
+later trip only offers it again for an unstaged souvenir. Reloading while
+away may reoffer it, deliberately using session-local staging rather than
+adding another save field. Legacy saves and the final homecoming are unchanged.
+No new scene geometry, audio, frame-loop work or effect flag; UI-only policy
+runs when the journal opens. This is the first return invitation prototype,
+not the proposed picnic expansion or an act cutscene.
+
+Twelve policy checks pass. The earned first-act v6 run earns Sydney's hat and
+sandwich, then the ferry memory, activates the journal return, stages two
+memories and retains Act II access through reload. The driver uses authored
+coordinates, not novice discovery. Retain failed v4 (test assumed a travel
+journal) and v5 (picnic route timed out); do not call the route deterministic.
+The phone-width fixture passes ten checks, including 44px target, keyboard
+activation, two physical keepsakes at actual shelf slots, cleared invitation
+after another departure, and unchanged onward access. It injects tasks and
+does not prove earned play or physical-phone performance. Desktop and narrow
+journal screenshots inspected. Human voluntary-return preference remains open.
+The inherited CSS regression now excludes only the exact new scoped selector;
+all other inherited CSS still compares to its baseline. Syntax/build and all
+66 suite gates pass. Weekly allowance: 48% remaining.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
