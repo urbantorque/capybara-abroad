@@ -1422,6 +1422,31 @@ added to production `pagehide`: it would add a fragile teardown beside save
 flushes without proof of benefit. The next crash experiment needs paired
 repeated routes or a renderer crash dump, not another unmeasured effect.
 
+### M2j: let the journey fill the frame
+
+A five-place headful visual survey (Sydney, Kyoto, Hanoi, Palawan, Iceland)
+identified the full task paper as a repeatable composition obstruction during
+ordinary traversal. Its old movement gate kept the paper open whenever the
+animal walked. The same existing sheet now offers an eight-second reading
+window after arrival or a deliberate tap, then folds to the pinned task,
+distance and one remark even while moving. Fresh task and marquee holds and
+the click-to-reopen path are unchanged. The compact label now leads with the
+specific task, not the generic Homecoming progress phrase that had ellipsised
+it. No render effect, save field, new input or independent work is added.
+
+One owned headful Edge 153 run passed 16 live desktop checks across Sydney
+and Hanoi: movement stays compact, tap restores the full sheet and it tucks
+again, with no page errors. At 1280x760, paper bounds fell from 93,000 to
+17,659 square pixels in Sydney (81.0%) and 97,276 to 17,659 in Hanoi
+(81.8%). A sequential 390x844 touch-sized run passed ten checks, including
+the 44.7 px compact tap target and an 82.0% paper-area reduction in Sydney.
+Desktop and narrow screenshots were read by eye. These are HUD-bound measures,
+not a quantified increase in world beauty or actual touch-device evidence;
+the player can still choose to keep the paper open for a longer read. NPC
+speech and the narrow full-paper layout remain candidates for separate,
+measured composition work. The long-route reload crash above still blocks
+public-master promotion.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

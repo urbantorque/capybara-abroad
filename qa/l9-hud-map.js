@@ -21,18 +21,18 @@ function pass(msg) { console.log('pass  ' + msg); }
 // H — THE PAPER, TUCKED
 // ============================================================================
 
-// ---- H1: the tuck rule is inverted, not just retimed -----------------------
-if (!/const sysTUCK_AFTER = 6\.0;/.test(sys)) fail('sysTUCK_AFTER is not 6.0 (H1: tuck 6s after arrival)');
-else pass('sysTUCK_AFTER is 6.0');
+// ---- H1: the sheet can be read, then leaves the moving vista --------------
+if (!/const sysTUCK_AFTER = 8\.0;/.test(sys)) fail('sysTUCK_AFTER is not 8.0 (Homecoming: timed reveal)');
+else pass('sysTUCK_AFTER is 8.0');
 const tuckFn = sys.match(/function todoTuckTick\(dt\) \{([\s\S]*?)\n  \}/);
 if (!tuckFn) fail('todoTuckTick not found');
 else {
   const body = tuckFn[1];
-  if (!/const stopped = spd < sysTUCK_V;/.test(body)) fail('todoTuckTick does not compute a "stopped" state');
-  else pass('todoTuckTick computes "stopped" (spd < sysTUCK_V)');
-  if (!/if \(busy \|\| todoAwayHold > 0 \|\| !stopped\) todoAwayT = 0;/.test(body))
-    fail('todoTuckTick still resets the away timer on WALKING rather than on STOPPING — the rule is not inverted');
-  else pass('todoTuckTick resets its timer while moving, accumulates while stopped (inverted, H1)');
+  if (/\bspd\b|sysTUCK_V|!stopped/.test(body)) fail('movement still re-opens the full sheet');
+  else pass('movement does not re-open the full sheet');
+  if (!/if \(busy \|\| todoAwayHold > 0\) todoAwayT = 0;/.test(body))
+    fail('only modal/arrival and fresh rewards should reset the reveal timer');
+  else pass('modal/arrival and fresh rewards reset the timed reveal');
 }
 // a fresh tick or a fresh marquee must hold the sheet open — the "don't tuck
 // over a fresh payout" half of H1. The tick's own hold predates this pass;

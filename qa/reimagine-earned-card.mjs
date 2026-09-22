@@ -5,8 +5,9 @@ import { execFileSync } from 'node:child_process';
 const source=readFileSync('src/systems.js','utf8');
 const inherited=execFileSync('git',['show','2891ecc:src/systems.js'],{encoding:'utf8',maxBuffer:15000000});
 const css=s=>s.match(/function sysBuildCSS\([^]*?\n\}/)[0];
-// M2a adds only a lesson subtree and prevents horizontal title scrolling.
-// Keep the historical whole-sheet comparison outside these named additions.
+// Homecoming adds named lesson/title/atlas sections and a 44 px task-tab tap
+// target. Keep the historical CSS comparison outside those exact additions;
+// prose comments do not change the rendered sheet.
 const withoutLearning = css(source)
   .replace(/\/\* HOMECOMING opening paper:[^]*?\/\* HOMECOMING opening paper end\. \*\/\r?\n/, '')
   .replace("'.capyui-homevisit .capyui-jrled{min-height:44px;letter-spacing:.04em;text-transform:none;}',\n", '')
@@ -15,8 +16,12 @@ const withoutLearning = css(source)
   .replace(/\/\* HOMECOMING learning reference:[^]*?\/\* HOMECOMING learning reference end\. \*\/\r?\n/, '')
   .replace(/\/\* HOMECOMING atlas:[^]*?\/\* HOMECOMING atlas end\. \*\/\r?\n/, '')
   .replace('overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;', 'overflow-y:auto;overscroll-behavior:contain;');
-assert.ok(withoutLearning.replace(/\/\* D4: the reward[^]*?(?=\/\* ---------- flight readout)/,'\n')===css(inherited),
-  'inherited CSS, including arrivals, unchanged outside earned and learning selectors');
+const withoutHomecomingTab = withoutLearning.replace(
+  "'.capyui-todo .capyui-tab{display:none;align-items:center;min-height:44px;gap:8px;font-size:",
+  "'.capyui-todo .capyui-tab{display:none;align-items:center;gap:8px;font-size:");
+const codeOnly = s => s.replace(/\/\*[^]*?\*\//g, '');
+assert.ok(codeOnly(withoutHomecomingTab.replace(/\/\* D4: the reward[^]*?(?=\/\* ---------- flight readout)/,'\n'))===codeOnly(css(inherited)),
+  'inherited CSS, including arrivals, unchanged outside earned, learning and task-tab selectors');
 const top=source.match(/function sysEarnedCardLive\([^]*?\n\}/)[0];
 const fn=name=>source.match(new RegExp('  function '+name+'\\([^]*?\\n  \\}'))[0];
 const gate=new Function(top+';return sysEarnedCardLive;')();

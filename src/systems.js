@@ -10092,16 +10092,13 @@ function sysBuildCSS() {
   'box-shadow:' + shMd + ';border:1px solid ' + paper2 + ';',
   'transition:opacity ' + dSlow + ' ease;opacity:0;}',
 '.capyui-todo.show{opacity:1;}',
-/* THE PAPER TUCKS (L3, E5; inverted H1, LIFT9). In forty-one settled frames
-   the card covered a fifth of the width and up to half the height, top-left,
-   where the eye enters. It used to tuck WHILE WALKING and pop back the
-   instant the animal stopped — reverting exactly when the player had
-   stopped to read it. Flipped: six seconds after the animal settles
-   (arrival), it collapses to one line — the row you are on, its arrow and
-   its metres — unless a task just ticked or the marquee just opened
-   (`todoAwayHold`, set at both). A tap of the tab, or the journal key,
-   always brings the full sheet back either way. */
-'.capyui-todo .capyui-tab{display:none;align-items:center;gap:8px;font-size:' + tMd + ';',
+/* THE PAPER TUCKS (L3, E5; Homecoming P2). It covered a fifth of the width
+   and up to half the height in play. A movement gate kept it fully open
+   throughout every walk, precisely when the animal and landmark need room.
+   It now offers eight seconds after arrival or a manual reveal, then leaves
+   one readable objective line, arrow and metres. Fresh task/marquee moments
+   hold the sheet longer. The tab and journal remain deliberate ways back. */
+'.capyui-todo .capyui-tab{display:none;align-items:center;min-height:44px;gap:8px;font-size:' + tMd + ';',
   'font-weight:600;color:' + ink + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;',
   // H1 (LIFT9): the tab is the one thing on the sheet a tucked player can
   // still tap — bringing the full sheet back, same as the journal key.
@@ -26607,26 +26604,16 @@ export function createSystems(game) {
   const todoTabSub = sysEl('div', 'capyui-tabsub', '');
   todoEl.appendChild(todoTabSub);
   let todoAway = false, todoAwayT = 0, todoAwayHold = 0;
-  // H1 (LIFT9): INVERTED. This used to tuck the paper after `sysTUCK_AFTER`
-  // seconds of WALKING and pop it back the instant the animal stopped —
-  // reverting exactly when the player had stood still to read it. Now it
-  // tucks `sysTUCK_AFTER` seconds after the animal SETTLES (arrival), and
-  // stays open while moving. `todoAwayHold` (set on a tick and on a fresh
-  // marquee, below) is unchanged — it still means "a fresh payout is up,
-  // don't tuck over it" — but now it also holds the sheet open across the
-  // handful of frames right after the animal stops, if that stop was itself
-  // caused by, say, a completed task.
-  const sysTUCK_AFTER = 6.0;    // s of standing still before the paper tucks
-  const sysTUCK_V = 1.0;        // m/s: below this counts as stopped, not walking
+  // LIFT9's old walking gate never tucked during ordinary traversal. A timed
+  // reveal keeps the full list legible on arrival or after a deliberate tap,
+  // then stops occupying the vista regardless of whether the animal moves.
+  // `todoAwayHold` still protects a fresh task or marquee from vanishing.
+  const sysTUCK_AFTER = 8.0;    // s after arrival or a deliberate reveal
   const sysTUCK_HOLD = 5.0;     // s the paper stays open after a tick
   function todoTuckTick(dt) {
-    const capy = game.capy;
-    const v = capy && capy.velocity;
-    const spd = v ? Math.hypot(v.x, v.z) : 0;
     if (todoAwayHold > 0) todoAwayHold -= dt;
     const busy = !started || transBusy || jrShown || ledShown || albShown || pauseShown || game.state.paused;
-    const stopped = spd < sysTUCK_V;
-    if (busy || todoAwayHold > 0 || !stopped) todoAwayT = 0;
+    if (busy || todoAwayHold > 0) todoAwayT = 0;
     else todoAwayT += dt;
     const want = !wowEarnedOn && todoAwayT > sysTUCK_AFTER;
     if (want !== todoAway) {
@@ -26639,10 +26626,9 @@ export function createSystems(game) {
     if (want) {
       const top = taskRec[todoTopId];
       const t = top && top.txt ? top.txt.textContent : '';
-      // ...with the tally in front of it, in the count's grey
-      const tally = countEl.textContent.replace(/^.*?·\s*/, '').replace(/\s*done.*$/i, '').toLowerCase();
-      const tt = (tally ? tally + '  ·  ' : '') + t;
-      if (todoTabTxt.textContent !== tt) todoTabTxt.textContent = tt;
+      // The tab has room for one instruction. A progress prefix swallowed the
+      // actual task on the 231 px paper; the full sheet keeps the tally.
+      if (todoTabTxt.textContent !== t) todoTabTxt.textContent = t;
       const d = top && top.dist ? top.dist.textContent : '';
       if (todoTabDist.textContent !== d) todoTabDist.textContent = d;
       const on = !!(top && top.aim && top.aim.classList.contains('on'));
