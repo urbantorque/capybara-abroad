@@ -157,8 +157,15 @@ try {
   await walkTo({x:-56,z:-10});
   await walkTo({x:-56,z:80});
   const riverRow=h.page.locator('.capyui-txt').filter({hasText:/^Ride the Uji rapids down to the mill$/});
-  if(!await riverRow.isVisible())await h.page.locator('.capyui-todo.away .capyui-tab').click();
-  await riverRow.click();
+  const foldedTab=h.page.locator('.capyui-todo.away .capyui-tab');
+  if(await foldedTab.isVisible()){
+    await foldedTab.click();
+    await h.page.waitForFunction(()=>!document.querySelector('.capyui-todo').classList.contains('away'));
+  }
+  // The authored checklist window can exclude this row even when unfolded.
+  // Read-only waypoint navigation remains a fixture, not task discoverability.
+  report.riverRowVisible=await riverRow.isVisible();
+  if(report.riverRowVisible)await riverRow.click();
   await walkTo('uji-run', 2.4); await sample('river entry waypoint');
   await runRiver();
   await h.page.waitForFunction(() => window.__capy.taskDone('uji-run'), null, { timeout: 12000 });

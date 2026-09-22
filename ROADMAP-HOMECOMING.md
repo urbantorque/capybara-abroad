@@ -1109,6 +1109,46 @@ a source-response tail-budget hypothesis (count repeated >20ms frames), to
 be tested rather than shipped on this evidence. All 72 gates pass after the
 instrument/driver edits. Weekly allowance now 32% remaining.
 
+### M1p: listening capture and governor-tail attribution
+
+The first native-destination audition capture passes in Sydney: 182.63 seconds,
+48kHz WebM/Opus, 2,872,109 bytes, 180 short-window meter samples and no runtime
+errors. The tap preserves the hardware destination and owns only its parallel
+analyser/recording branch. Eleven VM checks cover topology and cleanup ownership.
+Generated takes remain local and ignored. This is neither integrated loudness
+measurement nor human listening approval; paired regional takes remain pending.
+
+Hanoi's source-response tail governor improves resting p95 to 16.9ms in both
+90-second trials, versus 23.8ms in the subsequent original-governor control.
+Walking is 18.7/20.5ms; both experimental runs contain a >100ms interval with a
+systems-heavy CPU hitch and no new shader programs. Production remains unchanged.
+The baseline now records renderer resize calls and wall-time rung samples to
+test whether governor transitions cause those stalls, rather than guessing.
+
+Earned continuation v5 stopped at Kyoto's task-row click again. The full sheet
+has a limited task window, so unfolding alone cannot reveal every task. The
+driver now records whether the row is visible, clicks only when visible and
+otherwise continues via its existing read-only waypoint fixture. It does not
+force hidden UI, change the task window or manufacture progress. This route
+cannot establish novice discoverability. Weekly allowance remains 32%.
+
+Resize-tail-v1 attributes 86.3ms of a 94.3ms walking frame to the renderer's
+setPixelRatio/setSize drawing-buffer resize at Auto rung 1 to 2. The redundant
+following setSize costs approximately zero in that frame; removing it alone
+would not repair this hitch. A fixed-DPR, otherwise unchanged tail-governor
+source-response arm is available for comparison, not enabled in production.
+Earned continuation v6 passes Kyoto's river/tea memory and its reload check,
+retaining all four earlier memories. Later-act and finale checks continue.
+
+Earned-v6 subsequently passes Hanoi, Palawan, cave, Monaco and Iceland, all
+ten live/saved memory gates, actual home-lawn rest, the complete twenty-note
+coda, persisted fin=1, closing notebook entry and duplicate-free reload/rest.
+Earlier tasks survive throughout. This completes the cross-session earned
+continuity evidence from v4/v5 checkpoints; the fresh uninterrupted context,
+natural travel-door discovery, novice testing and hardware gates remain open.
+Syntax, build and all 73 repository checks pass. Weekly allowance is now 31%
+remaining; the 25% stop threshold and protected 20% reserve are unchanged.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

@@ -31,3 +31,6 @@ qa/sheet.html
 # their port and dist/ path per run). The history it appends to,
 # qa/soak-history.jsonl, IS tracked: one line per run is the point of it.
 qa/.soak/
+
+# Local listening takes; the capture instrument and evidence protocol are tracked.
+qa/homecoming-audition-*.webm

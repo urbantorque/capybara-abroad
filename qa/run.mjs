@@ -28,6 +28,7 @@ import { existsSync } from 'node:fs';
 
 const ASSERTS = [
   ['qa/homecoming-gpu-contract.mjs', 'GPU diagnostic query ownership, pass attribution and cleanup'],
+  ['qa/homecoming-audition-contract.mjs', 'soundtrack capture destination topology and ownership'],
   ['qa/homecoming-sea-cache.mjs', 'Monaco cached sea phases match authored water heights'],
   ['qa/homecoming-layout-reads.mjs', 'traveller world query avoids forced screen layout'],
   ['qa/homecoming-shop-practice.mjs', 'isolated purchase rehearsal, live price and no game mutation'],

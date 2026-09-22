@@ -10,7 +10,7 @@ const phaseSeconds = Number(process.argv[6] || 15);
 const governorThreshold = Number(process.argv[7] || 0);
 assert([0,19,22].includes(governorThreshold),'optional diagnostic governor threshold');
 const governorTail=process.argv[8]||'';
-assert(!governorTail||governorTail==='tail','optional tail-budget diagnostic');
+assert(!governorTail||['tail','tail-fixed-dpr'].includes(governorTail),'optional tail-budget diagnostic');
 assert([15, 30].includes(phaseSeconds), '15-second baseline or 90-second route');
 assert(CHAPTERS.includes(chapter)); assert(['auto', 'pretty', 'fast'].includes(mode));
 assert(/^[\w-]+$/.test(tag));
@@ -31,6 +31,11 @@ try {
         ['if (pfMs > sysPF_SLOW_MS) {','if (pfMs > sysPF_SLOW_MS || qaLateFraction > .10) {'],
         ['else if (tickMs < sysPF_TICK_FAST_MS) {','else if (tickMs < sysPF_TICK_FAST_MS && qaLateFraction < .03) {']
       ]){assert.equal(source.split(before).length,2,'one diagnostic site: '+before);source=source.replace(before,after);}
+      if(governorTail==='tail-fixed-dpr'){
+        const before='const scale = r >= 3 ? sysPF_DPR : (r >= 2 ? sysPF_DPR2 : 1);';
+        assert.equal(source.split(before).length,2,'one diagnostic DPR site');
+        source=source.replace(before,'const scale = 1;');
+      }
     }
     await h.page.route('**/src/systems.js',r=>r.fulfill({contentType:'text/javascript',body:source}));
     await h.page.reload();await h.page.waitForFunction(()=>!!window.__capy&&!!document.querySelector('.capyui-go'));
@@ -52,10 +57,19 @@ try {
     await h.page.evaluate(() => {
       const g = window.__capy, raw = g.tick;
       const rawRender = g.renderer.render, rawShadow = g.renderer.shadowMap.render;
-      const data = { frames: [], samples: [], hitches: [], last: performance.now(), lastSample: 0,
+      const data = { frames: [], samples: [], hitches: [], resizes: [], last: performance.now(), lastSample: 0,
         passes: { world: [], mirror: [], post: [], shadow: [] },
         music: g.musAudit(), theme: g.musThemeAudit() };
       g.__homeProbe = { data, raw, rawRender, rawShadow };
+      const rawSize=g.renderer.setSize, rawRatio=g.renderer.setPixelRatio;
+      g.__homeProbe.rawSize=rawSize;g.__homeProbe.rawRatio=rawRatio;
+      for(const [key,method] of [['setSize',rawSize],['setPixelRatio',rawRatio]]){
+        g.renderer[key]=function(...args){
+          const at=performance.now();
+          try{return method.apply(this,args);}
+          finally{data.resizes.push({method:key,at,ms:performance.now()-at,args,rung:g.state.perfRung});}
+        };
+      }
       const moduleNames = Object.keys(g.state.perf.ms), beforeMs = new Float64Array(moduleNames.length);
       g.renderer.render = function (scene, camera) {
         const key = scene === g.scene ? (camera === g.camera ? 'world' : 'mirror') : 'post';
@@ -110,7 +124,7 @@ try {
           }
           if (start - data.lastSample > 250) {
             const p = g.state.perf;
-            data.samples.push({ t: g.state.time, rung: g.state.perfRung, calls: p.calls,
+            data.samples.push({ at: start, t: g.state.time, rung: g.state.perfRung, calls: p.calls,
               triangles: p.triangles, contacts: p.contacts, substeps: p.substeps,
               modules: { ...p.ms }, reflection: g.reflectInfo(),
               programs: p.programs, geometries: g.renderer.info.memory.geometries,
@@ -127,6 +141,7 @@ try {
     const data = await h.page.evaluate(() => {
       const g = window.__capy, p = g.__homeProbe;
       g.renderer.render = p.rawRender; g.renderer.shadowMap.render = p.rawShadow;
+      g.renderer.setSize=p.rawSize;g.renderer.setPixelRatio=p.rawRatio;
       g.tick = p.raw; delete g.__homeProbe;
       return { ...p.data, musicAfter: g.musAudit(), themeAfter: g.musThemeAudit(),
         state: { lastError: g.state.lastError, started: g.state.started }, perf: g.perfAudit() };
