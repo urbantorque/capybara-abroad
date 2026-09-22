@@ -1844,6 +1844,24 @@ function mainMakePost(game) {
    */
   post.warmTarget = function () { return sceneRT; };
 
+  // The world warm cannot see this private fullscreen triangle. Link even
+  // dormant passes before the hold lifts, against their real destination.
+  post.warmMaterials = function () {
+    const previousTarget = renderer.getRenderTarget(), previousMaterial = quad.material;
+    const materials = [matBright, matBlur, matRays, matCoC, matComp];
+    try {
+      for (const material of materials) {
+        quad.material = material;
+        renderer.setRenderTarget(material === matComp ? null : bloomA);
+        renderer.compile(quadScene, quadCam);
+      }
+    } finally {
+      quad.material = previousMaterial;
+      renderer.setRenderTarget(previousTarget);
+    }
+    return materials;
+  };
+
   post.render = function () {
     post.resize();
     const p = P;

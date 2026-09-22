@@ -122,7 +122,8 @@ function assertHealthy(row) {
 }
 
 try {
-  h = await openHarness({ story: true, pinRung: false });
+  // Regional audition is a Free Roam visit, not fabricated Story access.
+  h = await openHarness({ story: chapter === 'sydney', pinRung: false });
   report.metadata = h.metadata;
   await installTap();
   await h.page.reload({ waitUntil: 'load', timeout: 30000 });

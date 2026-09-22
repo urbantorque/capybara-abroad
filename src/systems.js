@@ -6573,6 +6573,17 @@ const sysLEARN_SHOP = {
   bought: 'Practice complete. The journey’s wallet and upgrades are unchanged.',
   held: 'Owned in this practice',
 };
+const sysLEARN_MEMORY = {
+  open: 'Try making a practice memory',
+  intro: 'Select a few Sydney moments. These are rehearsal choices, not completed tasks.',
+  core: 'Big experience', alternative: 'Quieter route', support: 'Small moment',
+  needCore: 'A big experience or its quieter route is still missing.',
+  needLegacy: 'The big experience is still missing from this older journey.',
+  needSupport: 'One different small moment is still needed.',
+  needSupports: '{n} different small moments are still needed.',
+  ready: 'Practice memory complete. The real journey is unchanged.',
+  reset: 'Clear practice choices',
+};
 const sysLEARN_MAP = {
   open: 'Try the map-key practice',
   intro: 'A small map-key rehearsal. It changes no route, wallet, task or save.',
@@ -8901,7 +8912,8 @@ function sysBuildCSS() {
   'border:1px solid ' + rule + ';border-radius:3px;cursor:pointer;}',
 '.capyui-learn button:disabled{opacity:.55;cursor:default;}',
 '.capyui-learn button:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
-'.capyui-learnshop,.capyui-learnmap{margin:8px 0 16px;padding-top:8px;border-top:1px solid ' + rule + ';}',
+'.capyui-learnshop,.capyui-learnmap,.capyui-learnmemory{margin:8px 0 16px;padding-top:8px;border-top:1px solid ' + rule + ';}',
+'.capyui-learnmemory button[aria-pressed="true"]{border-color:' + accentInk + ';font-weight:600;}',
 '.capyui-learn .capyui-mappractice-answer{display:inline-flex;align-items:center;gap:8px;}',
 /* HOMECOMING learning reference end. */
 /* HOMECOMING atlas: the existing postcards, in five quiet folds. */
@@ -24721,6 +24733,52 @@ export function createSystems(game) {
     return host;
   }
 
+  // Rehearse the same pure rule the travel gates read. Only this local Set
+  // changes; neither the task ledger nor the journey writer is reachable.
+  function learnMemoryPractice() {
+    const host = sysEl('div', 'capyui-learnmemory');
+    const open = sysEl('button', 'capyui-memorypractice-open', sysLEARN_MEMORY.open);
+    open.type = 'button'; host.appendChild(open);
+    open.addEventListener('click', function () {
+      if (open.hidden) return;
+      const selected = new Set(), buttons = [];
+      const rule = homecomingArc ? homecomingMemory : chapterExperience;
+      const def = rule(1, function () { return false; });
+      const rows = [[def.signature, sysLEARN_MEMORY.core]];
+      if (def.alternative) rows.push([def.alternative, sysLEARN_MEMORY.alternative]);
+      for (const id of def.supports.slice(0, 2)) rows.push([id, sysLEARN_MEMORY.support]);
+      host.appendChild(sysEl('p', null, sysLEARN_MEMORY.intro));
+      const status = sysEl('p', 'capyui-memorypractice-status');
+      status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+      function refresh() {
+        const memory = rule(1, function (id) { return selected.has(id); });
+        for (const b of buttons) b.setAttribute('aria-pressed', String(selected.has(b.dataset.task)));
+        status.textContent = memory.enough ? sysLEARN_MEMORY.ready
+          : !(memory.coreDone || memory.signatureDone)
+            ? (def.alternative ? sysLEARN_MEMORY.needCore : sysLEARN_MEMORY.needLegacy)
+            : (memory.supportMissing === 1 ? sysLEARN_MEMORY.needSupport
+              : sysLEARN_MEMORY.needSupports.replace('{n}', memory.supportMissing));
+      }
+      for (const row of rows) {
+        const task = TASKS.find(function (t) { return t.id === row[0]; });
+        const b = sysEl('button', 'capyui-memorypractice-choice', row[1] + ': ' + task.text);
+        b.type = 'button'; b.dataset.task = row[0];
+        b.addEventListener('click', function () {
+          if (selected.has(row[0])) selected.delete(row[0]); else selected.add(row[0]);
+          refresh();
+        });
+        buttons.push(b); host.appendChild(b);
+      }
+      host.appendChild(status);
+      const reset = sysEl('button', 'capyui-memorypractice-reset', sysLEARN_MEMORY.reset);
+      reset.type = 'button'; reset.addEventListener('click', function () {
+        selected.clear(); refresh(); buttons[0].focus();
+      });
+      host.appendChild(reset); refresh(); open.hidden = true; buttons[0].focus();
+    });
+    return host;
+  }
+
   function learnGuide() {
     const guide = sysEl('div', 'capyui-learn');
     // Content is interactive reference, never the title backdrop's Begin.
@@ -24752,6 +24810,7 @@ export function createSystems(game) {
       });
       lesson.appendChild(body);
       lesson.appendChild(practice);
+      if (i === 2) lesson.appendChild(learnMemoryPractice());
       if (i === 3) lesson.appendChild(learnShopPractice());
       if (i === 4) lesson.appendChild(learnMapPractice());
       guide.appendChild(lesson);
@@ -33272,7 +33331,9 @@ export function createSystems(game) {
     const wz = boardZ - lx * s + lz * c;
     const wy = boardY + boardObj.topY - 0.10;
     g.position.set(wx, wy, wz);
-    scene.add(g);
+    // Rebuilt per visit like its board, not retained chapter scenery. Captured
+    // ornaments were reattached after disposal, adding one geometry per entry.
+    THREE.Object3D.prototype.add.call(scene, g);
     boardHangG = g;
     boardHangRec = game.hang({ biome: bio, group: g, x: wx, y: wy, z: wz, len: row.len,
                 mat: row.mat, wind: row.wind, chime: !!row.chime,
@@ -41996,6 +42057,9 @@ export function createSystems(game) {
       biomeWarmShim.objs = objs;
       if (rt) renderer.setRenderTarget(rt);
       mats = renderer.compile(biomeWarmShim, camera, scene);
+      if (game.post && typeof game.post.warmMaterials === 'function') {
+        game.post.warmMaterials().forEach(function (m) { mats.add(m); });
+      }
     } catch (e) {
       mats = null;
     } finally {
@@ -53961,8 +54025,8 @@ export function createSystems(game) {
       const tickMs = game.state.tickMs || pfMs;
       // A smooth mean can hide repeated missed refreshes. Keep the authored
       // clocks, but require frame-tail headroom before restoring detail.
-      if (pfMs > sysPF_SLOW_MS || lateFraction > 0.10) { pfSlowT += win; pfFastT = 0; }
-      else if (tickMs < sysPF_TICK_FAST_MS && lateFraction < 0.03) { pfFastT += win; pfSlowT = 0; }
+      if (pfMs > sysPF_SLOW_MS || lateFraction > 0.05) { pfSlowT += win; pfFastT = 0; }
+      else if (tickMs < sysPF_TICK_FAST_MS && lateFraction < 0.01) { pfFastT += win; pfSlowT = 0; }
       else { pfSlowT = 0; pfFastT = 0; }
       if (sysPerfMode === 1) sysPerfSet(0);
       else if (sysPerfMode === 2) sysPerfSet(3);

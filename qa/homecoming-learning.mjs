@@ -56,6 +56,33 @@ async function mapPractice(guide) {
   check(await next.isDisabled(),'map reset starts a new rehearsal');
   assert.deepEqual(await snapshot(),before);out.checks++;
 }
+async function memoryPractice(guide) {
+  const lesson=guide.locator('.capyui-learnlesson').nth(2);
+  if(await lesson.getAttribute('open')===null)await lesson.locator('summary').click();
+  const snapshot=()=>h.page.evaluate(()=>({started:window.__capy.state.started,
+    save:localStorage.getItem('capy3.journey.v1')}));
+  const before=await snapshot();
+  await lesson.locator('.capyui-memorypractice-open').click();
+  const choices=lesson.locator('.capyui-memorypractice-choice'),status=lesson.locator('.capyui-memorypractice-status');
+  check(await choices.count()===4,'fresh Story rehearsal offers both core routes and two supports');
+  check(await choices.first().evaluate(el=>document.activeElement===el),'opening focuses first choice');
+  for(let i=0;i<4;i++){
+    await choices.nth(i).scrollIntoViewIfNeeded();const box=await choices.nth(i).boundingBox();
+    check(box.height>=44&&box.x>=0&&box.x+box.width<=(touch?390:1280),'memory choice remains a usable target');
+  }
+  await choices.nth(2).click();await choices.nth(3).click();
+  check((await status.textContent()).includes('still missing'),'small moments alone do not complete memory');
+  await choices.nth(1).focus();await h.page.keyboard.press('Enter');
+  check((await status.textContent()).includes('complete'),'quiet route plus support completes rehearsal');
+  check(await choices.nth(1).getAttribute('aria-pressed')==='true','choice exposes selected state');
+  await choices.nth(1).click();check((await status.textContent()).includes('still missing'),'choice can be undone');
+  await choices.first().click();check((await status.textContent()).includes('complete'),'big experience is an alternative');
+  await h.screenshot('homecoming-memory-practice-'+(before.started?'pause':'title')+'-'+(touch?'touch':'desktop'));
+  await lesson.locator('.capyui-memorypractice-reset').click();
+  check(await choices.first().evaluate(el=>document.activeElement===el),'reset restores focus');
+  check(await lesson.locator('.capyui-memorypractice-choice[aria-pressed="true"]').count()===0,'reset clears local choices');
+  assert.deepEqual(await snapshot(),before);out.checks++;
+}
 try {
   const p = h.page;
   const title = p.locator('.capyui-more').filter({ hasText: 'learn to play' });
@@ -71,6 +98,7 @@ try {
   }
   const body = await lessons.first().textContent();
   await rehearse(title.locator('.capyui-learn'));
+  await memoryPractice(title.locator('.capyui-learn'));
   await mapPractice(title.locator('.capyui-learn'));
   check(touch ? body.includes('movement stick') && !body.includes('W, A, S, D') : body.includes('W, A, S, D'), 'correct control scheme');
   check(!await p.evaluate(() => window.__capy.state.started), 'reading does not begin game');
@@ -92,6 +120,7 @@ try {
   const before = await progress();
   const guide = p.locator('.capyui-jrkeys .capyui-learn');
   await rehearse(guide);
+  await memoryPractice(guide);
   await mapPractice(guide);
   // Map practice scrolled past the shop. Re-open it to exercise the actual
   // disclosure scroll contract instead of asserting an old offscreen lesson.
@@ -110,7 +139,7 @@ try {
   out.pass = true;
 } catch (e) { out.pass = false; out.failure = String(e.stack || e); process.exitCode = 1; }
 finally {
-  try { await h.result('homecoming-learning-v11-' + (touch ? 'touch' : 'desktop'), out); }
+  try { await h.result('homecoming-learning-v12-' + (touch ? 'touch' : 'desktop'), out); }
   finally { await h.close(); }
   console.log(JSON.stringify({ touch, checks: out.checks, pass: out.pass, failure: out.failure, errors: h.metadata.errors }));
 }

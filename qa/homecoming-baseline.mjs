@@ -10,7 +10,7 @@ const phaseSeconds = Number(process.argv[6] || 15);
 const governorThreshold = Number(process.argv[7] || 0);
 assert([0,19,22].includes(governorThreshold),'optional diagnostic governor threshold');
 const governorTail=process.argv[8]||'';
-assert(!governorTail||['tail','tail-fixed-dpr','tail-post-scale'].includes(governorTail),'optional tail-budget diagnostic');
+assert(!governorTail||['tail','tail-fixed-dpr','tail-post-scale','tail-tight-post-scale'].includes(governorTail),'optional tail-budget diagnostic');
 assert([15, 30].includes(phaseSeconds), '15-second baseline or 90-second route');
 assert(CHAPTERS.includes(chapter)); assert(['auto', 'pretty', 'fast'].includes(mode));
 assert(/^[\w-]+$/.test(tag));
@@ -39,7 +39,11 @@ try {
         assert.equal(source.split(before).length,2,'one diagnostic DPR site');
         source=source.replace(before,'const scale = 1;');
       }
-      if(governorTail==='tail-post-scale'){
+      if(governorTail==='tail-tight-post-scale'){
+        source=source.replace('qaLateFraction > .10','qaLateFraction > .05')
+          .replace('qaLateFraction < .03','qaLateFraction < .01');
+      }
+      if(governorTail.endsWith('post-scale')){
         const before='if (scale !== dprScale) { dprScale = scale; applyDPR(); }';
         assert.equal(source.split(before).length,2,'one diagnostic scale writer');
         source=source.replace(before,'game.state.__qaPostScale=scale;');

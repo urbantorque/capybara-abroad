@@ -1178,6 +1178,97 @@ clearly miss the p95 target, respectively; no full performance pass is claimed.
 Monaco has one 54.3ms CPU frame including a newly used RawShaderMaterial post
 program, distinct from the repaired canvas resize. Longer stability follows.
 
+### M1r / M2g: post readiness and memory rehearsal (in verification)
+
+The existing arrival warm now includes all five private fullscreen materials,
+using an offscreen target for intermediate passes and the native screen for
+the final composite. They join the same asynchronous readiness set as world
+materials. Target/material ownership is restored even on compile failure.
+This is startup/arrival work only, covered by the existing noWarm diagnostic;
+no new visual term, per-frame allocation or save field. Monaco post-warm-v1
+records p95 18.7/19.5/19.4ms and no >50ms CPU tick or >100ms interval. A bounded
+Luna review found no concrete rendering/ownership defect. This one repeat
+does not establish all-place frame coverage or prove every shader hitch gone.
+
+Learn to Play gains an optional memory rehearsal in its third lesson. Local
+choices use the actual Story/legacy pure memory rules and live Sydney task
+names, without any task/save/wallet writer. It demonstrates both core routes,
+distinct support requirements, undo and reset; native buttons expose pressed
+state and an announced result. DOM-only checks pass Story alternatives and
+the preserved older signature-plus-two-support rule. Desktop/touch browser
+verification is pending behind the single active resource test.
+
+Long-v1 stopped because its fresh Story fixture could not enter locked Hanoi;
+no production travel policy was changed. Long-v2 selects the real Free Roam
+menu for its resource-only loop. It runs the loaded stable-canvas/post-warm
+build before the memory-rehearsal UI edits, so it cannot certify that later UI.
+The earned Story journey evidence remains the separate earned-v6 run.
+
+Long-v2 completes thirty real minutes and 62 resource checkpoints with zero
+runtime errors/crashes, finite movement and maintained foreground focus. In
+its final twelve samples JS heap ranges 42.7–64.3MiB, programs stay at 86,
+DOM nodes range 6038–6138 and resident geometry rises from 581 to 584. This
+passes the bounded stability run, not a strict GPU-resource plateau finding;
+first-use uploads versus retained geometry growth still need attribution.
+
+Learning-v12 passes 113 desktop and 113 touch-sized checks; screenshots were
+inspected. The guide contract's fixture gained the new separately tested
+builder stub after its first full-suite failure. The corrected suite passes
+75 checks. A stricter source-response governor comparison passes Hanoi and
+Monaco; production then adopts a 5% slow-frame budget and 1% recovery ceiling,
+with the authored dwell/bounce clocks unchanged. Tight-production-v1 p95 is
+19.1/17.5/19.4ms in Hanoi and 17.9/17.6/17.2ms in Monaco, with all p99 below
+33.4ms and no >100ms interval. Broader hardware/place coverage remains open.
+
+Geometry-v1 crashed the owned Edge renderer during startup before sampling;
+no cause was established. Geometry-v2 starts and completes seven real-key
+visits. In Hanoi, 18 added resident geometries correspond to only two newly
+retained scene geometries, showing substantial first-use upload. Separately,
+each later arrival retains one new chapter-owned ornament: Sydney's five-box
+sign has 120 vertices, Hanoi's fifteen-box strand has 360. boardHangPlant used
+captured scene.add even though boardHangDrop disposes it every visit. The
+board itself already uses loose ownership. The ornament now uses that same
+native Object3D mount, preventing disposed ornaments being reattached from
+the chapter cache. Six rebuild/dispose cycles reproduce six captures on the
+old path and zero on the repaired path. Browser revisit verification pending.
+This is an ownership repair, with no visual authoring, save or effect flag.
+
+Native-destination audition captures also pass three-minute protocols in Kyoto,
+Hanoi and Iceland, plus Sydney with inherited arrangement flags. Regional
+captures select actual Free Roam because fresh Story access is intentionally
+locked. Files are local ignored WebM artifacts named
+`qa/homecoming-audition-{place}-{live|inherited}-v1.webm`; Sydney's live take is
+the earlier capture. Each reports non-silent output, a running audio clock,
+foreground play and no runtime error. These are unnormalised, non-seed-matched
+takes, not a listening preference approval, a prior-release reconstruction or
+nineteen-biome soundtrack sign-off. Weekly allowance was 26% before final
+verification; no additional feature tranche is being started.
+
+Geometry-fixed-v1 passes seven visits and fourteen snapshots with no runtime
+errors. After the three places are built, retained scene geometry stays at
+673 for all ten remaining snapshots. Each arrival adds and removes four
+temporary board geometries; movement creates none in those repeated visits.
+Resident geometry moves 559–561 while the retained inventory stays constant,
+consistent with first-use uploads, not the previous per-arrival retention bug.
+Syntax, build and all 76 repository checks pass.
+
+### Quota checkpoint: continuation paused at 25% remaining
+
+The account now reports 75% weekly usage. No further feature work is started.
+The continuation heartbeat is paused under the agreed quota rule; it must not
+resume automatically after reset. Public master remains unchanged. Existing
+unrelated local files and saves are preserved. The roadmap is not complete.
+
+Remaining engineering/release scope, in order: investigate the intermittent
+Edge startup crash; repeat current-build broader frame/transition/physics and
+fresh uninterrupted Story coverage; complete movement/interaction lesson work;
+review all biome arrangements and global visual prototypes within measured
+budgets; finish selected return variants and only justified rival scenes.
+Human listening/novice evaluation and real lower-power/mobile/browser coverage
+remain unavailable, not passed by these scripts. Hosted candidate verification
+and master promotion have not occurred. The five ignored audition files are
+ready for a listening review, but are neither loudness-normalised nor blind.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

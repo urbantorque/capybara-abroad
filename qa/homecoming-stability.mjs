@@ -15,7 +15,7 @@ const name = 'homecoming-stability-' + tag;
 const shortCycles = 5, routeMs = 7500;
 const chapters = ['sydney', 'hanoi', 'monaco', 'sydney'];
 const report = {
-  scope: 'One fresh headful story browser and retained normal save. Short mode reloads and restarts five times, then drives trusted W/D/S/A for 30 seconds per cycle. Long mode remains live for 30 minutes and samples the Sydney/Hanoi/Monaco/Sydney arrival fixture every two minutes. No forced GC, task/save/body/input writes, or earned-journey claim.',
+  scope: 'One fresh headful browser and retained normal save. Short Story mode reloads and restarts five times, then drives trusted W/D/S/A for 30 seconds per cycle. Long mode selects real Free Roam, remains live for 30 minutes and samples the Sydney/Hanoi/Monaco/Sydney arrival fixture every two minutes. No forced GC, task/save/body/input writes, or earned-journey claim.',
   diagnostic: 'Resource trends are observations, not proof of a leak, plateau, or crash cause. Arrival is a public diagnostic fixture, not natural travel.',
   mode: long ? 'long' : 'short', tag, rows: [], events: [], metadata: null,
   capabilities: { performance: false, runtimeHeap: false, performanceMemory: false }
@@ -139,7 +139,7 @@ async function longRun() {
 }
 
 try {
-  h = await openHarness({ story: true, pinRung: false });
+  h = await openHarness({ story: !long, pinRung: false });
   report.metadata = h.metadata;
   h.page.on('crash', () => { crashed = true; report.events.push({ kind: 'crash', cycle, stage, at: new Date().toISOString() }); });
   h.browser.on('disconnected', () => report.events.push({ kind: 'browser disconnected', cycle, stage, at: new Date().toISOString() }));

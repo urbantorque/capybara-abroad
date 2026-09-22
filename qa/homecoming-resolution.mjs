@@ -37,11 +37,11 @@ for(const scale of [1,.8,.6,1]){
   sizes.length=0;vm.runInContext('post.resize()',q);assert.equal(sizes.length,0,'stable dimensions allocate nothing');
 }
 const branch=systems.match(/      if \(pfMs > sysPF_SLOW_MS \|\| lateFraction[^]*?else \{ pfSlowT = 0; pfFastT = 0; \}/)[0];
-for(const [mean,cpu,late,slow,fast] of [[17,5,.2,.5,0],[17,5,0,0,.5],[17,5,.05,0,0],[23,5,0,.5,0],[17,20,0,0,0]]){
+for(const [mean,cpu,late,slow,fast] of [[17,5,.2,.5,0],[17,5,0,0,.5],[17,5,.05,0,0],[23,5,0,.5,0],[17,20,0,0,0],[17,5,.06,.5,0],[17,5,.02,0,0]]){
   const c=vm.createContext({pfMs:mean,tickMs:cpu,lateFraction:late,sysPF_SLOW_MS:22,sysPF_TICK_FAST_MS:10,
     win:.5,pfSlowT:0,pfFastT:0});vm.runInContext(branch,c);
   assert.equal(c.pfSlowT,slow);assert.equal(c.pfFastT,fast);
 }
 assert(systems.includes('if (fpsDt > 0.020) pfLateFrames++;'));
 assert(systems.includes('const lateFraction = pfLateFrames / fpsFrames;\n      pfLateFrames = 0;'));
-console.log('Homecoming resolution: stable canvas, fallback, seven target dimensions, reuse and five governor windows pass.');
+console.log('Homecoming resolution: stable canvas, fallback, seven target dimensions, reuse and seven governor windows pass.');

@@ -22,9 +22,11 @@ function el(tag, cls, text) {
 const q = vm.createContext({ sysEl: el, sysSay: s => s, mode: 'keyboard', homecomingArc: true,
   learnShopPractice: () => el('div', 'capyui-learnshop'),
   learnMapPractice: () => el('div', 'capyui-learnmap'),
+  learnMemoryPractice: () => el('div', 'capyui-learnmemory'),
   sysScheme: (keyboard, touch, pad) => q.mode === 'touch' ? touch : q.mode === 'pad' ? pad : keyboard });
 vm.runInContext(data[0] + '\n' + s.slice(at, end + 1), q);
 const guide = q.learnGuide();
+assert.equal(guide.children[2].children[3].cls,'capyui-learnmemory','third lesson exposes the separately tested rehearsal');
 assert(guide.children[2].children[1].textContent.includes('quieter route'));
 q.homecomingArc = false; guide.children[2].events.toggle();
 assert(!guide.children[2].children[1].textContent.includes('Two memories'));

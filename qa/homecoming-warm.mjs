@@ -39,3 +39,22 @@ assert.equal(q.biomeWarmReady({programs:new Map([['unsupported',{}]])}),true,'mi
 assert.equal(q.biomeWarmReady(null),true,'missing material does not deadlock');
 assert(s.includes('if (biomeWarmReady(pr)) mats.delete(m);'),'real warm poll uses complete readiness');
 console.log('Homecoming warm: 18 attached-world, variant and startup checks pass.');
+
+const warmPost=main.match(/  post.warmMaterials = function \(\) \{[^]*?\n  \};/)[0];
+const bright={},blur={},rays={},coc={},comp={},oldMaterial={},oldTarget={},bloomTarget={};
+const calls=[],quad={material:oldMaterial};let target=oldTarget,fail=false;
+const postContext=vm.createContext({post:{},quad,quadScene:{},quadCam:{},bloomA:bloomTarget,
+  matBright:bright,matBlur:blur,matRays:rays,matCoC:coc,matComp:comp,
+  renderer:{getRenderTarget:()=>target,setRenderTarget:t=>{target=t;},
+    compile:()=>{calls.push({material:quad.material,target});if(fail)throw Error('compile failure');}}});
+vm.runInContext(warmPost,postContext);
+const postMaterials=postContext.post.warmMaterials();
+assert.equal(postMaterials.length,5);
+assert.deepEqual(calls.map(c=>c.material),[bright,blur,rays,coc,comp]);
+assert(calls.slice(0,4).every(c=>c.target===bloomTarget));
+assert.equal(calls[4].target,null,'composite uses native-screen program');
+assert.equal(target,oldTarget);assert.equal(quad.material,oldMaterial);
+fail=true;assert.throws(()=>postContext.post.warmMaterials(),/compile failure/);
+assert.equal(target,oldTarget);assert.equal(quad.material,oldMaterial);
+assert(s.includes('game.post.warmMaterials().forEach(function (m) { mats.add(m); });'),'post joins existing asynchronous readiness set');
+console.log('Homecoming post warm: five real destinations, failure restoration and readiness ownership pass.');
