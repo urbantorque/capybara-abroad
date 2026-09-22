@@ -7,7 +7,14 @@ Work is on codex/homecoming; master stays published until a coherent release
 candidate passes hosted checks. The continuation heartbeat now tracks this
 roadmap, not the expired REIMAGINE loop. Weekly allowance was 57% remaining
 at approval, 55% at M1c; stop new work at 25% remaining and preserve the
-user's 20% reserve. Check the live account between milestones.
+user's 20% reserve. Latest M2b reading is 54% remaining. Check the live account
+between milestones.
+
+M2b replaces the displayed block title with live two-line serif lettering,
+narrows and straightens the first-page sheet, and moves the key chart into
+Learn to Play. Animated capybara/world and title camera are unchanged.
+Touch gameplay controls hide until entry. No font downloads or raster assets.
+The public master version has not been changed by these Homecoming commits.
 
 Pushed work covers subtractive score admission, four long-rest phrase
 prototypes, a five-lesson title/pause reference and sleeping scene-root
@@ -21,7 +28,7 @@ stopped on its subsequent pointer/focus assertion. Its desktop and
 touch-emulated browser runs pass 35 checks each; all 59 suite checks pass.
 M1c runs all nineteen arrivals and two returns, with 58 suite
 checks passing. CPU matrix traversal is reduced; whole-frame targets remain
-unmet in some samples. Interactive practice, five-act progression, opening,
+unmet in some samples. Interactive practice, earned progression validation, opening,
 returns, global art rollout and release validation remain work to do.
 Do not call reference lessons interactive practice, scheduler probes listening
 approval, or short arrival windows a sustained performance certification.

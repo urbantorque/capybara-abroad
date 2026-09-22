@@ -608,6 +608,21 @@ The separate real-key driver earned the hat in 10.4 seconds but stopped at
 its next pointer/focus assertion; earned first-memory validation stays open.
 No new visual/audio term; cached progress avoids per-frame allocations.
 
+### M2b: title typography and menu checkpoint
+
+The title now uses live Georgia/serif lettering: curved mixed-case Capybara
+over smaller, widely spaced Abroad. A narrower upright sheet replaces the
+tilted paper stack. Begin and Carry on use the same book face; the full key
+chart moves into Learn to Play. Touch gameplay buttons stay hidden until
+entry. The animated capybara/world, camera and separate atlas remain intact.
+No downloaded font, raster asset, new colour, save field or per-frame effect.
+Desktop and phone-emulated screenshots have been inspected; keyboard entry,
+disclosure, reduced motion and target bounds are checked in the browser.
+This is the first selected serif treatment, not a claim that multiple bespoke
+lettering variants or physical devices have been evaluated.
+Validation: 60 suite gates, sixteen title assertions each on desktop/touch,
+35 returning-atlas assertions and 25 touch-reference assertions pass.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

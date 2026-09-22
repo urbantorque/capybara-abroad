@@ -11432,6 +11432,33 @@ function sysBuildCSS() {
   '.capyui-toasts{left:auto;right:8px;bottom:auto;top:8px;transform:none;',
   'align-items:flex-end;width:min(50vw,220px);}}',
 '@media (max-height:520px){.capyui-task{font-size:10px;line-height:1.12;}}',
+/* HOMECOMING title: book lettering and a quieter first-page menu only. */
+'.capyui-title:not(.gone)~.capyui-touch{visibility:hidden;pointer-events:none;}',
+'.capyui-card:not(.two){max-width:520px;transform:none;border-radius:3px;',
+  'padding:clamp(24px,4vw,42px) clamp(24px,4vw,48px);background-image:none;',
+  'box-shadow:0 12px 42px ' + shadow2 + ';}',
+'.capyui-card:not(.two):before{display:none;}',
+'.capyui-p1 .capyui-mast{display:flex;flex-direction:column;align-items:center;',
+  'font-family:Georgia,"Times New Roman",serif;font-weight:400;line-height:1;',
+  'margin:0;text-transform:none;letter-spacing:normal;}',
+'.capyui-word{font-size:clamp(45px,8.8vw,70px);letter-spacing:-.055em;',
+  'font-weight:400;line-height:1.12;}',
+'.capyui-abroad{font-size:clamp(18px,3.8vw,25px);letter-spacing:.35em;',
+  'text-transform:uppercase;margin:8px -.35em 0 0;font-weight:400;}',
+'.capyui-p1 .capyui-sub{margin-top:22px;font-size:11px;line-height:1.6;',
+  'letter-spacing:.08em;text-transform:none;font-weight:400;}',
+'.capyui-p1 .capyui-why{line-height:1.6;margin-top:6px;}',
+'.capyui-p1 .capyui-orn{margin:18px 0 4px;}',
+'.capyui-p1 .capyui-go,.capyui-p1 .capyui-carry{min-height:48px;border-radius:2px;}',
+'.capyui-p1 .capyui-go b,.capyui-p1 .capyui-carryl b{',
+  'font-family:Georgia,"Times New Roman",serif;font-size:18px;font-weight:400;}',
+'.capyui-p1 .capyui-go.alt{margin-top:6px;}',
+'.capyui-p1 .capyui-go i{font-size:10px;letter-spacing:.04em;text-transform:none;font-weight:400;}',
+'.capyui-p1 .capyui-more>summary{min-height:44px;display:flex;align-items:center;justify-content:center;}',
+'.capyui-p1 .capyui-title-keys{margin:16px auto;}',
+'@media (max-width:520px){.capyui-card:not(.two){padding:24px 22px;}',
+  '.capyui-p1 .capyui-sub{margin-top:18px;}}',
+/* HOMECOMING title end. */
 ''
   ].join('');
 }
@@ -24619,16 +24646,12 @@ export function createSystems(game) {
   cardEl.appendChild(p1El);
   cardEl.appendChild(p2El);
   {
-    // ---- THE MASTHEAD IS CUT, NOT SET (D6). See sysBuildWordmark. --------
-    // It stays an <h1> and it keeps the words: the mark is aria-hidden and
-    // the heading carries a visually-hidden copy of the title, so the
-    // document still has a level-one heading with the game's name in it and
-    // a screen reader still reads three words rather than announcing a
-    // graphic. A wordmark that costs a page its <h1> is not a wordmark, it
-    // is a picture where a heading was.
+    // Live lettering keeps the curves of a book face at every display size.
+    // The heading itself is readable; no duplicate hidden title or font fetch.
     const h1 = sysEl('h1', 'capyui-mast');
-    h1.appendChild(sysBuildWordmark('Capybara Abroad'));
-    h1.appendChild(sysEl('span', 'capyui-sr', 'Capybara Abroad'));
+    h1.appendChild(sysEl('span', 'capyui-word', 'Capybara'));
+    h1.appendChild(document.createTextNode(' '));
+    h1.appendChild(sysEl('span', 'capyui-abroad', 'Abroad'));
     p1El.appendChild(h1);
   }
   p1El.appendChild(sysEl('div', 'capyui-sub',
@@ -24764,6 +24787,8 @@ export function createSystems(game) {
     const leg = sysFillLegend(sysEl('div', 'capyui-legend'));
     leg.insertBefore(sysEl('div', 'capyui-label', 'how to be a capybara'),
                      leg.firstChild);
+    // Kept in the reference fold below, not between the title and its menu.
+    leg.classList.add('capyui-title-keys');
     p1El.appendChild(leg);
   }
   {
@@ -24783,6 +24808,7 @@ export function createSystems(game) {
     });
     sum.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
     more.appendChild(sum);
+    more.appendChild(p1El.querySelector('.capyui-title-keys'));
     more.appendChild(learnGuide());
     const moreLeg = sysFillLegend(sysEl('div', 'capyui-legend'), 'more');
     moreLeg.addEventListener('pointerdown', function (e) { e.stopPropagation(); });

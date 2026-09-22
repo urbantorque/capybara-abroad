@@ -1,3 +1,22 @@
+## HOMECOMING M2b — BOOK-FACE TITLE (22 Sep 2026)
+
+Replace the displayed angular stencil with a live two-line serif heading:
+curved Capybara, smaller widely tracked Abroad. The first-page paper is
+upright, narrower and single-layered; menu labels share its book face.
+Move the main key chart into Learn to Play, preserving all controls and
+reference lessons. Hide touch gameplay controls behind the title until entry.
+The animated world, capybara, camera and atlas are untouched.
+
+No font fetch, bitmap, new colour, save field, audio writer or per-frame
+effect. Native heading text and existing focus outlines remain. This is a
+static interface replacement, not a governor-controlled decorative term.
+Desktop and phone-emulated screenshots are inspected. The browser instrument
+covers native disclosure, keyboard entry, reduced motion and target bounds.
+Actual-device typography and subjective preference remain reviewable.
+All 60 suite gates pass. Title checks pass sixteen assertions each on desktop
+and touch emulation; the returning atlas passes 35 and the touch reference
+passes 25. No runtime errors in these browser runs.
+
 ## HOMECOMING M3b — STORY ADMISSION (22 Sep 2026)
 
 Fresh journeys open Sydney first, then five acts at two memories per act.
