@@ -55,4 +55,24 @@ the player's earlier missing-reflection cause cannot be inferred from that.
 Focused post-fix Monaco inherited fuzz: 45 seconds, pass, peak 15.1 m/s,
 zero NaN/void/runtime errors, two solver recoveries (within inherited gate).
 This run did not reproduce the historical 33.1975 m/s contact sequence.
-Public deployment and hosted verification pending.
+## Published
+
+Master fast-forwarded from `719b3e3` to `a062472` (77 commits), pushed with
+the redesign branch. Pages workflow 35672823334 completed successfully.
+https://urbantorque.github.io/capybara-abroad/ serves 7,171,106 bytes, exactly
+matching the local artifact SHA-256:
+`9e5a8bae338a28fff25b82d33e375924d444e54a2c9d3b6723ddeb5c0cc4fe57`.
+
+54 automated checks pass. The same 12 browser assertions pass against the
+actual public HTTPS URL in a fresh headful Edge profile: movement, audio,
+three visited chapters, quality control, reflections, save/resume and zero
+console/runtime errors or failed requests. Hosted Kyoto mask: 191,154 pixels,
+172,966 changed, mean difference 33.33; screenshot inspected. The image shows
+the pavilion and surrounding trees reflected across the pond.
+
+Artifacts: qa/release-hosted.json.png, qa/release-hosted-reflections.png,
+qa/release-hosted-resume.png (ignored evidence); instruments are committed.
+No end-to-end earned journey or new full nineteen-place soak is claimed.
+The older Monaco intermittent-speed warning remains open despite the narrow
+clamp repair and passing focused run. This is a verified published playtest,
+not a claim of complete release certification.

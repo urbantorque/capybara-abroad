@@ -13,7 +13,11 @@ car speed +4, not the previous +2 trigger. 16 scenarios/88 checks; focused
 45-second inherited fuzz passes at 15.1 m/s with two solver recoveries.
 Do not present that as reproducing or closing the earlier 33.1975 m/s peak.
 No new saves, flags or visual/audio terms; only Settings copy and a corrected
-comparison in an existing loop. Public browser verification pending.
+comparison in an existing loop. Master production `a062472` is published:
+Pages 35672823334 succeeded, artifact byte-identical to local build. All 54
+automated checks and 12 browser assertions at the public HTTPS URL pass.
+Hosted mirror: 172,966 changed water pixels, screenshot inspected. Preserve
+the earlier soak failure; hosted smoke is not full journey certification.
 
 ## REIMAGINE G — CLOSING REGRESSION, MONACO OPEN (21 Sep 2026)
 

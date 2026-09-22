@@ -9,7 +9,11 @@ not merge the unfinished score-w2-wip pad multiplier. Reflections survive;
 Pretty keeps them, Auto can park them, Fast parks them. Settings says so.
 A separately proven Monaco accelerating-clamp bug is fixed; the focused
 45-second rerun passes, but does not reproduce/close the prior soak warning.
-Hosted verification is pending at this pre-deployment checkpoint.
+Master/redesign are pushed through production `a062472`; Pages deployment
+35672823334 succeeded. Public HTML exactly matches the built SHA-256 in
+ROADMAP-PAGES. All 54 automated checks and 12 hosted browser assertions pass,
+including visible Kyoto reflections and save/resume. Historical Monaco soak
+warning and unfinished full earned-journey proof remain open.
 
 ## Codex refinement update (21 Sep, closing twelve-hour pass)
 
