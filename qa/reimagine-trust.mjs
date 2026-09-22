@@ -66,14 +66,16 @@ check('Resume returns to the same lesson and counters', () => {
 // controls route. The journal double pauses exactly as the real modal does.
 const buttons = {};
 t.pauseBtn = (_cls, label, action) => { buttons[label] = action; return element(); };
-t.jrKeys = { open: false };
+t.jrKeys = { open: false, scrollIntoView() {} };
+t.jrKeysSum = { focus() {} };
+t.jrCard = { insertBefore() {}, firstChild: null, scrollTop: 0 };
 t.jrShow = () => { t.jrShown = true; t.game.state.paused = true; };
 t.jrReturnFocus = null;
 const menuStart = source.indexOf('const pauseGo = pauseBtn(');
 const menuEnd = source.indexOf('pauseSetBtn.setAttribute(', menuStart);
 vm.runInContext('{ ' + source.slice(menuStart, menuEnd) + ' }', t);
 check('Opening controls through Pause preserves guidance', () => {
-  t.pauseShow(); buttons['the controls']();
+  t.pauseShow(); buttons['learn to play']();
   assert.equal(t.jrKeys.open, true); assert.equal(t.game.state.paused, true);
   assert.equal(t.tutLive(), true); assert.equal(t.tutEver, false); assert.equal(t.saves, 0);
 });

@@ -446,6 +446,33 @@ reflection/shadows/depth cuts; calm phrase-rest prototypes; the first-session
 learning menu. M0/M1 are partial, and M2–M6 are not implemented. Public master
 remains unchanged until a release candidate passes the hosted gates.
 
+### M2a: selectable learning reference
+
+Five native disclosure lessons are available from the title and Pause:
+movement/view, interactions, tasks/memories, yuzu/shop and map/travel.
+The same pooled text builds both surfaces; opening a lesson refreshes its
+input-scheme wording. No save field, reward or spending action is added.
+Pause focuses the learning fold rather than leaving the player above the
+nineteen-destination board. Enter/Space toggles a lesson without also starting
+the game; this was caught by the first browser run and corrected. The title
+now prevents horizontal scrolling when its reference content grows.
+
+The separate learning-contract probe passes 30 checks; existing guidance
+contracts retain their 23 checks. Desktop 1280x760 and touch emulation at
+390x844 each pass 25 browser
+checks, including 44px disclosure targets, keyboard isolation, pause and
+unchanged score/wallet. This is not real-device or novice evidence. Screenshots
+are inspected; the guide moves above destinations for a learning visit and
+returns below them on ordinary journal visits. Interactive five-part practice is not implemented; Sydney's
+existing guided walk remains available from Pause.
+Syntax checks, the single-file build and all 56 suite checks pass.
+
+Performance attribution: shadow-cut walking p95 18.2 ms initially improved
+over the older 33.4 ms baseline, but a repeated uncut Pretty run also records
+18.2 ms. Do not attribute that difference to shadows or ship a quality cut on
+this evidence. Both probes preserve their >100ms outliers (one each in still
+or rest); no production rendering change has been made.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

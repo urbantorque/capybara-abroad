@@ -1,3 +1,21 @@
+## HOMECOMING M2a — LEARNING REFERENCE (22 Sep 2026)
+
+Five pooled reference lessons are reachable before Begin and from Pause.
+Native disclosures keep keyboard/touch operation; wording refreshes for the
+active input scheme. Learning visits put the guide above destinations, while
+ordinary journal visits restore the original board order. Reading cannot
+spend yuzu, award progress or set a tutorial-completion bit. Sydney's existing
+guided walk remains separate; five interactive practice modules are not done.
+
+The source-derived builder has 30 checks. Headful desktop 1280x760 and
+touch-emulated 390x844 each pass 25 checks, including 44px targets, Enter isolation, visible
+lesson text, paused simulation and unchanged wallet/score. Failed early runs
+are retained: Enter originally bubbled to Begin, and the first guide location
+left its body below the phone viewport. Both are corrected. The old whole-CSS
+earned-card regression now explicitly excludes only the new scoped learning
+block and title overflow-x rule; arrival/reward contracts stay protected.
+No visual effect, per-frame work, new save field or audio writer is added.
+
 ## HOMECOMING M1a — SUBTRACTIVE SCORE (22 Sep 2026)
 
 ROADMAP-HOMECOMING is approved, under a 25%-remaining weekly working stop

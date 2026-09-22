@@ -5,8 +5,13 @@ import { execFileSync } from 'node:child_process';
 const source=readFileSync('src/systems.js','utf8');
 const inherited=execFileSync('git',['show','2891ecc:src/systems.js'],{encoding:'utf8',maxBuffer:15000000});
 const css=s=>s.match(/function sysBuildCSS\([^]*?\n\}/)[0];
-assert.ok(css(source).replace(/\/\* D4: the reward[^]*?(?=\/\* ---------- flight readout)/,'\n')===css(inherited),
-  'all inherited CSS, including arrivals, unchanged outside earned selectors');
+// M2a adds only a lesson subtree and prevents horizontal title scrolling.
+// Keep the historical whole-sheet comparison outside these named additions.
+const withoutLearning = css(source)
+  .replace(/\/\* HOMECOMING learning reference:[^]*?\/\* HOMECOMING learning reference end\. \*\/\r?\n/, '')
+  .replace('overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;', 'overflow-y:auto;overscroll-behavior:contain;');
+assert.ok(withoutLearning.replace(/\/\* D4: the reward[^]*?(?=\/\* ---------- flight readout)/,'\n')===css(inherited),
+  'inherited CSS, including arrivals, unchanged outside earned and learning selectors');
 const top=source.match(/function sysEarnedCardLive\([^]*?\n\}/)[0];
 const fn=name=>source.match(new RegExp('  function '+name+'\\([^]*?\\n  \\}'))[0];
 const gate=new Function(top+';return sysEarnedCardLive;')();

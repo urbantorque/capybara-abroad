@@ -6527,6 +6527,27 @@ const sysTUT_LINES = [
 // ...and the one clause about the shop, said with beat five the first time
 // the wallet bumps inside it (the stall stands beside the board — L8 F2).
 const sysTUT_SHOP = 'the traveller’s stall buys things for yuzu.';
+// HOMECOMING M2a: reference before departure and inside the pause menu.
+// Reading a lesson never spends fruit, awards a task or changes the save.
+const sysLEARN = [
+  { title: '1. Moving and looking',
+    line: 'W, A, S, D moves it. Shift runs; Space hops. Drag or C turns the view. The controls below list the current buttons.',
+    touch: 'The movement stick steers it; push fully to run. HOP clears a low obstacle. The controls below show the touch camera gestures.',
+    pad: 'The left stick steers it. RT runs; A hops. The controls below show the camera buttons.',
+    try: 'In Sydney, replay the guided walk from Pause for a short practice route.' },
+  { title: '2. Taking things and meeting others',
+    line: 'E takes or drops a nearby object. Q calls out. The prompt beside an object names its action; the same button can do something different on a ride.',
+    try: 'A loose hat, a bench and a nearby bird are enough for a first experiment.' },
+  { title: '3. Tasks, memories and the journey',
+    line: 'The star marks the big experience in a place. The smaller tasks around it help earn a memory. The journey card shows what is kept and what remains.',
+    try: 'Start with one nearby task, then the star. The whole checklist does not need clearing before travelling onward.' },
+  { title: '4. Yuzu and the traveller’s shop',
+    line: 'Gold fruit adds yuzu to the wallet. The traveller sells upgrades, clothes and pocket items. Buying spends yuzu; owned upgrades travel with it.',
+    try: 'The coin on the map marks the shop. Read the price and effect before buying. These lessons spend nothing.' },
+  { title: '5. Reading the map and travelling',
+    line: 'The map key names its marks: peak or star, boat, water, leaf and shop. Hover over or hold the map to reveal the key; holding also brings the map closer.',
+    try: 'The journey board offers the onward route. Choose a place in Pause opens the full destination shelf; returning keeps completed tasks.' },
+];
 // Sydney's benches, as environment.js plants them (envAddBench, merged into
 // one static mesh and published nowhere), so beat three can put the arrow on
 // the nearest. The seat's collider top is 1.0 m; the animal stands at 1.34.
@@ -8829,6 +8850,18 @@ function sysBuildCSS() {
   'outline-offset:2px;}',
 '.capyui-jrkeys[open] summary{margin-bottom:9px;}',
 '.capyui-jrkeys .capyui-legend{max-width:none;}',
+/* HOMECOMING learning reference: scoped to the new lesson subtree. */
+'.capyui-learn{max-height:42vh;overflow:auto;text-align:left;padding:0 4px;',
+  'overscroll-behavior:contain;}',
+'.capyui-learn .capyui-learnlesson{border-bottom:1px solid ' + inkFaint + ';}',
+'.capyui-learn .capyui-learnlesson>summary{display:flex;align-items:center;',
+  'justify-content:space-between;min-height:44px;box-sizing:border-box;padding:8px 4px;',
+  'text-align:left;font-size:' + tMd + ';letter-spacing:0;text-transform:none;}',
+'.capyui-learnlesson>summary::after{content:"+";margin-left:12px;}',
+'.capyui-learnlesson[open]>summary::after{content:"−";}',
+'.capyui-learn p{font-size:' + tMd + ';line-height:1.6;letter-spacing:0;',
+  'text-transform:none;margin:0 4px 12px;color:' + inkSoft + ';}',
+/* HOMECOMING learning reference end. */
 /* ---------- THE REPERTOIRE, ON THE JOURNAL (Q2) ----------
    THE SHELF’S OWN RULE, applied to the forty names: always forty, and the
    ones you have not found are half of what the page is for. An unearned
@@ -8943,7 +8976,7 @@ function sysBuildCSS() {
   sysRgba(PALETTE.screenShadow, 0.20) + ' 100%),',
   'linear-gradient(180deg,' + sysRgba(PALETTE.fog, 0.12) + ' 0%,',
   sysRgba(PALETTE.fog, 0.15) + ' 58%,' + sysRgba(PALETTE.skyBottom, 0.22) + ' 100%);',
-  'overflow-y:auto;overscroll-behavior:contain;',
+  'overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;',
   'transition:opacity .75s ease,transform .75s ' + mGlide + ';padding:18px;}',
 '.capyui-title.gone{opacity:0;transform:scale(1.06);pointer-events:none;}',
 /* ---- THE PLACE YOU ARE LOOKING AT WARMS THE WHOLE SCREEN ----------------
@@ -24438,6 +24471,39 @@ export function createSystems(game) {
   document.head.appendChild(styleTag);
   sysTextApply();
 
+  function learnGuide() {
+    const guide = sysEl('div', 'capyui-learn');
+    // Content is interactive reference, never the title backdrop's Begin.
+    guide.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    guide.addEventListener('click', function (e) { e.stopPropagation(); });
+    guide.addEventListener('keydown', function (e) {
+      if (e.code === 'Enter' || e.code === 'Space') e.stopPropagation();
+    });
+    for (let i = 0; i < sysLEARN.length; i++) {
+      const row = sysLEARN[i];
+      const lesson = sysEl('details', 'capyui-learnlesson');
+      const label = sysEl('summary', null, row.title);
+      lesson.appendChild(label);
+      const body = sysEl('p');
+      const practice = sysEl('p');
+      function refresh() {
+        body.textContent = sysSay(sysScheme(row.line, row.touch || row.line, row.pad || row.line));
+        practice.textContent = sysSay(row.try);
+      }
+      refresh();
+      lesson.addEventListener('toggle', function () {
+        refresh();
+        if (lesson.open) requestAnimationFrame(function () {
+          if (lesson.open) body.scrollIntoView({ block: 'nearest' });
+        });
+      });
+      lesson.appendChild(body);
+      lesson.appendChild(practice);
+      guide.appendChild(lesson);
+    }
+    return guide;
+  }
+
   // --- title card ----------------------------------------------------------
   // ELEVEN PLACES DO NOT FIT IN A ROW OF TORN TICKETS.
   //
@@ -24648,9 +24714,13 @@ export function createSystems(game) {
     const more = sysEl('details', 'capyui-more');
     const sum = sysEl('summary');
     sum.appendChild(sysGlyphEl('chev'));
-    sum.appendChild(document.createTextNode('and a few extras'));
+    sum.appendChild(document.createTextNode('learn to play'));
+    sum.addEventListener('keydown', function (e) {
+      if (e.code === 'Enter' || e.code === 'Space') e.stopPropagation();
+    });
     sum.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
     more.appendChild(sum);
+    more.appendChild(learnGuide());
     const moreLeg = sysFillLegend(sysEl('div', 'capyui-legend'), 'more');
     moreLeg.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
     more.appendChild(moreLeg);
@@ -25365,8 +25435,9 @@ export function createSystems(game) {
   const jrKeys = sysEl('details', 'capyui-jrkeys');
   const jrKeysSum = sysEl('summary');
   jrKeysSum.appendChild(sysGlyphEl('chev'));
-  jrKeysSum.appendChild(document.createTextNode('the controls'));
+  jrKeysSum.appendChild(document.createTextNode('learn to play and controls'));
   jrKeys.appendChild(jrKeysSum);
+  jrKeys.appendChild(learnGuide());
   jrKeys.appendChild(sysFillLegend(sysEl('div', 'capyui-legend'), 'all'));
   const jrFoot = sysEl('div', 'capyui-jrfoot', '');
   jrEl.appendChild(jrCard);
@@ -25437,11 +25508,16 @@ export function createSystems(game) {
   // which is printed on no card anywhere — so the only route to the control
   // table went through knowing a control. Not a new surface: the same three
   // statements the KeyH branch already runs, on a button.
-  const pauseKeysBtn = pauseBtn('', 'the controls', function () {
+  const pauseKeysBtn = pauseBtn('', 'learn to play', function () {
     const from = document.activeElement;
     pauseHide();
     jrKeys.open = true;
     jrShow(false);
+    // Reference first for this visit; ordinary travel restores board order.
+    jrCard.insertBefore(jrKeys, jrCard.firstChild);
+    jrCard.scrollTop = 0;
+    jrKeysSum.focus();
+    jrKeys.scrollIntoView({ block: 'start' });
     if (from && from !== document.body) jrReturnFocus = from;
   });
   // Guidance belongs to the player. Help and Pause never dismiss a lesson;
@@ -31261,6 +31337,7 @@ export function createSystems(game) {
 
   let jrReturnFocus = null;
   function jrShow(depart) {
+    jrCard.insertBefore(jrKeys, jrFoot);
     jrDepart = !!depart;
     if (!jrShown && tutOn) tutTabN++;   // beat six's answer (ROADMAP-WOW2, T)
     jrShown = true;
