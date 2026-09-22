@@ -7,19 +7,24 @@ import { createHash } from 'node:crypto';
 import vm from 'node:vm';
 import { stripComments } from '../strip-comments.mjs';
 
-const args=process.argv.slice(2),prepare=args.includes('--prepare');
-const labels=args.filter(a=>a!=='--prepare');
-assert.ok(labels.length<=1,'usage: node qa/reimagine-journey-chain.mjs [tag] [--prepare]');
+const args=process.argv.slice(2),prepare=args.includes('--prepare'),homecoming=args.includes('--homecoming');
+const resumeArg=args.find(a=>a.startsWith('--resume='));
+const resumeTag=resumeArg?.slice(9);
+if(resumeArg)assert(homecoming&&/^[\w-]+$/.test(resumeTag),'resume requires a safe Homecoming artifact tag');
+const labels=args.filter(a=>a!=='--prepare'&&a!=='--homecoming'&&a!==resumeArg);
+assert.ok(labels.length<=1,'usage: node qa/reimagine-journey-chain.mjs [tag] [--prepare] [--homecoming]');
 const tag=labels[0]||'first';assert.match(tag,/^[\w-]+$/);
-const prefix='reimagine-journey-chain-'+tag;
+const prefix=(homecoming?'homecoming':'reimagine')+'-journey-chain-'+tag;
 const read=name=>readFileSync(new URL(name,import.meta.url),'utf8');
 const hash=text=>createHash('sha256').update(text).digest('hex');
 const shared=read('../src/shared.js'),first=shared.indexOf('export const TASKS ='),last=shared.indexOf('// RECORDS —',first);
 assert.ok(first>=0&&last>first,'authored route section');
 const data=vm.runInNewContext(shared.slice(first,last).replace(/^export /gm,'')+
-  '\n({TASKS,CHAPTERS,JOURNEY,CHAPTER_EXPERIENCES,chapterExperience})');
+  '\n({TASKS,CHAPTERS,JOURNEY,CHAPTER_EXPERIENCES,chapterExperience,homecomingMemory,homecomingProgress})');
 assert.equal(data.JOURNEY.join(','),'1,3,2,4,12,15,19','checked recommended route');
-const route=data.JOURNEY.map(n=>({n,chapter:data.CHAPTERS.find(c=>c.n===n).biome}));
+const routeIds=homecoming?[1,3,2,15,4,19,12,16,18,7]:data.JOURNEY;
+const route=routeIds.map(n=>({n,chapter:data.CHAPTERS.find(c=>c.n===n).biome}));
+data.earnedRoute=routeIds;
 const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
 const parameters=['assert','readFileSync','vm','openHarness','process','sourceUrl','journeyData'];
 const allowedImports=new Set(["import assert from 'node:assert/strict';","import { readFileSync } from 'node:fs';",
@@ -41,7 +46,7 @@ function adapt(name) {
   assert.ok(body.includes('finally')&&body.includes('await h.close()'),'driver has owned close lifecycle');
   return compile(name,body,original,imports,['Only static imports and import.meta.url adapted. All driver assertions and reloads retained.']);
 }
-const drivers=new Map(route.map(({chapter})=>[chapter,adapt(chapter==='pasto'?
+const drivers=new Map(route.filter(({chapter})=>!['cave','iceland','monaco'].includes(chapter)).map(({chapter})=>[chapter,adapt(chapter==='pasto'?
   'reimagine-boarding-browser.mjs':'reimagine-natural-'+chapter+'.mjs')]));
 
 // Reuse the tested homecoming movement/rest helpers, never its seeded setup or
@@ -72,7 +77,7 @@ const report={metadata:h.metadata,lawn,steps:[],navigation:[],rest:[],keys:[]};
 try {
   await observeKeys();await h.start();await h.arrive('sydney');
   const initial=await sample('cumulative journey returned home');live(initial);
-  assert.ok(journeyData.JOURNEY.every(n=>initial.gates.find(g=>g.n===n)?.enough),'all seven earned memories reached home');
+  assert.ok(journeyData.earnedRoute.every(n=>initial.gates.find(g=>g.n===n)?.enough),'all required earned memories reached home');
   assert.equal(initial.saved.fin,0,'ending not previously spent');
   assert.equal(initial.coda.done,false);assert.equal(initial.finaleOn,true);
   await h.screenshot(name+'-arrival');await walkHome();await h.screenshot(name+'-before');
@@ -109,6 +114,7 @@ const home=compile(homeName,homeBody,homeOriginal,[],[
   'Only named navigation/rest/read helpers reused; fixture save, task seeding, empty-mode and presentation helpers excluded.',
   'Finale assertions use actual accumulated progress, ordinary ending, twenty notes, persisted fin and duplicate-free reload/rest.']);
 const supportSources=['reimagine-harness.mjs','../src/systems.js','../src/pasto.js','../src/props.js','../src/npc.js','../src/capybara.js'];
+if(homecoming)supportSources.push('homecoming-late-memory.mjs','homecoming-monaco-memory.mjs');
 const manifest={route,sources:[...drivers.values(),home].map(d=>d.manifest),
   supportSources:supportSources.map(file=>({file,sha256:hash(read(file))})),sharedSha256:hash(shared),
   traps:['One fresh browser/context only; each injected driver close is a no-op.',
@@ -119,10 +125,26 @@ const manifest={route,sources:[...drivers.values(),home].map(d=>d.manifest),
     'Kyoto journey mode requires the authored river finish; bonus gates/chute are reported, with perfect-run assertions retained in the standalone driver.',
     'Public hud.cross chapter transitions are fixtures, not naturally opened travel doors.',
     'Waypoint and physics telemetry assist play; this is not novice/unguided enjoyment proof.']};
+let resume=null;
+if(resumeTag){
+  const file='homecoming-journey-chain-'+resumeTag+'-failure.json.png',raw=read(file),prior=JSON.parse(raw);
+  assert(prior.homecoming&&prior.lastSave&&prior.failure,'an actual failed earned Story checkpoint is required');
+  assert.equal(prior.manifest.sharedSha256,manifest.sharedSha256,'same progression authoring');
+  for(const item of prior.manifest.supportSources.filter(s=>s.file.startsWith('../src/')))
+    assert.equal(item.sha256,hash(read(item.file)),'same production source '+item.file);
+  assert.equal(prior.lastSave.arcV1,1);assert.equal(prior.lastSave.journeyMode,'story');assert(!prior.lastSave.fin);
+  for(const gate of prior.gates)assert((gate.saved.tasks||[]).every(id=>prior.lastSave.tasks.includes(id)),'checkpoint retains earlier earned tasks');
+  resume={file,sha256:hash(raw),save:prior.lastSave,priorGates:prior.gates,priorFailure:prior.failure};
+  manifest.traps.push('Resumed mode restores the exact persisted save from a prior failed test; this is cross-session earned continuity, not a fresh single-context completion.');
+}
 if(prepare){console.log(JSON.stringify({prepared:true,browserLaunched:false,...manifest},null,2));process.exit(0);}
 
 const {openHarness}=await import('./reimagine-harness.mjs');
-const root=await openHarness(),report={metadata:root.metadata,manifest,stages:[],gates:[],startedAt:new Date().toISOString()};
+// The retained seven-stop mode explicitly starts with an empty legacy file.
+// A fresh file now belongs to the five-act story, including in Free Roam.
+const legacyEmpty={v:1,tasks:[],seen:[],biome:'sydney',ms:0,tut:1,fin:0};
+const root=await openHarness(homecoming?{story:true,...(resume?{storage:{'capy3.journey.v1':resume.save}}:{})}:{storage:{'capy3.journey.v1':legacyEmpty}}),
+  report={homecoming,resumedFrom:resume,emptyLegacyFixture:homecoming?null:legacyEmpty,metadata:root.metadata,manifest,stages:[],gates:[],startedAt:new Date().toISOString()};
 let current='initial',lastTasks=[];
 async function ensureRunning() {
   if(!await root.page.evaluate(()=>window.__capy.state.started))await root.start();
@@ -155,7 +177,11 @@ async function gateSnapshot(label,completed) {
   const tasks=row.saved.tasks||[];
   assert.ok(lastTasks.every(id=>tasks.includes(id)),'previously earned tasks survive cumulative save');
   for(const n of completed){assert.equal(row.gates.find(g=>g.n===n)?.enough,true,'live cumulative memory '+n);
-    assert.equal(data.chapterExperience(n,id=>tasks.includes(id)).enough,true,'saved cumulative memory '+n);}
+    assert.equal((homecoming?data.homecomingMemory:data.chapterExperience)(n,id=>tasks.includes(id)).enough,true,'saved cumulative memory '+n);}
+  if(homecoming){
+    assert.equal(row.saved.arcV1,1);assert.equal(row.saved.journeyMode,'story');
+    row.progress=data.homecomingProgress(id=>tasks.includes(id));
+  }
   assert.equal(row.hidden,false);report.gates.push(row);lastTasks=tasks.slice();await root.result(prefix,report);
 }
 async function execute(driver,stage,argv=[]) {
@@ -258,12 +284,31 @@ async function empanadaSupport() {
 }
 try {
   const initial=await root.page.evaluate(()=>JSON.parse(localStorage.getItem('capy3.journey.v1')||'{}'));
-  assert.equal((initial.tasks||[]).length,0,'one fresh unseeded journey');assert.equal(initial.fin||0,0);
+  if(resume)assert.deepEqual(initial.tasks,resume.save.tasks,'exact earned checkpoint restored');
+  else assert.equal((initial.tasks||[]).length,0,'one fresh unseeded journey');
+  assert.equal(initial.fin||0,0);
   report.initialSave=initial;await root.result(prefix,report);
   const completed=[];
+  if(resume){
+    await ensureRunning();
+    for(const {n} of route){if(data.homecomingMemory(n,id=>initial.tasks.includes(id)).enough)completed.push(n);else break;}
+    await gateSnapshot('actual earned checkpoint resumed',completed);
+  }
   for(const {n,chapter} of route) {
+    if(completed.includes(n))continue;
     if(completed.length)await closeTravelCard();
-    if(chapter==='pasto')await flyPasto(drivers.get(chapter));
+    if(homecoming){
+      const earned=await root.page.evaluate(()=>JSON.parse(localStorage.getItem('capy3.journey.v1')||'{}').tasks||[]);
+      assert(data.homecomingProgress(id=>earned.includes(id)).open.includes(n),'earned chapter access before arrival '+chapter);
+    }
+    if(['cave','iceland','monaco'].includes(chapter)){
+      current=chapter;
+      const injected=await harnessFor(chapter)({});
+      const result=chapter==='monaco'?await (await import('./homecoming-monaco-memory.mjs')).monacoMemory(injected):
+        await (await import('./homecoming-late-memory.mjs')).lateMemory(injected,chapter);
+      report.stages.at(-1).pass=result.pass;
+    }
+    else if(chapter==='pasto')await flyPasto(drivers.get(chapter));
     else await execute(drivers.get(chapter),chapter,chapter==='kyoto'?['--journey']:[]);
     if(chapter==='pasto') {
       const memory=await root.page.evaluate(()=>window.__capy.gateInfo(2));
@@ -273,7 +318,7 @@ try {
     }
     await closeTravelCard();completed.push(n);await gateSnapshot(chapter+' earned and persisted',completed);
   }
-  await execute(home,'homecoming');await gateSnapshot('ending survived reload and repeat rest',data.JOURNEY);
+  await execute(home,'homecoming');await gateSnapshot('ending survived reload and repeat rest',routeIds);
   assert.equal(report.gates.at(-1).saved.fin,1);assert.deepEqual(root.metadata.errors,[]);
   report.finishedAt=new Date().toISOString();report.pass=true;await root.result(prefix,report);
   console.log(JSON.stringify({pass:true,artifact:prefix+'.json.png',stages:report.stages.map(s=>s.stage),fin:1}));

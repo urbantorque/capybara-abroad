@@ -23,7 +23,7 @@ async function sample(label) {
   report.steps.push(row); return row;
 }
 async function walkTo(target, radius = 1.1, maxMs = 35000) {
-  const started = Date.now(); let best = Infinity, progressAt = Date.now(), from = null;
+  const started = Date.now(); let best = Infinity, progressAt = Date.now(), from = null, detours = 0;
   try {
     while (Date.now() - started < maxMs) {
       const s = await h.page.evaluate(target => {
@@ -49,7 +49,16 @@ async function walkTo(target, radius = 1.1, maxMs = 35000) {
       if (Math.abs(z) > Math.abs(x) * .42) want.add(z > 0 ? 's' : 'w');
       for (const k of [...keys]) if (!want.has(k)) { await h.page.keyboard.up(k); keys.delete(k); }
       for (const k of want) if (!keys.has(k)) { await h.page.keyboard.down(k); keys.add(k); }
-      if (Date.now() - progressAt > 3500) throw new Error('walk stuck at ' + JSON.stringify(s));
+      if (Date.now() - progressAt > 3500) {
+        assert(detours++ < 3, 'bounded wharf approach blocked: ' + JSON.stringify(s));
+        // A passer-by can shove the animal off the narrow approach into a
+        // planter. Step sideways, then recompute the line from that position.
+        await release();
+        const side = Math.abs(x) > Math.abs(z) ? (x > 0 ? 'w' : 's') : (z > 0 ? 'd' : 'a');
+        await h.page.keyboard.down(side);keys.add(side);
+        await h.page.keyboard.press('Space');await h.page.waitForTimeout(800);
+        await release();from=null;best=Infinity;progressAt=Date.now();
+      }
       await h.page.waitForTimeout(80);
     }
     throw new Error('walk waypoint timed out: ' + target);
@@ -65,14 +74,15 @@ async function sailTo(target, { final = false, radius = 12, maxMs = 70000 } = {}
       }, target);
       const dx = target.x - s.p[0], dz = target.z - s.p[2], d = Math.hypot(dx, dz);
       report.navigation.push({ target, ...s, distance: d });
-      if (d < radius && (!final || Math.abs(s.speed) < 4.5)) return;
+      if (d < radius && (!final || (Math.abs(s.speed) < 4 && s.throttle <= 0.02))) return;
       if (d < best - 1.0) { best = d; progressAt = Date.now(); }
       // Boat forward=(sin(yaw),cos(yaw)); positive x input turns yaw down.
       // This cross product is positive when the target is to that right.
       const turn = Math.sin(s.yaw) * dz - Math.cos(s.yaw) * dx;
       let throttle = 'w';
       if (final) {
-        if (d < 115 && s.speed > 4.5) throttle = 's';
+        if (d < radius && (s.speed > 4 || s.throttle > 0.02)) throttle = 's';
+        else if (d < 115 && s.speed > 4.5) throttle = 's';
         else if (d < 115 && d > 30 && s.speed < 3) throttle = 'w';
         else if (d < 115) throttle = null; // coast; never brake into reverse
       }

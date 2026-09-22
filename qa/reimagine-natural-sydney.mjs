@@ -20,7 +20,7 @@ async function sample(label) {
       stage: g.env.concertAudit(), hidden: document.hidden, paused: g.state.paused,
       tasks: Object.fromEntries(['opera-stage', 'picnic-thief', 'swim'].map(id => [id, g.taskDone(id)])) };
   }, label);
-  report.steps.push(s); return s;
+  report.steps.push(s); await h.result(name + '-progress', report); return s;
 }
 async function go(target, radius = 1.1, maxMs = 35000, run = false) {
   const start = Date.now(); let best = Infinity, progressAt = Date.now(), jumps = 0, detour = [];
@@ -130,9 +130,11 @@ try {
   await h.result(name, report);
   console.log(JSON.stringify({ steps: report.steps, errors: h.metadata.errors }, null, 2));
 } catch (error) {
-  await release(); await sample('failure');
   report.failure = String(error.stack || error);
-  if (!report.keys.length) report.keys = await h.page.evaluate(() => window.__naturalKeys || []);
-  await h.screenshot(name + '-failure'); await h.result(name + '-failure', report);
+  // A crashed renderer cannot answer diagnostics; retain the original fault.
+  try { await release(); await sample('failure'); } catch {}
+  try { if (!report.keys.length) report.keys = await h.page.evaluate(() => window.__naturalKeys || []); } catch {}
+  try { await h.screenshot(name + '-failure'); } catch {}
+  await h.result(name + '-failure', report);
   throw error;
 } finally { await h.close(); }

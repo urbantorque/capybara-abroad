@@ -1,19 +1,41 @@
 // HOMECOMING M0: real-clock frame pacing and score activity in one place.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { openHarness, CHAPTERS, snapshot } from './reimagine-harness.mjs';
 const chapter = process.argv[2] || 'sydney';
 const mode = process.argv[3] || 'auto';
 const tag = process.argv[4] || 'before';
 const cut = process.argv[5] || 'none';
 const phaseSeconds = Number(process.argv[6] || 15);
+const governorThreshold = Number(process.argv[7] || 0);
+assert([0,19,22].includes(governorThreshold),'optional diagnostic governor threshold');
+const governorTail=process.argv[8]||'';
+assert(!governorTail||governorTail==='tail','optional tail-budget diagnostic');
 assert([15, 30].includes(phaseSeconds), '15-second baseline or 90-second route');
 assert(CHAPTERS.includes(chapter)); assert(['auto', 'pretty', 'fast'].includes(mode));
 assert(/^[\w-]+$/.test(tag));
 assert(['none', 'reflection', 'shadows', 'depth'].includes(cut));
 const h = await openHarness({ pinRung: false,
   storage: { 'capy3.prefs.v1': { v: 1, pf: ['auto', 'pretty', 'fast'].indexOf(mode) } } });
-const out = { chapter, mode, tag, cut, phaseSeconds, metadata: h.metadata, phases: [] };
+const out = { chapter, mode, tag, cut, phaseSeconds, governorThreshold, governorTail, metadata: h.metadata, phases: [] };
 try {
+  if(governorThreshold||governorTail){
+    const original=readFileSync(new URL('../src/systems.js',import.meta.url),'utf8');
+    let source=original.replace(/const sysPF_SLOW_MS\s*=\s*22;/,'const sysPF_SLOW_MS = '+(governorThreshold||22)+';');
+    assert(source.includes('const sysPF_SLOW_MS = '+(governorThreshold||22)+';'),'diagnostic replacement found');
+    if(governorTail){
+      for(const [before,after] of [
+        ['let pfBiome =','let qaLateFrames=0; let pfBiome ='],
+        ['fpsAcc += fpsDt; fpsFrames++;','fpsAcc += fpsDt; fpsFrames++; if(fpsDt>0.020)qaLateFrames++;'],
+        ['const win = fpsAcc;','const win = fpsAcc, qaLateFraction=qaLateFrames/fpsFrames; qaLateFrames=0;'],
+        ['if (pfMs > sysPF_SLOW_MS) {','if (pfMs > sysPF_SLOW_MS || qaLateFraction > .10) {'],
+        ['else if (tickMs < sysPF_TICK_FAST_MS) {','else if (tickMs < sysPF_TICK_FAST_MS && qaLateFraction < .03) {']
+      ]){assert.equal(source.split(before).length,2,'one diagnostic site: '+before);source=source.replace(before,after);}
+    }
+    await h.page.route('**/src/systems.js',r=>r.fulfill({contentType:'text/javascript',body:source}));
+    await h.page.reload();await h.page.waitForFunction(()=>!!window.__capy&&!!document.querySelector('.capyui-go'));
+    out.scope='Source-response governor fixture only; production threshold unchanged. Equal reload path in both arms.';
+  }
   await h.start(); await h.arrive(chapter);
   await h.page.waitForFunction(() => !window.__capy.state.renderHold && window.__capy.state.frames > 0);
   // Diagnostic cuts only, never production defaults or a new quality tier.

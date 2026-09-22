@@ -1048,6 +1048,67 @@ Syntax, build and all 71 repository gates pass. Weekly allowance: 36%
 remaining. Next: complete the later-act real-input routes and cumulative
 earned journey; retain the separate performance/release gates.
 
+### M1o: render elapsed attribution, not another quality cut
+
+The GPU diagnostic now has separate whole-post, renderer-pass and main-world
+shadow modes. Nonblocking queries sample every fourth outer call, cap pending
+queries at twelve, retain submission phase/focus and restore wrapped methods.
+The VM contract covers cadence, nesting during an active query, classification,
+exceptions, bounds and cleanup. No production render hook or save field.
+
+Hanoi Pretty renderer-pass samples place world-render medians at
+12.78/11.44/12.72ms across still/walk/rest; world includes shadow submission.
+Mirror medians are 1.41/1.36/1.33ms. Whole-post regression p95 is
+19.63/19.14/18.54ms, with at least 181 samples per phase. Main-world shadow
+submission medians are 1.25/1.19/1.65ms and p95 4.85/5.21/5.12ms, with at
+least 202 samples. These are elapsed-query diagnostics, including possible
+command-feed stalls, not GPU-busy time or an FPS pass. Do not add or subtract
+percentiles from these independent runs. Initial shadow attribution included
+empty post-quad calls; main-world-shadows corrects that filter. Its earlier
+zero median is not evidence of free shadows. No shadow-quality cut is justified
+by these measurements alone.
+
+Later-act real-input probes pass cave's echo/doline, Iceland's organ/spring
+and Monaco's yacht/lap routes. The latter uses the actual car door, pedals and
+steering, then verifies task persistence and the live memory gate. Casino
+piano/champagne navigation remains unverified. The cumulative ten-memory
+instrument starts a fresh Story save and checks earned access before every
+fixture arrival, with all earlier task IDs retained; its full pass is pending.
+First attempt stopped at Quay's narrow approach after displacement beside a
+planter. A bounded real-key detour was added to that driver. Second attempt
+crashed Edge's renderer during Sydney (target error -2147483645), without a
+JavaScript cause. A later Sydney/reload repeat passed; that does not close the
+intermittent crash. More frequent result checkpoints and a dedicated reload/
+resource diagnostic are being added. No public release or completion claim.
+
+Reload-v1 subsequently passes five fresh start/reload cycles and 150 seconds
+of real movement, with eleven resource checkpoints and zero runtime errors.
+Post-route shader counts are 52 throughout; the final three post-route JS
+heaps are 53.1/58.2/53.3MiB without forced GC (earlier peak 83.2MiB). This is
+not the separate thirty-minute traversal plateau gate or a crash-cause finding.
+The third cumulative attempt earned Quay's voyage, but the driver left its
+latched throttle engaged after slowing down and sampled 4.64m/s after the
+award. The revised driver brakes below 4m/s and clears positive throttle;
+the production docking threshold and strict final 4.5m/s assertion remain.
+Build and all 72 repository checks pass; cumulative verification continues.
+Weekly allowance: 34% remaining, with the 25% stop threshold unchanged.
+
+The fourth fresh cumulative run earned and persisted Sydney, Quay, Pasto and
+Pantanal, then stopped in Kyoto when its driver clicked a folded-away task
+row. The driver now uses the visible paper tab first. A separate `--resume`
+mode restores the exact persisted failed-run save, hashes its artifact and
+checks unchanged production/progression source plus earlier earned task IDs.
+It is explicitly cross-session earned continuity, not a fresh single-context
+pass; the original fresh mode remains. No tasks are manufactured or removed.
+
+Hanoi Auto mean-threshold A/B/B/A (22/19/19/22ms) completes four 90-second
+routes. Rest p95 is 24.8/22.0/21.8/25.4ms; walking is
+22.2/22.2/22.5/22.9ms. The lower threshold is not enough for the 20ms p95
+target, so production stays unchanged. The baseline instrument also supports
+a source-response tail-budget hypothesis (count repeated >20ms frames), to
+be tested rather than shipped on this evidence. All 72 gates pass after the
+instrument/driver edits. Weekly allowance now 32% remaining.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

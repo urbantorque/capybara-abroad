@@ -156,7 +156,9 @@ try {
   await walkTo({x:-16,z:0});await walkTo({x:-16,z:-10});
   await walkTo({x:-56,z:-10});
   await walkTo({x:-56,z:80});
-  await h.page.locator('.capyui-txt').filter({hasText:/^Ride the Uji rapids down to the mill$/}).click();
+  const riverRow=h.page.locator('.capyui-txt').filter({hasText:/^Ride the Uji rapids down to the mill$/});
+  if(!await riverRow.isVisible())await h.page.locator('.capyui-todo.away .capyui-tab').click();
+  await riverRow.click();
   await walkTo('uji-run', 2.4); await sample('river entry waypoint');
   await runRiver();
   await h.page.waitForFunction(() => window.__capy.taskDone('uji-run'), null, { timeout: 12000 });
