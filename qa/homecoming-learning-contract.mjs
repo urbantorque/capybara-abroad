@@ -21,6 +21,7 @@ function el(tag, cls, text) {
 }
 const q = vm.createContext({ sysEl: el, sysSay: s => s, mode: 'keyboard', homecomingArc: true,
   learnShopPractice: () => el('div', 'capyui-learnshop'),
+  learnMapPractice: () => el('div', 'capyui-learnmap'),
   sysScheme: (keyboard, touch, pad) => q.mode === 'touch' ? touch : q.mode === 'pad' ? pad : keyboard });
 vm.runInContext(data[0] + '\n' + s.slice(at, end + 1), q);
 const guide = q.learnGuide();

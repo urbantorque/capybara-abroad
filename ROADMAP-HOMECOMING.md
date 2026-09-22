@@ -989,6 +989,39 @@ are not valid render-cost attribution; retained for traceability.
 Weekly allowance: 40% remaining. Full-world fuzz after the souvenir ownership
 repair, cumulative earned journey, map practice and release gates remain open.
 
+### M1m: nineteen-place physics repeat passes
+
+The 981-second fuzz on 1a5483a passes all nineteen routes: no NaN or below-world
+frames, runtime errors or unexplained speed violations. Sahara has zero solver
+recoveries after the mover seam and souvenir ownership repairs, versus 2,772
+in the preceding failed full run. Pantanal and Antarctica each record one
+recovery; Monaco records three. These isolated safety interventions remain
+visible in history, not relabelled zero. KS and load were intentionally skipped
+in this repeat (their earlier passes are not new measurements). This clears
+the demonstrated sustained Sahara failure, not the separate frame-pacing,
+30-minute resource plateau or cross-device release targets.
+
+### M2f: a map-key rehearsal
+
+Learn to Play now offers three small map questions: finding an upgrade,
+somewhere to swim and a ferry. Answers reuse the live legend's shapes, colours
+and labels. A wrong answer permits retry; a correct answer enables explicit
+Next. Completion and Reset retain keyboard focus. The exercise does not move
+the map, spend yuzu, award tasks or write saves. No runtime frame work or new
+save field; ordinary menu UI, no optional visual/audio effect flag.
+
+The production-builder probe covers lazy legend access, retry, advance,
+completion and reset. Desktop and emulated-touch learning v11 each pass 85
+checks, including real Enter input, 44px targets, title/pause access, unchanged
+save state and focus. Screenshots inspected. The v10 desktop fixture failed
+because its final shop-visibility assertion followed scrolling into the new
+map exercise without reopening the shop; v11 explicitly reopens the lesson
+and retains the visibility assertion. All 70 repository gates pass.
+
+Weekly allowance: 39% remaining. Next: real-input later-act memories and a
+cumulative earned journey. Optional narrative/visual rollout stays behind its
+performance and human-preference gates; no public master update yet.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

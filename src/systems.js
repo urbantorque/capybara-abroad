@@ -6573,6 +6573,19 @@ const sysLEARN_SHOP = {
   bought: 'Practice complete. The journey’s wallet and upgrades are unchanged.',
   held: 'Owned in this practice',
 };
+const sysLEARN_MAP = {
+  open: 'Try the map-key practice',
+  intro: 'A small map-key rehearsal. It changes no route, wallet, task or save.',
+  prompts: [
+    { question: 'Which mark helps it find an upgrade?', correct: 'the shop', options: ['the shop', 'water', 'boat'] },
+    { question: 'Which mark points to somewhere it can swim?', correct: 'water', options: ['boat', 'water', 'the shop'] },
+    { question: 'Which mark points to a ferry?', correct: 'boat', options: ['water', 'the shop', 'boat'] },
+  ],
+  correct: 'That is the mark. Choose Next when ready.',
+  wrong: 'That mark belongs to another place on the key.',
+  done: 'Practice complete. The live map and journey are unchanged.',
+  next: 'Next', reset: 'Reset practice',
+};
 const sysTUT_BENCHES = [
   [26, 14.5], [46.5, 33.5], [-30, -6.5], [-48, -6.5],
   [56.5, 52.0], [38.0, 60.5], [60.5, 40.0], [20.0, 60.0],
@@ -8888,7 +8901,8 @@ function sysBuildCSS() {
   'border:1px solid ' + rule + ';border-radius:3px;cursor:pointer;}',
 '.capyui-learn button:disabled{opacity:.55;cursor:default;}',
 '.capyui-learn button:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
-'.capyui-learnshop{margin:8px 0 16px;padding-top:8px;border-top:1px solid ' + rule + ';}',
+'.capyui-learnshop,.capyui-learnmap{margin:8px 0 16px;padding-top:8px;border-top:1px solid ' + rule + ';}',
+'.capyui-learn .capyui-mappractice-answer{display:inline-flex;align-items:center;gap:8px;}',
 /* HOMECOMING learning reference end. */
 /* HOMECOMING atlas: the existing postcards, in five quiet folds. */
 '.capyui-act{grid-column:1/-1;min-width:0;border-bottom:1px solid ' + rule + ';}',
@@ -24646,6 +24660,67 @@ export function createSystems(game) {
     return host;
   }
 
+  // Local rehearsal only: use the live map legend's glyphs, but never touch
+  // the live map, route shelf, tasks or journey save.
+  function learnMapPractice() {
+    const host = sysEl('div', 'capyui-learnmap');
+    const open = sysEl('button', 'capyui-mappractice-open', sysLEARN_MAP.open);
+    open.type = 'button'; host.appendChild(open);
+    const panel = sysEl('div', 'capyui-mappractice-panel'); panel.hidden = true;
+    panel.appendChild(sysEl('p', null, sysLEARN_MAP.intro));
+    const question = sysEl('p', 'capyui-mappractice-question');
+    question.setAttribute('role', 'heading'); question.setAttribute('aria-level', '3');
+    question.setAttribute('tabindex', '-1');
+    const answers = sysEl('div', 'capyui-mappractice-answers');
+    const status = sysEl('p', 'capyui-mappractice-status');
+    status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+    const next = sysEl('button', 'capyui-mappractice-next', sysLEARN_MAP.next);
+    next.type = 'button';
+    const reset = sysEl('button', 'capyui-mappractice-reset', sysLEARN_MAP.reset);
+    reset.type = 'button'; reset.hidden = true;
+    panel.appendChild(question); panel.appendChild(answers); panel.appendChild(status);
+    panel.appendChild(next); panel.appendChild(reset); host.appendChild(panel);
+    let index = 0, solved = false;
+    function focusQuestion() { if (typeof question.focus === 'function') question.focus(); }
+    function render() {
+      const prompt = sysLEARN_MAP.prompts[index];
+      question.textContent = prompt.question;
+      answers.replaceChildren();
+      solved = false; next.disabled = true; next.hidden = false; reset.hidden = true;
+      const rows = new Map(mapLegendRows.map(row => [row.label, row]));
+      for (const label of prompt.options) {
+        const row = rows.get(label);
+        const answer = sysEl('button', 'capyui-mappractice-answer');
+        answer.type = 'button'; answer.setAttribute('aria-label', label);
+        answer.dataset.shape = row.shape;
+        const sw = sysEl('i', 'capyui-mlswatch capyui-mlswatch-' + row.shape);
+        sw.setAttribute('aria-hidden', 'true'); sw.style.setProperty('--mlc', row.color);
+        answer.appendChild(sw); answer.appendChild(document.createTextNode(label));
+        answer.addEventListener('click', function () {
+          if (solved) return;
+          if (label === prompt.correct) { solved = true; next.disabled = false; status.textContent = sysLEARN_MAP.correct; }
+          else status.textContent = sysLEARN_MAP.wrong;
+        });
+        answers.appendChild(answer);
+      }
+      status.textContent = '';
+      focusQuestion();
+    }
+    next.addEventListener('click', function () {
+      if (!solved) return;
+      if (++index < sysLEARN_MAP.prompts.length) render();
+      else {
+        status.textContent = sysLEARN_MAP.done;
+        for (const answer of answers.children) answer.disabled = true;
+        next.hidden = true; reset.hidden = false;
+        if (typeof reset.focus === 'function') reset.focus();
+      }
+    });
+    open.addEventListener('click', function () { open.hidden = true; panel.hidden = false; render(); });
+    reset.addEventListener('click', function () { index = 0; render(); });
+    return host;
+  }
+
   function learnGuide() {
     const guide = sysEl('div', 'capyui-learn');
     // Content is interactive reference, never the title backdrop's Begin.
@@ -24678,6 +24753,7 @@ export function createSystems(game) {
       lesson.appendChild(body);
       lesson.appendChild(practice);
       if (i === 3) lesson.appendChild(learnShopPractice());
+      if (i === 4) lesson.appendChild(learnMapPractice());
       guide.appendChild(lesson);
     }
     return guide;

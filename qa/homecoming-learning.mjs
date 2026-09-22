@@ -27,6 +27,35 @@ async function rehearse(guide) {
   assert.deepEqual(await saved(),before); out.checks++;
   check(await h.page.evaluate(() => window.__capy.state.started) === started, 'practice never starts the world');
 }
+async function mapPractice(guide) {
+  const lesson=guide.locator('.capyui-learnlesson').nth(4);
+  if(await lesson.getAttribute('open')===null)await lesson.locator('summary').click();
+  const snapshot=()=>h.page.evaluate(()=>({started:window.__capy.state.started,
+    save:localStorage.getItem('capy3.journey.v1')}));
+  const before=await snapshot();
+  await lesson.locator('.capyui-mappractice-open').click();
+  const next=lesson.locator('.capyui-mappractice-next'),status=lesson.locator('.capyui-mappractice-status');
+  for(const shape of ['coin','ring','boat']){
+    check(await lesson.locator('.capyui-mappractice-question').evaluate(el=>document.activeElement===el),'question receives focus after explicit advance');
+    check(await next.isDisabled(),'map practice waits for a correct answer');
+    const wrong=lesson.locator('.capyui-mappractice-answer').filter({has: h.page.locator('.capyui-mlswatch-'+(shape==='coin'?'boat':'coin'))});
+    await wrong.click();
+    check(await next.isDisabled()&&(await status.textContent()).includes('another'),'wrong answer permits retry');
+    const answer=lesson.locator('.capyui-mappractice-answer[data-shape="'+shape+'"]');
+    await answer.scrollIntoViewIfNeeded();const box=await answer.boundingBox();
+    check(box.height>=44&&box.x>=0&&box.x+box.width<=(touch?390:1280),'map answer is a usable target');
+    check(await answer.locator('.capyui-mlswatch-'+shape).count()===1,'answer reuses live legend glyph');
+    await answer.focus();await h.page.keyboard.press('Enter');
+    check(!await next.isDisabled(),'correct symbol enables next');
+    await next.click();
+  }
+  check((await status.textContent()).includes('unchanged'),'map completion describes isolation');
+  check(await lesson.locator('.capyui-mappractice-reset').evaluate(el=>document.activeElement===el),'completion retains keyboard focus');
+  await h.screenshot('homecoming-map-practice-'+(before.started?'pause':'title')+'-'+(touch?'touch':'desktop'));
+  await lesson.locator('.capyui-mappractice-reset').click();
+  check(await next.isDisabled(),'map reset starts a new rehearsal');
+  assert.deepEqual(await snapshot(),before);out.checks++;
+}
 try {
   const p = h.page;
   const title = p.locator('.capyui-more').filter({ hasText: 'learn to play' });
@@ -42,6 +71,7 @@ try {
   }
   const body = await lessons.first().textContent();
   await rehearse(title.locator('.capyui-learn'));
+  await mapPractice(title.locator('.capyui-learn'));
   check(touch ? body.includes('movement stick') && !body.includes('W, A, S, D') : body.includes('W, A, S, D'), 'correct control scheme');
   check(!await p.evaluate(() => window.__capy.state.started), 'reading does not begin game');
   await lessons.first().locator('summary').focus();
@@ -62,7 +92,11 @@ try {
   const before = await progress();
   const guide = p.locator('.capyui-jrkeys .capyui-learn');
   await rehearse(guide);
-  if (await guide.locator('.capyui-learnlesson').nth(3).getAttribute('open') === null) await guide.locator('summary').nth(3).click();
+  await mapPractice(guide);
+  // Map practice scrolled past the shop. Re-open it to exercise the actual
+  // disclosure scroll contract instead of asserting an old offscreen lesson.
+  if (await guide.locator('.capyui-learnlesson').nth(3).getAttribute('open') !== null) await guide.locator('summary').nth(3).click();
+  await guide.locator('summary').nth(3).click();
   await p.waitForTimeout(350);
   const lessonBody = await guide.locator('.capyui-learnlesson').nth(3).locator('p').first().boundingBox();
   check(lessonBody.y >= 0 && lessonBody.y + lessonBody.height <= (touch ? 844 : 760), 'opened lesson body enters viewport');
@@ -76,7 +110,7 @@ try {
   out.pass = true;
 } catch (e) { out.pass = false; out.failure = String(e.stack || e); process.exitCode = 1; }
 finally {
-  try { await h.result('homecoming-learning-v9-' + (touch ? 'touch' : 'desktop'), out); }
+  try { await h.result('homecoming-learning-v11-' + (touch ? 'touch' : 'desktop'), out); }
   finally { await h.close(); }
   console.log(JSON.stringify({ touch, checks: out.checks, pass: out.pass, failure: out.failure, errors: h.metadata.errors }));
 }
