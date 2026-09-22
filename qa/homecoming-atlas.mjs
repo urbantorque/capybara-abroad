@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+const source = readFileSync('src/shared.js', 'utf8');
+const start = source.indexOf('export const TASKS =');
+const end = source.indexOf('// RECORDS —', start);
+const { CHAPTERS, HOMECOMING_ACTS } = vm.runInNewContext(source.slice(start, end).replace(/^export /gm, '') + '\n({CHAPTERS,HOMECOMING_ACTS})');
+assert.equal(HOMECOMING_ACTS.length, 5);
+assert.equal(HOMECOMING_ACTS.map(a => a.places.join(',')).join('|'), '1,3,14|2,5,6,15|4,19,11,10|12,16,13,8|18,7,17,9');
+const ids = HOMECOMING_ACTS.flatMap(a => a.places);
+assert.equal(ids.length, 19); assert.equal(new Set(ids).size, 19);
+for (const id of ids) assert(CHAPTERS.some(c => c.n === id));
+for (const act of HOMECOMING_ACTS) assert(act.title.length > 0 && act.places.length >= 3 && act.places.length <= 4);
+console.log('Homecoming atlas: 28 data checks passed; all nineteen stable ids in five folds.');

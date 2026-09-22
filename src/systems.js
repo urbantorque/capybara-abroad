@@ -4,7 +4,7 @@ import * as THREE from 'three';
 // and the two shape-type constants it must ignore. See sysCamClear.
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount, rand, randInt, clamp, damp, lerp,
-         CHAPTERS, JOURNEY, chapterExperience, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY, cloudSet,
+         CHAPTERS, JOURNEY, HOMECOMING_ACTS, chapterExperience, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY, cloudSet,
          rimTick, cloudTick, skyTick, fresnelTick, paleTick, triTick, mirrorTick, shadeTick, bounceSlots, bounceTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo, keyDomeTick, keyDomeInfo, skyDomeLit, sky2CloudTick, sky2SunTick, sky2Info,
@@ -8862,6 +8862,15 @@ function sysBuildCSS() {
 '.capyui-learn p{font-size:' + tMd + ';line-height:1.6;letter-spacing:0;',
   'text-transform:none;margin:0 4px 12px;color:' + inkSoft + ';}',
 /* HOMECOMING learning reference end. */
+/* HOMECOMING atlas: the existing postcards, in five quiet folds. */
+'.capyui-act{grid-column:1/-1;min-width:0;border-bottom:1px solid ' + rule + ';}',
+'.capyui-act>summary{min-height:44px;padding:10px 4px;cursor:pointer;color:' + ink + ';}',
+'.capyui-act>summary b{font-size:14px;font-weight:650;line-height:1.4;}',
+'.capyui-act>summary small{display:block;margin:4px 0 0 16px;font-size:11px;line-height:1.5;color:' + inkSoft + ';}',
+'.capyui-act>summary:focus-visible{outline:2px solid ' + ink + ';outline-offset:-2px;}',
+'.capyui-actplaces{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:4px 2px 12px;}',
+'@media(min-width:640px){.capyui-actplaces{grid-template-columns:repeat(var(--act-cols,4),minmax(0,1fr));}}',
+/* HOMECOMING atlas end. */
 /* ---------- THE REPERTOIRE, ON THE JOURNAL (Q2) ----------
    THE SHELF’S OWN RULE, applied to the forty names: always forty, and the
    ones you have not found are half of what the page is for. An unearned
@@ -25079,8 +25088,30 @@ export function createSystems(game) {
   picksEl.style.setProperty('--cols', String(sysPickCols(pickDefs.length - 1)));
   picksEl.setAttribute('role', 'group');
   picksEl.setAttribute('aria-label', 'the other places');
-  for (let i = 1; i < pickDefs.length; i++) {
-    picksEl.appendChild(buildPick(pickDefs[i], i, false));
+  const atlasHere = jrFile && jrFile.biome ? chapterOf(jrFile.biome) : 1;
+  for (let i = 0; i < HOMECOMING_ACTS.length; i++) {
+    const act = HOMECOMING_ACTS[i];
+    const fold = sysEl('details', 'capyui-act');
+    fold.open = act.places.indexOf(atlasHere) >= 0;
+    const label = sysEl('summary');
+    label.appendChild(sysEl('b', null, act.title));
+    const defs = act.places.map(function (n) { return pickDefs.find(function (d) { return d.n === n; }); });
+    label.appendChild(sysEl('small', null, defs.map(function (d) { return d.name; }).join(' · ')));
+    fold.appendChild(label);
+    const places = sysEl('div', 'capyui-actplaces');
+    const shown = defs.filter(function (d) { return d.n !== 1; });
+    places.style.setProperty('--act-cols', String(shown.length));
+    for (let k = 0; k < shown.length; k++) places.appendChild(buildPick(shown[k], k, false));
+    fold.appendChild(places);
+    // A disclosure is never Begin. Its native keyboard activation must not
+    // reach the title's Enter/Space shortcuts, including from a postcard.
+    fold.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
+    fold.addEventListener('click', function (e) { e.stopPropagation(); });
+    fold.addEventListener('keydown', function (e) {
+      if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') e.stopPropagation();
+    });
+    fold.addEventListener('toggle', function () { requestAnimationFrame(picksFade); });
+    picksEl.appendChild(fold);
   }
   p2El.appendChild(picksEl);
 
@@ -25160,7 +25191,7 @@ export function createSystems(game) {
       // the count came out as twelve when four were hidden. Viewport rects are
       // in one frame of reference by construction.
       const pr = picksEl.getBoundingClientRect();
-      const kids = picksEl.children;
+      const kids = picksEl.querySelectorAll('summary,.capyui-act[open] .capyui-pick');
       for (let i = 0; i < kids.length; i++) {
         if (kids[i].getBoundingClientRect().bottom > pr.bottom - 10) n++;
       }
@@ -25177,29 +25208,17 @@ export function createSystems(game) {
   picksEl.addEventListener('scroll', picksFade, { passive: true });
 
   // ---- THE ARROWS WALK THE SHELF ------------------------------------------
-  // Seventeen places and the only way through them from the keyboard was Tab,
-  // seventeen times, in one direction. A grid you can see is a grid you should
-  // be able to steer, and the shelf is genuinely a grid — so the arrows are
-  // two dimensional here and the column count is READ off the resolved
-  // layout rather than re-derived, which means it is automatically right in
-  // every one of the four media queries the shelf has.
-  function pickCols() {
-    try {
-      const t = getComputedStyle(picksEl).gridTemplateColumns;
-      const n = t ? t.trim().split(/\s+/).length : 1;
-      return n > 0 ? n : 1;
-    } catch (e) { return 1; }
-  }
+  // Summary rows join the visible postcards. Reading their rectangles keeps
+  // keyboard movement aligned with both desktop rows and the two-column phone.
   function pickList() {
     const l = [heroEl];
-    const kids = picksEl.children;
+    const kids = picksEl.querySelectorAll('summary,.capyui-act[open] .capyui-pick');
     for (let i = 0; i < kids.length; i++) l.push(kids[i]);
     return l;
   }
   /**
-   * Move the focus by (dx, dy) tiles. The hero is index 0 and is a row of its
-   * own above the grid, so up from the shelf's first row lands on it and down
-   * from it enters the shelf. Returns false only when the move walks off the
+   * Move focus among exposed atlas controls. The hero is index 0 and is a row
+   * of its own above the folds. Returns false only when the move walks off the
    * left-hand edge, which is the caller's cue to turn the page back.
    */
   function pickMove(dx, dy) {
@@ -25207,11 +25226,20 @@ export function createSystems(game) {
     let i = l.indexOf(document.activeElement);
     if (i < 0) { l[0].focus(); return true; }
     if (dy) {
-      if (i === 0) { if (dy < 0) return true; i = 1; }
-      else {
-        const s = i - 1 + dy * pickCols();
-        i = s < 0 ? 0 : (s > l.length - 2 ? i : s + 1);
+      // Folds and postcard rows have different widths. Follow the actual
+      // rectangles; a closed fold never contributes a hidden focus target.
+      const here = l[i].getBoundingClientRect();
+      const x = here.left + here.width / 2, y = here.top + here.height / 2;
+      let best = Infinity, next = i;
+      for (let k = 0; k < l.length; k++) {
+        if (k === i) continue;
+        const r = l[k].getBoundingClientRect();
+        const gap = (r.top + r.height / 2 - y) * dy;
+        if (gap <= 1) continue;
+        const distance = gap * 4 + Math.abs(r.left + r.width / 2 - x);
+        if (distance < best) { best = distance; next = k; }
       }
+      i = next;
     } else {
       if (i + dx < 0) return false;
       i = clamp(i + dx, 0, l.length - 1);

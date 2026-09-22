@@ -9,6 +9,7 @@ const css=s=>s.match(/function sysBuildCSS\([^]*?\n\}/)[0];
 // Keep the historical whole-sheet comparison outside these named additions.
 const withoutLearning = css(source)
   .replace(/\/\* HOMECOMING learning reference:[^]*?\/\* HOMECOMING learning reference end\. \*\/\r?\n/, '')
+  .replace(/\/\* HOMECOMING atlas:[^]*?\/\* HOMECOMING atlas end\. \*\/\r?\n/, '')
   .replace('overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;', 'overflow-y:auto;overscroll-behavior:contain;');
 assert.ok(withoutLearning.replace(/\/\* D4: the reward[^]*?(?=\/\* ---------- flight readout)/,'\n')===css(inherited),
   'inherited CSS, including arrivals, unchanged outside earned and learning selectors');

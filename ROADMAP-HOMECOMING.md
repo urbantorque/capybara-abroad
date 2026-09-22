@@ -548,6 +548,27 @@ are lifecycle evidence, not a sustained smoothness pass; the variability
 remains open. No visual quality cut,
 save field or audio writer is added; no new per-frame feature or cut flag.
 
+### M3a: five-fold atlas
+
+The title's eighteen secondary postcards are grouped into the five approved
+acts. Sydney remains the first, separate invitation; a fresh atlas opens its
+coastal fold, while a returning file opens the fold containing its saved
+destination. Native disclosures retain keyboard activation and 44px targets.
+Arrow navigation reads exposed controls' rectangles and skips folded cards.
+The scroll cue counts exposed summaries/cards rather than hidden children.
+All nineteen places, stable keys and existing save/travel semantics remain.
+This is the navigation foundation, not story gating or the new memory rule.
+
+28 data checks and 35 headful checks each on desktop and touch emulation pass, including fold activation,
+selected-destination Enter, return-fold selection and preserved progress on
+reload. The earlier byte-identical reload assertion correctly noticed the
+unload clock flush (47.3 ms); it now permits only monotonic elapsed-time
+change and compares every progress field. Fresh-title browsing remains
+byte-identical. Desktop and phone-emulated screenshots are inspected;
+real-device coverage remains outstanding. No new save field,
+visual effect, per-frame work or audio writer is added.
+Syntax checks, the single-file build and all 59 suite checks pass.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

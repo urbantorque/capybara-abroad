@@ -11,7 +11,10 @@ user's 20% reserve. Check the live account between milestones.
 
 Pushed work covers subtractive score admission, four long-rest phrase
 prototypes, a five-lesson title/pause reference and sleeping scene-root
-ownership. M1c runs all nineteen arrivals and two returns, with 58 suite
+ownership, plus the five-fold title atlas (M3a). The atlas preserves existing
+travel/save semantics; story admission is not implemented. Its desktop and
+touch-emulated browser runs pass 35 checks each; all 59 suite checks pass.
+M1c runs all nineteen arrivals and two returns, with 58 suite
 checks passing. CPU matrix traversal is reduced; whole-frame targets remain
 unmet in some samples. Interactive practice, five-act progression, opening,
 returns, global art rollout and release validation remain work to do.

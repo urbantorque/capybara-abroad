@@ -4301,6 +4301,16 @@ export function chapterDef(n) { return CHAPTERS[n - 1] || CHAPTERS[0]; }
 // The other twelve places remain trips, with their own full lists.
 export const JOURNEY = [1, 3, 2, 4, 12, 15, 19];
 
+// HOMECOMING: an atlas in five folds. Stable chapter ids remain the save keys.
+// This first surface groups choices; story admission is a separate milestone.
+export const HOMECOMING_ACTS = [
+  { title: 'A little further', places: [1, 3, 14] },
+  { title: 'In good company', places: [2, 5, 6, 15] },
+  { title: 'Other people’s rhythms', places: [4, 19, 11, 10] },
+  { title: 'Beyond the familiar', places: [12, 16, 13, 8] },
+  { title: 'What comes home', places: [18, 7, 17, 9] },
+];
+
 // A memory asks for the place's signature and two small things around it.
 // These are authored choices, not a fraction of a checklist. Arrival is
 // never one of them. Quay's to-quay is casting off under the player's hand,

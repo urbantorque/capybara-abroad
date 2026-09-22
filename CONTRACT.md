@@ -1,3 +1,19 @@
+## HOMECOMING M3a — FIVE-FOLD ATLAS (22 Sep 2026)
+
+HOMECOMING_ACTS groups the nineteen stable chapter ids into the five approved
+journey acts. The title retains Sydney's hero postcard and puts the other
+eighteen into native disclosure folds. Fresh players see the coastal fold;
+returning players see the fold containing their saved place. Existing free
+travel and save rules are untouched: this milestone does not implement story
+locks or change the memory threshold.
+
+Arrow navigation follows exposed rectangles; closed cards are not focus
+targets. Enter/Space operate folds without triggering Begin. All 28 data
+checks and 35 headful browser checks each on desktop and touch emulation pass.
+Reload preserves every progress field; only the expected unload-time clock
+flush advances. Screenshots are inspected. No new save field, per-frame
+feature, audio writer or visual effect. Real-device coverage remains open.
+
 ## HOMECOMING M1c — SLEEPING SCENE OWNERSHIP (22 Sep 2026)
 
 Detach sleeping chapter roots instead of relying on matrixWorldAutoUpdate:
