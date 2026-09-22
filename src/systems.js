@@ -42761,8 +42761,17 @@ export function createSystems(game) {
   // =========================================================================
   let dprScale = 1;
   function applyDPR() {
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, sysMaxDPR()) * dprScale);
+    const scale = game.post && game.post.enabled ? 1 : dprScale;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, sysMaxDPR()) * scale);
     renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+  function sysPerfResolution(scale) {
+    dprScale = scale;
+    // Keep the native canvas stable during play; the scene target still sheds
+    // the same pixels. Devices without the post path retain the DPR fallback.
+    const postOn = !!(game.post && game.post.enabled);
+    game.state.sceneScale = postOn ? scale : 1;
+    if (!postOn) applyDPR();
   }
   applyDPR();
   addEventListener('resize', applyDPR);
@@ -42823,7 +42832,7 @@ export function createSystems(game) {
   // map halving quarters the shadow pass's fill without touching a shader;
   // the texel snap follows it through sysShadowRes.
   //
-  // ONE WRITER for the pixel ratio remains applyDPR (sysPerfSet writes
+  // ONE WRITER for the pixel ratio remains applyDPR (sysPerfResolution writes
   // dprScale and calls it), one writer for the map size (sysPerfSet), and the
   // composite reads sysPerfRung itself where it already reads noDof.
   //
@@ -42848,6 +42857,7 @@ export function createSystems(game) {
   const sysPF_SAY_S    = 30;     // s of play before the note may be said
   const sysPF_TICK_GAP = 3.0;    // s after a tick pill the note waits
   let pfSlowT = 0, pfFastT = 0, pfUpNeed = sysPF_UP_S, pfLastUp = -1e9, pfSaid = false, pfOnT = 0;
+  let pfLateFrames = 0;
   let pfBiome = '', fpsPrev = 0, pfMs = 16.7, pfFastMs = 18;
   function sysPerfSet(r) {
     r = clamp(Math.round(r), 0, 3);
@@ -42855,7 +42865,7 @@ export function createSystems(game) {
     sysPerfRung = r;
     game.state.perfRung = r;
     const scale = r >= 3 ? sysPF_DPR : (r >= 2 ? sysPF_DPR2 : 1);
-    if (scale !== dprScale) { dprScale = scale; applyDPR(); }
+    if (scale !== dprScale) sysPerfResolution(scale);
     // The far cascade is the first thing to go (THE FAR CASCADE): it is one
     // whole extra shadow pass, and it is gone on the same step as the shadow
     // map halves — both invisible in a screenshot (L7, E7).
@@ -53926,8 +53936,11 @@ export function createSystems(game) {
     // ---- perf readout ----
     const fpsDt = game.state.rawDt || dt;
     fpsAcc += fpsDt; fpsFrames++;
+    if (fpsDt > 0.020) pfLateFrames++;
     if (fpsAcc >= 0.5) {
       const win = fpsAcc;
+      const lateFraction = pfLateFrames / fpsFrames;
+      pfLateFrames = 0;
       fps = fpsFrames / fpsAcc;
       fpsAcc = 0; fpsFrames = 0;
       // The ceiling is a property of the DISPLAY, not of the scene, and it
@@ -53946,8 +53959,10 @@ export function createSystems(game) {
       // actually slow is slow, vsync or not. The UP branch reads tickMs
       // instead (L7, E7) — see the note on game.state.tickMs in main.js.
       const tickMs = game.state.tickMs || pfMs;
-      if (pfMs > sysPF_SLOW_MS) { pfSlowT += win; pfFastT = 0; }
-      else if (tickMs < sysPF_TICK_FAST_MS) { pfFastT += win; pfSlowT = 0; }
+      // A smooth mean can hide repeated missed refreshes. Keep the authored
+      // clocks, but require frame-tail headroom before restoring detail.
+      if (pfMs > sysPF_SLOW_MS || lateFraction > 0.10) { pfSlowT += win; pfFastT = 0; }
+      else if (tickMs < sysPF_TICK_FAST_MS && lateFraction < 0.03) { pfFastT += win; pfSlowT = 0; }
       else { pfSlowT = 0; pfFastT = 0; }
       if (sysPerfMode === 1) sysPerfSet(0);
       else if (sysPerfMode === 2) sysPerfSet(3);

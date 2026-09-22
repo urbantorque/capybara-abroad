@@ -1,6 +1,6 @@
 // HOMECOMING M0: real-clock frame pacing and score activity in one place.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { openHarness, CHAPTERS, snapshot } from './reimagine-harness.mjs';
 const chapter = process.argv[2] || 'sydney';
 const mode = process.argv[3] || 'auto';
@@ -10,7 +10,7 @@ const phaseSeconds = Number(process.argv[6] || 15);
 const governorThreshold = Number(process.argv[7] || 0);
 assert([0,19,22].includes(governorThreshold),'optional diagnostic governor threshold');
 const governorTail=process.argv[8]||'';
-assert(!governorTail||['tail','tail-fixed-dpr'].includes(governorTail),'optional tail-budget diagnostic');
+assert(!governorTail||['tail','tail-fixed-dpr','tail-post-scale'].includes(governorTail),'optional tail-budget diagnostic');
 assert([15, 30].includes(phaseSeconds), '15-second baseline or 90-second route');
 assert(CHAPTERS.includes(chapter)); assert(['auto', 'pretty', 'fast'].includes(mode));
 assert(/^[\w-]+$/.test(tag));
@@ -20,7 +20,10 @@ const h = await openHarness({ pinRung: false,
 const out = { chapter, mode, tag, cut, phaseSeconds, governorThreshold, governorTail, metadata: h.metadata, phases: [] };
 try {
   if(governorThreshold||governorTail){
-    const original=readFileSync(new URL('../src/systems.js',import.meta.url),'utf8');
+    // Preserve the experimental control after the measured repair ships.
+    out.fixtureRevision='d702b69';
+    const historical=file=>execFileSync('git',['show',out.fixtureRevision+':src/'+file],{encoding:'utf8',maxBuffer:24*1024*1024});
+    const original=historical('systems.js');
     let source=original.replace(/const sysPF_SLOW_MS\s*=\s*22;/,'const sysPF_SLOW_MS = '+(governorThreshold||22)+';');
     assert(source.includes('const sysPF_SLOW_MS = '+(governorThreshold||22)+';'),'diagnostic replacement found');
     if(governorTail){
@@ -35,6 +38,16 @@ try {
         const before='const scale = r >= 3 ? sysPF_DPR : (r >= 2 ? sysPF_DPR2 : 1);';
         assert.equal(source.split(before).length,2,'one diagnostic DPR site');
         source=source.replace(before,'const scale = 1;');
+      }
+      if(governorTail==='tail-post-scale'){
+        const before='if (scale !== dprScale) { dprScale = scale; applyDPR(); }';
+        assert.equal(source.split(before).length,2,'one diagnostic scale writer');
+        source=source.replace(before,'game.state.__qaPostScale=scale;');
+        const main=historical('main.js');
+        const size='const w = Math.max(2, Math.floor(s.x)), h = Math.max(2, Math.floor(s.y));';
+        assert.equal(main.split(size).length,2,'one diagnostic post-size site');
+        const scaled=main.replace(size,'const scale=game.state.__qaPostScale||1; const w=Math.max(2,Math.floor(s.x*scale)),h=Math.max(2,Math.floor(s.y*scale));');
+        await h.page.route('**/src/main.js',r=>r.fulfill({contentType:'text/javascript',body:scaled}));
       }
     }
     await h.page.route('**/src/systems.js',r=>r.fulfill({contentType:'text/javascript',body:source}));

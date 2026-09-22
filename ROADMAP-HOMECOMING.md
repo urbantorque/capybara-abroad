@@ -1149,6 +1149,35 @@ natural travel-door discovery, novice testing and hardware gates remain open.
 Syntax, build and all 73 repository checks pass. Weekly allowance is now 31%
 remaining; the 25% stop threshold and protected 20% reserve are unchanged.
 
+### M1q: stable canvas, adaptive scene resolution
+
+The governor now scales the existing offscreen scene/blur targets at the
+authored 1/.8/.6 factors while retaining the native canvas. Direct-render
+fallbacks keep the original DPR path. A half-second frame-tail counter adds
+downward pressure above 10% of frames over 20ms, and permits recovery below
+3%, alongside the existing mean/CPU thresholds, dwell and bounce clocks.
+No visual layer, allocation per frame, save field or authored quality factor
+is added. sceneScale is transient render state, written only by the resolution
+helper. This is a core performance repair, not an optional decorative term.
+
+Two Hanoi source-response prototypes recorded walking p95 18.0/17.5ms and
+resting 18.7/20.6ms, with no >100ms interval or >50ms CPU tick. This does not
+close the strict 20ms p95 gate. Production syntax/build and 74 checks pass.
+Actual helper contracts cover native-canvas ownership, direct fallback, all
+seven target dimensions, unchanged-size reuse and five governor conditions.
+Pretty/Fast browser checks pass desktop/phone-sized/desktop resizing and full
+native final viewport coverage; Fast screenshots were inspected. This is
+desktop viewport emulation, not mobile-device certification. Three production
+Auto routes and longer stability verification are next. Weekly allowance: 30%.
+
+Production stable-canvas-v1 90-second Auto routes finish without >100ms frames
+or canvas resize calls during sampling. Still/walk/rest p95: Hanoi
+19.8/20.1/19.9ms, Monaco 21.9/18.6/18.1ms, Sydney 17.3/18.6/19.2ms. All phase
+p99 values are below 33.4ms. Hanoi walking and Monaco still narrowly/more
+clearly miss the p95 target, respectively; no full performance pass is claimed.
+Monaco has one 54.3ms CPU frame including a newly used RawShaderMaterial post
+program, distinct from the repaired canvas resize. Longer stability follows.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

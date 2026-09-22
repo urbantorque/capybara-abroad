@@ -1804,7 +1804,10 @@ function mainMakePost(game) {
 
   post.resize = function () {
     const s = renderer.getDrawingBufferSize(mainPostSize);
-    const w = Math.max(2, Math.floor(s.x)), h = Math.max(2, Math.floor(s.y));
+    // Auto scales the scene, not the browser's drawing buffer. Resizing the
+    // latter synchronised 86ms of queued work on the reference GPU.
+    const scale = game.state.sceneScale || 1;
+    const w = Math.max(2, Math.floor(s.x * scale)), h = Math.max(2, Math.floor(s.y * scale));
     if (w === vw && h === vh) return;
     vw = w; vh = h;
     bw = Math.max(2, w >> 2); bh = Math.max(2, h >> 2);
