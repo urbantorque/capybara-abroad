@@ -8,6 +8,20 @@ const h=await openHarness({pinRung:false});
 const out={chapter,tag,metadata:h.metadata,fixture:'post-step observation, synthetic fuzz keys'};
 try{
   await h.start();
+  if(process.argv.includes('--keeps')){
+    // Physical souvenir fixtures only; no earned-memory or journey claim.
+    for(const name of CHAPTERS.slice(0,CHAPTERS.indexOf(chapter))){
+      await h.page.evaluate(({name,drop})=>{
+        const g=window.__capy;g.biome.switchTo(name);
+        const s=g.biome.spawnOf(name),b=g.capy.body;
+        b.position.set(s.x,s.y,s.z);b.velocity.set(0,0,0);
+        b.previousPosition.copy(b.position);b.interpolatedPosition.copy(b.position);
+        const keep=g.physics.spawnKeep(name,s.x,s.z);
+        if(drop){g.physics.grab(keep);g.physics.release(null);}
+      },{name,drop:process.argv.includes('--drop-keeps')});
+      await h.page.waitForTimeout(1000);
+    }
+  }
   if(process.argv.includes('--prefix')){
     for(const name of CHAPTERS.slice(1,CHAPTERS.indexOf(chapter))){
       await h.arrive(name);
@@ -22,6 +36,7 @@ try{
     },chapter);
     await h.page.waitForTimeout(300);
   }else await h.arrive(chapter);
+  out.keeps=await h.page.evaluate(()=>window.__capy.props.filter(p=>p.keep).map(p=>({keep:p.keep,parent:p.mesh.parent?.type||null,inScene:p.mesh.parent===window.__capy.scene,frozen:p.frozen,inWater:p.inWater})));
   out.trace=await h.page.evaluate(async chapter=>{
     const g=window.__capy,raw=g.world.step,records=new Map();
     const startSaves=g.state.solverSaves||0, start=performance.now();
@@ -38,7 +53,9 @@ try{
           const prop=g.props.find(p=>p.body===b);
           r={id:b.id,mass:b.mass,type:b.type,shapes:b.shapes.map(s=>s.type),
             capy:b===g.capy.body,prop:prop?{type:prop.type,biome:prop.biome,keep:prop.keep,held:prop.held,
-              home:[prop.homeX,prop.homeY,prop.homeZ],removed:prop.removed}:null,
+              home:[prop.homeX,prop.homeY,prop.homeZ],removed:prop.removed,
+              frozen:prop.frozen,hidden:prop.hidden,inWater:prop.inWater,
+              solo:prop.solo,parent:prop.mesh.parent?.type,inScene:prop.mesh.parent===g.scene}:null,
             group:b.collisionFilterGroup,mask:b.collisionFilterMask,linearDamping:b.linearDamping,
             count:0,peak:0,first:[],last:null};records.set(b.id,r);
         }

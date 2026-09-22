@@ -3501,7 +3501,7 @@ function physRelease(impulse) {
 
   m.getWorldPosition(physV1);
   m.getWorldQuaternion(physQ1);
-  physGame.scene.add(m);
+  physSceneReturnProp(prop);
   m.position.copy(physV1);
   m.quaternion.copy(physQ1);
   m.scale.setScalar(1);
@@ -3718,7 +3718,7 @@ function physDropOwned(prop, vx, vy, vz) {
   const b = prop.body;
   m.getWorldPosition(physV1);
   m.getWorldQuaternion(physQ1);
-  physGame.scene.add(m);
+  physSceneReturnProp(prop);
   m.position.copy(physV1);
   m.quaternion.copy(physQ1);
   m.scale.setScalar(1);
@@ -4093,7 +4093,7 @@ function physSpill(prop) {
     physGame.capy.heldProp = null;
     prop.held = false;
     prop.mesh.getWorldPosition(physV1);
-    physGame.scene.add(prop.mesh);
+    physSceneReturnProp(prop);
     b.position.set(physV1.x, physV1.y, physV1.z);
   }
   b.velocity.set(0, 0, 0);
@@ -4634,6 +4634,16 @@ function physCheckWater(prop, dt) {
  */
 function physSceneAddLoose(obj) {
   THREE.Object3D.prototype.add.call(physGame.scene, obj);
+}
+/** Dropping a travelling prop must not give its mesh a chapter owner. */
+function physSceneReturnProp(prop) {
+  if (prop.biome) physGame.scene.add(prop.mesh);
+  else {
+    // A previous return may have captured the mesh while its body stayed
+    // global. Remove that stale ownership before putting the pair back.
+    if (physGame.biome && physGame.biome.disown) physGame.biome.disown(prop.mesh);
+    physSceneAddLoose(prop.mesh);
+  }
 }
 /** ...and the same for a body, so a pooled shard is not removed with a biome. */
 function physWorldAddLoose(body) {
@@ -5731,7 +5741,7 @@ function physHide(prop, delay) {
   if (prop.held) {
     if (physGame.capy && physGame.capy.heldProp === prop) physGame.capy.heldProp = null;
     prop.held = false;
-    if (prop.mesh.parent !== physGame.scene) physGame.scene.add(prop.mesh);
+    if (prop.mesh.parent !== physGame.scene) physSceneReturnProp(prop);
     physDropPayload.prop = prop;
     physGame.events.emit('capy:drop', physDropPayload);
   }

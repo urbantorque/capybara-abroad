@@ -929,6 +929,34 @@ failure. Fuzz now records bounded post-clamp body candidates when its counter
 increases; these are candidates, not exact pre-solver attribution. Repeat
 the fuzz gate before release. Weekly allowance: 44% remaining at start.
 
+### M1k: travelling souvenir ownership repaired
+
+The 16.4-minute repeat fuzz on 5a22e82 still fails Sahara (2,772 saves).
+All nineteen player routes report finite positions and movement, but the new
+candidate trace identifies global keep-pasto and keep-sydney bodies below
+-170m. Their meshes had been captured by the chapter where they were dropped,
+then detached on travel; their globally owned bodies remained in the solver.
+physUpdate skips a mesh outside the scene, so its fall rescue never ran.
+The M1c scene parking exposed this inherited ownership mismatch.
+
+A physical-fixture route creates seven souvenirs and calls the real grab/drop
+methods before travelling. It reproduces 6,587 interventions in 45 seconds,
+with detached keeps falling below -3,700m. This is a diagnostic fixture, not
+earned-memory evidence. The actual release/scene-owner regression fails before
+the repair. Returning a biome-neutral prop now bypasses chapter capture and
+removes stale mesh ownership. Ordinary local props keep their chapter owner.
+Release, NPC drop, held spill and held hide use the same return helper.
+
+After repair, all seven souvenir meshes remain in the scene at arrival; the
+same 45-second fixture observes 2,407 steps, no focus loss, no errors and zero
+solver interventions. Seventeen ownership checks and all 69 suite gates pass.
+Artifacts: homecoming-solver-sahara-dropped-before / dropped-fixed. Failed
+soak history is retained. Repeat the full-world release fuzz after the next
+coherent candidate; this focused proof does not replace that gate.
+
+No save change, effect or flag. Ownership work occurs on existing discrete
+prop-return actions, not a new frame loop. Weekly allowance: 41% remaining.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
