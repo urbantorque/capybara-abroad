@@ -2829,10 +2829,14 @@ function mainBoot() {
     requestAnimationFrame(mainLoop);
     game.tick(game.clock.getDelta(), true);
   }
+  // Warm after the Sydney traveller and all global effect pools exist.
+  // The existing async hold keeps shader first-use out of ordinary play.
+  if (systems && typeof systems.warm === 'function') systems.warm(biome.current);
   mainLoop();
 
   const boot = document.getElementById('boot');
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  requestAnimationFrame(() => requestAnimationFrame(function bootPaint() {
+    if (!game.state.frames) { requestAnimationFrame(bootPaint); return; }
     // THE WATCHDOG IS CALLED OFF BY A FRAME, NOT BY A MODULE.
     // index.html arms a timer at parse time that puts a readable failure card
     // over the splash if the game never starts. The signal that clears it has

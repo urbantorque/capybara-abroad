@@ -15,6 +15,7 @@ const h = await openHarness({ pinRung: false,
 const out = { chapter, mode, tag, cut, phaseSeconds, metadata: h.metadata, phases: [] };
 try {
   await h.start(); await h.arrive(chapter);
+  await h.page.waitForFunction(() => !window.__capy.state.renderHold && window.__capy.state.frames > 0);
   // Diagnostic cuts only, never production defaults or a new quality tier.
   await h.page.evaluate(cut => {
     const g = window.__capy;
@@ -29,10 +30,11 @@ try {
     await h.page.evaluate(() => {
       const g = window.__capy, raw = g.tick;
       const rawRender = g.renderer.render, rawShadow = g.renderer.shadowMap.render;
-      const data = { frames: [], samples: [], last: performance.now(), lastSample: 0,
+      const data = { frames: [], samples: [], hitches: [], last: performance.now(), lastSample: 0,
         passes: { world: [], mirror: [], post: [], shadow: [] },
         music: g.musAudit(), theme: g.musThemeAudit() };
       g.__homeProbe = { data, raw, rawRender, rawShadow };
+      const moduleNames = Object.keys(g.state.perf.ms), beforeMs = new Float64Array(moduleNames.length);
       g.renderer.render = function (scene, camera) {
         const key = scene === g.scene ? (camera === g.camera ? 'world' : 'mirror') : 'post';
         const start = performance.now();
@@ -45,10 +47,43 @@ try {
         finally { data.passes.shadow.push(performance.now() - start); }
       };
       g.tick = function (...args) {
+        for (let i = 0; i < moduleNames.length; i++) beforeMs[i] = g.state.perf.ms[moduleNames[i]];
+        const programsBefore = g.renderer.info.programs.length;
         const start = performance.now();
         const value = raw.apply(this, args);
+        const elapsed = performance.now() - start;
         if (args[1] !== false) {
-          data.frames.push([start - data.last, performance.now() - start]); data.last = start;
+          data.frames.push([start - data.last, elapsed]); data.last = start;
+          if (elapsed > 50 && data.hitches.length < 100) {
+            // Recover the current sample from mainMsAdd's documented .035
+            // EMA. Unchanged modules may have been parked, so omit them.
+            const modules = {};
+            for (let i = 0; i < moduleNames.length; i++) {
+              const name = moduleNames[i], after = g.state.perf.ms[name];
+              if (after !== beforeMs[i]) modules[name] = +(beforeMs[i] + (after - beforeMs[i]) / .035).toFixed(2);
+            }
+            data.hitches.push({ at: start, cpu: elapsed, modules,
+              programsBefore, programsAfter: g.renderer.info.programs.length,
+              geometries: g.renderer.info.memory.geometries,
+              position: g.capy.body.position.toArray(), contacts: g.world.contacts.length });
+            const added = new Set(g.renderer.info.programs.slice(programsBefore));
+            if (added.size) {
+              const materials = new Map();
+              g.scene.traverse(o => {
+                for (const m of Array.isArray(o.material) ? o.material : o.material ? [o.material] : []) {
+                  const programs = g.renderer.properties.get(m).programs;
+                  if (programs && [...programs.values()].some(p => added.has(p))) {
+                    materials.set(m.uuid, { object: o.name, type: m.type, name: m.name,
+                      color: m.color?.getHexString(), transparent: m.transparent,
+                      vertexColors: m.vertexColors, flatShading: m.flatShading,
+                      depthWrite: m.depthWrite, side: m.side, fog: m.fog,
+                      customKey: m.customProgramCacheKey().slice(0, 500) });
+                  }
+                }
+              });
+              data.hitches.at(-1).newMaterials = [...materials.values()];
+            }
+          }
           if (start - data.lastSample > 250) {
             const p = g.state.perf;
             data.samples.push({ t: g.state.time, rung: g.state.perfRung, calls: p.calls,
@@ -78,7 +113,7 @@ try {
     const summary = { phase, frames: intervals.length, p50: pct(intervals, .5), p95: pct(intervals, .95),
       p99: pct(intervals, .99), cpuP95: pct(cpu, .95), over33: intervals.filter(v => v > 33.4).length,
       over50: intervals.filter(v => v > 50).length, over100: intervals.filter(v => v > 100).length,
-      rung: data.perf.rung, hiddenOrPaused: data.samples.filter(s => s.hidden || s.paused).length,
+      hitches: data.hitches, rung: data.perf.rung, hiddenOrPaused: data.samples.filter(s => s.hidden || s.paused).length,
       unfocused: data.samples.filter(s => !s.focused).length };
     summary.passCpu = Object.fromEntries(Object.entries(data.passes).map(([key, values]) => {
       values.sort((a, b) => a - b);

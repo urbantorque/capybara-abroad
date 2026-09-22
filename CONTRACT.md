@@ -1,3 +1,22 @@
+## HOMECOMING M1e — FIRST-USE SHADER HITCHES (22 Sep 2026)
+
+The longer Sydney route reproduced 146–181ms CPU stalls with newly created
+programs. Material tracing identifies the hidden guidance beacon and plain
+NPC Lambert variants; inferred draw costs were 129–175ms. Warm all attached
+scene objects, including hidden globals, using the existing bounded async
+warm pass. M1c already removes sleeping chapter roots. Run this pass at boot
+after the traveller is created; clear the boot card only after a real frame.
+No new visual term, quality cut, save field or ongoing render work. Existing
+noWarm bypass and hold timeout remain. No new material or mesh is added.
+
+The 90-second rerun has no >50ms CPU event with program creation. Its one
+66.4ms CPU hitch has 58.1ms draw and no new program. Frame p95 remains
+21.1–21.7ms, with two >100ms intervals outside a >50ms game tick; smoothness
+is not certified. Six headful travel/return checks pass with sleeping roots
+detached and Hanoi/Kyoto reflections still drawing. Seven source/real-Three
+warm checks cover hidden globals, detached roots, lights and boot readiness.
+The build, all 61 suite gates and seventeen phone-title checks pass.
+
 ## HOMECOMING M3c — FIRST MEMORY EARNED (22 Sep 2026)
 
 The real-key driver earns hat theft and picnic theft in 34.641 seconds and

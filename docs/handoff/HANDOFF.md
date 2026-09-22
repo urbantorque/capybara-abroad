@@ -12,6 +12,16 @@ between milestones.
 Latest post-M1d reading: 53% remaining. Extended Hanoi Auto 90-second sample
 passes error/focus checks but misses the 20ms p95 target (23.7/22.2/25.5ms).
 One >50ms frame, none >100ms. Do not call performance complete.
+M1e traces Sydney's recurring 146–181ms CPU stalls to first-use beacon/NPC
+shader variants. The existing warm pass now covers hidden attached globals
+and runs at boot after all constructors. Boot readiness requires a rendered
+frame. The rerun removes observed large program-creation hitches, but a
+66ms CPU draw hitch and other >100ms intervals remain. Six travel/return
+checks pass; performance and full release validation remain open.
+M1e syntax/build and all 61 suite gates pass, plus seventeen phone-title
+checks. Latest quota is 52% remaining. Continuation remains active; next work
+should close first-act earned travel/progression, regional-band arrangement
+and remaining performance attribution before adding global visual layers.
 
 M2b replaces the displayed block title with live two-line serif lettering,
 narrows and straightens the first-page sheet, and moves the key chart into

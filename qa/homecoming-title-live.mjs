@@ -7,6 +7,7 @@ const out = { metadata: h.metadata, touch, checks: 0 };
 function check(ok, why) { assert(ok, why); out.checks++; }
 try {
   const p = h.page;
+  await p.waitForFunction(() => window.__capyRunning && window.__capy.state.frames > 0);
   await p.waitForTimeout(2500);
   check((await p.locator('.capyui-mast').textContent()).replace(/\s+/g, ' ').trim() === 'Capybara Abroad', 'readable title');
   const measure = () => p.evaluate(() => {

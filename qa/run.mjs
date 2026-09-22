@@ -27,6 +27,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
 const ASSERTS = [
+  ['qa/homecoming-warm.mjs', 'hidden global shader warm-up and actual first-frame readiness'],
   ['qa/homecoming-story.mjs', 'alternative memories, earned act thresholds and no full-clear requirement'],
   ['qa/homecoming-atlas.mjs', 'five atlas folds and nineteen preserved chapter identities'],
   ['qa/homecoming-biome-parking.mjs', 'sleeping scene traversal, returning rigs and owner rollback'],

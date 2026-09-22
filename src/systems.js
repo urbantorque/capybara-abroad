@@ -41726,14 +41726,16 @@ export function createSystems(game) {
   // lights too, and a program is keyed on the light count: their materials
   // needed a ten-point-light variant on the Cave's first frame that nothing
   // had compiled (13 programs, 2.5 s, after the chapter's own were warm).
-  // traverseVisible over the scene skips the eighteen detached chapters —
-  // which is the reason for not using compile(scene) — and skips the live
-  // chapter's at-rest-hidden effects, which the roots' full traverse then
-  // picks up. An object seen twice costs a cache lookup.
+  // Sleeping roots are detached by M1c, so a full attached-scene traversal
+  // also covers hidden global effects. The old visible-only walk missed the
+  // beacon until its first hint, costing 175 ms in draw on the reference GPU.
+  // The roots retain their explicit traversal; duplicates cost a cache lookup.
   const biomeWarmShim = {
     objs: null,
     traverse: function (fn) {
-      scene.traverseVisible(fn);
+      // M1c detaches sleeping roots. Attached hidden globals are live-world
+      // effects, including the beacon, and need warming before first use.
+      scene.traverse(fn);
       const a = this.objs; for (let i = 0; i < a.length; i++) a[i].traverse(fn);
     },
     traverseVisible: function () {},
@@ -53798,5 +53800,5 @@ export function createSystems(game) {
     if (padEdgeJump)   { input.jumpPressed = true; padEdgeJump = false; sysBufJump(); }
   }
 
-  return { update: update, sun: sun, hemi: hemi };
+  return { update: update, sun: sun, hemi: hemi, warm: biomeWarm };
 }

@@ -666,6 +666,30 @@ The governor moves between zero and one. This misses the 20ms p95 target;
 it is a bounded stationary/key-route sample, not full task/ride or device
 coverage. No new rendering cut is justified by this run alone.
 
+### M1e: shader first-use attribution and warm-up
+
+Sydney's longer baseline reproduces a 157.4ms frame following 152.8ms CPU.
+The trace rerun attributes 129.2ms to draw while program count rises 49 to 50.
+A material-traced run identifies the hidden hint beacon (175.4ms draw) and
+plain NPC Lambert variants (137.6ms draw). This is evidence for missing shader
+warm-up, not an excuse to remove reflections or lower geometry quality.
+
+The existing warm pass now traverses the whole attached scene, including
+hidden global effects; sleeping roots remain detached. Boot invokes it after
+all constructors and the Sydney traveller; boot readiness waits for a real
+rendered frame. No new mesh/material, save field or recurring frame work.
+The existing noWarm bypass, shader-ready polling and timeout are retained.
+
+Afterward, the 90-second Sydney sample has no >50ms CPU hitch with program
+creation. A 66.4ms CPU event remains (58.1ms draw, no program increase).
+Still/walk/rest p95 is 21.7/21.6/21.1ms; two >100ms frame intervals occur
+without a >50ms game tick. Keep investigating; the 20ms target is not passed.
+Six live travel/return checks pass, with zero sleeping roots attached and
+Hanoi/Kyoto reflections still drawing. Seven warm ownership/readiness checks
+pass. Full nineteen-place and sustained release coverage remain outstanding.
+The build and all 61 suite gates pass, as do seventeen phone-title checks.
+Latest weekly allowance: 52% remaining; the 25% operational floor remains.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

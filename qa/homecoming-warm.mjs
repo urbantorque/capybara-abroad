@@ -1,0 +1,24 @@
+// The warm shim sees attached hidden effects, never detached chapter roots.
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import * as THREE from '../vendor/three.module.js';
+const s = readFileSync('src/systems.js', 'utf8');
+const source = s.match(/const biomeWarmShim = \{[^]*?\n  \};/)[0];
+const scene = new THREE.Scene(), root = new THREE.Group(), hidden = new THREE.Group();
+const beacon = new THREE.Mesh(), sleeper = new THREE.Group(), global = new THREE.Mesh();
+hidden.visible = false; hidden.add(beacon); scene.add(root, hidden, global);
+const q = vm.createContext({ scene });
+vm.runInContext(source + '; globalThis.shim = biomeWarmShim;', q);
+q.shim.objs = [root];
+const visited = new Set(); q.shim.traverse(o => visited.add(o));
+assert(visited.has(beacon), 'hidden global beacon is warmed');
+assert(visited.has(global), 'visible global still warmed');
+assert(visited.has(root), 'active root still warmed');
+assert(!visited.has(sleeper), 'detached chapter never warmed');
+let lights = 0; q.shim.traverseVisible(() => lights++);
+assert.equal(lights, 0, 'target-scene lights are not counted twice');
+const main = readFileSync('src/main.js', 'utf8');
+assert(main.indexOf('systems.warm(biome.current)') > main.indexOf('game.addTraveller({ biome:'), 'startup warm follows traveller creation');
+assert(main.includes('if (!game.state.frames) { requestAnimationFrame(bootPaint); return; }'), 'boot waits for an actual rendered frame');
+console.log('Homecoming warm: 7 attached-world and startup checks pass.');
