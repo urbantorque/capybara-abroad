@@ -1514,6 +1514,27 @@ prove the cause of the >100 ms intervals. No production quality or authored
 scene term was cut on this evidence; further attribution requires a long
 frame-linked trace or another named device.
 
+### M2k: speech as a short paper note
+
+The existing NPC bubble kept every sentence on one line, creating broad
+landmark-covering banners. Its text now wraps at 300 px (70 viewport percent
+on a narrow screen), retaining the established paper, ink, tail and font.
+This is a restyle of the existing four-slot DOM term, not another effect or
+per-frame layout read. Absolute auto width depended on the bubble's previous
+left coordinate; a once-cached width could then understate the actual box
+and defeat the existing edge clamp. `width:max-content` under the same cap
+keeps the measured and drawn width equal at either side of the viewport.
+
+The first narrow-screen prototype had 13 offscreen observations in 194 visible
+bubble samples. After the stable-width change, two independent 390x844
+30-second headful Edge observations found zero offscreen samples in 60 and
+142 visible samples; a third run found zero in two visible samples. A
+1280x760 run found zero in 175 visible samples. The long-line fixture measured
+273x85 px at both left anchors on the narrow screen and 300x68 px at both
+anchors on desktop. One live narrow screenshot was read by eye. Random speech
+means these counts do not prove all lines, languages, panel combinations or
+physical touch devices; the broader dialogue-density review remains open.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

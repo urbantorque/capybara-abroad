@@ -1597,7 +1597,12 @@ export function createNPCs(game) {
     // the rung the two rules were arguing about, written down. A bubble is the
     // world talking and the paper is the game talking.
     'z-index:30;' +
-    'display:none;opacity:0;white-space:nowrap;' +
+    // One long sentence became a banner across the landmark. Allow a short
+    // paper note instead; the existing first-line size read also measures its
+    // new height for screen-edge and panel avoidance.
+    // Absolute auto width depends on the last left position. Size the note
+    // from its text so the once-per-line edge clamp uses the width it draws.
+    'display:none;opacity:0;white-space:normal;width:max-content;max-width:min(300px,70vw);overflow-wrap:break-word;' +
     'font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;' +
     'font-weight:600;font-size:calc(15px * var(--capyui-t,1));line-height:1.15;padding:7px 13px 8px;border-radius:7px;' +
     'background:' + bubPaper + ';color:' + npcCssHex(PALETTE.ibisHead) + ';' +
