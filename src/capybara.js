@@ -1458,6 +1458,27 @@ function capyPaintCoat(root, furMats, only) {
 const _keyDir = { value: new THREE.Vector3(0, 1, 0) };
 const _keyC = { value: new THREE.Color(0, 0, 0) };
 const _keyK = { value: 0 };
+// ---- THE HERO (AAA pass, 23 Sep 2026) --------------------------------------
+// The animal is the one thing in every frame and it was shaded like a crate:
+// one Lambert, a fill from the lens (which is what flattens a form — light
+// from the viewer's side has no terminator to show), a rim. Cropped at 3x on
+// the Kyoto flags it read as a single orange tone from back to belly, and on
+// the Erg's orange pavement it was the ground with a different outline.
+// Three terms in the program it already has, so no draw call and no compile
+// beyond the one it already pays:
+//   1. THE BELLY. A face turning toward the ground loses up to 58 % of its sky
+//      and 28 % of its sun — the ground under a body is where the light is not.
+//      This is what makes a lozenge sit ON the street instead of in front of it.
+//   2. THE TERMINATOR. Light wrapped half a radian past the edge, in a red-
+//      brown, where fur scatters it: the line between lit and unlit is warm
+//      and soft instead of grey and hard.
+//   3. THE FUZZ. A grazing sheen, stronger with the sun behind, in pale gold:
+//      the outline glows where it is edge-on, which is the separation the
+//      rim was built for, but lit by the sun rather than the sky.
+// All three under capyShadowV, so an animal in shade is not glowing.
+// Cut: noHero. Parks at rung 1.
+const _heroK = { value: 0 };
+export function capyHeroTick(k) { _heroK.value = k > 0 ? (k < 1.5 ? k : 1.5) : 0; }
 function capyKeyWrap(m) {
   const prev = m.onBeforeCompile;
   const pk = m.customProgramCacheKey;
@@ -1466,17 +1487,35 @@ function capyKeyWrap(m) {
     shader.uniforms.uCkDir = _keyDir;
     shader.uniforms.uCkC = _keyC;
     shader.uniforms.uCkK = _keyK;
+    shader.uniforms.uHeroK = _heroK;
     // The rim's injection keeps `#include <common>` at the head of what it
     // substitutes, so this anchor is still there after it has run.
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>',
-               '#include <common>\nuniform vec3 uCkDir;\nuniform vec3 uCkC;\nuniform float uCkK;')
+               '#include <common>\nuniform vec3 uCkDir;\nuniform vec3 uCkC;\nuniform float uCkK;\nuniform float uHeroK;')
       .replace('#include <lights_fragment_end>', [
         '#include <lights_fragment_end>',
         'if (uCkK > 0.0) {',
         '  vec3 ckD = normalize((viewMatrix * vec4(uCkDir, 0.0)).xyz);',
         '  reflectedLight.directDiffuse += saturate(dot(geometryNormal, ckD)) * uCkK * uCkC * BRDF_Lambert(material.diffuseColor);',
         '}',
+        // THE HERO (AAA pass) — see capyHeroTick. Index 0 is the sun (three
+        // sorts shadow casters first; see _keyDome in shared.js).
+        '#if NUM_DIR_LIGHTS > 0',
+        'if (uHeroK > 0.0) {',
+        '  vec3 hL = directionalLights[0].direction;',
+        '  vec3 hSun = directionalLights[0].color;',
+        '  float hNL = dot(geometryNormal, hL);',
+        '  float hUp = smoothstep(-0.75, 0.6, normalize(vRimN).y);',
+        '  reflectedLight.indirectDiffuse *= mix(1.0, mix(0.42, 1.0, hUp), uHeroK);',
+        '  reflectedLight.directDiffuse *= mix(1.0, mix(0.72, 1.0, hUp), uHeroK);',
+        '  float hWrap = saturate((hNL + 0.5) / 1.5) - saturate(hNL);',
+        '  float hF = pow(1.0 - saturate(dot(geometryNormal, geometryViewDir)), 2.5);',
+        '  float hBack = 0.3 + 0.7 * saturate(0.5 - 0.5 * dot(geometryViewDir, hL));',
+        '  vec3 hAdd = hWrap * vec3(1.3, 0.5, 0.26) + hF * hBack * vec3(0.95, 0.8, 0.62) * 1.7;',
+        '  reflectedLight.directDiffuse += hAdd * hSun * capyShadowV * uHeroK * BRDF_Lambert(material.diffuseColor);',
+        '}',
+        '#endif',
       ].join('\n'));
   };
   m.customProgramCacheKey = function () { return (pk ? pk.call(this) : '') + '|ckey'; };

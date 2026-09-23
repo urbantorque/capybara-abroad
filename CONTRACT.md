@@ -1,3 +1,28 @@
+## AAA A0 — LIGHT, HERO, MISCHIEF, FREE ROAM, ROUNDED PEOPLE (24 Sep 2026)
+
+The author handed over creative ownership (ROADMAP-AAA.md). The first
+milestone lays nine flagged terms over the shipped picture and re-bases
+nothing.
+
+Four terms light the frame, and all four park at rung 1: composite occlusion
+`noAO`, spiral bilinear shadows `noShadowLerp`, turned-away shade
+`noFormShade` and near-clear air `noNearClear`. Together they cost 0.65–1.33
+ms of GPU across six chapters on the Arc 130V (qa/aaa-ab.mjs). The
+capybara's own shading, `noHero`, measures as noise.
+
+Mischief now lands, in three terms: round dust `noPuff2`, a named freeze on a
+knock-over the animal caused `noMischiefBeat`, and a take over whoever jumped
+`noTake`. Proven with real keys (qa/aaa-bin.mjs).
+
+Free Roam is reachable from a story file. The title's second door opens all
+nineteen places and commits the mode only when a place is chosen
+(qa/aaa-freeroam.mjs, 9 checks).
+
+People are rounded, `noPersonRound`. Every roster, Pasto and local part has
+a rounded twin, and each torso is taken over from the contour registry so
+every mesh has one writer. The pinned person contour test still passes 1128
+checks. npm test: 77 checks, 0 failed.
+
 ## HOMECOMING M6v — PUBLIC PLAYTEST (23 Sep 2026)
 
 The user directed publication of the Homecoming candidate. Master

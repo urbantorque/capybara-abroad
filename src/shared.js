@@ -2014,6 +2014,21 @@ export function shadeTick(color, sunDirWorld) {
   if (color) _shadeC.value.copy(color);
   if (sunDirWorld) _shadeSun.value.copy(sunDirWorld).normalize();
 }
+// ---------------------------------------------------------------------------
+// ...AND A FACE TURNED AWAY IS IN SHADE TOO (AAA pass, 23 Sep 2026).
+//
+// The block above gave the turned-away face the shade's HUE and kept its LEVEL
+// on cast shadow alone, on purpose: uShadowSky is a shipped per-chapter number.
+// Measured over eight arrival frames after that, the darkest 2 % of every
+// daylight frame still sat at 49-62 of 255 — the north wall of a house in
+// Kyoto is lit by the whole sky at full strength, and a box world with every
+// back face that bright has no form. This is a new term laid over it: the
+// same per-chapter sky number, applied to a face as it turns from the sun,
+// at uFormK of the way. 0 is bit for bit the line it replaces, and an
+// overcast chapter (uShadowSky 1.0) is untouched at any strength. The cut is
+// noFormShade; it parks at rung 1.
+const _formK = { value: 0 };
+export function formShadeTick(k) { _formK.value = k > 0 ? (k < 1 ? k : 1) : 0; }
 /** For a probe: the live values, and whether the shader half is actually in. */
 export function shadeInfo() {
   const c = _shadeC.value;
@@ -2256,7 +2271,8 @@ const _RIM_FS_SHADE = `capyShadowV = 1.0;
 #include <lights_fragment_begin>
 #if defined( RE_IndirectDiffuse )
   float capyShF = 1.0 - capyShadowV;
-  irradiance *= mix(1.0, uShadowSky, capyShF);
+  float capyAway = 1.0 - smoothstep(-0.25, 0.2, dot(normalize(vRimN), uShadeSun));
+  irradiance *= mix(1.0, uShadowSky, max(capyShF, capyAway * uFormK));
   float capyShT = max(capyShF, 1.0 - clamp(dot(normalize(vRimN), uShadeSun), 0.0, 1.0));
   irradiance *= mix(vec3(1.0), uShadeC, capyShT);
 #endif`;
@@ -2269,6 +2285,7 @@ uniform vec3 uRimC;
 uniform float uShadowSky;
 uniform vec3 uShadeC;
 uniform vec3 uShadeSun;
+uniform float uFormK;
 uniform vec4 uSpillP[${_SPILL_N}];
 uniform vec3 uSpillC[${_SPILL_N}];
 uniform float uSpillOn;
@@ -2450,6 +2467,12 @@ const _RIM_FS_OUT = `{
 // binds the animal's pair instead of the world's, and the program is bit for
 // bit the one every wall in the chapter is already using. The capybara does not
 // gain a rim here. It stops sharing the scenery's.
+// THE SMOOTH SHADOW FILTER'S SWITCH (AAA pass). Declared in the shadow chunk
+// every lit program includes; bound here because this hook is the one that
+// reaches essentially every material. A program without the hook reads the
+// unset default, 0, which is the old filter — never a broken one.
+const _shLerp = { value: 1 };
+export function shLerpTick(on) { _shLerp.value = on ? 1 : 0; }
 function _rimInjectWith(kU, cU, capOnU) {
   return function (shader) {
     shader.uniforms.uRimK = kU;
@@ -2463,6 +2486,7 @@ function _rimInjectWith(kU, cU, capOnU) {
     shader.uniforms.uShadowSky = _skyOcc;
     shader.uniforms.uShadeC = _shadeC;
     shader.uniforms.uShadeSun = _shadeSun;
+    shader.uniforms.uFormK = _formK;
     shader.uniforms.uSpillP = _spillP;
     shader.uniforms.uSpillC = _spillC;
     shader.uniforms.uSpillOn = _spillOn;
@@ -2481,6 +2505,8 @@ function _rimInjectWith(kU, cU, capOnU) {
     shader.uniforms.uCloudP = _cloudP;
     shader.uniforms.uCloudS = _cloudS;
     shader.uniforms.uLensFade = _lensFadeU;
+    // the smooth shadow filter's switch (AAA pass; systems.js, sysInstallShadowFilter)
+    shader.uniforms.uShLerp = _shLerp;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', _RIM_VS_COMMON)
       .replace('#include <begin_vertex>', _RIM_VS_BEGIN);

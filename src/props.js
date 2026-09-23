@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matOwn, TASKS, rand, randInt, clamp, damp, lerp, grain, waterYAt } from './shared.js';
+import { PALETTE, mat, matOwn, matRound, matEmit, TASKS, rand, randInt, clamp, damp, lerp, grain, waterYAt } from './shared.js';
 
 // ===========================================================================
 // AGENT C — world physics + interactive props.
@@ -546,6 +546,17 @@ const physDustVel = new Float32Array(physDUST_MAX * 3);
 const physDustLife = new Float32Array(physDUST_MAX);
 let physDustHead = 0;
 let physDustDirty = true;
+// ---- THE PUFF (AAA pass, 23 Sep 2026) — see physDust3. The span is what the
+// scale curve needs; physDustPuffK is which model each particle was BORN
+// under, so a flag flipped mid-cloud does not re-shape one already in the air.
+const physDustSpan = new Float32Array(physDUST_MAX);
+const physDustPuffK = new Uint8Array(physDUST_MAX);
+let physDustGeoOld = null, physDustGeoPuff = null, physDustMatOld = null, physDustMatPuff = null;
+// Paler than the ground it comes off: dust is the ground's colour lifted by
+// the air in it. Same four kinds, same order, as physDUST_COLOR below.
+const physDUST_PUFF_COLOR = [PALETTE.sandstone, PALETTE.sand, PALETTE.antIceLt, PALETTE.foam];
+// ---- THE BEAT (AAA pass) — see physBeat. Sim time of the last one.
+let physBeatT = -1e9;
 let physFoam = null;
 const physFoamPos = new Float32Array(physFOAM_MAX * 3);
 const physFoamLife = new Float32Array(physFOAM_MAX);
@@ -2030,6 +2041,7 @@ export function createProps(game) {
   // nobody has visited yet on frame 1.
   physInitParticles();
   physInitPuff();
+  physInitTake();
   physInitShards();
   physInitRubbish();
   physScatter();
@@ -4123,6 +4135,7 @@ function physSpill(prop) {
   // the evidence a frame before it was read.
   const earnedSpill = prop.type === 'coffee' && (prop.owner || prop.stolenFrom) &&
                       physCausedByCapy(prop, physCAUSE_SPILL);
+  const mineSpill = physCausedByCapy(prop, physCAUSE_SPILL);
 
   physImpactPayload.prop = prop;
   physImpactPayload.speed = 0;
@@ -4133,6 +4146,7 @@ function physSpill(prop) {
   physSfxOpts.volume = 0.8;
   physGame.sfx(def.spillSfx || 'splash', physSfxOpts);
   physDust3(b.position.x, b.position.y - prop.originY + 0.12, b.position.z, 5);
+  if (mineSpill) physBeat(0.16, 0.04);
   // ...AND IT IS SYDNEY'S ROW (L3-8). The errand puts owned cups in other
   // people's hands in other places now, and a flat white spilt in Venice
   // must not tick a line on the Gardens' list (memory: shared-space leaks).
@@ -4162,13 +4176,14 @@ function physCheckTip(prop) {
       b.position.z + rand(-0.35, 0.35)
     );
   }
-  physDust3(b.position.x, 0.15, b.position.z, 6);
+  const mineTip = physCausedByCapy(prop, physCAUSE_TIP);
+  physDust3(b.position.x, 0.15, b.position.z, mineTip ? 10 : 6);
   physSfxOpts.volume = 0.9;
   physGame.sfx('rustle', physSfxOpts);
-  physGame.shake(0.3);
+  if (!(mineTip && physBeat(0.3, 0.05))) physGame.shake(0.3);
   // A bin that a tourist blunders into still spills its rubbish — but only the
   // capybara can tick the checklist, and only if it hit the thing just now.
-  if (physCausedByCapy(prop, physCAUSE_TIP)) physTask('bin-chicken');
+  if (mineTip) physTask('bin-chicken');
 }
 
 /**
@@ -4659,7 +4674,20 @@ function physInitParticles() {
   // above, and Material.copy() would have dropped the rim on the way.
   const dustMat = matOwn(PALETTE.soil);
   physDustColor = PALETTE.soil;
-  physDust = new THREE.InstancedMesh(new THREE.TetrahedronGeometry(0.1), dustMat, physDUST_MAX);
+  physDustGeoOld = new THREE.TetrahedronGeometry(0.1);
+  // Eighty faces, not four: at 0.12 m a tetrahedron is a chip of gravel and a
+  // sphere is a ball of air — the difference between debris and dust. Detail
+  // 1, not 0: three gives a detail-0 polyhedron FACE normals whatever the
+  // material says, and it came back from the lens as a faceted rock.
+  physDustGeoPuff = new THREE.IcosahedronGeometry(0.13, 1);
+  physDustMatOld = dustMat;
+  // ...and SMOOTH, and a little thin: faceted and opaque, a ball of air at
+  // 0.3 m reads as a boulder (looked at, Sydney lawn, 3x crop). Its own
+  // material for the reason dustMat is — the colour is written per chapter —
+  // which the name makes: matRound caches by colour and options.
+  physDustMatPuff = matRound(PALETTE.sandstone, { transparent: true, opacity: 0.8, depthWrite: false,
+    emissive: PALETTE.sandstone, emissiveIntensity: 0.32, name: 'aaa-puff' });
+  physDust = new THREE.InstancedMesh(physDustGeoOld, dustMat, physDUST_MAX);
   physDust.frustumCulled = false;
   physDust.userData.noReflection = true; // a footfall puff cannot read in a water mirror
   physDust.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -4716,19 +4744,51 @@ function physDust3(x, y, z, count) {
   const kind = physDUST_BIOME[physLiveBiome()];
   if (kind === physDUST_ASH && physPuffMesh) { physPuff3(x, y, z, count); return; }
   if (!physDust) return;
-  const col = physDUST_COLOR[kind === undefined || kind < 0 ? physDUST_SOIL : kind];
-  if (col !== physDustColor) { physDustColor = col; physDust.material.color.setHex(col); }
+  // THE PUFF (AAA pass). The old model threw each grain up at 1.4-3.4 m/s
+  // under full gravity and bounced it off y = 0.04: a landing threw gravel.
+  // Dust does the opposite — it is thrown OUT, the air stops it inside a
+  // quarter second, it hangs, it rises a little and it thins away — and it
+  // is round. Same pool, same count, same draw: this costs nothing the old
+  // model did not, so it has no rung. Cut: noPuff2.
+  const puff = !(physGame.state && physGame.state.noPuff2);
+  const kk = kind === undefined || kind < 0 ? physDUST_SOIL : kind;
+  const col = (puff ? physDUST_PUFF_COLOR : physDUST_COLOR)[kk];
+  const dm = puff ? physDustMatPuff : physDustMatOld;
+  if (physDust.material !== dm) { physDust.material = dm; physDustColor = -1; }
+  if (col !== physDustColor) {
+    physDustColor = col; physDust.material.color.setHex(col);
+    // a third of its own colour as light, so the underside of a cloud is not
+    // the ground's shadow colour: dust is lit through, not on
+    if (puff) physDust.material.emissive.setHex(col);
+  }
   const n = count || 4;
+  // Gravity used to put every grain on the ground; a puff hangs where it is
+  // born, so it is born ON the ground when the call is within 0.6 m of it
+  // (a landing names the body centre, a bin its own middle).
+  let yPuff = y;
+  if (puff) { const gy = physSurfaceY(x, z); if (gy === gy && y - gy < 0.6) yPuff = gy + 0.04; }
   for (let k = 0; k < n; k++) {
     const i = physDustHead;
     physDustHead = (physDustHead + 1) % physDUST_MAX;
+    physDustPuffK[i] = puff ? 1 : 0;
+    if (puff) {
+      const a = rand(0, Math.PI * 2), sp = rand(1.3, 3.1);
+      physDustPos[i * 3] = x + Math.cos(a) * 0.12;
+      physDustPos[i * 3 + 1] = yPuff + rand(0.02, 0.14);
+      physDustPos[i * 3 + 2] = z + Math.sin(a) * 0.12;
+      physDustVel[i * 3] = Math.cos(a) * sp;
+      physDustVel[i * 3 + 1] = rand(0.35, 1.2);
+      physDustVel[i * 3 + 2] = Math.sin(a) * sp;
+      physDustLife[i] = physDustSpan[i] = rand(0.5, 0.95);
+      continue;
+    }
     physDustPos[i * 3] = x + rand(-0.16, 0.16);
     physDustPos[i * 3 + 1] = y + rand(0.02, 0.2);
     physDustPos[i * 3 + 2] = z + rand(-0.16, 0.16);
     physDustVel[i * 3] = rand(-1.6, 1.6);
     physDustVel[i * 3 + 1] = rand(1.4, 3.4);
     physDustVel[i * 3 + 2] = rand(-1.6, 1.6);
-    physDustLife[i] = rand(0.4, 0.8);
+    physDustLife[i] = physDustSpan[i] = rand(0.4, 0.8);
   }
   physDustDirty = true;
 }
@@ -4748,8 +4808,22 @@ function physFoamRing(x, z, delay) {
 }
 
 function physWriteDust() {
+  // one geometry for the pool, the live model's: the cut is an A/B, not a mix
+  const cutP = physGame.state && physGame.state.noPuff2;
+  physDust.geometry = cutP ? physDustGeoOld : physDustGeoPuff;
+  const dm = cutP ? physDustMatOld : physDustMatPuff;
+  if (physDust.material !== dm) { physDust.material = dm; physDustColor = -1; }
   for (let i = 0; i < physDUST_MAX; i++) {
-    if (physDustLife[i] > 0) {
+    if (physDustLife[i] > 0 && physDustPuffK[i]) {
+      // up fast (sqrt), hold, and gone in the last fifth: a puff swells and
+      // then is simply not there, which is how thinning air reads at 12 cm
+      const age = 1 - physDustLife[i] / physDustSpan[i];
+      const s = (0.5 + 1.9 * Math.sqrt(age)) * (1 - age * age * age);
+      physV1.set(physDustPos[i * 3], physDustPos[i * 3 + 1], physDustPos[i * 3 + 2]);
+      physQ1.setFromAxisAngle(physUp, i * 1.7 + age * 1.3);
+      physV2.set(s, s * 0.88, s);
+      physM4.compose(physV1, physQ1, physV2);
+    } else if (physDustLife[i] > 0) {
       const s = clamp(physDustLife[i] * 1.6, 0.12, 1);
       physV1.set(physDustPos[i * 3], physDustPos[i * 3 + 1], physDustPos[i * 3 + 2]);
       physQ1.setFromAxisAngle(physUp, physDustLife[i] * 6);
@@ -4785,6 +4859,17 @@ function physParticleUpdate(dt) {
     if (physDustLife[i] <= 0) continue;
     anyDust = true;
     physDustLife[i] -= dt;
+    if (physDustPuffK[i]) {
+      // air drag (a quarter-second time constant) and a little lift
+      const dr = Math.exp(-3.6 * dt);
+      physDustVel[i * 3] *= dr; physDustVel[i * 3 + 2] *= dr;
+      physDustVel[i * 3 + 1] = physDustVel[i * 3 + 1] * dr + 0.5 * dt;
+      physDustPos[i * 3] += physDustVel[i * 3] * dt;
+      physDustPos[i * 3 + 1] += physDustVel[i * 3 + 1] * dt;
+      physDustPos[i * 3 + 2] += physDustVel[i * 3 + 2] * dt;
+      if (physDustLife[i] <= 0) physDustLife[i] = 0;
+      continue;
+    }
     physDustVel[i * 3 + 1] -= 9 * dt;
     physDustPos[i * 3] += physDustVel[i * 3] * dt;
     physDustPos[i * 3 + 1] += physDustVel[i * 3 + 1] * dt;
@@ -5721,6 +5806,7 @@ function physShatter(prop) {
   const x = b.position.x;
   const y = b.position.y;
   const z = b.position.z;
+  const mineBreak = physCausedByCapy(prop, physCAUSE_SPILL);
   // A camera and a pair of sunglasses do not break into pottery: `shard:`
   // on the type picks the material, and defaults to the ceramic sliver that
   // was the only one there was.
@@ -5730,7 +5816,7 @@ function physShatter(prop) {
   physGame.sfx('pop', physSfxOpts);
   physSfxOpts.volume = 0.5;
   physGame.sfx('thud', physSfxOpts);
-  physGame.shake(0.26);
+  if (!(mineBreak && physBeat(0.26, 0.05))) physGame.shake(0.26);
   physDestroyPayload.prop = prop;
   physGame.events.emit('prop:destroy', physDestroyPayload);
   physHide(prop, physHIDE_BOWL);
@@ -5802,6 +5888,137 @@ function physUnhide(prop) {
   }
   physRescue(prop);                      // home, dead still, asleep, transforms synced
   physPuff3(prop.homeX, prop.homeY + 0.35, prop.homeZ, 3);
+}
+
+// ---- THE BEAT (AAA pass, 23 Sep 2026) --------------------------------------
+// A bin going over was a shake(0.3) and a 60 ms flash, and so was a bin a
+// tourist walked into: the game could not tell mischief from weather. When
+// the ANIMAL did it (physCausedByCapy, the same window the task reads) the
+// knock-over gets the full punch — shake, FOV kick, pad — and a named freeze
+// of 40-50 ms, the "that landed" frame every marquee already has. Held to
+// one per 0.45 s of sim time, because the bin cascade in a busy market is
+// several impacts a second and the punch's own comment says what a freeze
+// under every third crate feels like. The calm setting already governs the
+// freeze and the kick inside punch(). Cut: noMischiefBeat. Returns whether it
+// fired, so the caller's plain shake stands in when it does not.
+const physBEAT_GAP = 0.45;
+function physBeat(a, freeze) {
+  const st = physGame.state;
+  if (!st || st.noMischiefBeat || !physGame.punch) return false;
+  if (st.time - physBeatT < physBEAT_GAP) return false;
+  physBeatT = st.time;
+  physGame.punch(a, freeze);
+  return true;
+}
+
+// ---- THE TAKE (AAA pass, 23 Sep 2026) --------------------------------------
+// A person the animal startles flinches 8.6 degrees and turns round (npc.js,
+// localsReact) — the fun review's "the local rig has no legs" — and at 12 m
+// on a 720-line frame 8.6 degrees is four pixels. The cartoon answer is the
+// TAKE: three strokes that pop out over the head of whoever jumped hardest,
+// hold a beat, and are gone in three quarters of a second. Not a glyph and
+// not a word — the voice rule stands — just the shape the eye already reads
+// as "they noticed". One per `npc:startled` (npc.js emits one, for the
+// loudest reactor, on purpose), one per person per 1.4 s, four alive at most,
+// one instanced draw while any is up and none when not. Billboarded off the
+// camera's own basis. Cut: noTake; parks at rung 1.
+const physTAKE_N = 4;               // takes alive at once
+const physTAKE_LIFE = 0.75;         // s
+const physTAKE_A = [-0.8, 0, 0.8];  // stroke angles from vertical, rad
+let physTakeMesh = null;
+let physTakeHead = 0;
+let physTakeAny = false;
+const physTakeT = new Float32Array(physTAKE_N).fill(-1);
+const physTakeP = new Float32Array(physTAKE_N * 3);
+const physTakeHeadY = new WeakMap();   // group -> head height over its origin
+const physTakeLast = new WeakMap();    // group -> sim time of its last take
+const physTakeBox = new THREE.Box3();
+const physTakeR = new THREE.Vector3();
+const physTakeU = new THREE.Vector3();
+function physInitTake() {
+  if (physTakeMesh) return;
+  // tapered, thick end out, base at the origin so it grows away from the head
+  const g = new THREE.CylinderGeometry(0.048, 0.016, 0.36, 5);
+  g.translate(0, 0.18, 0);
+  physTakeMesh = new THREE.InstancedMesh(g, matEmit(PALETTE.churchWhite, 0.55), physTAKE_N * 3);
+  physTakeMesh.frustumCulled = false;
+  physTakeMesh.castShadow = false;
+  physTakeMesh.userData.noReflection = true;
+  physTakeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  for (let n = 0; n < physTAKE_N * 3; n++) {
+    physM4.compose(physV3.set(0, -900, 0), physQ2.identity(), physV2.set(0, 0, 0));
+    physTakeMesh.setMatrixAt(n, physM4);
+  }
+  physTakeMesh.visible = false;
+  physSceneAddLoose(physTakeMesh);
+  physGame.events.on('npc:startled', physOnStartled);
+}
+function physOnStartled(p) {
+  const st = physGame.state;
+  if (!physTakeMesh || !st || st.noTake || (st.perfRung | 0) >= 1) return;
+  const rec = (p && p.npc) || p;
+  const g = rec && rec.group;
+  if (!g || !g.position || !(g.position.x === g.position.x)) return;
+  const cp = physGame.capy && physGame.capy.position;
+  if (cp) {
+    const dx = g.position.x - cp.x, dz = g.position.z - cp.z;
+    if (dx * dx + dz * dz > 30 * 30) return;       // out of the frame, near enough
+  }
+  const last = physTakeLast.get(g);
+  if (last !== undefined && st.time - last < 1.4) return;
+  physTakeLast.set(g, st.time);
+  let hy = physTakeHeadY.get(g);
+  if (hy === undefined) {
+    // once per person: the top of what is drawn, over where they stand
+    g.updateMatrixWorld(true);
+    physTakeBox.setFromObject(g);
+    hy = physTakeBox.isEmpty() ? 1.8 : clamp(physTakeBox.max.y - g.position.y, 0.6, 3.2);
+    physTakeHeadY.set(g, hy);
+  }
+  const i = physTakeHead;
+  physTakeHead = (physTakeHead + 1) % physTAKE_N;
+  physTakeT[i] = 0;
+  physTakeP[i * 3] = g.position.x;
+  physTakeP[i * 3 + 1] = g.position.y + hy - 0.04;
+  physTakeP[i * 3 + 2] = g.position.z;
+  physTakeAny = true;
+  physTakeMesh.visible = true;
+}
+function physTakeUpdate(dt) {
+  if (!physTakeMesh || !physTakeAny) return;
+  const cam = physGame.camera;
+  if (!cam) return;
+  physTakeR.setFromMatrixColumn(cam.matrixWorld, 0);
+  physTakeU.setFromMatrixColumn(cam.matrixWorld, 1);
+  let any = false;
+  for (let i = 0; i < physTAKE_N; i++) {
+    let t = physTakeT[i];
+    if (t >= 0) { t += dt; if (t > physTAKE_LIFE) t = -1; physTakeT[i] = t; }
+    for (let k = 0; k < 3; k++) {
+      const n = i * 3 + k;
+      if (t < 0) {
+        physM4.compose(physV3.set(0, -900, 0), physQ2.identity(), physV2.set(0, 0, 0));
+        physTakeMesh.setMatrixAt(n, physM4);
+        continue;
+      }
+      any = true;
+      // out fast, overshoot, settle, then shrink away in the last fifth
+      const out = 1 - Math.pow(1 - Math.min(t / 0.16, 1), 3);
+      const sc = t < 0.09 ? t / 0.09 * 1.35 : t < 0.24 ? 1.35 - 0.35 * (t - 0.09) / 0.15
+               : t > physTAKE_LIFE - 0.18 ? Math.max(0, (physTAKE_LIFE - t) / 0.18) : 1;
+      const a = physTAKE_A[k];
+      physV1.copy(physTakeR).multiplyScalar(Math.sin(a)).addScaledVector(physTakeU, Math.cos(a)).normalize();
+      physQ1.setFromUnitVectors(physUp, physV1);
+      physV3.set(physTakeP[i * 3], physTakeP[i * 3 + 1], physTakeP[i * 3 + 2])
+        .addScaledVector(physV1, 0.06 + 0.26 * out);
+      const len = k === 1 ? 1.2 : 0.95;
+      physV2.set(sc, sc * len, sc);
+      physM4.compose(physV3, physQ1, physV2);
+      physTakeMesh.setMatrixAt(n, physM4);
+    }
+  }
+  physTakeMesh.instanceMatrix.needsUpdate = true;
+  if (!any) { physTakeAny = false; physTakeMesh.visible = false; }
 }
 
 // ---- the puff pool (Pasto's dust; built inside the biome, so it is tagged) --
@@ -6871,6 +7088,7 @@ function physUpdate(dt) {
   // chapter pays a few dozen array reads a frame and nothing else.
   physParticleUpdate(dt);
   physPuffUpdate(dt);
+  physTakeUpdate(dt);
   physShardUpdate(dt);
   // Pasto only, not merely "not Sydney": the stall triggers compare the
   // capybara's position against stall coordinates that every biome shares, so

@@ -41,20 +41,20 @@ assert(s.includes('if (biomeWarmReady(pr)) mats.delete(m);'),'real warm poll use
 console.log('Homecoming warm: 18 attached-world, variant and startup checks pass.');
 
 const warmPost=main.match(/  post.warmMaterials = function \(\) \{[^]*?\n  \};/)[0];
-const bright={},blur={},rays={},coc={},comp={},oldMaterial={},oldTarget={},bloomTarget={};
+const bright={},blur={},rays={},coc={},ao={},aoBlur={},comp={},oldMaterial={},oldTarget={},bloomTarget={};
 const calls=[],quad={material:oldMaterial};let target=oldTarget,fail=false;
 const postContext=vm.createContext({post:{},quad,quadScene:{},quadCam:{},bloomA:bloomTarget,
-  matBright:bright,matBlur:blur,matRays:rays,matCoC:coc,matComp:comp,
+  matBright:bright,matBlur:blur,matRays:rays,matCoC:coc,matAO:ao,matAOBlur:aoBlur,matComp:comp,
   renderer:{getRenderTarget:()=>target,setRenderTarget:t=>{target=t;},
     compile:()=>{calls.push({material:quad.material,target});if(fail)throw Error('compile failure');}}});
 vm.runInContext(warmPost,postContext);
 const postMaterials=postContext.post.warmMaterials();
-assert.equal(postMaterials.length,5);
-assert.deepEqual(calls.map(c=>c.material),[bright,blur,rays,coc,comp]);
-assert(calls.slice(0,4).every(c=>c.target===bloomTarget));
-assert.equal(calls[4].target,null,'composite uses native-screen program');
+assert.equal(postMaterials.length,7);
+assert.deepEqual(calls.map(c=>c.material),[bright,blur,rays,coc,ao,aoBlur,comp]);
+assert(calls.slice(0,6).every(c=>c.target===bloomTarget));
+assert.equal(calls[6].target,null,'composite uses native-screen program');
 assert.equal(target,oldTarget);assert.equal(quad.material,oldMaterial);
 fail=true;assert.throws(()=>postContext.post.warmMaterials(),/compile failure/);
 assert.equal(target,oldTarget);assert.equal(quad.material,oldMaterial);
 assert(s.includes('game.post.warmMaterials().forEach(function (m) { mats.add(m); });'),'post joins existing asynchronous readiness set');
-console.log('Homecoming post warm: five real destinations, failure restoration and readiness ownership pass.');
+console.log('Homecoming post warm: seven real destinations, failure restoration and readiness ownership pass.');

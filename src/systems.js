@@ -5,13 +5,13 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, JOURNEY, HOMECOMING_ACTS, homecomingMemory, homecomingProgress, chapterExperience, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY, cloudSet,
-         rimTick, cloudTick, skyTick, fresnelTick, paleTick, triTick, mirrorTick, shadeTick, bounceSlots, bounceTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
+         rimTick, shLerpTick, formShadeTick, cloudTick, skyTick, fresnelTick, paleTick, triTick, mirrorTick, shadeTick, bounceSlots, bounceTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo, keyDomeTick, keyDomeInfo, skyDomeLit, sky2CloudTick, sky2SunTick, sky2Info,
          exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt, lensFadeUniform, lensCapTick, reflectSet, dappleSet,
          rainbowTick, puddleSet } from './shared.js';
 // THE CHARACTER KEY (L7, E4)
-import { capyKeyTick, capyForceNap } from './capybara.js';
+import { capyKeyTick, capyHeroTick, capyForceNap } from './capybara.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -6559,6 +6559,7 @@ const sysHOME_UI = {
   subtitle: 'Nineteen places. One unhurried capybara.',
   why: 'it is bringing a few things home. the rest can wait.',
   begin: 'Begin', free: 'Free roam', freeHint: 'all nineteen places, open from the start',
+  freeKeep: 'all nineteen places, open; everything kept stays',
   firstGate: 'a Sydney memory opens the coast', actGate: 'two memories open the next act',
   ready: 'the way home is open', core: 'the big experience or the quieter route',
   freeSwitch: 'free roam: open every place', freeSaid: 'Every place is open. Everything kept stays.',
@@ -11580,6 +11581,9 @@ function sysBuildCSS() {
 // header there. The frustum is 64 m deep in a flat chapter, so a caster two
 // metres up is 0.031 of depth and lands about eight texels of blur — 17 cm,
 // which is what a two-metre-high edge actually looks like.
+// How far a face turned from the sun goes toward the chapter's shade level
+// (shared.js, formShadeTick). Tuned by eye on the eight-chapter A/B, AAA pass.
+const sysFORM_K = 0.6;
 const sysPEN_K   = 260.0;
 const sysPEN_MAX = 16.0;    // texels. 34 cm; past this it stops being a shadow.
 const sysPEN_MIN = 1.0;     // texels. A contact edge is allowed to be sharp.
@@ -11610,6 +11614,25 @@ function sysInstallShadowFilter(T) {
     R.push([Math.cos(a), Math.sin(a)]);
   }
   const f = (v) => v.toFixed(4);
+  // THE SMOOTH FILTER (AAA pass, 23 Sep 2026). Every tap above is a binary
+  // step, so a penumbra is at most thirteen levels, and each level flips on a
+  // shadow-texel boundary: under a 3x crop the capybara's shadow on the Venice
+  // flags was a stack of blocky contours, and each raised grout strip cast a
+  // serrated edge — eight copies of it, one per ring tap. Two changes:
+  //   - each tap is a BILINEAR compare (four texels, blended by the fraction),
+  //     so a tap slides across a texel instead of jumping, and
+  //   - the twelve sit on a golden-angle spiral, radius sqrt-spaced, so no two
+  //     share a direction and there is no ring for a copy to line up on.
+  // No jitter, so no noise: the "no denoiser" argument above still holds.
+  // A fragment whose five-tap search found all five blocked and whose penumbra
+  // fits inside that search is the inside of a shadow, and skips the filter:
+  // Kyoto is 42 % cast shadow and paying 48 fetches for a constant is waste.
+  // `uShLerp` is set from `noShadowLerp` (0 = the rings above, as before).
+  const S = [];
+  for (let k = 0; k < 12; k++) {
+    const r = Math.sqrt((k + 0.5) / 12), a = k * 2.39996323;
+    S.push([Math.cos(a) * r, Math.sin(a) * r]);
+  }
   const body = [
     '#elif defined( SHADOWMAP_TYPE_PCF_SOFT )',
     '  vec2 texelSize = vec2( 1.0 ) / shadowMapSize;',
@@ -11637,14 +11660,53 @@ function sysInstallShadowFilter(T) {
       f(sysPEN_MIN) + ', ' + f(sysPEN_MAX) + ' );',
     '    vec2 capyStep = texelSize * capyR;',
     '    float capyS = 0.0;',
+    // The far cascade (radius sysFAR_RAD, never a near value: 1.0 or 3.2)
+    // keeps the rings: its texels are 3.2x the near ones and sit under the
+    // haze and the defocus, and a fragment inside both paid the spiral twice.
+    '    if ( uShLerp < 0.5 || abs( shadowRadius - ' + f(sysFAR_RAD) + ' ) < 0.01 ) {',
   ]).concat(R.map(function (o) {
     return '    capyS += texture2DCompare( shadowMap, shadowCoord.xy + vec2( ' +
            f(o[0]) + ', ' + f(o[1]) + ' ) * capyStep, capyRec );';
   })).concat([
-    '    shadow = capyS * ( 1.0 / ' + R.length.toFixed(1) + ' );',
+    '    capyS *= ( 1.0 / ' + R.length.toFixed(1) + ' );',
+    '    } else if ( capyBN > 4.5 && capyR < ' + f(sysPEN_SEARCH) + ' * ( 1.0 + shadowRadius ) ) {',
+    '    capyS = 0.0;',
+    // All five blocked but a penumbra wider than the search: four bilinear
+    // taps on the rim first. All dark is the inside of a building's shadow —
+    // measured, Kyoto paid 2.6-3.1 ms for the spiral before this line — and
+    // it stops at 21 fetches instead of 53.
+    '    } else if ( capyBN > 4.5 && ( capyCmpLerp( shadowMap, shadowCoord.xy + vec2( 0.7071, 0.7071 ) * capyStep, capyRec, texelSize ) +',
+    '      capyCmpLerp( shadowMap, shadowCoord.xy + vec2( -0.7071, 0.7071 ) * capyStep, capyRec, texelSize ) +',
+    '      capyCmpLerp( shadowMap, shadowCoord.xy + vec2( 0.7071, -0.7071 ) * capyStep, capyRec, texelSize ) +',
+    '      capyCmpLerp( shadowMap, shadowCoord.xy + vec2( -0.7071, -0.7071 ) * capyStep, capyRec, texelSize ) ) < 0.001 ) {',
+    '    capyS = 0.0;',
+    // the spiral is the unit disc, the same reach as the outer ring
+    '    } else {',
+  ]).concat(S.map(function (o) {
+    return '    capyS += capyCmpLerp( shadowMap, shadowCoord.xy + vec2( ' +
+           f(o[0]) + ', ' + f(o[1]) + ' ) * capyStep, capyRec, texelSize );';
+  })).concat([
+    '    capyS *= ( 1.0 / ' + S.length.toFixed(1) + ' );',
+    '    }',
+    '    shadow = capyS;',
     '    capyShadowV = min( capyShadowV, shadow );',
     '  }',
   ]).join('\n') + '\n';
+  // The bilinear compare, declared ahead of getShadow in the same chunk.
+  const lerpFn = [
+    'float capyCmpLerp( sampler2D m, vec2 uv, float z, vec2 ts ) {',
+    '  vec2 st = uv / ts - 0.5;',
+    '  vec2 fr = fract( st );',
+    '  vec2 b = ( floor( st ) + 0.5 ) * ts;',
+    '  float a0 = texture2DCompare( m, b, z );',
+    '  float a1 = texture2DCompare( m, b + vec2( ts.x, 0.0 ), z );',
+    '  float a2 = texture2DCompare( m, b + vec2( 0.0, ts.y ), z );',
+    '  float a3 = texture2DCompare( m, b + ts, z );',
+    '  return mix( mix( a0, a1, fr.x ), mix( a2, a3, fr.x ), fr.y );',
+    '}',
+  ].join('\n') + '\n';
+  const gs = ch.indexOf('float getShadow(');
+  if (gs < 0 || gs > i) return;
   // ...AND THE SUN VISIBILITY GOES SOMEWHERE THE REST OF THE SHADER CAN SEE IT.
   //
   // `getShadow` returns into an expression inside <lights_fragment_begin> that
@@ -11658,7 +11720,8 @@ function sysInstallShadowFilter(T) {
   // how many shadow-casting lights there are, and the declaration has to exist
   // whether the answer is one or none.
   T.ShaderChunk.shadowmap_pars_fragment =
-    'float capyShadowV = 1.0;\n' + ch.slice(0, i) + body + ch.slice(j);
+    'float capyShadowV = 1.0;\nuniform float uShLerp;\n' +
+    ch.slice(0, gs) + lerpFn + ch.slice(gs, i) + body + ch.slice(j);
   sysShadowFilterDone = true;
   // Both halves of the term are armed by this one line: if we returned early
   // above, shared.js never injects the fragment that reads capyShadowV.
@@ -25062,6 +25125,20 @@ export function createSystems(game) {
   const jrHasFile = !!jrFile;
   let homecomingArc = !jrHasFile || jrFile.arcV1 === 1;
   let journeyMode = homecomingArc && (!jrHasFile || jrFile.journeyMode === 'story') ? 'story' : 'free';
+  // ---- FREE ROAM FROM A STORY FILE (23 Sep 2026) --------------------------
+  // With a story file the title offered Carry on and "Go somewhere else", and
+  // the shelf behind the second locked eighteen of nineteen places: measured
+  // on a fresh profile after one Begin (qa/aaa-freeroam.mjs). Free Roam lived
+  // only on a fresh file and as an unlabelled switch in Pause. Now the second
+  // door on a story file IS Free Roam: it opens every tile on the shelf, and
+  // the file changes mode only when a place is actually chosen — so turning
+  // the page and coming back to Carry on leaves the story exactly as it was.
+  let titleFree = false;
+  function titleFreeCommit() {
+    if (!titleFree || !jrFile) return;
+    jrFile.journeyMode = 'free';
+    journeyMode = 'free';
+  }
   let homeProgressN = -1, homeProgressCache = null;
   // task id -> true, for the per-chapter tallies below
   const jrFileDone = Object.create(null);
@@ -25110,11 +25187,11 @@ export function createSystems(game) {
   // fresh, and it did not mean it: this button turns the page, and it was the
   // TILE on the far side of it that quietly wiped the file. The page turns; the
   // label now says so, and starting over is its own control on page two.
-  goEl.appendChild(sysEl('b', null,
-    jrHasFile ? 'Go somewhere else' : sysHOME_UI.free));
-  if (!jrHasFile) {
+  const goFree = !jrHasFile || journeyMode === 'story';
+  goEl.appendChild(sysEl('b', null, goFree ? sysHOME_UI.free : 'Go somewhere else'));
+  if (goFree) {
     goEl.dataset.free = '1';
-    goEl.setAttribute('title', sysHOME_UI.freeHint);
+    goEl.setAttribute('title', jrHasFile ? sysHOME_UI.freeKeep : sysHOME_UI.freeHint);
   }
   // TWO FILLED ACCENT BUTTONS ON ONE CARD IS NO HIERARCHY AT ALL, and as of T2
   // this one is ALWAYS the outline: on a fresh file the filled button above it
@@ -25131,6 +25208,16 @@ export function createSystems(game) {
   goEl.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
   goEl.addEventListener('click', function (e) {
     e.preventDefault(); e.stopPropagation();
+    if (jrHasFile && journeyMode === 'story') {
+      titleFree = true;
+      const gated = titleEl.querySelectorAll('.capyui-pick[data-gate="1"]');
+      for (let i = 0; i < gated.length; i++) {
+        gated[i].disabled = false;
+        delete gated[i].dataset.gate;
+        const note = gated[i].querySelector('.capyui-pickgate');
+        if (note) note.remove();
+      }
+    }
     titlePage(2);
   });
   // ---- THE DECISION SITS ABOVE THE REFERENCE (T2) ------------------------
@@ -25455,7 +25542,10 @@ export function createSystems(game) {
     const fileOpen = !jrHasFile || journeyMode !== 'story' ||
       homecomingProgress(function (id) { return !!jrFileDone[id]; }).open.indexOf(d.n) >= 0;
     el.disabled = !fileOpen;
-    if (!fileOpen) body.appendChild(sysEl('em', 'capyui-pickfirst', sysHOME_UI.actGate));
+    if (!fileOpen) {
+      el.dataset.gate = '1';
+      body.appendChild(sysEl('em', 'capyui-pickfirst capyui-pickgate', sysHOME_UI.actGate));
+    }
     el.setAttribute('aria-label', d.name + ', chapter ' + d.n +
       (d.key ? ', key ' + d.key : '') +
       (done > 0 ? ', ' + done + ' of ' + ids.length + ' done' : '') +
@@ -25479,6 +25569,7 @@ export function createSystems(game) {
       // behaviour and the one every part of this tile already implied.
       // Starting over is still possible and is its own clearly-labelled
       // control, below the shelf, and it asks first.
+      titleFreeCommit();
       startGame(d.biome, jrHasFile, 'free');
     });
     // ---- THE CARD LEANS TOWARDS WHATEVER YOU ARE LOOKING AT ---------------
@@ -39548,7 +39639,7 @@ export function createSystems(game) {
       // click listener — this was the second door into the same data loss and
       // it was the quicker one.
       const pick = sysPickFromKey(c);
-      if (pick > 0) { startGame(CHAPTERS[pick - 1].biome, jrHasFile, 'free'); return; }
+      if (pick > 0) { titleFreeCommit(); startGame(CHAPTERS[pick - 1].biome, jrHasFile, 'free'); return; }
       // THE PAGE TURNS BOTH WAYS FROM THE KEYBOARD. Escape is the one key
       // every player already tries when a screen has gone somewhere they did
       // not mean, and it did nothing at all on this card until now.
@@ -40866,6 +40957,10 @@ export function createSystems(game) {
       sysColR.lerp(sysRIM_WHITE, 0.40);
     }
     rimTick(sysRIM[name] === undefined ? sysRIM_DEF : sysRIM[name], sysColR);
+    // the smooth shadow filter (AAA pass); parks from rung 1 like every term since WOW3
+    shLerpTick(!game.state.noShadowLerp && (game.state.perfRung | 0) < 1);
+    // a face turned from the sun takes the chapter's own shade level (AAA pass, shared.js)
+    formShadeTick(!game.state.noFormShade && (game.state.perfRung | 0) < 1 ? sysFORM_K : 0);
     // ---- ...and what colour the shade is ---------------------------------
     // See the block above sysSHADE. THE MAX CHANNEL FIRST, THEN THE LUMA, and
     // the order is the whole of it: normalising the max channel keeps the
@@ -40970,6 +41065,7 @@ export function createSystems(game) {
       sysKeyC.copy(sun.color).multiplyScalar(Math.max(0, sun.intensity) * sysKEY_K);
       // `noKey` cuts the key alone, so an A/B can tell its share from the rim's.
       capyKeyTick(sysKeyDir, sysKeyC, (game.state.noSelfRim || game.state.noKey) ? 0 : 1);
+      capyHeroTick(game.state.noHero || (game.state.perfRung | 0) >= 1 ? 0 : 1);   // the hero terms (AAA pass, capybara.js)
     }
     // ---- and the light coming THROUGH things ------------------------------
     // See the leaf block in shared.js. The direction is the live sun axis —

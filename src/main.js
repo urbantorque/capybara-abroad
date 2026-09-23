@@ -1054,6 +1054,82 @@ const MAIN_POST_COC = MAIN_POST_HEAD + '\n' + [
   '}',
 ].join('\n');
 
+// ---- THE OCCLUSION (AAA pass, 23 Sep 2026) --------------------------------
+// The crease below cannot see the one junction every frame is built out of: a
+// wall standing on the ground. From the lens the grass in front of a wall is
+// NEARER than the wall, so the opposed pair calls it flat and leaves it lit —
+// measured over eight arrival frames, the darkest 2 % of pixels sat at 49-62
+// of 255 in every daylight chapter. Nothing in the picture was ever dark.
+//
+// This asks the question the crease cannot: is the neighbour ABOVE this
+// pixel's own surface? That needs a normal, and the normal is rebuilt from
+// depth off whichever neighbour is nearer in depth on each axis, so a flat-
+// shaded face gets its exact plane and a silhouette does not bleed across.
+// Twelve taps on a golden-angle spiral, a world-sized ring, rotated per pixel
+// by interleaved gradient noise; the noise is what the bilateral pair below is
+// for. Elevation under ~13 degrees counts for nothing (0.22 below), which is
+// what keeps a lawn of blades and a cobbled square from greying themselves.
+// Half resolution: g carries the view depth so the blur and the upsample can
+// refuse to average across an edge.
+const MAIN_POST_AO = MAIN_POST_HEAD + '\n' + [
+  'uniform sampler2D tDepth;',
+  'uniform vec2 uCam;',
+  'uniform vec2 uTexel;',
+  'uniform vec2 uTan;',
+  'uniform float uFocalPx;',
+  'uniform float uR;',
+  MAIN_POST_DEPTH_FN,
+  'float aoZ(vec2 uv) { return mainViewZ(texture(tDepth, uv).x, uCam.x, uCam.y); }',
+  'vec3 aoPos(vec2 uv, float z) { return vec3((uv * 2.0 - 1.0) * uTan * z, -z); }',
+  'void main() {',
+  '  float z = aoZ(vUv);',
+  '  if (z > uCam.y * 0.98) { fragColor = vec4(0.0, z, 0.0, 1.0); return; }',
+  '  vec3 P = aoPos(vUv, z);',
+  '  vec2 dx = vec2(uTexel.x * 2.0, 0.0), dy = vec2(0.0, uTexel.y * 2.0);',
+  '  float zr = aoZ(vUv + dx), zl = aoZ(vUv - dx), zu = aoZ(vUv + dy), zd = aoZ(vUv - dy);',
+  '  vec3 ex = abs(zr - z) < abs(zl - z) ? aoPos(vUv + dx, zr) - P : P - aoPos(vUv - dx, zl);',
+  '  vec3 ey = abs(zu - z) < abs(zd - z) ? aoPos(vUv + dy, zu) - P : P - aoPos(vUv - dy, zd);',
+  '  vec3 N = normalize(cross(ex, ey));',
+  '  float R2 = uR * uR;',
+  '  float rpx = clamp(uFocalPx * uR / z, 3.0, 140.0);',
+  '  float ang = 6.2831853 * fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));',
+  '  float occ = 0.0;',
+  '  for (int i = 0; i < 12; i++) {',
+  '    float t = (float(i) + 0.5) / 12.0;',
+  '    float a = ang + float(i) * 2.39996323;',
+  '    vec2 uv = vUv + vec2(cos(a), sin(a)) * (rpx * t) * uTexel;',
+  '    vec3 v = aoPos(uv, aoZ(uv)) - P;',
+  '    float vv = dot(v, v);',
+  '    float c = dot(v, N) * inversesqrt(vv + 1e-4);',
+  '    occ += max(0.0, c - 0.22) * (1.0 - smoothstep(0.4 * R2, R2, vv));',
+  '  }',
+  // /12 taps, x2.6: the foot of a wall sees half its ring at ~45 degrees,
+  // which is ~0.4 before the gain and a slot at 1.0 after it.
+  '  occ *= (2.6 / 12.0) * (1.0 - smoothstep(55.0, 130.0, z));',
+  '  fragColor = vec4(min(occ, 1.0), z, 0.0, 1.0);',
+  '}',
+].join('\n');
+
+// The bilateral half of it: seven taps along one axis, each weighted out as
+// its depth leaves this pixel's by more than 4 % (plus 5 cm, so the capybara's
+// flank a metre from the lens is not one surface per texel).
+const MAIN_POST_AOBLUR = MAIN_POST_HEAD + '\n' + [
+  'uniform sampler2D tAO;',
+  'uniform vec2 uStep;',
+  'void main() {',
+  '  vec2 c = texture(tAO, vUv).rg;',
+  '  float s = c.x, w = 1.0, tol = 0.04 * c.y + 0.05;',
+  '  for (int i = 1; i <= 3; i++) {',
+  '    vec2 a = texture(tAO, vUv + uStep * float(i)).rg;',
+  '    vec2 b = texture(tAO, vUv - uStep * float(i)).rg;',
+  '    float wa = max(0.0, 1.0 - abs(a.y - c.y) / tol);',
+  '    float wb = max(0.0, 1.0 - abs(b.y - c.y) / tol);',
+  '    s += a.x * wa + b.x * wb; w += wa + wb;',
+  '  }',
+  '  fragColor = vec4(s / w, c.y, 0.0, 1.0);',
+  '}',
+].join('\n');
+
 const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   'uniform sampler2D tDiffuse;',
   'uniform sampler2D tBloom;',
@@ -1090,9 +1166,16 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   'uniform vec3  uFarDist;',
   'uniform float uAirMax;',
   'uniform vec3  uAirCol;',
+  'uniform vec3  uNearClear;',
   'uniform float uCreaseK;',
   'uniform vec3  uCreaseW;',
   'uniform vec2  uCrease;',
+  // THE OCCLUSION (AAA pass). The half-res result, its texel, how deep and
+  // what colour: a slot is darker AND bluer, which is what shade is here.
+  'uniform sampler2D tAO;',
+  'uniform vec2  uAoPx;',
+  'uniform float uAoK;',
+  'uniform vec3  uAoCol;',
   // ---- AIRLIGHT (v48). See the block over mainAirLight below.
   'uniform float uAirLitK;',
   'uniform float uAirLitFar;',
@@ -1278,6 +1361,19 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   '  }',
   '  return occ * 0.25;',
   '}',
+  // The four half-res texels round this pixel, bilinear by position and cut
+  // by depth: a half-res occlusion bilinearly stretched is a dark rim a
+  // texel wide round every silhouette, on the far side of it.
+  'float mainAO(float d0) {',
+  '  vec2 st = vUv / uAoPx - 0.5;',
+  '  vec2 f = fract(st), b = (floor(st) + 0.5) * uAoPx;',
+  '  vec2 t0 = texture(tAO, b).rg, t1 = texture(tAO, b + vec2(uAoPx.x, 0.0)).rg;',
+  '  vec2 t2 = texture(tAO, b + vec2(0.0, uAoPx.y)).rg, t3 = texture(tAO, b + uAoPx).rg;',
+  '  float tol = 0.04 * d0 + 0.05;',
+  '  vec4 w = vec4((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y), (1.0 - f.x) * f.y, f.x * f.y);',
+  '  w *= max(vec4(0.0), 1.0 - abs(vec4(t0.y, t1.y, t2.y, t3.y) - d0) / tol) + 0.001;',
+  '  return dot(w, vec4(t0.x, t1.x, t2.x, t3.x)) / (w.x + w.y + w.z + w.w);',
+  '}',
   'vec3 mainSRGB(vec3 c) {',
   '  c = clamp(c, 0.0, 1.0);',
   '  return mix(c * 12.92, 1.055 * pow(c, vec3(0.4166666667)) - 0.055, step(vec3(0.0031308), c));',
@@ -1309,6 +1405,12 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   //    ...and the wide octave under it (L3-11): see MAIN_CREASE_WR
   '      oc += mainCreaseWide(d, vUv) * uCreaseK * uCreaseW.z * (1.0 - coc * uDofK);',
   '      lin *= 1.0 - oc;',
+  '    }',
+  // 2b. THE OCCLUSION, under the same defocus fade and before the air, so a
+  //     slot forty metres off is hazed like everything else that far off.
+  '    if (uAoK > 0.0005) {',
+  '      float ao = mainAO(d) * uAoK * (1.0 - coc * uDofK);',
+  '      lin *= mix(vec3(1.0), uAoCol, ao);',
   '    }',
   // 3. THE AIR. Exponential and starting at ZERO, which is the half that
   //    scene.fog — linear, and not beginning until 78-90 m — has never been
@@ -1350,6 +1452,8 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   //    for a volcano to sit in its air — and the ground plane takes it all.
   '    if (uAirK > 0.000001 && raw < 0.999999) {',
   '      float a = min(1.0 - exp(-d * uAirK), uAirMax) * (0.15 + 0.85 * gnd);',
+  // THE NEAR AIR CLEARS (AAA pass): see MAIN_NEAR_CLEAR.
+  '      a *= mix(1.0, smoothstep(uNearClear.x, uNearClear.y, d), uNearClear.z);',
   '      lin = mix(lin, uAirCol * (1.0 - uAirGnd * gnd), a);',
   '    }',
   '    if (uFarDark > 0.0001 && raw < 0.999999) {',
@@ -1531,6 +1635,26 @@ const MAIN_CREASE_RANGE = 0.30;
 const MAIN_CREASE_WR = 1.6;
 const MAIN_CREASE_WRANGE = 2.4;
 const MAIN_CREASE_WK = 0.55;
+// THE OCCLUSION (AAA pass): the ring is 2.0 m — a doorway, a bench's
+// underside, the gap between two market stalls, a kerb under a shopfront —
+// and a full slot takes a pixel 95 % of the way to the colour below. Tried
+// first at 1.4 m / 0.8: correct and too shy to see at the resting boom. The colour is a blue-violet
+// multiply rather than grey: open shade in every chapter is lit by sky, so an
+// occluded pixel loses the warm sun share first. The cut is `noAO`; it parks
+// at rung 1 like every term since WOW3, and costs nothing when it does.
+const MAIN_AO_R = 2.0;
+const MAIN_AO_K = 0.95;
+const MAIN_AO_COL = [0.34, 0.36, 0.48];
+// THE NEAR AIR CLEARS (AAA pass). The air term starts at zero metres by
+// design, and in LINEAR light: three per cent of a pale colour added to a
+// dark that is one per cent is a dark that doubles, and after the sRGB
+// encode that is the milk over every foreground in the game. Measured with
+// noAir, the darkest 2 % of the frame went 53 -> 36 (Sydney), 43 -> 32
+// (Kyoto), 46 -> 22 (Sahara). This fades the air IN over view depth — clear
+// to 6 m, whole by 45 m — at 85 % strength, so the animal and the street it
+// is standing in are crisp and the distance keeps every metre of its haze.
+// The air rows are untouched; this is laid over them. Cut: noNearClear.
+const MAIN_NEAR_CLEAR = [6.0, 45.0, 0.85];
 
 // How wide the defocus blur is, in quarter-res texels at MAIN_POST_REF_H. It
 // is a lens constant and not a grade row because HOW BLURRED the out-of-focus
@@ -1654,10 +1778,11 @@ function mainMakePost(game) {
   };
 
   let sceneRT = null, bloomA = null, bloomB = null, wideA = null, wideB = null;
-  let dofA = null, dofB = null, sceneDepth = null;
+  let dofA = null, dofB = null, sceneDepth = null, aoA = null, aoB = null;
   let quadScene = null, quadCam = null, quad = null;
   let matBright = null, matBlur = null, matComp = null, matCoC = null, matRays = null;
-  let vw = 0, vh = 0, bw = 0, bh = 0, ww = 0, wh = 0;
+  let matAO = null, matAOBlur = null;
+  let vw = 0, vh = 0, bw = 0, bh = 0, ww = 0, wh = 0, aw = 0, ah = 0;
 
   try {
     if (!renderer.capabilities.isWebGL2) throw new Error('needs WebGL2');
@@ -1702,6 +1827,11 @@ function mainMakePost(game) {
     // The defocus ping-pong, at a quarter, carrying (rgb * coc, coc).
     dofA = new THREE.WebGLRenderTarget(2, 2, half);
     dofB = new THREE.WebGLRenderTarget(2, 2, half);
+    // The occlusion's ping-pong, at a half, carrying (occlusion, view depth).
+    // NEAREST: a filtered depth across a silhouette is a distance nothing is at.
+    const aoOpts = Object.assign({}, half, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+    aoA = new THREE.WebGLRenderTarget(2, 2, aoOpts);
+    aoB = new THREE.WebGLRenderTarget(2, 2, aoOpts);
 
     // One triangle, in clip space, with uv baked in. No matrices, no camera
     // maths, and no chance of the quad being frustum-culled out of its own pass.
@@ -1741,6 +1871,14 @@ function mainMakePost(game) {
       uCam: { value: new THREE.Vector2(0.5, 400) },
       uDof: { value: new THREE.Vector4(-1, 0, 1e6, 2e6) },
     });
+    matAO = raw(MAIN_POST_AO, {
+      tDepth: { value: null }, uCam: { value: new THREE.Vector2(0.5, 400) },
+      uTexel: { value: new THREE.Vector2() }, uTan: { value: new THREE.Vector2(1, 1) },
+      uFocalPx: { value: 800 }, uR: { value: MAIN_AO_R },
+    });
+    matAOBlur = raw(MAIN_POST_AOBLUR, {
+      tAO: { value: null }, uStep: { value: new THREE.Vector2() },
+    });
     matComp = raw(MAIN_POST_COMP, {
       tDiffuse: { value: null }, tBloom: { value: mainPostBlack },
       tWide: { value: mainPostBlack },
@@ -1762,7 +1900,10 @@ function mainMakePost(game) {
       uAirK: { value: 0 }, uAirMax: { value: 0 },
       uAirGnd: { value: 0 }, uFarDark: { value: 0 }, uFarDist: { value: new THREE.Vector3(30, 160, 0) },
       uAirCol: { value: new THREE.Vector3(1, 1, 1) },
+      uNearClear: { value: new THREE.Vector3(MAIN_NEAR_CLEAR[0], MAIN_NEAR_CLEAR[1], 0) },
       uCreaseK: { value: 0 },
+      tAO: { value: mainPostBlack }, uAoPx: { value: new THREE.Vector2(0.5, 0.5) },
+      uAoK: { value: 0 }, uAoCol: { value: new THREE.Vector3().fromArray(MAIN_AO_COL) },
       uAirLitK: { value: 0 }, uAirLitFar: { value: MAIN_AIRLIT_FAR },
       uSub: { value: new THREE.Vector4(0, 0, 0, 0) },     // (L7, E3)
       tRays: { value: mainPostBlack }, uRaysK: { value: 0 },  // (ROADMAP-WOW A4)
@@ -1819,6 +1960,10 @@ function mainMakePost(game) {
     wideB.setSize(ww, wh);
     dofA.setSize(bw, bh);
     dofB.setSize(bw, bh);
+    aw = Math.max(2, w >> 1); ah = Math.max(2, h >> 1);
+    aoA.setSize(aw, ah);
+    aoB.setSize(aw, ah);
+    matComp.uniforms.uAoPx.value.set(1 / aw, 1 / ah);
     // The bright pass's taps are in FULL-resolution texels — it is reading
     // sceneRT, not the target it is writing. So are the CoC pass's.
     matBright.uniforms.uTexel.value.set(1 / vw, 1 / vh);
@@ -1848,7 +1993,7 @@ function mainMakePost(game) {
   // dormant passes before the hold lifts, against their real destination.
   post.warmMaterials = function () {
     const previousTarget = renderer.getRenderTarget(), previousMaterial = quad.material;
-    const materials = [matBright, matBlur, matRays, matCoC, matComp];
+    const materials = [matBright, matBlur, matRays, matCoC, matAO, matAOBlur, matComp];
     try {
       for (const material of materials) {
         quad.material = material;
@@ -1910,6 +2055,27 @@ function mainMakePost(game) {
       // rung (systems.js, THE GOVERNOR), which writes creaseWide 0: the
       // 4..112 px gather is the composite's least cache-friendly term.
       cu.uCreaseW.value.z = p.creaseWide === 0 ? 0 : MAIN_CREASE_WK;
+      // ---- the occlusion (AAA pass): one half-res gather, one bilateral
+      // pair, then four taps in the composite. Parked from rung 1 with the
+      // other terms added since WOW3; `noAO` is the A/B.
+      const aoK = (game.state.noAO || (game.state.perfRung | 0) >= 1) ? 0 : MAIN_AO_K;
+      cu.uAoK.value = aoK;
+      if (aoK > 0) {
+        const q = matAO.uniforms;
+        const th = Math.tan(THREE.MathUtils.DEG2RAD * 0.5 * cam.fov);
+        q.tDepth.value = sceneDepth;
+        q.uCam.value.copy(cu.uCam.value);
+        q.uTexel.value.set(1 / vw, 1 / vh);
+        q.uTan.value.set(th * cam.aspect, th);
+        q.uFocalPx.value = cu.uFocalPx.value;
+        mainPostDraw(matAO, aoA);
+        const u = matAOBlur.uniforms;
+        u.tAO.value = aoA.texture; u.uStep.value.set(1 / aw, 0); mainPostDraw(matAOBlur, aoB);
+        u.tAO.value = aoB.texture; u.uStep.value.set(0, 1 / ah); mainPostDraw(matAOBlur, aoA);
+        cu.tAO.value = aoA.texture;
+      } else {
+        cu.tAO.value = mainPostBlack;
+      }
       // ---- the airlight's ray basis ------------------------------------
       // Three world vectors, rebuilt once a frame, so the fragment shader can
       // get a world ray out of its own uv with two multiplies and an add and
@@ -1942,6 +2108,7 @@ function mainMakePost(game) {
       cu.uAirK.value = game.state.noAir ? 0 : p.air;
       cu.uAirMax.value = p.airMax;
       cu.uAirCol.value.set(p.airR, p.airG, p.airB);
+      cu.uNearClear.value.z = (game.state.noNearClear || (game.state.perfRung | 0) >= 1) ? 0 : MAIN_NEAR_CLEAR[2];
       cu.uAirGnd.value = game.state.noAir ? 0 : (p.airGnd || 0);
       cu.uFarDark.value = game.state.noAir ? 0 : (p.farDark || 0);
       cu.uFarDist.value.set(p.farDist0 || 30, p.farDist1 || 160, 0);
@@ -1977,6 +2144,7 @@ function mainMakePost(game) {
       // Cut, not faded, and the samplers go back to the 1x1 black so nothing
       // downstream can be reading a stale target.
       cu.uDofK.value = 0; cu.uAirK.value = 0; cu.uCreaseK.value = 0;
+      cu.uAoK.value = 0; cu.tAO.value = mainPostBlack;
       cu.uAirLitK.value = 0;      // ...this one too, or it keeps the last chapter's
       cu.tDof.value = mainPostBlack;
     }

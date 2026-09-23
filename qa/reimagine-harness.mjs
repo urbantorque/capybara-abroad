@@ -42,6 +42,11 @@ export async function openHarness({ url = 'http://localhost:5188/',
   // Keep automated browser runs silent when the desk is in use; the Web Audio
   // graph still runs for timing checks. Listening runs omit this opt-in flag.
   if (process.env.CAPY_QA_MUTE_AUDIO === '1') browserArgs.push('--mute-audio');
+  // Opt-in for timing runs on a shared desk: a headful window another app
+  // covers had rAF drop to 1 Hz with document.hidden still false (AAA pass,
+  // measured 12 frames in 12 s). Ordinary launches are unchanged.
+  if (process.env.CAPY_QA_NO_THROTTLE === '1') browserArgs.push('--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding', '--disable-background-timer-throttling');
   const profileTrace = process.env.CAPY_QA_PROFILE_TRACE === '1';
   if (profileTrace) browserArgs.push('--enable-automation');
   if (crashCapture && process.env.BREAKPAD_DUMP_LOCATION)

@@ -269,6 +269,107 @@ function npcGarmentGeo(rings, tones, detail) {
   return geo;
 }
 
+// ===========================================================================
+// THE ROUNDED PERSON (AAA pass, 24 Sep 2026).
+//
+// Every person in nineteen chapters was built from boxes — the roster's
+// instanced limbs, the hand-built locals, the crowds' merged figures — and at
+// the resting boom a box head on a box neck on a box body reads as a toy made
+// of bricks, which is the one note the player gave about people ("blocky").
+// The fix is not more parts, it is the SAME parts with their edges taken off:
+// a box of the same w/h/d whose twelve edges are quarter-round, whose eight
+// corners are eighth-spheres, and whose faces stay FLAT — so an eye or a brow
+// that sits 3 mm proud of the face plane still sits 3 mm proud of it. Limbs
+// take a radius near half their thickness (they become capsules) and taper to
+// the wrist and the ankle; a head takes a fifth of its width (a skull, not a
+// ball, so the face keeps its plane).
+//
+// Built from a 3x3x3 unit box whose grid lines are pulled out to the edges of
+// the flat face (±half − r) and whose outer lines are then projected on to
+// the rounding: 0°, 45°, 90° round every edge, 108 triangles a part. Normals
+// are the direction from the inner box — exact for a rounded box, and smooth
+// across every edge under a smooth material.
+//
+// A SEPARATE builder, beside npcMakeGeo and never inside it: the part lists,
+// npcMakeGeo, buildHuman and buildLocalFigure are pinned byte-exact by
+// qa/reimagine-person-contour.mjs, and the rounded twins are built FROM them.
+// `spec` is one [radiusFactor, taper] per part (taper: x/z scale at the
+// part's bottom, 1 at its top); a part thinner than 4.5 cm stays a box.
+function npcRoundBox(w, h, d, rf, taper) {
+  const g = new THREE.BoxGeometry(1, 1, 1, 3, 3, 3);
+  const r = Math.min(w, h, d) * rf;
+  const hx = w / 2, hy = h / 2, hz = d / 2, ix = hx - r, iy = hy - r, iz = hz - r;
+  const pos = g.attributes.position, nor = g.attributes.normal;
+  const map = (u, hh, ii) => Math.abs(u) < 0.3 ? Math.sign(u) * ii : Math.sign(u) * hh;
+  for (let i = 0; i < pos.count; i++) {
+    let x = map(pos.getX(i), hx, ix), y = map(pos.getY(i), hy, iy), z = map(pos.getZ(i), hz, iz);
+    const cx = Math.max(-ix, Math.min(ix, x)), cy = Math.max(-iy, Math.min(iy, y)), cz = Math.max(-iz, Math.min(iz, z));
+    let dx = x - cx, dy = y - cy, dz = z - cz;
+    const l = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (l > 1e-7) {
+      dx /= l; dy /= l; dz /= l;
+      x = cx + dx * r; y = cy + dy * r; z = cz + dz * r;
+      nor.setXYZ(i, dx, dy, dz);
+    }
+    if (taper !== undefined && taper !== 1) {
+      const k = taper + (1 - taper) * (y + hy) / h;
+      x *= k; z *= k;
+    }
+    pos.setXYZ(i, x, y, z);
+  }
+  return g;
+}
+function npcRoundGeo(parts, spec) {
+  const out = [];
+  let total = 0;
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i], sp = (spec && spec[i]) || [0.3, 1];
+    let g;
+    if (!p.k && Math.min(p.w, p.h, p.d) >= 0.045) g = npcRoundBox(p.w, p.h, p.d, sp[0], sp[1]);
+    else g = npcMakeGeo([Object.assign({}, p, { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, c: undefined })]);
+    npcM1.makeRotationFromEuler(npcE1.set(p.rx || 0, p.ry || 0, p.rz || 0));
+    npcM1.setPosition(p.x || 0, p.y || 0, p.z || 0);
+    g.applyMatrix4(npcM1);
+    let ng = g;
+    if (g.index) { ng = g.toNonIndexed(); g.dispose(); }
+    out.push(ng); total += ng.attributes.position.count;
+  }
+  const pos = new Float32Array(total * 3), nor = new Float32Array(total * 3), col = new Float32Array(total * 3);
+  let off = 0;
+  for (let i = 0; i < out.length; i++) {
+    const c = out[i], n = c.attributes.position.count, m = parts[i].c;
+    pos.set(c.attributes.position.array, off * 3);
+    nor.set(c.attributes.normal.array, off * 3);
+    const cr = m === undefined ? 1 : (typeof m === 'number' ? m : m[0]);
+    const cg = m === undefined ? 1 : (typeof m === 'number' ? m : m[1]);
+    const cb = m === undefined ? 1 : (typeof m === 'number' ? m : m[2]);
+    for (let v = 0; v < n; v++) { col[(off + v) * 3] = cr; col[(off + v) * 3 + 1] = cg; col[(off + v) * 3 + 2] = cb; }
+    off += n; c.dispose();
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.computeBoundingBox(); geo.computeBoundingSphere();
+  return geo;
+}
+// How round each of the shared person's parts goes, [radiusFactor, taper],
+// in the part lists' own order. Read by the roster and by Pasto's cast.
+const npcROUND = {
+  // the body, the shoulders (a bar with its ends rounded off is a pair of
+  // shoulders), the hem, the placket (2 cm deep: stays a box). The body
+  // narrows 12 % to the waist, and the hem goes with it so it does not flare.
+  torso:     [[0.3, 0.88], [0.48, 1], [0.35, 0.9], [0.3, 1]],
+  head:      [[0.2, 1], [0.35, 1], [0.45, 1]],      // skull, nose, neck
+  hairParts: [[0.42, 1], [0.4, 1]],
+  hips:      [[0.32, 0.94]],
+  arm:       [[0.46, 0.9]],
+  forearm:   [[0.46, 0.8], [0.48, 1]],               // to the wrist; the hand
+  leg:       [[0.42, 0.86]],
+  shin:      [[0.42, 0.78]],
+  shoe:      [[0.4, 1]],
+};
+
 // --- dialogue (dry, Australian, never repeated back to back) ---------------
 const npcLINES = {
   // ---- THE LAST THING ANYBODY SAYS IN THIS GAME (M11) ----------------------
@@ -1415,6 +1516,115 @@ export function createNPCs(game) {
       r.mesh.geometry = on ? r.contour : r.inherited;
     }
   }
+  // ---- THE ROUNDED PERSON'S SWITCH (AAA pass) ----------------------------
+  // Its own registry, beside the contour's and never over it: a mesh the
+  // contour owns (a torso) is never registered here, so each geometry has
+  // one writer. The inherited geometry and material are kept, so the cut is
+  // exact. A roster part also swaps to instMatRound — the same smooth
+  // program the animals already compiled — because the people's instMat is
+  // flat-shaded and a rounded box under a flat material is a faceted one.
+  // Cut: noPersonRound. Parks at rung 2, not 1: it is triangles only (the
+  // A/B in qa/aaa-people.mjs), and a governor stepping down on a busy frame
+  // should not turn the whole population back into bricks.
+  const npcRoundPeople = [];
+  let npcRoundPplOn = !game.state.noPersonRound && (game.state.perfRung | 0) < 2;
+  let npcRoundCtrOn = !game.state.noPersonContour && (game.state.perfRung | 0) < 1;
+  function npcRoundApply(r) {
+    r.mesh.geometry = npcRoundPplOn ? r.geo : (r.contour && npcRoundCtrOn ? r.contour : r.inherited);
+    r.mesh.material = npcRoundPplOn && r.mat ? r.mat : r.inheritedMat;
+  }
+  function npcRoundRegister(mesh, geo, material) {
+    if (!mesh || !geo || mesh.userData.personContour || mesh.userData.personRound) return mesh;
+    const rec = { mesh: mesh, inherited: mesh.geometry, inheritedMat: mesh.material, geo: geo,
+                  mat: material || null, contour: null };
+    npcRoundPeople.push(rec);
+    mesh.userData.personRound = true;
+    if (npcRoundPplOn) npcRoundApply(rec);
+    return mesh;
+  }
+  // A TORSO IS TAKEN OVER, NOT SHARED. The contour registry owns every torso;
+  // two registries writing one mesh's geometry is the "one writer" law broken
+  // at a flag edge. So the torso's contour record is lifted out of that list
+  // and carried here, and this one writer chooses between all three: rounded,
+  // the contour (on the contour's own flag and rung), the box it was built as.
+  function npcRoundTakeTorso(mesh, geo, material) {
+    let rec = null;
+    for (let i = 0; i < npcPersonMeshes.length; i++) {
+      if (npcPersonMeshes[i].mesh === mesh) { rec = npcPersonMeshes[i]; npcPersonMeshes.splice(i, 1); break; }
+    }
+    if (!rec || mesh.userData.personRound) return mesh;
+    const r = { mesh: mesh, inherited: rec.inherited, inheritedMat: mesh.material, geo: geo,
+                mat: material || null, contour: rec.contour };
+    npcRoundPeople.push(r);
+    mesh.userData.personRound = true;
+    npcRoundApply(r);
+    return mesh;
+  }
+  function npcRoundTick() {
+    const on = !game.state.noPersonRound && (game.state.perfRung | 0) < 2;
+    const ctr = !game.state.noPersonContour && (game.state.perfRung | 0) < 1;
+    if (on === npcRoundPplOn && ctr === npcRoundCtrOn) return;
+    npcRoundPplOn = on; npcRoundCtrOn = ctr;
+    for (let i = 0; i < npcRoundPeople.length; i++) npcRoundApply(npcRoundPeople[i]);
+  }
+  // One set of rounded twins for every instanced cast (the roster, Pasto's),
+  // built on first use from the shared part lists.
+  let npcRoundCastGeo = null;
+  function npcRoundCast(c) {
+    if (!npcRoundCastGeo) {
+      const R = function (key) { return npcRoundGeo(npcPERSON[key], npcROUND[key]); };
+      npcRoundCastGeo = { torso: R('torso'), head: R('head'), hair: R('hairParts'), hips: R('hips'),
+        arm: R('arm'), farm: R('forearm'), leg: R('leg'), shin: R('shin'), shoe: R('shoe') };
+    }
+    const G = npcRoundCastGeo;
+    npcRoundTakeTorso(c.torso, G.torso, instMatRound);
+    const pairs = [[c.head, G.head], [c.hair, G.hair], [c.hips, G.hips], [c.armL, G.arm], [c.armR, G.arm],
+      [c.farmL, G.farm], [c.farmR, G.farm], [c.legL, G.leg], [c.legR, G.leg], [c.shinL, G.shin],
+      [c.shinR, G.shin], [c.shoeL, G.shoe], [c.shoeR, G.shoe]];
+    for (let i = 0; i < pairs.length; i++) npcRoundRegister(pairs[i][0], pairs[i][1], instMatRound);
+  }
+  // A LOCAL IS ROUNDED AFTER IT IS BUILT, off its own boxes: buildLocalFigure
+  // is pinned, and every part it makes is a BoxGeometry that still carries its
+  // w/h/d. Cached per size, so eight locals share one buffer per part shape.
+  // The shared shin and forearm buffers are named. Anything under 4.5 cm
+  // (brows, the mouth) stays a box; the torso belongs to the contour.
+  const npcRoundLocCache = new Map();
+  let npcRoundLocTorso = null;
+  function npcRoundLocal(root) {
+    if (!root) return;
+    root.traverse(function (o) {
+      if (!o.isMesh || o.userData.personRound) return;
+      if (o.userData.personContour) {
+        // the shirt (0.50 x 0.62 x 0.28): rounded, 12 % in at the waist
+        if (!npcRoundLocTorso) {
+          npcRoundLocTorso = npcRoundGeo([{ w: 0.50, h: 0.62, d: 0.28 }], [[0.3, 0.88]]);
+          npcRoundLocTorso.deleteAttribute('color');
+        }
+        npcRoundTakeTorso(o, npcRoundLocTorso, null);
+        return;
+      }
+      const gg = o.geometry;
+      let geo = null;
+      if (gg === npcLocShinGeo) geo = npcRoundLocShin;
+      else if (gg === npcLocFarmGeo) geo = npcRoundLocFarm;
+      else if (gg && gg.type === 'BoxGeometry') {
+        const q = gg.parameters;
+        if (Math.min(q.width, q.height, q.depth) < 0.045) return;
+        const key = q.width + '|' + q.height + '|' + q.depth;
+        geo = npcRoundLocCache.get(key);
+        if (!geo) {
+          // a limb is long in y; a head is near a cube and keeps its face
+          const limb = q.height > 1.8 * Math.max(q.width, q.depth);
+          const cube = Math.max(q.width, q.height, q.depth) < 1.35 * Math.min(q.width, q.height, q.depth);
+          const rf = limb ? 0.44 : cube ? 0.2 : 0.4;
+          geo = npcRoundGeo([{ w: q.width, h: q.height, d: q.depth }], [[rf, limb ? 0.88 : 1]]);
+          geo.deleteAttribute('color');
+          npcRoundLocCache.set(key, geo);
+        }
+      }
+      if (geo) npcRoundRegister(o, geo, null);
+    });
+  }
   game.personContourAudit = function () {
     return { on: npcPersonOn, meshes: npcPersonMeshes.length,
       rows: npcPersonMeshes.map(r => ({ uuid: r.mesh.uuid, kind: r.kind,
@@ -1471,6 +1681,10 @@ export function createNPCs(game) {
   const iShinR = mkInst(gShin, HUMANS);
   const iShoeL = mkInst(gShoe, HUMANS);
   const iShoeR = mkInst(gShoe, HUMANS);
+  // THE ROUNDED PERSON (AAA pass): every part of the roster has its twin.
+  npcRoundCast({ torso: iTorso, head: iHead, hair: iHair, hips: iHips, armL: iArmL, armR: iArmR,
+    farmL: iFarmL, farmR: iFarmR, legL: iLegL, legR: iLegR, shinL: iShinL, shinR: iShinR,
+    shoeL: iShoeL, shoeR: iShoeR });
   const iHat   = mkInst(gHat, HUMANS);
   // the face: one instance for the pair of eyes, two for the brows (see
   // FACES). Two extra draw calls buys an expression for thirty-two people.
@@ -2009,6 +2223,15 @@ export function createNPCs(game) {
     { w: 0.12, h: 0.28, d: 0.13, y: -0.135 },
     { w: 0.12, h: 0.13, d: 0.13, y: -0.31 },           // hand
   ]);
+  // their rounded twins (AAA pass; see npcRoundLocal)
+  const npcRoundLocShin = npcRoundGeo([
+    { w: 0.16, h: 0.30, d: 0.18, y: -0.145 },
+    { w: 0.185, h: 0.09, d: 0.25, y: -0.335, z: 0.04, c: npcSRGB3(0.55, 0.55, 0.58) },
+  ], [[0.42, 0.78], [0.4, 1]]);
+  const npcRoundLocFarm = npcRoundGeo([
+    { w: 0.12, h: 0.28, d: 0.13, y: -0.135 },
+    { w: 0.12, h: 0.13, d: 0.13, y: -0.31 },
+  ], [[0.46, 0.8], [0.48, 1]]);
   function npcLocPart(w, h, d, hex, x, y, z) {
     const m = new THREE_.Mesh(new THREE_.BoxGeometry(w, h, d), npcLocMat(hex));
     m.position.set(x, y, z);
@@ -3932,6 +4155,7 @@ export function createNPCs(game) {
     let fig = null;
     if (!g && o.figure) {
       fig = buildLocalFigure(o.figure === true ? {} : o.figure, !!npcSTANCE_SUN[o.biome]);
+      npcRoundLocal(fig.group);
       g = fig.group;
       g.position.set(o.x || 0, o.y || 0, o.z || 0);
       g.rotation.y = o.face || 0;
@@ -13941,6 +14165,9 @@ export function createNPCs(game) {
     pShinR = mkInst(gShin, PA_H);
     pShoeL = mkInst(gShoe, PA_H);
     pShoeR = mkInst(gShoe, PA_H);
+    npcRoundCast({ torso: pTorso, head: pHead, hair: pHair, hips: pHips, armL: pArmL, armR: pArmR,
+      farmL: pFarmL, farmR: pFarmR, legL: pLegL, legR: pLegR, shinL: pShinL, shinR: pShinR,
+      shoeL: pShoeL, shoeR: pShoeR });
     pHat = mkInst(gHat, PA_H);
     pEyes = mkInst(gEyes, PA_H);
     pBrow = mkInst(gBrow, PA_H * 2);
@@ -15625,6 +15852,7 @@ export function createNPCs(game) {
   function update(dt) {
     if (dt > 0.08) dt = 0.08;
     npcPersonTick();
+    npcRoundTick();
     npcWxRead();
     // the gesture's flag and its parking rung (V2.2), read once a frame
     npcGestOn = !game.state.noGesture && ((game.state.perfRung | 0) < 1);
