@@ -4430,6 +4430,11 @@ function hanUpdateTasks(game, dt) {
   // ---- the pho and the egg coffee --------------------------------------
   if (hanPhoProp && !hanPhoGone && hanPhoProp.held) {
     hanPhoGone = true;
+    // The first bowl sits where a committed crossing ends. Traffic can strike
+    // it at the far kerb before E is in reach; only make it breakable after
+    // the animal has actually had it in its mouth.
+    hanPhoProp.pendingImpact = 0;
+    hanPhoProp.fragile = true;
     hanTask('pho-raid');
     hanSfx('splash', { volume: 0.4, pitch: 1.5 });
     hanToast('it is a big bowl. you are a big rodent. it works out.');
@@ -4949,6 +4954,8 @@ export function createHanoi(game) {
     swerved() { return Math.round(hanSwerved); },
     /** The crossing state machine, for the harness: [lane, ok, from, dither]. */
     crossState() { return [hanCrossLane, hanCrossOk ? 1 : 0, hanCrossFrom, +hanDither.toFixed(2)]; },
+    /** Keep a player-set camera bearing until the far kerb; no array per frame. */
+    crossing() { return hanCrossLane >= 0; },
     /** Which scooter is carrying you, or -1. */
     riding() { return hanRider; },
     /** How many stools are down right now. */
@@ -5010,6 +5017,7 @@ export function createHanoi(game) {
         hanSpawned = true;
         if (!hanPhoProp && !hanPhoGone) {
           hanPhoProp = game.physics.spawnProp('phobowl', 11.2, 15.4, hanGROUND + 0.55);
+          if (hanPhoProp) hanPhoProp.fragile = false;
         }
         if (!hanCoffeeProp && !hanCoffeeGone) {
           // ...on a first-floor balcony, which is the whole task

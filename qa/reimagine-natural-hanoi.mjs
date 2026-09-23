@@ -12,7 +12,7 @@ assert.ok(door>0&&dropRadius>0&&dropSpeed>0);
 const traceEnabled=process.argv.includes('--trace'),tag=process.argv.find(a=>a.startsWith('--tag='))?.slice(6);
 if(tag!==undefined)assert.match(tag,/^[\w-]+$/,'safe artifact tag');
 const h=await openHarness(),name='reimagine-natural-hanoi'+(tag?'-'+tag:''),ids=['cross-the-road','pho-raid','pho-run'];
-const out={metadata:h.metadata,authored:{lanes,door,dropRadius,dropSpeed},steps:[],navigation:[]};
+const out={metadata:h.metadata,authored:{lanes,door,dropRadius,dropSpeed},steps:[],navigation:[],bowlEvents:[]};
 let held=new Set();
 async function keys(want){
   for(const k of held)if(!want.has(k))await h.page.keyboard.up(k);
@@ -206,6 +206,12 @@ try{
   await h.page.evaluate(()=>{window.__hanoiKeys=[];for(const type of['keydown','keyup'])document.addEventListener(type,e=>
     window.__hanoiKeys.push({type,key:e.code,trusted:e.isTrusted,t:window.__capy.state.time}));});
   await h.start();await h.arrive('hanoi');const arrival=await sample('fresh Hanoi');running(arrival);
+  await h.page.evaluate(()=>{window.__hanoiBowlEvents=[];for(const name of['capy:grab','capy:drop','prop:impact','prop:destroy','capy:graze'])
+    window.__capy.events.on(name,e=>{const prop=e?.prop||e;
+      if(prop?.type==='phobowl')window.__hanoiBowlEvents.push({name,t:window.__capy.state.time,
+        x:prop.body?.position.x,y:prop.body?.position.y,z:prop.body?.position.z,
+        speed:e?.speed||null,held:!!prop.held,pending:prop.pendingImpact||0,
+        hidden:!!prop.hidden,capyHeld:window.__capy.capy.heldProp?.type||null});});});
   assert.ok(ids.every(id=>!arrival.tasks[id]));
   const pho=await h.page.evaluate(()=>{const p=window.__capy.hanoi.pho();return{x:p.x,y:p.y,z:p.z};});
   // Reach the lake's northern street through its actual western ring.
@@ -233,7 +239,11 @@ try{
   await h.page.waitForFunction(()=>window.__capy.taskDone('cross-the-road'),null,{timeout:3000});
   await sample('crossing earned');
   await installJumpTrace();
-  for(let i=0;i<4&&!((await state()).tasks['pho-raid']);i++){await h.hold('e',90);await h.page.waitForTimeout(550);}
+  for(let i=0;i<4&&!((await state()).tasks['pho-raid']);i++){
+    await h.hold('e',90);await h.page.waitForTimeout(550);
+    out.bowlEvents.push({attempt:i+1,...await state()});
+  }
+  out.bowlEvents.push(...await h.page.evaluate(()=>window.__hanoiBowlEvents||[]));
   assert.ok((await state()).tasks['pho-raid'],'actual nearby bowl grabbed');
   await sample('pho raid earned');await h.screenshot(name+'-bowl');
   assert.equal((await state()).held,'phobowl','real bowl remains held before release');
@@ -261,5 +271,7 @@ try{
   assert.ok(ids.every(id=>resumed.tasks[id])&&resumed.gate.enough);assert.deepEqual(h.metadata.errors,[]);
   out.scope='Chapter arrival fixture, shipped-road navigation telemetry and actual keyboard walking/grab/Cub steering/braking/horn. No task/body/clock/vehicle/debug-state writes. Not novice or unguided pacing proof.';
   await h.result(name,out);console.log(JSON.stringify({pass:true,samples:out.navigation.length,errors:h.metadata.errors}));
-}catch(error){await collectJumpTrace(true);await release();out.failure=String(error.stack||error);try{await sample('failure');await h.screenshot(name+'-failure');}catch{}
+}catch(error){await collectJumpTrace(true);await release();out.failure=String(error.stack||error);try{
+    out.bowlEvents.push(...await h.page.evaluate(()=>window.__hanoiBowlEvents||[]));
+    await sample('failure');await h.screenshot(name+'-failure');}catch{}
   await h.result(name+'-failure',out);throw error;}finally{await collectJumpTrace(true);await h.close();}

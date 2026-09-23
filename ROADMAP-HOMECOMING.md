@@ -1599,6 +1599,41 @@ reloads remain counterevidence. One successful current-build route cannot
 establish a safe crash frequency or root-cause repair. Public master remains
 held while the release gate is assessed; the pushed branch is the candidate.
 
+### M6c: Hanoi crossing bearing and the far-kerb bowl
+
+A separate fresh Chrome earned route reached Hanoi after five prior memories,
+then stopped while attempting its crossing, with 23 tasks safely persisted.
+There was no page or renderer crash in that run. The driver had set the lens
+with the real Z/X controls, but auto-recentring resumed during the single held
+W crossing: the bearing drifted from about -1.57 to -2.48 radians and the
+animal walked into a tube-house face. The player's just-set camera bearing
+now keeps its 1.6-second hand hold while Hanoi's crossing state is active;
+the hold resumes counting down at the far kerb. This changes neither the
+authored crossing threshold nor the camera when the player has not touched it.
+
+The first post-repair Chrome chapter test earned the crossing with no swerve
+and 35 steady-walk samples holding about -1.625 to -1.627 radians, but its
+pho bowl disappeared before the delivery. An Edge control also earned the
+crossing, then lost the bowl. A focused event probe found the quest bowl took
+a 6.16 m/s impact at the far kerb and shattered before E was pressed: its
+body was parked at y=-900, so `pho-raid` could not be earned until restock.
+On another attempt it was briefly grabbed and the task saved, yet was already
+gone at the held-bowl assertion. The required first bowl is now impact-safe
+until grabbed, then resumes ordinary fragile behaviour; an already queued
+impact is cleared at that hand-off. This is a scoped interaction repair, not
+a new visual/audio effect, save field or governor rung.
+
+The post-repair headful Edge chapter run completed the actual street crossing,
+pickup, release, Cub mount, all three deliveries, saved memory, reload and
+memory retention. It recorded 35 steady crossing samples with bearing
+-1.602 to -1.608 radians, 1,303 navigation samples, zero runtime/browser
+errors and zero lost deliveries. This is a single chapter fixture, not a
+fresh cumulative Chrome route, a crash root cause, or physical-device proof.
+The local built single-file artifact also passed its 12-check Chrome smoke,
+including a saved Hanoi reload. The optional browser crash-capture launch is
+diagnostic only; no crash occurred under it, so dump collection is unproven.
+Public master remains held pending coherent release verification.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

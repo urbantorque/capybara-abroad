@@ -34,10 +34,16 @@ export async function openHarness({ url = 'http://localhost:5188/',
   pinRung = true, story = false } = {}) {
   const { chromium } = playwright();
   // A fresh Playwright profile never attaches to the player's browser/save.
-  const browser = await chromium.launch({ channel, headless: false });
+  // Opt-in renderer crash capture for earned-route diagnostics. The browser
+  // inherits BREAKPAD_DUMP_LOCATION; ordinary QA launches are unchanged.
+  const crashCapture = process.env.CAPY_QA_CRASH_CAPTURE === '1';
+  const browserArgs = crashCapture ? ['--enable-crash-reporter'] : [];
+  if (crashCapture && process.env.BREAKPAD_DUMP_LOCATION)
+    browserArgs.push('--crash-dumps-dir=' + process.env.BREAKPAD_DUMP_LOCATION);
+  const browser = await chromium.launch({ channel, headless: false, args: browserArgs });
   // Register crash evidence before navigation, including failures before __capy.
   const metadata = { at: new Date().toISOString(), browser: browser.version(), channel,
-    headless: false, viewport: { width, height, deviceScaleFactor, hasTouch, isMobile },
+    headless: false, crashCapture, viewport: { width, height, deviceScaleFactor, hasTouch, isMobile },
     errors: [], warnings: [], requests: [], startup: [], crashTrace: [] };
   const stage = name => metadata.startup.push({ name, at: new Date().toISOString() });
   try {

@@ -49696,7 +49696,11 @@ export function createSystems(game) {
       if (keys.KeyZ) { camYawTarget += dt * sysCAM_KEY_RATE * sysLookMul(); camHandT = sysCAM_HAND_T; }
       if (keys.KeyX) { camYawTarget -= dt * sysCAM_KEY_RATE * sysLookMul(); camHandT = sysCAM_HAND_T; }
     }
-    if (camHandT > 0) camHandT -= dt;
+    // Hanoi asks for one committed walk across traffic. Auto-recentring the
+    // rig mid-crossing rotates camera-relative W and can steer the animal into
+    // a shopfront. A bearing the player just set stays theirs until the kerb.
+    if (camHandT > 0 && !(started && game.biome.isActive('hanoi') && game.hanoi?.crossing?.()))
+      camHandT -= dt;
     // ---- THE FRAMING ENVELOPE (v26) -----------------------------------
     // Aged on the RAW clock and not on `dt`. A marquee is the one moment that
     // is most likely to be under slow motion — `completeTask` pays `slowmo` out
