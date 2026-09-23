@@ -1669,6 +1669,30 @@ discovery. The optional `--resume-gate` takes an actual saved complete gate;
 it does not seed progress. Earlier intermittent renderer crashes remain
 counterevidence, so public master is still held.
 
+### M6e: uninterrupted Chrome current-build journey and failed startup gate
+
+The frozen current branch then completed a fresh, uninterrupted headful Chrome
+Story journey in one context: Sydney, Quay, Pasto, Pantanal, Kyoto, Hanoi,
+Palawan, Son Doong, Monaco and Iceland earned their actual memory tasks in
+order. It returned to the Sydney lawn, played the twenty-note coda, persisted
+`fin=1`, reloaded and repeated the rest without duplicate ending state. The
+saved file held forty task IDs. There were no browser/page errors in that
+journey. It is automated route execution with public travel fixtures, not
+novice discovery, human listening, every place or physical-device coverage.
+
+The current 7.05 MB self-contained HTML was then served locally for its
+release smoke. The first fresh Chrome run crashed its renderer after load,
+before the first trusted movement check (`Target.targetCrashed`, Windows
+error -2147483645). There was no page exception or failed request. Three
+subsequent fresh Chrome runs and one Edge run passed all twelve checks each:
+trusted movement, running score, Settings quality, reflection hide-and-diff,
+Hanoi arrival, save reload and retained Pretty choice. One Chrome Kyoto
+reflection mask had 192,167 pixels, 170,531 of which changed on cut. These
+are local built-artifact checks, not the public host. The crash-capture option
+ran on the passes, but no crash under it produced a dump. No root cause has
+been established, and three successful reruns do not erase the initial
+failure. Public master remains held at the release gate.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
