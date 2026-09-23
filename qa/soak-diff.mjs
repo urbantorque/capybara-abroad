@@ -2,8 +2,11 @@
 // qa/soak-diff.mjs — has the soak moved? (L6, E8 / qa F5)
 //
 // Reads qa/soak-history.jsonl (one JSON line per `npm run soak`) and compares
-// the LAST row against the median of the up-to-three rows before it, column
-// by column, chapter by chapter. Exits non-zero when any column has moved by
+// the LAST row against the median of the up-to-three valid earlier rows for
+// that probe, column by column, chapter by chapter. Failed and skipped rows
+// stay in history but cannot become a speed or frame-time baseline. A 1 Hz
+// unfocused crossing once made the next valid run look 90 % "faster" everywhere.
+// Exits non-zero when any column has moved by
 // more than SOAK_TOL (30 %) — up or down, because a longest frame that
 // halved is as much a change to explain as one that doubled.
 //
@@ -77,14 +80,21 @@ const last = all[all.length - 1];
     process.exit(1);
   }
 }
-const base = all.slice(Math.max(0, all.length - 4), all.length - 1);
+const probeFor = col => col === 'maxSpeed' || col === 'saves' ? 'fuzz' : 'load';
+const valid = (r, probe) => r.ok?.[probe] === true && r.ok?.runtime !== false &&
+  !(r.skipped || []).includes(probe);
+const previous = all.slice(0, -1);
+const base = Object.fromEntries(['fuzz', 'load'].map(probe =>
+  [probe, previous.filter(r => valid(r, probe)).slice(-3)]));
 const moves = [];
 for (const ch in last.chapters) {
   const now = last.chapters[ch];
   for (const col in COLS) {
+    const probe = probeFor(col);
+    if (!valid(last, probe)) continue;
     const v = now[col];
     if (typeof v !== 'number' || v !== v) continue;
-    const m = median(base.map(r => r.chapters && r.chapters[ch] && r.chapters[ch][col]));
+    const m = median(base[probe].map(r => r.chapters && r.chapters[ch] && r.chapters[ch][col]));
     if (m === null) continue;
     const abs = Math.abs(v - m);
     const rel = m === 0 ? (v === 0 ? 0 : Infinity) : abs / Math.abs(m);
@@ -94,7 +104,8 @@ for (const ch in last.chapters) {
 const okNow = last.ok || {};
 const skippedNow = new Set(last.skipped || []);
 const okLine = Object.keys(okNow).map(k => k + ' ' + (skippedNow.has(k) ? 'skipped' : okNow[k] ? 'ok' : 'FAIL')).join('  ');
-console.log('soak-diff: ' + last.commit + ' (' + String(last.date).slice(0, 16).replace('T', ' ') + ') against the median of ' + base.length + ' earlier row' + (base.length === 1 ? '' : 's') + '  |  ' + okLine);
+console.log('soak-diff: ' + last.commit + ' (' + String(last.date).slice(0, 16).replace('T', ' ') +
+  ') against valid earlier rows (fuzz ' + base.fuzz.length + ', load ' + base.load.length + ')  |  ' + okLine);
 if (!moves.length) {
   console.log('soak-diff: no column moved more than ' + Math.round(SOAK_TOL * 100) + ' % — ' + Object.keys(last.chapters).length + ' chapters, ' + Object.keys(COLS).length + ' columns');
   process.exit(0);

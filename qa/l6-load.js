@@ -54,6 +54,9 @@ async page => {
   for (let lap = 0; lap < LAPS; lap++) {
     const rows = []
     for (const n of names) {
+      // The packaged-file probe navigates this same tab first. An occluded or
+      // unfocused browser can throttle rAF to 1 Hz and counterfeit a hitch.
+      await page.bringToFront()
       const r = await page.evaluate(async (arg) => {
         const name = arg.name, win = arg.win
         const g = window.__capy
@@ -61,10 +64,14 @@ async page => {
         const t0 = performance.now()
         const gaps = []
         let last = t0, tSwitch = -1, offAt = -1, seenOn = false, progOff = -1, iOff = -1
+        const focusStart = document.hasFocus(), hiddenStart = document.hidden
+        let unfocusedFrames = 0, hiddenFrames = 0
         const prog0 = g.renderer.info.programs.length, geo0 = g.renderer.info.memory.geometries
         const p = new Promise(res => {
           const f = (t) => {
             const gap = t - last; last = t; gaps.push(gap)
+            if (!document.hasFocus()) unfocusedFrames++
+            if (document.hidden) hiddenFrames++
             if (g.biome.current === name && tSwitch < 0) tSwitch = t - t0
             const on = fadeEl && fadeEl.classList.contains('on')
             if (on) seenOn = true
@@ -85,6 +92,9 @@ async page => {
         }
         const progN = g.renderer.info.programs.length
         return { biome: g.biome.current, ok: g.biome.current === name, tSwitch: +tSwitch.toFixed(0),
+          focused: focusStart && document.hasFocus() && unfocusedFrames === 0,
+          visible: !hiddenStart && !document.hidden && hiddenFrames === 0,
+          unfocusedFrames, hiddenFrames,
           offAt: +offAt.toFixed(0), maxGap: +maxGap.toFixed(0), over100, over250, stallMs: +sumOver.toFixed(0),
           maxAfter: +maxAfter.toFixed(0), over100After,
           progFade: progOff >= 0 ? progOff - prog0 : -1, progAfter: progOff >= 0 ? progN - progOff : -1,
@@ -93,12 +103,20 @@ async page => {
           frames: gaps.length, rung: g.state.perfRung, lastError: g.state.lastError || null }
       }, { name: n, win: lap === 0 ? 9000 : 6000 })
       rows.push(r)
-      console.log('load lap ' + (lap + 1) + ' ' + n + ' ' + JSON.stringify({ ok: r.ok, maxAfter: r.maxAfter, rung: r.rung }))
+      console.log('load lap ' + (lap + 1) + ' ' + n + ' ' + JSON.stringify({
+        ok: r.ok, focused: r.focused, visible: r.visible, frames: r.frames,
+        maxAfter: r.maxAfter, rung: r.rung }))
     }
     laps.push(rows)
   }
+  const invalid = laps.flat().filter(r => !r.ok || !r.focused || !r.visible ||
+    r.frames < 30 || !!r.lastError).map(r => r.biome)
+  const out = { tTitle, tStarted, rows: laps[0], lap2: laps[1] || null,
+    pass: laps.length === 2 && laps.every(rows => rows.length === 19) && invalid.length === 0,
+    invalid }
   await page.evaluate(async (o) => {
     await fetch('/shot?name=l6-load.json', { method: 'POST',
       body: btoa(unescape(encodeURIComponent(JSON.stringify(o, null, 1)))) })
-  }, { tTitle, tStarted, rows: laps[0], lap2: laps[1] || null })
+  }, out)
+  if (!out.pass) throw new Error('load FAILED: ' + invalid.join(', '))
 }

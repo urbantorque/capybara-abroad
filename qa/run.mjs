@@ -156,11 +156,11 @@ const REPORTS = [
   // THE SOAK HAS A HISTORY (L6, E8 / qa F5). `npm run soak` boots the game
   // under playwright and appends one line to qa/soak-history.jsonl; this
   // reads it back and says which columns moved more than 30 % against the
-  // last three rows. A REPORT and not an assert on purpose: it needs a
+  // last three valid rows for each probe. A REPORT and not an assert on purpose: it needs a
   // history this checkout may not have, and a check that cannot run must
   // not be a check that fails. It exits non-zero on a move for `npm run
   // soak`, which is the run that has just added the row it is judging.
-  ['qa/soak-diff.mjs',    'the soak against its last three rows'],
+  ['qa/soak-diff.mjs',    'the soak against its last three valid probe rows'],
 ];
 
 function run(file, args = []) {

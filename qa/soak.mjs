@@ -15,7 +15,7 @@
 // chapter the fuzz's maxSpeed and solver saves, the crossing's longest frame
 // (whole, and after the white came off) and the draw calls. qa/soak-diff.mjs
 // reads that file back and exits non-zero when a column has moved more than
-// 30 % against the median of the last three rows; `npm test` prints it as a
+// 30 % against the last three valid rows for that probe; `npm test` prints it as a
 // report, because a check that needs history it may not have must not be
 // able to fail a build on an empty file.
 //
@@ -198,8 +198,9 @@ const row = {
   ok: {
     fuzz: !!(cleanProbe('fuzz') && fz && fz.pass === true),
     ks: !!(cleanProbe('ks') && ks && ks.pass === true),
-    load: !!(cleanProbe('load') && ld && ld.tStarted >= 0 && ld.rows?.length === 19 &&
-      ld.lap2?.length === 19 && [...ld.rows, ...ld.lap2].every(r => r.ok && !r.lastError)),
+    load: !!(cleanProbe('load') && ld && ld.pass === true && ld.tStarted >= 0 && ld.rows?.length === 19 &&
+      ld.lap2?.length === 19 && [...ld.rows, ...ld.lap2].every(r =>
+        r.ok && r.focused && r.visible && r.frames >= 30 && !r.lastError)),
     runtime: !browserMetadata || browserMetadata.errors.length === 0,
   },
   skipped: Array.from(SKIP),

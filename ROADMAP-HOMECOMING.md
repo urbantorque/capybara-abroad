@@ -1781,6 +1781,38 @@ trace, then a full-source-frozen soak; attribute the cold-arrival hitches and
 intermittent Chrome renderer crash before considering public master. Weekly
 allowance was 18% remaining before this checkpoint, above the 6% hard stop.
 
+### M6i: water-entry proof and focused crossing evidence
+
+A controlled headful Rio fixture used the real condor summon, mount and
+release, then placed the released body above open sea with a measured downward
+velocity. It did not script tasks or replace the game controller. On the first
+swimming frame at y -0.515, the capybara controller's -1.950 m/s vertical
+velocity was unchanged by `condor.update`; ninety ticks ended buoyant at
++0.499 m/s, with twelve observed swim rows, no runtime error and no browser
+error. This is a controlled landing, not a naturally flown player route.
+
+The next 22.7-minute headful Edge soak on unchanged production source passed
+all nineteen 45-second physics windows and the self-contained-file probe.
+Its arrival probe failed: the browser delivered about one rAF per second
+across almost every place, and the first Antarctica crossing timed out. The
+failed row is retained. A new per-row focus/visibility and sample-count gate,
+with the probe tab brought forward before each measurement, now rejects such
+runs instead of treating them as performance evidence. The probe also writes
+its own explicit pass/fail result, so `pass load` cannot precede a failed
+acceptance gate. The history reporter excludes failed and skipped probes from
+future per-column baselines; it does not erase their rows.
+
+Two headful load-only reruns on the same game source each passed 38/38
+crossings with zero hidden/unfocused samples. The first had at least 300 rAF
+samples per arrival and a worst visible gap of 250 ms; the second had at least
+344 samples per arrival, an 83 ms first-lap visible maximum and a 117 ms
+second-lap maximum (Cave). These are independent probes, not one uninterrupted
+three-probe release soak. The remaining 117 ms stall misses the proposed
+smoothness target and needs CPU/GPU attribution. The intermittent Chrome
+renderer crash and unavailable human listening, novice and physical-device
+checks still hold public master. Return visits remain parked. Weekly allowance
+was 17% remaining before this checkpoint.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
