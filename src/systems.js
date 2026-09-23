@@ -30239,6 +30239,7 @@ export function createSystems(game) {
   // card, because a moment that allocates three elements is a moment that can
   // stutter on the frame it is supposed to be the best one.
   const momentEl = sysEl('div', 'capyui-moment');
+  function sysMomentUp() { return !!(momentEl && momentEl.classList && momentEl.classList.contains('show')); }
   const momentKick = sysEl('div', 'capyui-momentkick', '');
   const momentText = sysEl('div', 'capyui-momenttext', '');
   // Q1: the third line, empty and hidden until a chain has a name.
@@ -34513,7 +34514,9 @@ export function createSystems(game) {
     if (game.state.homecomingArc && experience && !experience.enough) {
       // PLAIN WORDS (AAA A5): "the big experience or the quieter route + one
       // small moment" was the design document, not an instruction.
-      countEl.textContent = chapLabel(n) + '  ·  ' +
+      // ...and the whole of the story's progress, in front of the chapter's
+      // (AAA A4): the shelf the premise card promised, counted.
+      countEl.textContent = keepCount() + ' of ' + chapMax + ' memories  ·  ' + chapLabel(n) + '  ·  ' +
         (experience.coreDone ? 'one small thing left for the memory' :
           'a memory: the star, or its quiet way' + (experience.supportMissing ? ', and one small thing' : ''));
     }
@@ -39002,6 +39005,21 @@ export function createSystems(game) {
       window.removeEventListener('keydown', finish);
       window.removeEventListener('pointerdown', finish);
       after();
+      // ---- WHY IT IS HERE, SAID ONCE (AAA A4) ----------------------------
+      // The author: "It's not clear what the purpose of the game is, why the
+      // capybara is here". The house rule was that the why is answered in one
+      // image and never in words, and the image — an animal asleep by a bag —
+      // did not answer it. One card, as the nap ends, in the game's own
+      // voice, naming the three things the next hours are made of: the bag
+      // it is following, the shelf it is filling, and the bird that is not
+      // going to make that easy. Never again on this file; the journey card
+      // says the count from here on. Cut: noPremise.
+      if (!game.state.noPremise && game.state.journeyMode === 'story') {
+        setTimeout(function () {
+          if (started && !transBusy) showMoment("A TRAVELLER'S BAG", 'NINETEEN PLACES',
+            'one memory from each, for the shelf at home. an ibis is coming too.');
+        }, 900);
+      }
     }
     window.addEventListener('keydown', finish);
     window.addEventListener('pointerdown', finish);
@@ -46593,8 +46611,10 @@ export function createSystems(game) {
     // Incidental mouths yield to teaching and the first two seconds of a
     // receipt. Direct replies are protected by the caller's classification.
     incidentalQuiet: function () {
+      // ...and nobody chats over a moment card (AAA A4): the premise, an
+      // incident, a rank — measured, two bubbles standing on the premise card.
       return endingSpace() || !!(tutOn && tutEl && tutEl.parentNode && !tutEl.dataset.going) ||
-        game.state.time - sysTickLastAt < 2;
+        game.state.time - sysTickLastAt < 2 || (typeof sysMomentUp === 'function' && sysMomentUp());
     },
     leaveAudit: function () { return { busy: leaveBusy, n: leaveN, said: game.state.leaveSaid || 0 }; },
     codaAudit: function () {
@@ -47884,6 +47904,47 @@ export function createSystems(game) {
   function dropRemove(rec) {
     if (game.physics && typeof game.physics.removeProp === 'function') game.physics.removeProp(rec.prop);
   }
+  // ---- THE RIVAL'S HANDS ON THE YUZU (AAA A4; see rival.js) ----------------
+  // Three doors and no more: which fruit is nearest (a plain, rolling or
+  // golden yuzu on the ground, nobody holding it), take one out of the world,
+  // and put one back. The rival never touches dropLive itself, so the pool
+  // cap, the auras and the despawn clocks keep one owner.
+  game.dropNearest = function (x, z, rMax) {
+    let best = null, bd = rMax * rMax;
+    for (let i = 0; i < dropLive.length; i++) {
+      const d = dropLive[i], pr = d.prop;
+      if (!pr || pr.removed || pr.held) continue;
+      if (d.kind !== 'yuzu' && d.kind !== 'golden' && d.kind !== 'rolling') continue;
+      const b = pr.body && pr.body.position;
+      const px = b ? b.x : d.x, pz = b ? b.z : d.z;
+      const dd = (px - x) * (px - x) + (pz - z) * (pz - z);
+      if (dd < bd) { bd = dd; best = { prop: pr, x: px, y: b ? b.y : 0, z: pz }; }
+    }
+    return best;
+  };
+  game.dropSteal = function (prop) {
+    if (!prop || prop.removed || prop.held) return 0;
+    const worth = prop.dropWorth || 1;
+    for (let i = dropLive.length - 1; i >= 0; i--) {
+      if (dropLive[i].prop === prop) { dropRemove(dropLive[i]); dropLive.splice(i, 1); return worth; }
+    }
+    return 0;
+  };
+  game.dropGive = function (x, z, worth) {
+    const golden = worth >= 3;
+    const prop = dropSpawnAt(golden ? 'yuzugold' : 'yuzu', x, z);
+    if (!prop) return false;
+    prop.dropKind = golden ? 'golden' : 'yuzu';
+    prop.dropWorth = worth;
+    dropLive.push({ prop: prop, kind: prop.dropKind, x: x, z: z, despawnT: 60 });
+    return true;
+  };
+  /** Is the world the player's right now — nothing over it, nothing staged. */
+  game.rivalOK = function () {
+    return started && !transBusy && !jrShown && !pauseShown && !game.state.paused &&
+           sysOpenT < 0 && !tutOn && !(game.capy && (game.capy.atHelm || game.capy.carriedBy));
+  };
+  game.groundY = function (x, z) { return sysGroundY(x, z); };
 
   /** Once a frame, from `update()`, only while the chapter is actually live
    *  — the `wxFrontT` pattern (weather.js). */

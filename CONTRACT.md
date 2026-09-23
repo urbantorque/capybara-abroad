@@ -1,3 +1,35 @@
+## AAA A4 — A REASON TO BE HERE, AND SOMEBODY AGAINST IT (24 Sep 2026)
+
+**The premise, said once.** The author said it was not clear why the
+capybara is there. The house rule answered the why in one image, and the
+image, an animal asleep by a bag, did not answer it. As the opening nap ends
+on a story file, one moment card now reads: "A TRAVELLER'S BAG · NINETEEN
+PLACES · one memory from each, for the shelf at home. an ibis is coming
+too." Cut: `noPremise`.
+
+The paper's footer now leads with the count the card promised: "N of 19
+memories · Kyoto & Uji · …". Incidental chatter holds while a moment card
+is up; measured, two bubbles had been standing on the premise.
+
+**The rival, `src/rival.js`, the 29th module.** Sydney's white ibis
+followed the animal. Every 85–140 s, and never in the first 75 s of a visit,
+it flies onto a yuzu within 26 m, takes it, looks at you and runs, then flies
+low (1.2–2.6 m). Three ways it can go:
+
+- Catch it (it runs at 3.8 m/s and flies at 5.2; the animal sprints at 7.4),
+  or hop at it.
+- Wheek inside 6 m and it drops the fruit plus one of its own.
+- Leave it, and after 9 s or 30 m it is gone.
+
+It never comes during a crossing, the opening, the tutorial, a modal, the
+helm or a carry. It talks only through the doors it needs:
+`game.dropNearest`, `dropSteal`, `dropGive`, `groundY` and `rivalOK`. It is
+8 meshes on the animals' smooth program, invisible when off. Cut: `noRival`.
+qa/aaa-rival.mjs, Kyoto, 7 checks: it came, stole and escaped; chased and
+wheeked, it dropped the fruit and a fruit was back near you.
+
+homecoming-opening-live 15/15. npm test 77/0.
+
 ## AAA A2a + A5 — THE PAPER TUCKS, ONE LINE SAYS WHERE; CALMER GÖREME; SOFT YUZU (24 Sep 2026)
 
 **Clarity (A5).** The compact tab already existed. Three things made it read

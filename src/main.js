@@ -27,6 +27,7 @@ import { createHanoi } from './hanoi.js';
 import { createWeather } from './weather.js';
 import { createGrass } from './grass.js';
 import { createCondor } from './condor.js';
+import { createRival } from './rival.js';
 
 // ---------------------------------------------------------------------------
 // Coordinator-owned bootstrap. Modules are wired in a fixed order and each is
@@ -2568,6 +2569,8 @@ function mainBoot() {
   // every grass chapter borrows, so it is not captured into a biome either.
   const grass   = mainSafe('grass',       () => createGrass(game));
   const systems = mainSafe('systems',     () => createSystems(game));
+  // THE RIVAL (AAA A4): after systems, whose drop and ground doors it uses.
+  const rival   = mainSafe('rival',       () => createRival(game));
 
   // The locals service, now that npc.js exists. Biomes call game.addLocal()
   // from their build and game.say() from their update; both were no-ops until
@@ -2704,11 +2707,11 @@ function mainBoot() {
   // controller's grip, the locals' umbrellas and the atmosphere pass.
   const all = [env, pasto, quay, kyoto, cali, rio, iceland, sahara, drift, venice, kowloon,
                palawan, goreme, manly, pantanal, cave, antarctic, monaco, hanoi, weather, grass,
-               props, capy, condor, npcs, systems];
+               props, capy, condor, npcs, systems, rival];
   const updaterNames = ['environment', 'pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland', 'sahara',
                         'drift', 'venice', 'kowloon', 'palawan', 'goreme',
                         'manly', 'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi', 'weather', 'grass',
-                        'props', 'capybara', 'condor', 'npc', 'systems'];
+                        'props', 'capybara', 'condor', 'npc', 'systems', 'rival'];
   all.forEach((m, i) => { if (m) m.__name = updaterNames[i]; });
   const updaters = all.filter(m => m && typeof m.update === 'function');
   // The two the loop may never give up on. See the strike handler in tick().

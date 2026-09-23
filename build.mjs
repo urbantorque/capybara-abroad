@@ -43,6 +43,7 @@ const ORDER = [
   'src/capybara.js',
   'src/condor.js',
   'src/npc.js',
+  'src/rival.js',
   'src/systems.js',
   'src/main.js',
 ];
