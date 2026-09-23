@@ -1535,6 +1535,42 @@ anchors on desktop. One live narrow screenshot was read by eye. Random speech
 means these counts do not prove all lines, languages, panel combinations or
 physical touch devices; the broader dialogue-density review remains open.
 
+### M6a: current-build two-lap travel and resource plateau
+
+The frozen current branch completed the existing two-lap headful Edge travel
+instrument: 38 consecutive public Free Roam arrivals, short W/S inputs and
+two-second timing windows, ending back in Sydney. Every arrival retained
+foreground focus, finite body position and an attached live root; no sleeping
+biome root was attached, and there was no page/game error. On the repeat lap,
+resident renderer geometry stayed within 2,708–2,716, shader programs within
+316–317 and live prop records within 411–413. This is a short two-lap plateau
+in reported object counts, not VRAM measurement or a 30-minute soak. The
+fixed 9.5-second crossing dwell is included in arrival wall time and must
+not be called measured loading latency.
+
+The result strengthens world-transition coverage but uses fixture crossings,
+not earned Story progression. It does not reproduce or resolve the separate
+long-route reload/start renderer crash (M1t/M1v), nor certify sustained frame
+pacing, full journeys, browser diversity, physical mobile devices or a hosted
+candidate. Public master remains held at the release gate.
+
+### M1z: all-biome foreground mix census
+
+A new read-only audio probe attached temporary analysers to the game's
+exposed music and world-audio outputs without changing the destination graph.
+One owned headful Edge context completed 12-second current-build arrival
+windows in all 19 biomes, with a running AudioContext, foreground focus,
+zero scheduler throws and no browser/game error. The music stem exceeded the
+world stem by 3.76–19.39 dB in these windows; observed limiter reduction
+never exceeded 0.15 dB. Kowloon was the narrowest margin at 3.76 dB and
+reported 100 regional-band events during its window, so its city bed and
+arrangement deserve a targeted attribution check. The analyser does not
+separate NPC remarks, weather and movers within the world stem. A 12-second
+arrival window does not represent a whole cue, a score rest, a chase, a
+player's volume settings or perceived spectral masking. No blanket music
+gain or world-noise cut is justified by these numbers, and human listening
+and cultural fit remain open gates.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
