@@ -1746,6 +1746,41 @@ journey or evidence that the earlier intermittent renderer crash is repaired.
 Stop repeating this exact replay without a new diagnostic lead; public master
 remains held for the failed release gate.
 
+### M6h: condor release yields to water; failed soak retained
+
+The current-build 22.8-minute headful Edge soak on b2712b0 passed the
+self-contained file probe and both 19-place crossing laps. The 45-second
+physics fuzz failed: Rio reached 30.041 m/s underwater at y -10.54, one frame
+over the 30 m/s unexplained-speed ceiling. No NaN, below-world frame or solver
+save was reported there. Keep the failed row in `qa/soak-history.jsonl`;
+neither the soak nor the release gate passed. The first crossing lap also
+recorded 250 ms visible-frame gaps at Pasto, Kyoto and Iceland, versus 33,
+83 and 67 ms on its warm second lap. Eighteen history columns shifted over
+30%; these are measured hitches, not yet attributed GPU time.
+
+A pre-fix six-place fuzz prefix reproduced a different failure:
+Pasto peaked at 34.272 m/s during sixteen continuously sampled frames of
+descent down the crater wall. The preceding velocity was -26.09 m/s vertical;
+the following samples gained roughly 0.39 m/s downward per physics step,
+without observed contact or a new impulse. That is consistent with gravity,
+but the fall classifier has no witnessed condor-release anchor and correctly
+fails closed. Do not loosen the general speed gate or call this fixed.
+
+Rio exposed an actual controller conflict. `condor.update` runs after the
+capybara's controller and, during post-release grace, restored its pre-control
+velocity snapshot even after `capy.swimming` became true. Water entry now ends
+that grace so the swim controller keeps its velocity; dry airborne release
+still retains the ballistic snapshot. A regression executes the shipped
+passenger branch in dry, submerged and landed cases (566 boarding checks,
+zero failed). A fresh headful six-place prefix on the changed build passed,
+Rio peaking at 25.0 m/s with zero NaN/void frames. Its peak was dry, so this
+replay is not a direct live-water reproduction of the original failure.
+Syntax, self-contained build and all 77 repository checks pass. No new save,
+visual/audio term or per-frame allocation. Next: a controlled live water-entry
+trace, then a full-source-frozen soak; attribute the cold-arrival hitches and
+intermittent Chrome renderer crash before considering public master. Weekly
+allowance was 18% remaining before this checkpoint, above the 6% hard stop.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

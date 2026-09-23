@@ -6,11 +6,11 @@ import vm from 'node:vm';
 import { stripComments } from '../strip-comments.mjs';
 
 const source = stripComments(readFileSync(new URL('../src/condor.js', import.meta.url), 'utf8'));
-function blockEnd(start) {
+function blockEnd(start, text = source) {
   let depth = 0;
-  for (let i = start; i < source.length; i++) {
-    if (source[i] === '{') depth++;
-    if (source[i] === '}' && --depth === 0) return i + 1;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === '{') depth++;
+    if (text[i] === '}' && --depth === 0) return i + 1;
   }
   throw Error('Unclosed source block');
 }
@@ -104,6 +104,28 @@ function fixture() {
 let checks = 0, groups = 0;
 const check = (ok, why) => { assert.ok(ok, why); checks++; };
 function test(name, run) { try { run(); groups++; } catch (e) { e.message = name + ': ' + e.message; throw e; } }
+test('released flight gives way to water', () => {
+  const update = fn('condorUpdate');
+  const cut = update.lastIndexOf('if (capy && capy.body) {');
+  check(cut > 0, 'shipped passenger velocity branch');
+  const passenger = update.slice(cut, blockEnd(update.indexOf('{', cut), update));
+  const program = new vm.Script('function passenger(dt) { const capy = condorGame.capy; ' + passenger + ' }');
+  const at = (y, swimming, grounded = false) => {
+    const q = { condorState: 'circling', condorLaunchGrace: 1, condorSettleT: 0,
+      condorTumbleX: 1, condorTumbleY: 1, condorTumbleZ: 1, condorSETTLE_T: .5,
+      condorTerrain: () => 0, condorTumbleCapy() {},
+      condorVelSnap: { x: 10 }, condorGame: { capy: { grounded, swimming,
+        body: { position: { x: 0, y, z: 0 }, velocity: { x: 2, copy(v) { this.x = v.x; } } } } } };
+    vm.createContext(q); program.runInContext(q); vm.runInContext('passenger(1 / 60)', q);
+    return { speed: q.condorGame.capy.body.velocity.x, grace: q.condorLaunchGrace };
+  };
+  const dry = at(8, false);
+  check(dry.speed === 10 && dry.grace > 0, 'dry high release retains ballistic snapshot');
+  const wet = at(-2, true);
+  check(wet.speed === 2 && wet.grace === 0, 'water keeps swim-controlled velocity and ends grace');
+  const landed = at(.5, false);
+  check(landed.speed === 2 && landed.grace === 0, 'dry landing still ends grace');
+});
 function mounted() {
   const q = fixture(); q.input.action = true; q.tick();
   check(q.mounts === 1 && q.condorConstraint, 'fixture mounted by held action');

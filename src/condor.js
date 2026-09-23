@@ -2155,7 +2155,9 @@ function condorUpdate(dt) {
     } else if (condorLaunchGrace > 0) {
       condorLaunchGrace -= dt;                    // safety expiry only
       const terr = condorTerrain(capy.body.position.x, capy.body.position.z);
-      if (capy.grounded || capy.body.position.y < terr + 0.6) {
+      // Water owns a released passenger as soon as it enters. Keeping the
+      // ballistic snapshot through a swim overwrites the buoyancy drag below.
+      if (capy.grounded || capy.swimming || capy.body.position.y < terr + 0.6) {
         condorLaunchGrace = 0;
         condorTumbleX = 0; condorTumbleY = 0; condorTumbleZ = 0;
         condorSettleT = condorSETTLE_T;           // unwind, do not snap

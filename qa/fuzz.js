@@ -144,7 +144,10 @@ async page => {
             out.maxUnexplainedSpeed = Math.max(out.maxUnexplainedSpeed, speed);
             if (speed > cap) {
               out.unexplainedFrames++;
-              if (out.violations.length < 12) out.violations.push({ t: s.t, speed, p: s.p.slice(), v: s.v.slice(), reason });
+              if (out.violations.length < 12) out.violations.push({ t: s.t, speed, p: s.p.slice(), v: s.v.slice(), reason,
+                before: previous && { t: previous.t, p: previous.p.slice(), v: previous.v.slice(),
+                  swimming: previous.swimming, grounded: previous.grounded, carried: previous.carried,
+                  frame: previous.frame.slice(), contacts: previous.contacts, impulseT: previous.impulseT } });
             }
           }
           previous = { ...s, p: s.p.slice(), v: s.v.slice(), carried, speed, h };
