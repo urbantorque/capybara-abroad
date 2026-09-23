@@ -1694,6 +1694,17 @@ function gorBuildTown(game, root) {
     // stops resolving individual stones and starts reading a surface, which is
     // the entire point of paving something.
     const CS = 0.62;
+    // ---- ...AND THREE TONES WAS STILL CONFETTI (AAA A2) ------------------
+    // At the resting boom the three tones above — pale tuff, road, tuff — are
+    // far enough apart in value that fourteen hundred setts still read as a
+    // floor of dropped cards (qa/aaa-all19-goreme.png, the noisiest frame in
+    // the game). A worn square is ONE tone with a little grain in it. Five
+    // blends that never leave the road/tuff pair by more than a third, and
+    // the pale tuff only as a tenth-part accent. Cut: noGorCalm (at build).
+    const calm = !(game.state && game.state.noGorCalm);
+    const T0 = new THREE.Color(PALETTE.gorRoad), T1 = new THREE.Color(PALETTE.gorTuff), TP = new THREE.Color(PALETTE.gorTuffPale);
+    const TONES = [T0.clone(), T0.clone().lerp(T1, 0.18), T0.clone().lerp(T1, 0.34),
+                   T0.clone().lerp(TP, 0.14), T0.clone().lerp(TP, 0.3)];
     for (let gx = -13; gx <= 13; gx += CS) {
       for (let gz = -13; gz <= 13; gz += CS) {
         const h = Math.sin(gx * 12.9898 + gz * 78.233) * 43758.5453;
@@ -1707,7 +1718,8 @@ function gorBuildTown(game, root) {
         // ...and the edge of a square is not a circle drawn with a compass: the
         // paving frays where it meets the dirt.
         if (d > P.r * 0.80 && r1 < (d - P.r * 0.80) / (P.r * 0.20)) continue;
-        const c = r2 < 0.34 ? PALETTE.gorTuffPale : (r2 < 0.72 ? PALETTE.gorRoad : PALETTE.gorTuff);
+        const c = calm ? TONES[r2 < 0.30 ? 0 : r2 < 0.55 ? 1 : r2 < 0.75 ? 2 : r2 < 0.92 ? 3 : 4]
+                       : (r2 < 0.34 ? PALETTE.gorTuffPale : (r2 < 0.72 ? PALETTE.gorRoad : PALETTE.gorTuff));
         M.quad(x, P.y + 0.035, z, CS * 0.92, CS * 0.92, c, (r1 - 0.5) * 0.5);
       }
     }
@@ -1788,8 +1800,11 @@ function gorBuildTown(game, root) {
       const bulbs = new THREE.InstancedMesh(gorG.sph6, gorGlowMat(PALETTE.gorBurner, 1.25), 14);
       for (let i = 0; i < 14; i++) {
         const t = i / 13;
+        // 13 cm, not 34 (AAA A2): a festoon bulb is a bulb, and at 34 cm a
+        // string of them across the arrival lens was a row of yellow balloons.
+        const bs = game.state && game.state.noGorCalm ? 0.34 : 0.13;
         bulbs.setMatrixAt(i, gorXform(lerp(BX0, BX1, t), sag(t), BZ,
-                                      0, 0, 0, 0.34, 0.34, 0.34));
+                                      0, 0, 0, bs, bs, bs));
       }
       bulbs.instanceMatrix.needsUpdate = true;
       bulbs.computeBoundingSphere();

@@ -30,9 +30,12 @@ else {
   const body = tuckFn[1];
   if (/\bspd\b|sysTUCK_V|!stopped/.test(body)) fail('movement still re-opens the full sheet');
   else pass('movement does not re-open the full sheet');
-  if (!/if \(busy \|\| todoAwayHold > 0\) todoAwayT = 0;/.test(body))
-    fail('only modal/arrival and fresh rewards should reset the reveal timer');
-  else pass('modal/arrival and fresh rewards reset the timed reveal');
+  // AAA A5: a crossing or the title resets the read; a modal only STOPS the
+  // clock, because closing the journal handed back the whole sheet each time.
+  if (!/if \(!started \|\| transBusy \|\| todoAwayHold > 0\) todoAwayT = 0;/.test(body) ||
+      !/else if \(!busy\) todoAwayT \+= dt;/.test(body))
+    fail('arrival and fresh rewards reset the reveal; a modal only pauses it');
+  else pass('arrival and fresh rewards reset the timed reveal; a modal pauses it');
 }
 // a fresh tick or a fresh marquee must hold the sheet open — the "don't tuck
 // over a fresh payout" half of H1. The tick's own hold predates this pass;

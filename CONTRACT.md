@@ -1,3 +1,35 @@
+## AAA A2a + A5 — THE PAPER TUCKS, ONE LINE SAYS WHERE; CALMER GÖREME; SOFT YUZU (24 Sep 2026)
+
+**Clarity (A5).** The compact tab already existed. Three things made it read
+as "the paper is always open", and each is fixed:
+
+- Every modal handed back the whole sheet for 8 s. Now a crossing or the
+  title resets the read, and the journal, ledger, album and Pause only pause
+  it.
+- Nothing opened the list. **L** now opens and closes it. G is the slide and
+  Tab is the journal; photo mode takes L first.
+- The riddle rule hid the arrow for 40 s after a first tick. Arrows straight
+  away is the default now, under a new prefs key `ar2`, so old files get it
+  too.
+
+The tab's second line is now the top row's clue, the verb ("press E at the
+foot of the holes"). A tick holds the sheet 3 s, down from 5. The footer is in
+words a player has: "a memory: the star, or its quiet way, and one small
+thing". qa/aaa-hud.mjs passes 5 checks, homecoming-hud-breath 16, and
+l9-hud-map is re-pinned to the new reset rule.
+
+**The weak places (A2, part one):**
+
+- **Göreme.** The square's three contrasting tones were the noisiest frame
+  in the game, so it is now five blends of road and tuff. The 34 cm festoon
+  bulbs across the arrival lens are 13 cm, the size of a bulb. Cut:
+  `noGorCalm`, read at build.
+- **Yuzu auras.** They were uniform discs that read as stickers. They now
+  fall from bright to zero in vertex colour, a glow with no edge, at 1.35×
+  the size. Cut: `noAuraSoft`.
+
+npm test: 77/0.
+
 ## AAA A1 + A3a — THE LIVING, AND A MARCH THAT COSTS (24 Sep 2026)
 
 **The living, all of them.** Every chapter's instanced crowd now has a

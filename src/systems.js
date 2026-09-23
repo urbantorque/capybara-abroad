@@ -4538,7 +4538,13 @@ let sysWearPick = '';          // the wardrobe pick (L3-7); '' is the place's ow
 // named cues the world plays are also a short toast — the sound's name, in
 // the game's own words, once per sound every few seconds.
 let sysCaptions = false;
-let sysArrowsNow = false;      // arrows straight away (L3-14): the riddle switched off
+// ARROWS STRAIGHT AWAY IS THE DEFAULT NOW (AAA A5). The author: "it should be
+// clearer for the player". The riddle rule hid the arrow and the metres for
+// forty seconds after a chapter's first tick, so the tucked tab — the one line
+// a player reads in play — was a task with no direction. A new key, `ar2`, so
+// every file that ever saved `ar: 0` by default gets the new default too; the
+// switch in Pause still turns the riddle back on.
+let sysArrowsNow = true;       // arrows straight away (L3-14): the riddle switched off
 // ---- THE GOVERNOR (L4, qa #4) -----------------------------------------------
 // `sysPerfMode` is the settings-card row: 0 auto (the governor drives), 1
 // pretty (rung 0, whatever the frame costs), 2 fast (rung 3, whatever the
@@ -4619,7 +4625,7 @@ function sysPrefsRead() {
   sysHoldToggle = !!o.ht;
   sysWearPick = typeof o.wp === 'string' ? o.wp : '';
   sysCaptions = !!o.cc;
-  sysArrowsNow = !!o.ar;
+  sysArrowsNow = o.ar2 === undefined ? true : !!o.ar2;
   sysPerfMode = (o.pf === 1 || o.pf === 2) ? o.pf : 0;
   sysScoreBefore = o.sc === 1;
   sysMuteMaster = !!o.mm;
@@ -4644,7 +4650,7 @@ function sysPrefsWrite() {
       ht: sysHoldToggle ? 1 : 0,
       wp: sysWearPick,
       cc: sysCaptions ? 1 : 0,
-      ar: sysArrowsNow ? 1 : 0,
+      ar2: sysArrowsNow ? 1 : 0,
       pf: sysPerfMode,
       sc: sysScoreBefore ? 1 : 0,
     }));
@@ -26776,12 +26782,16 @@ export function createSystems(game) {
   // then stops occupying the vista regardless of whether the animal moves.
   // `todoAwayHold` still protects a fresh task or marquee from vanishing.
   const sysTUCK_AFTER = 8.0;    // s after arrival or a deliberate reveal
-  const sysTUCK_HOLD = 5.0;     // s the paper stays open after a tick
+  const sysTUCK_HOLD = 3.0;     // s the paper stays open after a tick (AAA A5: was 5)
   function todoTuckTick(dt) {
     if (todoAwayHold > 0) todoAwayHold -= dt;
     const busy = !started || transBusy || jrShown || ledShown || albShown || pauseShown || game.state.paused;
-    if (busy || todoAwayHold > 0) todoAwayT = 0;
-    else todoAwayT += dt;
+    // A crossing or the title resets the read; the journal, the ledger, the
+    // album and Pause only stop the clock (AAA A5). Closing any of them used
+    // to hand back the whole sheet for another eight seconds, and a player
+    // who checks the journal often lived under a paper that never tucked.
+    if (!started || transBusy || todoAwayHold > 0) todoAwayT = 0;
+    else if (!busy) todoAwayT += dt;
     const want = !wowEarnedOn && todoAwayT > sysTUCK_AFTER;
     if (want !== todoAway) {
       todoAway = want;
@@ -26808,9 +26818,24 @@ export function createSystems(game) {
                 : (marqId && marqEl.classList.contains('on') && !marqEl.classList.contains('row') && marqSayEl.textContent)
                   ? marqSayEl.textContent
                   : (recEl.classList.contains('on') ? recNowEl.textContent
-                  : (findsEl.classList.contains('on') ? findsEl.textContent : ''));
+                  : (todoTabClue() || (findsEl.classList.contains('on') ? findsEl.textContent : '')));
       if (todoTabSub.textContent !== sub) { todoTabSub.textContent = sub; todoTabSub.classList.toggle('on', !!sub); }
     }
+  }
+  // THE TAB SAYS HOW, NOT ONLY WHAT (AAA A5): the clue under the top row —
+  // "press E at the foot of the holes" — is the verb a player is missing when
+  // they read only the tab, and it was on the sheet the tab had replaced.
+  function todoTabClue() {
+    if (!clueEl || clueEl.classList.contains('off')) return '';
+    const t = (clueEl.textContent || '').split(/[.\n]/)[0].trim();
+    return t.length > 70 ? '' : t;
+  }
+  // L: THE LIST, EITHER WAY (AAA A5). There was no key for it — Tab is the
+  // journal, G is the slide — so the whole list was a tap on a 44 px tab away.
+  // L opens it the way the tap does, and tucks it again when it is open.
+  function todoToggle() {
+    if (todoAway) { todoAwayHold = sysTUCK_HOLD; todoAwayT = 0; }
+    else { todoAwayHold = 0; todoAwayT = sysTUCK_AFTER + 1; }
   }
   // H1 (LIFT9): a tap of the tab brings the full sheet back immediately,
   // the same door the journal key already is (Tab, handled where jrShow is
@@ -34486,9 +34511,11 @@ export function createSystems(game) {
         (experience.supportMissing ? ' + ' + experience.supportMissing + ' small moments' : ' still to find'))
       : done + ' of ' + rec.ids.length + ' done');
     if (game.state.homecomingArc && experience && !experience.enough) {
+      // PLAIN WORDS (AAA A5): "the big experience or the quieter route + one
+      // small moment" was the design document, not an instruction.
       countEl.textContent = chapLabel(n) + '  ·  ' +
-        (experience.coreDone ? 'one small moment still to find' : sysHOME_UI.core +
-          (experience.supportMissing ? ' + one small moment' : ''));
+        (experience.coreDone ? 'one small thing left for the memory' :
+          'a memory: the star, or its quiet way' + (experience.supportMissing ? ', and one small thing' : ''));
     }
     todoFindsLine(n);
     // THE YUZU (L8, F1): the wallet sits just under the paper, and the paper's
@@ -39863,6 +39890,7 @@ export function createSystems(game) {
       const cg = game.capy && game.capy.group;
       if (cg) { camYawTarget = cg.rotation.y + Math.PI; camHandT = 0; camIdleT = 0; restStillT = 0; }
     }
+    if (c === 'KeyL' && started) todoToggle();   // the list (AAA A5); photo mode takes L first
     // Move the arrow to the next thing you have not done. See todoStep.
     if (c === 'KeyF' && started) {
       // ...and with one row open, F is the arrow itself (L3-14)
@@ -47546,9 +47574,32 @@ export function createSystems(game) {
   const sysDROP_SHAFT_RGB = [1.8, 1.5, 0.4];
   const sysDROP_SHAFT_SPIN = 0.6;         // rad/s, same as beaconShaft
   const sysDROP_SHAFT_BIOMES = { monaco: true, kowloon: true, hanoi: true };
+  // ---- ...AND A GLOW HAS NO EDGE (AAA A2) --------------------------------
+  // A uniform 0.45 on a circle is a DISC: photographed in Marrakech, Venice
+  // and the Göreme square, every live yuzu wore a flat pale-yellow plate the
+  // size of a head, and in daylight it read as a sticker, not as light. The
+  // same circle with a vertex colour falling from 1 at the centre to 0 at the
+  // rim is, under additive blending, a soft radial glow — so it is drawn 1.35x
+  // wider to keep the same apparent size where the eye finds its edge. Both
+  // geometries are built; `noAuraSoft` swaps back on its edge. Same draw.
+  const dropAuraGeoFlat = new THREEx.CircleGeometry(0.5, 20);
+  const dropAuraGeoSoft = new THREEx.CircleGeometry(0.5 * 1.35, 24);
+  {
+    const n = dropAuraGeoSoft.attributes.position.count, cA = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const x = dropAuraGeoSoft.attributes.position.getX(i), y = dropAuraGeoSoft.attributes.position.getY(i);
+      const f = Math.max(0, 1 - Math.hypot(x, y) / (0.5 * 1.35));
+      cA[i * 3] = cA[i * 3 + 1] = cA[i * 3 + 2] = f * f * 1.6;   // brighter core, same total
+    }
+    dropAuraGeoSoft.setAttribute('color', new THREEx.BufferAttribute(cA, 3));
+    const cF = new Float32Array(dropAuraGeoFlat.attributes.position.count * 3).fill(1);
+    dropAuraGeoFlat.setAttribute('color', new THREEx.BufferAttribute(cF, 3));
+  }
+  let dropAuraSoftOn = true;
   const dropAuraMesh = new THREEx.InstancedMesh(
-    new THREEx.CircleGeometry(0.5, 20),
+    dropAuraGeoSoft,
     new THREEx.MeshBasicMaterial({ color: 0xffffff, side: THREEx.DoubleSide, transparent: true, opacity: 0.45,
+                                   vertexColors: true,
                                    depthWrite: false, fog: false, toneMapped: false, blending: THREEx.AdditiveBlending }),
     sysDROP_AURA_MAX);
   dropAuraMesh.castShadow = false;
@@ -47846,6 +47897,10 @@ export function createSystems(game) {
     // shared pulse for every live aura this frame — 0.35..0.55, ~1.1 Hz
     const dropAuraAlpha = 0.45 + Math.sin(game.state.time * sysDROP_AURA_HZ * 6.2832) * 0.10;
     dropAuraMesh.material.opacity = dropAuraAlpha;
+    if (dropAuraSoftOn === !!game.state.noAuraSoft) {
+      dropAuraSoftOn = !game.state.noAuraSoft;
+      dropAuraMesh.geometry = dropAuraSoftOn ? dropAuraGeoSoft : dropAuraGeoFlat;
+    }
     const dropShaftYaw = game.state.time * sysDROP_SHAFT_SPIN;
     for (let i = dropLive.length - 1; i >= 0; i--) {
       const d = dropLive[i];
