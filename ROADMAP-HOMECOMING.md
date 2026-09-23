@@ -2082,6 +2082,61 @@ candidate check has occurred. The intermittent renderer crash, sustained frame
 targets, human listening and novice playtests, and physical-device coverage
 remain open. Weekly allowance: 15% remaining; the user's 6% floor still applies.
 
+### M6t: same-host restarts and release-handoff diagnosis
+
+An owned Edge tab completed three consecutive load probes, 114 focused visible
+crossings, without a renderer crash; its cold/warm maxima were 50/100 ms.
+An owned Chrome tab completed two probes, 76 crossings, with 67/117 ms maxima.
+The Chrome save grew from 624 bytes after cycle one to 645 bytes after cycle
+two, and cycle two read the 624-byte save before reloading. The 117 ms Sydney
+warm interval still misses the proposed smoothness gate. These repetitions
+bound the observed startup failure but do not explain the earlier Edge crash.
+The QA harness can now opt into browser-profile crash capture. A deliberate
+owned-page crash produced and preserved a nonempty 7.3 MB Crashpad report;
+the game has not produced a dump in that capture mode.
+
+A separate partial Story route earned Sydney, Quay, Pasto, Pantanal and Kyoto
+through their live interactions, with 22 task IDs in Kyoto's persisted gate
+and a successful reload. Pasto took three actual mount attempts. This is
+coverage through Kyoto, not a full uninterrupted route or novice playtest.
+
+The next source-frozen full soak passed all 38 focused visible load crossings
+without a renderer crash, and passed the packaged-file probe, but failed fuzz:
+Venice recorded 13 solver safety clamps during its 45-second window. Its
+animal stayed below 11.4 m/s, and the post-clamp candidate scan found no body.
+An isolated Venice window and a complete Sydney-to-Venice replay with a
+temporary clamp-site probe produced zero clamps; the temporary production
+probe was removed. The Venice cause remains unproved and the five-save gate
+remains intact.
+
+That replay also caught another Pasto 34.6 m/s descent which the classifier
+could not certify. A later three-trial focused trace reproduced 34.7 m/s and
+showed the condor's talon-point handoff increased horizontal speed by about
+0.7 m/s once. The released body's platform-frame residual then decayed from
+2.16e-6 m/s. The classifier now allows 0.75 m/s only on the witnessed release
+tick and treats frames below 1e-5 m/s as zero; later horizontal acceleration,
+the 30 m/s general ceiling, contact and impulse exclusions stay strict. The
+source-extracted suite passes 206 checks, including that measured handoff,
+rejection of a larger shove, and rejection of a real moving platform. Two
+short focused reruns passed but did not repeat the high-speed handoff. The
+first unchanged-source full fuzz passed 19/19 rooms, with Venice at zero
+solver saves and Pasto below 30 m/s. The user requested silent testing while
+its packaged-file stage was running, so that browser was stopped; a new full
+soak used the QA harness's opt-in browser audio mute. It passed in 22.8
+minutes: nineteen 45-second fuzz windows, the packaged-file probe, 38/38
+focused visible load crossings and the runtime-error gate. Venice had zero
+solver saves and 11.0 m/s animal peak; Pasto stayed at 27.7 m/s with zero
+unexplained frames. No renderer crash or crash dump appeared in this run.
+After-reveal gaps topped out at 84 ms cold and 67 ms warm. The masked cold
+intervals still reached 917 ms in Antarctica and 800 ms in Cave, and the
+governor ended at rung 3 in 18 of 19 rooms on each lap. This is one passing
+automated soak, not sustained frame-rate certification or a repair for the
+earlier crash and Venice clamps. Syntax checks on every edited QA JavaScript
+file, `node build.mjs`, and all 77 `npm test` checks passed. Public master
+remains held for those intermittent failures, sustained performance, human
+listening and novice playtests, and physical-device coverage. Weekly
+allowance: 14% remaining at this checkpoint, above the user's 6% floor.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

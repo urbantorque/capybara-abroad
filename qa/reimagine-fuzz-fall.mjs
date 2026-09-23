@@ -69,6 +69,28 @@ function handoff(verticalDelta) {
   ok(r.invalidations['vertical impulse'] > 0, 'larger upward handoff still invalidates');
   ok(r.unexplainedFrames > 0, 'later overspeed remains a failure after invalid handoff');
 }
+function horizontalHandoff(vx) {
+  const f = make(30, physics), before = initial({ v: [15.9915, -10.8889, 8.4859] });
+  f.sample(before);
+  const v = [vx, -10.8287, 7.4875];
+  let s = next(before, { v, motion: v.map(x => x * step),
+    p: before.p.map((x, i) => x + v[i] * step) });
+  f.sample(s);
+  s = next(s, { frame: [3e-8, -2.16e-6] }); f.sample(s);
+  fall(f, s, 160);
+  return f.report();
+}
+{
+  const r = horizontalHandoff(17.2417);
+  eq(r.releases, 1, 'observed talon-point horizontal handoff anchors');
+  ok(r.certifiedFallFrames > 0, 'measured handoff and decaying frame certify gravity fall');
+  eq(r.unexplainedFrames, 0, 'handoff keeps general speed gate');
+}
+{
+  const r = horizontalHandoff(19);
+  ok(r.invalidations['horizontal acceleration'] > 0, 'larger horizontal handoff invalidates');
+  ok(r.unexplainedFrames > 0, 'overspeed after larger handoff remains a failure');
+}
 rejects({ grounded: true }, 'ground contact');
 rejects({ contacts: true }, 'airborne contact');
 rejects({ swimming: true }, 'water');

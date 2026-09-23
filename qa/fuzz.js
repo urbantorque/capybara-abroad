@@ -104,7 +104,10 @@ async page => {
           const unsafe = !finite ? 'nonfinite' : s.blocked ? 'paused/hidden' :
             !continuous ? 'sampling gap' : s.contacts ? 'contact' : s.grounded ? 'grounded' :
             // Exponential platform decay never reaches exact zero.
-            s.swimming ? 'swimming' : Math.hypot(...s.frame) > 1e-6 ? 'moving frame' :
+            // The carrier leaves a decaying frame below 3e-6 m/s after
+            // release; a hundredth of a millimetre per second is still
+            // below one pixel over this whole flight.
+            s.swimming ? 'swimming' : Math.hypot(...s.frame) > 1e-5 ? 'moving frame' :
             s.gravity <= 0 || (previous && s.gravity !== previous.gravity) ? 'gravity changed' : '';
           if (unsafe) reason = invalidate(unsafe);
           else if (carried) reason = invalidate('carried');
@@ -130,7 +133,11 @@ async page => {
               const horizontal = Math.min(cap, Math.max(anchor.h, physics.run)) + .05;
               if (elapsed > 8) reason = invalidate('stale anchor');
               else if (s.impulseT !== anchor.impulseT) reason = invalidate('external impulse');
-              else if (h > horizontal || h - previous.h > physics.accel * dt + .05) reason = invalidate('horizontal acceleration');
+              // The talon-point velocity replaces the carried body's solver
+              // velocity once. Pasto's witnessed handoff adds 0.7 m/s;
+              // later ticks retain the controller's strict acceleration cap.
+              else if (h > horizontal || h - previous.h > physics.accel * dt + (releaseHandoff ? .75 : .05))
+                reason = invalidate('horizontal acceleration');
               else if (s.v[1] < anchor.v[1] - g * (elapsed + physics.step) - .05 ||
                 s.v[1] < previous.v[1] - g * (dt + physics.step) - .05 ||
                 // Talon-point velocity replaces the constrained body's solver

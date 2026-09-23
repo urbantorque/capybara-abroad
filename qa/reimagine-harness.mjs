@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -38,6 +39,11 @@ export async function openHarness({ url = 'http://localhost:5188/',
   // inherits BREAKPAD_DUMP_LOCATION; ordinary QA launches are unchanged.
   const crashCapture = process.env.CAPY_QA_CRASH_CAPTURE === '1';
   const browserArgs = crashCapture ? ['--enable-crash-reporter'] : [];
+  // Keep automated browser runs silent when the desk is in use; the Web Audio
+  // graph still runs for timing checks. Listening runs omit this opt-in flag.
+  if (process.env.CAPY_QA_MUTE_AUDIO === '1') browserArgs.push('--mute-audio');
+  const profileTrace = process.env.CAPY_QA_PROFILE_TRACE === '1';
+  if (profileTrace) browserArgs.push('--enable-automation');
   if (crashCapture && process.env.BREAKPAD_DUMP_LOCATION)
     browserArgs.push('--crash-dumps-dir=' + process.env.BREAKPAD_DUMP_LOCATION);
   const browser = await chromium.launch({ channel, headless: false, args: browserArgs });
@@ -45,6 +51,37 @@ export async function openHarness({ url = 'http://localhost:5188/',
   const metadata = { at: new Date().toISOString(), browser: browser.version(), channel,
     headless: false, crashCapture, viewport: { width, height, deviceScaleFactor, hasTouch, isMobile },
     errors: [], warnings: [], requests: [], startup: [], crashTrace: [] };
+  let crashProfile = null;
+  if (profileTrace) {
+    try {
+      const session = await browser.newBrowserCDPSession();
+      const command = await session.send('Browser.getBrowserCommandLine');
+      crashProfile = command.arguments.find(arg => arg.startsWith('--user-data-dir='))?.slice(16) || null;
+      await session.detach();
+    } catch (error) { metadata.crashCaptureError = String(error.message || error); }
+  }
+  async function preserveCrashDumps() {
+    try {
+      const destination = process.env.BREAKPAD_DUMP_LOCATION;
+      if (!crashProfile || !destination || !metadata.errors.some(e =>
+        e.kind === 'crash' || e.kind === 'targetcrashed')) return;
+      const reports = join(crashProfile, 'Crashpad', 'reports');
+      let files = [];
+      for (let i = 0; i < 12; i++) {
+        if (existsSync(reports)) files = readdirSync(reports).filter(name => name.endsWith('.dmp') &&
+          statSync(join(reports, name)).size > 0);
+        if (files.length) break;
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      if (!files.length) { metadata.crashCaptureError = 'No nonempty Crashpad report before browser close'; return; }
+      mkdirSync(destination, { recursive: true });
+      metadata.crashDumps = files.map(name => {
+        const target = join(destination, crashProfile.split(/[\\/]/).at(-1) + '-' + name);
+        copyFileSync(join(reports, name), target);
+        return { path: target, bytes: statSync(target).size };
+      });
+    } catch (error) { metadata.crashCaptureError = String(error.message || error); }
+  }
   const stage = name => metadata.startup.push({ name, at: new Date().toISOString() });
   try {
     const origin = new URL(url).origin;
@@ -160,9 +197,10 @@ export async function openHarness({ url = 'http://localhost:5188/',
       if (!response.ok) throw new Error('QA sink failed: ' + response.status);
     };
     return { browser, context, page, metadata, hold, start, arrive, screenshot, result,
-      close: () => browser.close() };
+      close: async () => { await preserveCrashDumps(); await browser.close(); } };
   } catch (error) {
     error.harnessMetadata = metadata;
+    await preserveCrashDumps();
     await browser.close(); throw error;
   }
 }
