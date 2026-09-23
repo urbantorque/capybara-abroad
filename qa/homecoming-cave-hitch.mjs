@@ -146,7 +146,7 @@ try {
                 a.push((q.name || q.type) + '#' + q.id); return a; })(),
               geometry: o.geometry?.type, vertices: o.geometry?.getAttribute('position')?.count,
               material: m.name, color: m.color?.getHexString(), side: m.side,
-              visible: o.visible, castShadow: o.castShadow }); });
+              visible: o.visible, instanced: !!o.isInstancedMesh, castShadow: o.castShadow }); });
         }
       });
       return { chapter, arrived: g.biome.current === chapter, focused: focusLost === 0,
@@ -174,6 +174,9 @@ try {
     if (seenRoomIds.has(chapter)) assert.equal(row.roomNodeId, seenRoomIds.get(chapter),
       chapter + ' must reuse its room convolver on return');
     else seenRoomIds.set(chapter, row.roomNodeId);
+    if (pretty && chapter === 'cave' && out.rows.length > 1) assert.ok(
+      !row.lateOwners.some(o => o.instanced && o.geometry === 'TetrahedronGeometry' && o.vertices === 12),
+      'Cave dust must not compile a reflected shader after white');
   }
   assert.deepEqual(h.metadata.errors, []);
   out.pass = true;

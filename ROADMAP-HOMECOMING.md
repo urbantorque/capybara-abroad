@@ -1878,6 +1878,38 @@ should identify why the dust's six-point-light variant escapes the warm pass,
 then rerun a source-frozen full soak and real-device/listening gates. Public
 master stays unchanged. Weekly allowance: 17% remaining.
 
+### M6l: keep fine particle pools out of the water mirror
+
+The late fixed-Pretty Cave program was traced to a scene-root instanced
+tetrahedron with the soil material and twelve vertices, matching the 60-slot
+physics dust pool. Its `lambert`/`rim2s` program differed from the closest
+already linked variant only at Three's point-light count, 0→6. The water
+mirror can draw that pool with a different set of visible lights, while the
+main Cave scene was already warm. The pool fell under the mirror's existing
+150-instance cover cutoff, so it remained eligible for reflection despite
+being too fine and transient to read there.
+
+Only the global dust and eight-slot foam particle pools now carry a
+`noReflection` marker. The reflection pass hides those two instanced meshes
+for its draw and restores them afterward; it also skips their periodic cull
+sweep. Normal-world particle drawing and the water reflection itself are
+unchanged. This is a culling correction, not an added visual term, save field
+or audio writer. A source-frozen headful fixed-Pretty Cave→Sydney→Cave replay
+twice found zero late Cave programs and returned visible maxima of 66.6 and
+50.2 ms. Before the correction, several equivalent fixed-Pretty runs had
+383–534 ms visible draw ticks and a late dust program. A seven-crossing Auto
+replay after the correction was focused, visible and error-free throughout:
+the three Cave returns peaked at 67.0, 50.2 and 33.4 ms; none compiled a
+late program. This is bounded route evidence, not a full release soak.
+
+The first Cave entry still took roughly 6–7 seconds of compilation behind
+the opaque card in fixed Pretty, with first-visible gaps reaching about
+100 ms. The intermittent renderer crash and prior white-frame rAF freeze
+remain open; the change does not establish their causes or repair them.
+Next: syntax/build/test and a source-frozen full soak, followed by the
+unavailable human listening, novice and physical-device gates. Public
+master remains held. Weekly allowance: 17% remaining.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

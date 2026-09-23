@@ -5969,7 +5969,7 @@ function _reflSweep(scene, now) {
   _reflCover.length = 0;
   _reflSmall.length = 0;
   scene.traverse(function (o) {
-    if (!o.isMesh || o.renderOrder === 6) return;
+    if (!o.isMesh || o.renderOrder === 6 || o.userData.noReflection) return;
     const g = o.geometry;
     if (!g) return;
     if (o.isInstancedMesh) {
@@ -6138,7 +6138,9 @@ export function reflectRender(renderer, scene, camera, cut, rung, scale) {
   const ch = scene.children;
   for (let i = 0; i < ch.length; i++) {
     const c = ch[i];
-    if (c.isInstancedMesh && c.renderOrder === 6 && c.visible) { c.visible = false; _reflHid.push(c); }
+    if (c.isInstancedMesh && c.visible && (c.renderOrder === 6 || c.userData.noReflection)) {
+      c.visible = false; _reflHid.push(c);
+    }
   }
   if (now - _reflSweepAt > 1000) _reflSweep(scene, now);
   for (let i = 0; i < _reflCover.length; i++) {

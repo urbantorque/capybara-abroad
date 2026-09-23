@@ -4661,6 +4661,7 @@ function physInitParticles() {
   physDustColor = PALETTE.soil;
   physDust = new THREE.InstancedMesh(new THREE.TetrahedronGeometry(0.1), dustMat, physDUST_MAX);
   physDust.frustumCulled = false;
+  physDust.userData.noReflection = true; // a footfall puff cannot read in a water mirror
   physDust.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   physSceneAddLoose(physDust);
 
@@ -4671,6 +4672,7 @@ function physInitParticles() {
     physFOAM_MAX
   );
   physFoam.frustumCulled = false;
+  physFoam.userData.noReflection = true; // a splash is already the water's own surface
   physFoam.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   physSceneAddLoose(physFoam);
 
