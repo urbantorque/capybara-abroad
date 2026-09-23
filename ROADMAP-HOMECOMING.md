@@ -1813,6 +1813,38 @@ renderer crash and unavailable human listening, novice and physical-device
 checks still hold public master. Return visits remain parked. Weekly allowance
 was 17% remaining before this checkpoint.
 
+### M6j: repeated-room audio hitch isolated and removed
+
+Four focused Cave arrivals interleaved with Sydney reproduced 83–117 ms warm
+visible gaps. The tick profiler placed 75–87 ms in `systems.update`, with only
+2–3 physics camera rays costing about 0.2 ms. Temporary internal marks isolated
+the room-audio calls: Cave music IR creation and `ConvolverNode.buffer` swaps
+used 83–110 ms; effects swaps used 20–71 ms even when the `AudioBuffer` was
+cached. This is main-thread Web Audio graph work, not a measured GPU fault.
+
+The score now caches at most three room IR buffers and skips assigning one
+already installed in its inactive convolver slot. Effects keep at most three
+ready convolver/output pairs and switch the live send to the existing pair on
+return; evicted pairs are disconnected. The authored room sizes, wet gains,
+crossfade clocks, sound synthesis and save shape are unchanged. Cache storage
+is bounded to three stereo IRs per bus; there is no per-frame allocation or new
+visual/audio term to flag.
+
+In a source-frozen, headful Edge seven-crossing replay after the change, all
+rows stayed focused, visible and error-free with a running audio context.
+The three warm Cave returns had visible maxima of 34.1, 49.9 and 66.7 ms;
+their current-room node identity remained `1`, while
+Sydney reused node `2` on its returns. A separate post-change run measured
+33.5, 33.4 and 33.2 ms on those three Cave returns. Room-switch timings on
+cached returns dropped to 0–0.1 ms for both buses. The first cold Cave arrival
+still reached 100.1 ms after white in the final replay, and the earlier
+intermittent Chrome renderer crash remains unproven. Node identity and timing
+do not establish audible quality or absence of glitches; human listening is
+still required. Syntax, build and 77 repository checks pass. Next: validate
+the wet signal path after node reuse, then tackle cold-first-entry room work
+under the transition mask without changing the musical handoff; rerun the
+release soak before public master. Weekly allowance: 17% remaining.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

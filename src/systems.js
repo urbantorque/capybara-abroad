@@ -13660,29 +13660,71 @@ export function createSystems(game) {
     return ac;
   }
 
+  // A room's noise tail is expensive to synthesize, especially the cave's.
+  // Keep only the three most recently heard rooms on each bus: backtracking
+  // reuses the exact IR, while a nineteen-place journey cannot retain them all.
+  const sysIR_CACHE_ROOMS = 3;
+  const acRoomCache = new Map();
+  function sysIRCached(cache, key, secs, decay) {
+    let entry = cache.get(key);
+    if (entry) cache.delete(key);
+    else entry = { buffer: musIR(secs, decay) };
+    cache.set(key, entry);
+    if (cache.size > sysIR_CACHE_ROOMS) cache.delete(cache.keys().next().value);
+    return entry;
+  }
+
   /**
    * Point the convolver at this chapter's room. Once per border crossing.
-   *
-   * The buffer is regenerated rather than cached — see the note on sysROOMS.
-   * A failure here is not fatal: a convolver with no buffer passes silence, so
-   * the send goes to nothing and the dry path is the whole signal, which is
-   * the mix this game had before any of this existed.
+   * A failure here is not fatal: the dry path remains the whole signal.
    */
   function sysRoomLoad(name) {
     if (!ac || !acRoomConv) return;
     const key = name || 'sydney';
     if (acRoomFor === key) return;
-    acRoomFor = key;
     const R = sysROOMS[key] || sysROOM_DEF;
-    let buf = null;
-    try { buf = musIR(R.size, R.decay); } catch (e) { buf = null; }
-    acRoomConv.buffer = buf;
+    let entry = acRoomCache.get(key);
+    if (entry) acRoomCache.delete(key);
+    else {
+      // The first room inherits the already-wired node. Later rooms each keep
+      // their own convolver: assigning a cached AudioBuffer to a *different*
+      // node still took 20–71 ms on focused return crossings.
+      const first = acRoomCache.size === 0;
+      let conv = first ? acRoomConv : null, out = first ? acRoomOut : null;
+      try {
+        if (!first) {
+          conv = ac.createConvolver(); conv.normalize = true;
+          out = ac.createGain(); out.gain.value = 1;
+        }
+        const buf = musIR(R.size, R.decay);
+        conv.buffer = buf;
+        if (!first) { conv.connect(out); out.connect(sysSfxOut()); }
+        entry = { conv, out, buffer: buf, makeup: sysRoomMakeup(buf) };
+      } catch (e) {
+        if (!first) { try { conv && conv.disconnect(); out && out.disconnect(); } catch (_) {} }
+        return;               // keep the old room and its dry path alive
+      }
+    }
+    if (entry.conv !== acRoomConv) {
+      acRoomSend.disconnect();
+      acRoomConv = entry.conv;
+      acRoomOut = entry.out;
+      acRoomSend.connect(acRoomConv);
+    }
     // ---- THE MAKE-UP (L6, E3): see sysROOM_E_REF -------------------------
     // Written here and nowhere else, and only while the send is at nothing
     // (sysRoomSet loads a room once the old one has drained to 0.006), so
     // the step is never heard. A build with no buffer gets unity.
-    acRoomMakeup = buf ? sysRoomMakeup(buf) : 1;
+    acRoomMakeup = entry.makeup;
     if (acRoomOut) acRoomOut.gain.setTargetAtTime(acRoomMakeup, ac.currentTime, 0.25);
+    acRoomFor = key;
+    acRoomCache.set(key, entry);
+    if (acRoomCache.size > sysIR_CACHE_ROOMS) {
+      const oldKey = acRoomCache.keys().next().value;
+      const old = acRoomCache.get(oldKey);
+      acRoomCache.delete(oldKey);
+      old.conv.disconnect(); old.out.disconnect();
+    }
   }
   /**
    * What the convolver's normaliser leaves of this impulse's head, and the
@@ -18589,6 +18631,7 @@ export function createSystems(game) {
   // ---- THE SCORE'S OWN ROOM, ONE PER CHAPTER (v41) -------------------------
   // See the note in musicStart. Two slots, one live, cross-faded on the border.
   const musRoomSlot = [];
+  const musRoomCache = new Map();
   let musRoomCur = 0, musRoomFor = '', musRoomWant = sysMUS_WET, musRoomFadeT = 0;
 
   /**
@@ -18640,10 +18683,10 @@ export function createSystems(game) {
                        Math.sqrt(sysMUS_WET_REF / secs),
                        sysMUS_WET_MIN, sysMUS_WET_MAX);
     let buf;
-    try { buf = musIR(secs, dec); } catch (e) { return; }
+    try { buf = sysIRCached(musRoomCache, key, secs, dec).buffer; } catch (e) { return; }
     const nxt = musRoomSlot[1 - musRoomCur];
     const cur = musRoomSlot[musRoomCur];
-    nxt.conv.buffer = buf;
+    if (nxt.conv.buffer !== buf) nxt.conv.buffer = buf;
     if (!nxt.fed) { try { musSend.connect(nxt.conv); nxt.fed = true; } catch (e) { return; } }
     // The FIRST room is not a crossfade — there is nothing to cross from, and
     // a score that takes two and a half seconds to acquire a reverb sounds
