@@ -1941,6 +1941,25 @@ it passes, still inspect those long tails before considering public master;
 human listening, novice and physical-device gates remain unavailable. Weekly
 allowance: 16% remaining.
 
+### M6n: same-session release soak passes, warm tail remains
+
+The unchanged `6485341` candidate passed a source-frozen 23.1-minute headful
+Edge run with crash capture armed: nineteen 45-second fuzz windows, the
+packaged single-file probe and 38/38 focused, visible load crossings. The
+browser recorded no error or target-crash event, and the crash-capture
+directory remained empty. Pasto's 34.4 m/s peak was accepted by the fall
+classifier; there were zero NaN or below-world windows. This is one complete
+three-stage pass, not proof that the earlier intermittent renderer crash is
+gone.
+
+The load laps still miss the proposed smoothness target. The largest warm
+visible gaps were 117 ms in Cali, 100 ms in Kowloon and 83 ms in Cave; cold
+Quay reached 85 ms. Other warm returns stayed at or below 67 ms. The 117 ms
+sample needs CPU/GPU attribution before public-master promotion. Keep the
+history row and crash-capture controls, and preserve the prior failed row.
+No human listening, novice playtest or physical-device gate was performed.
+Public master remains held. Weekly allowance: 16% remaining.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
