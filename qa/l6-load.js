@@ -17,6 +17,7 @@ async page => {
   const tGoto = Date.now()
   await page.addInitScript(() => { try { localStorage.clear() } catch (e) {} })
   await page.goto('http://localhost:5190/', { waitUntil: 'domcontentloaded', timeout: 90000 })
+  console.log('load stage: hosted page navigated')
   let tTitle = -1
   for (let i = 0; i < 120; i++) {
     await page.waitForTimeout(250)
@@ -24,7 +25,9 @@ async page => {
     if (ok) { tTitle = Date.now() - tGoto; break }
   }
   await page.waitForTimeout(1500)
+  console.log('load stage: title ready ' + tTitle + ' ms')
   const tBegin = Date.now()
+  console.log('load stage: starting free roam')
   await page.evaluate(() => {
     const free = document.querySelector('.capyui-go[data-free]');
     if (free) {
@@ -39,6 +42,7 @@ async page => {
     }
   })
   await page.keyboard.press('Shift')
+  console.log('load stage: start gesture sent')
   let tStarted = -1
   for (let i = 0; i < 80; i++) {
     await page.waitForTimeout(100)
@@ -47,6 +51,7 @@ async page => {
   }
   await page.waitForTimeout(5000)
   if (tStarted < 0) throw new Error('load probe never started the game')
+  console.log('load stage: game started ' + tStarted + ' ms')
   const names = ['pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland',
                  'sahara', 'drift', 'venice', 'kowloon', 'palawan', 'goreme',
                  'manly', 'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi', 'sydney']

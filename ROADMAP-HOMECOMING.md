@@ -1910,6 +1910,37 @@ Next: syntax/build/test and a source-frozen full soak, followed by the
 unavailable human listening, novice and physical-device gates. Public
 master remains held. Weekly allowance: 17% remaining.
 
+### M6m: full-soak crash, two-stage isolation and tail limits
+
+The first source-frozen, headful Edge full soak on `5a87583` completed all
+nineteen 45-second fuzz windows and the packaged single-file check. The load
+probe's renderer target then crashed during the Free Roam start path, three
+seconds into that stage, with no fresh arrival row. The history retains a
+failed full-run row (`fuzz ok`, `ks ok`, `load FAIL`, `runtime FAIL`) and the
+Edge target crash event; the result is not a release pass.
+
+Two fresh-browser isolation sequences on the identical game source succeeded:
+load alone passed 38/38 focused, visible crossings; package→load also passed
+its package check and 38/38 crossings. A long fuzz→load sequence, with the
+package stage skipped and crash capture armed, likewise passed its 19 physics
+windows and 38/38 crossings. The added QA-only load-stage markers confirmed
+navigation, title readiness, Free Roam click, trusted start gesture and the
+started state before travel began. Neither pair reproduced the crash. This
+narrows the failure but cannot tell whether the full sequence accumulated a
+resource fault or hit an independent renderer/driver event. Pasto's 34.2 m/s
+peak in fuzz→load was an eighteen-frame certified fall; its maximum unexplained
+speed was 29.76 m/s, with no violation.
+
+Performance remains short of the proposed target even in passing probes.
+The load-only warm Cave lap had one 150 ms visible gap without a new program;
+package→load had 150 ms cold Iceland and 116 ms warm Manly gaps; fuzz→load had
+one 183 ms warm Göreme gap, also with zero new programs or geometries. These
+are one-off tail observations, not attributed GPU time. The full three-stage
+soak must be rerun with crash capture and no production-source changes. If
+it passes, still inspect those long tails before considering public master;
+human listening, novice and physical-device gates remain unavailable. Weekly
+allowance: 16% remaining.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
