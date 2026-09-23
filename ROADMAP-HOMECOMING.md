@@ -2018,6 +2018,27 @@ full-soak tails. Run the same opt-in trace after the long fuzz and packaged
 stages, then attribute any repeat before public master. The partial history
 row is retained and marked with the skipped stages.
 
+### M6r: cumulative tail shifts to cold arrivals
+
+One attempted traced full run lost its command runner after Iceland's fuzz
+window. It left no new history row or Edge crash dump, so it is not a game
+result. An unchanged-source rerun completed all three stages in 23.8 minutes:
+nineteen fuzz windows, packaged-file probe and 38/38 focused, visible load
+crossings, with no reported runtime error or browser crash.
+
+The warm Pantanal and Hanoi tails from M6p did not recur: 83 and 50 ms on
+their warm returns. The opt-in trace recorded a warm Pantanal 82.8 ms draw
+tick aligned with its 83 ms interval; warm Hanoi's maximum game tick was
+17.7 ms. The worst gaps instead moved to cold Rio 416 ms, Iceland 433 ms
+and Venice 299 ms, plus a warm Manly 133 ms gap. Those first-entry places
+created no shader programs after reveal, although they introduced 76, 110
+and 98 geometries during entry. Geometry upload or driver work is a possible
+cause, not an established attribution: the current trace only covers
+Pantanal and Hanoi. `CAPY_QA_TRACE_ALL=1` now extends the same QA-only tick
+and browser-longtask trace to every load row for one bounded diagnostic run.
+The production source remains unchanged from M6o; public master stays held.
+Weekly allowance: 16% remaining.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

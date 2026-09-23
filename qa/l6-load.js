@@ -1,5 +1,6 @@
 async page => {
   const traceTail = process.env.CAPY_QA_TRACE_TAIL === '1';
+  const traceAll = process.env.CAPY_QA_TRACE_ALL === '1';
   // ---- THE CROSSING, TIMED FROM BOTH SIDES OF THE WHITE (L6, E8) ----------
   // Shape of qa/l6r-qa-load.js with two more columns per chapter. That probe
   // measured the longest rAF gap in the nine seconds after hud.cross and the
@@ -64,8 +65,8 @@ async page => {
       // unfocused browser can throttle rAF to 1 Hz and counterfeit a hitch.
       await page.bringToFront()
       const r = await page.evaluate(async (arg) => {
-        const name = arg.name, win = arg.win, trace = arg.trace &&
-          (name === 'hanoi' || name === 'pantanal')
+        const name = arg.name, win = arg.win, trace = arg.traceAll || (arg.trace &&
+          (name === 'hanoi' || name === 'pantanal'))
         const g = window.__capy
         const fadeEl = document.querySelector('.capyui-fade')
         const t0 = performance.now()
@@ -136,7 +137,7 @@ async page => {
           calls: g.state.perf ? g.state.perf.calls : -1, tris: g.state.perf ? g.state.perf.triangles : -1,
           frames: gaps.length, rung: g.state.perfRung, lastError: g.state.lastError || null,
           ...(trace ? { maxTick: +maxTick.toFixed(1), slowTicks, longtasks } : {}) }
-      }, { name: n, win: lap === 0 ? 9000 : 6000, trace: traceTail })
+      }, { name: n, win: lap === 0 ? 9000 : 6000, trace: traceTail, traceAll })
       rows.push(r)
       console.log('load lap ' + (lap + 1) + ' ' + n + ' ' + JSON.stringify({
         ok: r.ok, focused: r.focused, visible: r.visible, frames: r.frames,
@@ -149,9 +150,15 @@ async page => {
   const out = { tTitle, tStarted, rows: laps[0], lap2: laps[1] || null,
     pass: laps.length === 2 && laps.every(rows => rows.length === 19) && invalid.length === 0,
     invalid }
-  await page.evaluate(async (o) => {
-    await fetch('/shot?name=l6-load.json', { method: 'POST',
-      body: btoa(unescape(encodeURIComponent(JSON.stringify(o, null, 1)))) })
-  }, out)
+  try {
+    await page.evaluate(async (o) => {
+      await fetch('/shot?name=l6-load.json', { method: 'POST',
+        body: btoa(unescape(encodeURIComponent(JSON.stringify(o, null, 1)))) })
+    }, out)
+  } catch (e) {
+    // Direct soak keeps the result even when a reused server dies at the sink.
+    console.log('load sink unavailable: ' + String(e))
+  }
   if (!out.pass) throw new Error('load FAILED: ' + invalid.join(', '))
+  return out
 }
