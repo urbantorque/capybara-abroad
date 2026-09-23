@@ -1,4 +1,27 @@
-# HANDOFF — state of play, 23 Sep 2026
+# HANDOFF — state of play, 24 Sep 2026
+
+## The AAA pass (24 Sep, newest)
+
+The author handed over creative ownership with a 24-hour autonomous brief
+(docs/roadmaps/ROADMAP-AAA.md). Every milestone is an entry at the top of
+docs/CONTRACT.md with its numbers. **The repository moved:** the roadmaps
+are in docs/roadmaps/, the contract is docs/CONTRACT.md, and retired
+reviews and the long README are in docs/archive/. Older entries below cite
+the old root paths; the file names are unchanged.
+
+What is new in play:
+
+- **Look:** composite AO, a smooth shadow filter, form shade, near-clear
+  air, hero shading, rounded people, crowds and animals, and redrawn
+  Hanoi scooters.
+- **Feel:** a mischief beat, round dust, and the take.
+- **Consequences:** a march that costs 1–3 yuzu and an escape that pays 2.
+- **Clarity:** a one-line paper tab with an arrow; L opens the list.
+- **Story:** the premise card, the memory count, and the ibis rival
+  (src/rival.js).
+- **Access:** Free Roam from a story file.
+
+qa/aaa-*.mjs are the instruments.
 
 ## Homecoming published for playtest (23 Sep, newest)
 

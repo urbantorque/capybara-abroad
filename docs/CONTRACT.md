@@ -1,3 +1,22 @@
+## AAA A6 — THE REPOSITORY, TIDIED (24 Sep 2026)
+
+The author's note: "the GitHub page is really detailed … theres so many old
+roadmaps and verbose details, needs to be cleaned up". The root held thirty
+roadmaps, an 18 000-line contract, three one-off reviews and a 2 147-line
+README. It now holds only the files a visitor or an agent opens first:
+README, AGENTS, LICENSING and the build.
+
+- Every `ROADMAP-*.md` moved to `docs/roadmaps/` with `git mv`, so history
+  follows. Closed roadmaps are archived, never deleted, as the house rule
+  says.
+- This contract moved to `docs/CONTRACT.md`. The reviews, the audio handoff,
+  the watching guide and the long README moved to `docs/archive/`.
+- The README is now one screen: the play link, what the game is, the
+  controls, how to run, build and test, and where things are.
+- AGENTS.md has the new paths and counts (29 modules, 77 checks).
+
+No test read these files by path (checked). npm test: 77/0.
+
 ## AAA A4 — A REASON TO BE HERE, AND SOMEBODY AGAINST IT (24 Sep 2026)
 
 **The premise, said once.** The author said it was not clear why the

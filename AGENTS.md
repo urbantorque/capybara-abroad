@@ -2,7 +2,7 @@
 
 This file is read by coding agents (Codex, and any other) before touching
 the repository. It is the distilled version of a month of rules; the long
-form is CONTRACT.md (the living contract, newest entry at the top) and
+form is docs/CONTRACT.md (the living contract, newest entry at the top) and
 docs/handoff/ (the previous agent's memory and briefs). Read
 docs/handoff/HANDOFF.md first for the state of play.
 
@@ -10,10 +10,11 @@ docs/handoff/HANDOFF.md first for the state of play.
 
 A single-file browser game (Three.js + cannon-es, no bundler, no
 dependencies): a capybara loose in nineteen real places. `npm start`
-serves `src/` unbundled on a port; `node build.mjs` inlines twenty-eight
-modules into `dist/untitled-capybara-game.html`; `npm test` runs 25
-static/probe checks in ~10 s. The main branch for PRs is `master`; day-to-
-day work has been on `lift-pass`.
+serves `src/` unbundled on a port; `node build.mjs` inlines twenty-nine
+modules into `dist/untitled-capybara-game.html`; `npm test` runs 77
+static checks in about two minutes. `master` is the published build
+(GitHub Pages builds from it); the latest pass (ROADMAP-AAA) was worked
+on `aaa-polish` and merged.
 
 ## The laws (do not argue with these; they are measured decisions)
 
@@ -24,7 +25,8 @@ day work has been on `lift-pass`.
 - Every new visual or audio term is a `game.state.noX` flag (falsy = live),
   costs ≤ 0.1 ms when cut, and parks at governor rung ≥ 1
   (`game.state.perfRung`). Frame-time budgets are measured on the reference
-  GPU in a real browser, not headless (see ROADMAP-WOW3.md Part H).
+  GPU in a real browser, not headless (see docs/roadmaps/ROADMAP-WOW3.md
+  Part H; qa/aaa-ab.mjs is the one-command flag A/B with GPU timer queries).
 - Never re-base a grade, sun, fog, mote, spawn, chord, root, next, dwell,
   cut or instrument row. New things are laid over them.
 - No new save field without a roadmap naming it (`sysSAVE_SHAPE`,
@@ -39,7 +41,7 @@ day work has been on `lift-pass`.
 
 1. `node --check src/<every file you edited>.js`
 2. `node build.mjs`
-3. `npm test` (25 checks, 0 failed — the "reports" section cannot fail;
+3. `npm test` (77 checks, 0 failed — the "reports" section cannot fail;
    the soak-diff staleness line is informational)
 4. `git status`, then `git add` only your files BY NAME. Never `git add
    -A`, never stash while another agent is live, never amend or rebase.
@@ -91,9 +93,13 @@ that, work sequentially. `src/systems.js` (51k lines) and `src/npc.js`
 
 ## Where things are
 
-- CONTRACT.md — every pass, newest first; grep `^## ` for the list.
-- ROADMAP-*.md — one per pass; closed passes keep a `## Closed` section
-  and are never deleted (they are what CONTRACT.md's entries cite).
+- docs/CONTRACT.md — every pass, newest first; grep `^## ` for the list.
+- docs/roadmaps/ROADMAP-*.md — one per pass; closed passes keep a
+  `## Closed` section and are never deleted (they are what the contract's
+  entries cite). ROADMAP-AAA.md is the latest.
+- docs/archive/ — retired reviews, the old handoffs and the long README.
+- src/rival.js — the ibis (AAA A4): talks to systems.js only through
+  game.dropNearest / dropSteal / dropGive / groundY / rivalOK.
 - src/shared.js — PALETTE, CHAPTERS (~3741), TASKS (~2945), grain(), the
   reflection pass, the tracks pool. src/systems.js — everything else
   (HUD, save, score, sfx, finale, tutorial, camera). src/npc.js — people
