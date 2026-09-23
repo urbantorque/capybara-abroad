@@ -2337,20 +2337,32 @@ function kyoBuildKerbs(game, root) {
 const kyoPICK_N = 22;
 let kyoPickMesh = null, kyoPickHead = null, kyoPickData = null;
 function kyoBuildPickers(root) {
-  const B = kyoMerger();
-  // bent at the waist: legs vertical, torso forward, both arms down and in
-  B.box(-0.11, 0.36, 0, 0.17, 0.72, 0.19, 0xffffff);
-  B.box(0.11, 0.36, 0, 0.17, 0.72, 0.19, 0xffffff);
-  B.box(0, 0.88, 0.20, 0.48, 0.60, 0.30, 0xffffff, 0.85, 0, 0);
-  for (let s = -1; s <= 1; s += 2) {
-    B.box(s * 0.27, 0.74, 0.42, 0.12, 0.54, 0.12, 0xffffff, 0.45, 0, 0);
-  }
-  // THE BASKET, and it is what makes the silhouette a picker rather than a
-  // person tying a shoelace: a deep pannier high on the back, and a cloth
-  // shoulder strap over it.
-  B.cyl(0, 1.06, -0.24, 0.24, 0.44, PALETTE.teaSack, 0.28, 0, 0, 8);
-  B.cyl(0, 1.26, -0.28, 0.25, 0.06, PALETTE.matchaField, 0.28, 0, 0, 8);
-  kyoPickMesh = new THREE.InstancedMesh(B.build(), kyoVC(), kyoPICK_N);
+  // THE ROUNDED TWIN (AAA pass): each figure drawn twice, the second time
+  // with makeMerger's `round` on, and the twin handed to the rounded
+  // person's switch (npc.js, game.personRound) once both meshes are in the
+  // scene. The basket is two cylinders and comes through as it was.
+  const two = (parts) => {
+    const M = kyoMerger(); parts(M);
+    const g = M.build();
+    const R = kyoMerger(); R.round = 0.36; parts(R);
+    g.userData.roundTwin = R.build();
+    return g;
+  };
+  const gBody = two((B) => {
+    // bent at the waist: legs vertical, torso forward, both arms down and in
+    B.box(-0.11, 0.36, 0, 0.17, 0.72, 0.19, 0xffffff);
+    B.box(0.11, 0.36, 0, 0.17, 0.72, 0.19, 0xffffff);
+    B.box(0, 0.88, 0.20, 0.48, 0.60, 0.30, 0xffffff, 0.85, 0, 0);
+    for (let s = -1; s <= 1; s += 2) {
+      B.box(s * 0.27, 0.74, 0.42, 0.12, 0.54, 0.12, 0xffffff, 0.45, 0, 0);
+    }
+    // THE BASKET, and it is what makes the silhouette a picker rather than a
+    // person tying a shoelace: a deep pannier high on the back, and a cloth
+    // shoulder strap over it.
+    B.cyl(0, 1.06, -0.24, 0.24, 0.44, PALETTE.teaSack, 0.28, 0, 0, 8);
+    B.cyl(0, 1.26, -0.28, 0.25, 0.06, PALETTE.matchaField, 0.28, 0, 0, 8);
+  });
+  kyoPickMesh = new THREE.InstancedMesh(gBody, kyoVC(), kyoPICK_N);
   kyoPickMesh.castShadow = true;
   kyoPickMesh.frustumCulled = false;
   kyoPickMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(kyoPICK_N * 3), 3);
@@ -2358,11 +2370,12 @@ function kyoBuildPickers(root) {
   // the head, and the tenugui wrapped over it — everybody on a tea terrace in
   // June has a cloth on their head and it is the most recognisable thing about
   // the whole trade
-  const H = kyoMerger();
-  H.sph(0, 0, 0.42, 0.13, 0.15, 0.13, PALETTE.skin2);
-  H.sph(0, 0.09, 0.40, 0.145, 0.11, 0.145, PALETTE.shoji);
-  H.box(0, 0.03, 0.28, 0.28, 0.06, 0.26, PALETTE.shoji, 0.5, 0, 0);
-  kyoPickHead = new THREE.InstancedMesh(H.build(), kyoVC(), kyoPICK_N);
+  const gHead = two((H) => {
+    H.sph(0, 0, 0.42, 0.13, 0.15, 0.13, PALETTE.skin2);
+    H.sph(0, 0.09, 0.40, 0.145, 0.11, 0.145, PALETTE.shoji);
+    H.box(0, 0.03, 0.28, 0.28, 0.06, 0.26, PALETTE.shoji, 0.5, 0, 0);
+  });
+  kyoPickHead = new THREE.InstancedMesh(gHead, kyoVC(), kyoPICK_N);
   kyoPickHead.castShadow = false;
   kyoPickHead.userData.noShadow = true;
   kyoPickHead.frustumCulled = false;
@@ -2400,6 +2413,10 @@ function kyoBuildPickers(root) {
   if (kyoPickMesh.instanceColor) kyoPickMesh.instanceColor.needsUpdate = true;
   root.add(kyoPickMesh);
   root.add(kyoPickHead);
+  if (kyoGame && kyoGame.personRound) {
+    kyoGame.personRound(kyoPickMesh, gBody.userData.roundTwin);
+    kyoGame.personRound(kyoPickHead, gHead.userData.roundTwin);
+  }
   kyoUpdatePickers(0);
 }
 const kyoPickY = new Float32Array(kyoPICK_N);

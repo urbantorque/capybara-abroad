@@ -1,3 +1,48 @@
+## AAA A1 + A3a — THE LIVING, AND A MARCH THAT COSTS (24 Sep 2026)
+
+**The living, all of them.** Every chapter's instanced crowd now has a
+rounded twin on `noPersonRound`. There are eleven crowd builders across
+Venice, the Quay, Kowloon, Rio, Marrakech, Cali, Manly, Kyoto and Monte Carlo.
+Each draws its people twice through makeMerger's new `round` option or
+npc.js's exported `npcRoundParts`, and registers the twin through
+`game.personRound`. Quay's dog and Pasto's llamas and dogs are rounded the
+same way.
+
+The big crowds of Rio (302 people) and the Erg (181) measured +1.1 ms with
+bevelled bodies. They keep boxed bodies and rounded heads, for 0.15–0.23 ms.
+
+**Hanoi's scooters, redrawn.** `noBike2` is a step-through with a leg
+shield, cowls, mirrors and a seat. The rider sits on it with hands on the
+grips and feet on the board, some wear masks, and half the machines carry a
+passenger.
+
+**The choppiness was measured, not guessed.** Motion is exact: each frame's
+step is proportional to that frame's duration. Roll was 0.000 on every
+machine, and frame pacing alternates between 10 and 21 ms because Hanoi's
+world pass is 13 ms. Hiding all 240 machines saves 0.14 ms (qa/aaa-cost.mjs).
+They now lean into bends by atan(v²k/g), capped at 0.28 rad, and ride a
+centimetre of suspension.
+
+**A march that costs, and an escape that pays** (qa/aaa-march.mjs, 8 checks,
+Kyoto):
+
+- Reached by a witness costs 1 yuzu; reached by the authority costs 3.
+- Out-walked or out-hidden pays 2, at most once every 25 s.
+- The marcher wears the take, pulsed every 0.9 s.
+- Setting off starts the chase pulse, and the chain stays open until they
+  arrive.
+
+Three bugs are fixed:
+
+1. The catch and give-up payloads were wrapped `{npc: …}`, so the authority
+   toast never showed and its snort doubled.
+2. The authority was never asked when no witness stood within 18 m.
+3. A marcher with an errand clock or a walking route never stepped, which
+   left a march "marching" at t = 0 for 30 s. The D2 route note already
+   ranks the route below the march.
+
+Marchers jog at 1.35× (a walk still escapes). npm test: 77/0.
+
 ## AAA A0 — LIGHT, HERO, MISCHIEF, FREE ROAM, ROUNDED PEOPLE (24 Sep 2026)
 
 The author handed over creative ownership (ROADMAP-AAA.md). The first

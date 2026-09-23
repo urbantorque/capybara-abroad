@@ -48765,19 +48765,44 @@ export function createSystems(game) {
   // two-chain that never carded costs nothing but the two, which is right.
   // Zeroing `incT` is what makes incTick run its own ending on the next frame.
   // ---- THE HIDE WORKED (L3, F1): the marcher lost you; the chain runs on --
+  // ---- A CATCH COSTS SOMETHING, AND AN ESCAPE PAYS (AAA A3) ---------------
+  // The author's note: "not clear what the consequences of being mischievous
+  // are". They were the chain, and only the chain — a number nobody had been
+  // told was worth anything. Now the wallet moves both ways and the flying
+  // number says so where the player is already looking: reached by the
+  // authority, three yuzu (their fine); reached by a witness, one; out-walked
+  // or out-hidden, two back. Never below zero, and an escape pays at most
+  // once in sysESC_GAP so standing at a hedge edge is not a farm.
+  // ALSO A FIX: npc.js's emit() wraps every payload as { npc: payload }, so
+  // `e.authority` here was always undefined and the "picked up" line never
+  // once showed. Unwrapped, as the decoy handler already does.
+  const sysESC_GAP = 25, sysFINE_AUTH = 3, sysFINE_WIT = 1, sysESC_PAY = 2;
+  let sysEscAt = -1e9;
+  function sysGotAway(how) {
+    const t = game.state.time || 0;
+    const cp = game.capy && game.capy.position;
+    if (t - sysEscAt < sysESC_GAP) { toast(how); return; }
+    sysEscAt = t;
+    yuzuAdd(sysESC_PAY, how, cp ? cp.x : undefined, cp ? cp.y + 0.8 : undefined, cp ? cp.z : undefined);
+    sfx('chime', { volume: 0.32, pitch: 1.4, force: true });   // inside the half-octave (qa/l7-voices)
+  }
   game.events.on('npc:lost', function () {
-    toast(incT > 0 ? 'lost them. the chain is still open.' : 'lost them.');
+    sysGotAway(incT > 0 ? 'lost them · the chain is still open' : 'lost them');
     sfx('tick', { volume: 0.14, pitch: 1.35, force: true });
   });
+  game.events.on('npc:gaveup', function (e) {
+    const d = (e && e.npc) || e || {};
+    sysGotAway(d.authority ? 'got away from the ' + (d.role || 'authority') : 'got away');
+  });
   game.events.on('npc:caught', function (e) {
-    if (incT < 0) return;              // no chain open; nothing to end
-    // ...and it is SAID what that cost (N1): the chain, and only the chain.
-    // An authority says it differently: you are being carried out.
-    if (e && e.authority) toast(incCarded > 0 ? 'picked up. the chain is over — the card stays.'
-                                              : 'picked up. the chain is over.');
-    else if (incN > 0) toast(incCarded > 0 ? 'they reached you. the chain is over — the card stays.'
-                                      : 'they reached you. the chain is over.');
-    incT = 0.0001;                     // ...and incTick does the rest
+    const d = (e && e.npc) || e || {};
+    const fine = Math.min(jrYuzu, d.authority ? sysFINE_AUTH : sysFINE_WIT);
+    const who = d.authority ? 'picked up by the ' + (d.role || 'authority') : 'they reached you';
+    const cp = game.capy && game.capy.position;
+    if (fine > 0) yuzuAdd(-fine, null, cp ? cp.x : undefined, cp ? cp.y + 0.8 : undefined, cp ? cp.z : undefined);
+    toast(who + (fine > 0 ? '  ·  −' + fine + ' yuzu' : '') +
+          (incT >= 0 ? (incCarded > 0 ? '  ·  the card stays' : '  ·  the chain is over') : ''));
+    if (incT >= 0) incT = 0.0001;      // ...and incTick does the rest
   });
 
   /** THE RING, FOR THE HARNESS. Nothing in src reads this — it is the only
@@ -49236,6 +49261,13 @@ export function createSystems(game) {
         if (typeof game.notoSet === 'function') game.notoSet(notoPendTier);
       }
     }
+    // A march in progress holds the chain open (AAA A3): the 12 s window was
+    // shorter than the walk over, so the row vanished and the catch that
+    // followed was said to nobody. And the pulse keeps going while they come.
+    if (incT >= 0 && typeof game.marcher === 'function' && game.marcher()) {
+      if (incT < 1) incT = 1;
+      if (musChaseT < 2) musChaseT = 2;
+    }
     if (incT >= 0) {
       incT -= dt;
       if (incT < 0) {
@@ -49262,7 +49294,14 @@ export function createSystems(game) {
   // THE ROW TURNS AMBER WHEN SOMEBODY SETS OFF (N1). npc.js decides who and
   // when — and from 'a menace' that is a rung earlier — so it says so, and the
   // label stops being a count and becomes the one instruction that matters.
-  game.events.on('npc:march', function () { if (incT > 0) { incMarchOn = true; pipsLit = -1; } });
+  game.events.on('npc:march', function () {
+    if (incT > 0) { incMarchOn = true; pipsLit = -1; }
+    // SOMEBODY SET OFF, AND THE BAND SAYS SO (AAA A3): the chase pulse, on the
+    // same latch a chase uses. The march was silent — the one moment the
+    // player most needed to hear.
+    if (musChaseT <= 0) musChaseHit = 1;
+    musChaseT = 8;
+  });
 
   /**
    * THE CHAIN, ON SCREEN, WHILE IT IS OPEN (B4, item 2).

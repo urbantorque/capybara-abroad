@@ -353,12 +353,15 @@ const hkPaxData = new Float32Array(hkPAX_N * 3);
 
 function hkBuildPax(group) {
   if (!group) return;
-  const B = hkMerger();
-  B.box(0, 0.30, 0, 0.42, 0.58, 0.24, 0xffffff);
-  B.box(0, -0.14, 0, 0.30, 0.34, 0.20, 0xffffff);
-  const H = hkMerger();
-  H.box(0, 0.66, 0, 0.23, 0.26, 0.22, PALETTE.hkSkin || 0xd7a98a);
-  H.box(0, 0.81, -0.01, 0.25, 0.09, 0.24, PALETTE.hkHair || 0x2a2320);
+  // drawn twice, like the street's crowd (hkPersonGeo, AAA pass)
+  const gBody = hkPersonGeo((B) => {
+    B.box(0, 0.30, 0, 0.42, 0.58, 0.24, 0xffffff);
+    B.box(0, -0.14, 0, 0.30, 0.34, 0.20, 0xffffff);
+  });
+  const gHead = hkPersonGeo((H) => {
+    H.box(0, 0.66, 0, 0.23, 0.26, 0.22, PALETTE.hkSkin || 0xd7a98a);
+    H.box(0, 0.81, -0.01, 0.25, 0.09, 0.24, PALETTE.hkHair || 0x2a2320);
+  });
   const c = new THREE.Color();
   const SH = [PALETTE.hkLaundry, PALETTE.hkNeonCyan, PALETTE.hkCrate, PALETTE.hkAwning];
   const mk = (geo, tint) => {
@@ -372,10 +375,11 @@ function hkBuildPax(group) {
       for (let i = 0; i < hkPAX_N; i++) { c.set(SH[i % SH.length]); im.setColorAt(i, c); }
       im.instanceColor.needsUpdate = true;
     }
+    if (hkGame && hkGame.personRound) hkGame.personRound(im, geo.userData.roundTwin);
     return im;
   };
-  hkPaxBody = mk(B.build(), true);
-  hkPaxHead = mk(H.build(), false);
+  hkPaxBody = mk(gBody, true);
+  hkPaxHead = mk(gHead, false);
   group.add(hkPaxBody); group.add(hkPaxHead);
   for (let i = 0; i < hkPAX_N; i++) {
     hkPaxData[i * 3] = (i % 2 ? 1 : -1) * 0.62;
@@ -3226,6 +3230,17 @@ const hkCrowdData = new Float32Array(hkCROWD_N * 6);
 const hkCrowdBodies = [];              // one static box per walker, see hkUpdateCrowd
 
 function hkCrowdGeo(parts) { const M = hkMerger(); parts(M); return M.build(); }
+// THE ROUNDED TWIN (AAA pass). A person's part is drawn twice, the second
+// time with makeMerger's `round` on, and the twin rides on the geometry to
+// mk(), which hands it to the rounded person's switch (npc.js,
+// game.personRound). The bag and the brolly stay hkCrowdGeo: they are not
+// people, and a rounded carrier bag is a pillow.
+function hkPersonGeo(parts) {
+  const g = hkCrowdGeo(parts);
+  const R = hkMerger(); R.round = 0.36; parts(R);
+  g.userData.roundTwin = R.build();
+  return g;
+}
 // M14: see the long note on venCrowdBuild in venice.js — these two casts are
 // the same helper written twice, and this is the same fix.
 // ---- ARMS, AND A HEIGHT (L3-11) ------------------------------------------
@@ -3241,19 +3256,19 @@ function hkCrowdBuild(i) {
   return 0.92 + (h - Math.floor(h)) * 0.16;
 }
 function hkBuildCrowd(game, root) {
-  const limb = (sgn) => hkCrowdGeo((M) => {
+  const limb = (sgn) => hkPersonGeo((M) => {
     M.box(sgn * 0.11, -0.4, 0, 0.16, 0.8, 0.18, 0xf2f2f2);          // the leg
     M.box(sgn * 0.11, -0.79, 0.03, 0.17, 0.1, 0.26, 0xdcdcdc);      // and its shoe
   });
-  const arm = (sgn) => hkCrowdGeo((M) => {
+  const arm = (sgn) => hkPersonGeo((M) => {
     M.box(sgn * 0.29, -0.27, 0, 0.13, 0.54, 0.14, 0xffffff);        // the arm, from the shoulder
     M.box(sgn * 0.29, -0.60, 0, 0.12, 0.12, 0.13, 0xe8e8e8);        // and its hand
   });
-  const gBody = hkCrowdGeo((M) => {
+  const gBody = hkPersonGeo((M) => {
     M.box(0, 0, 0, 0.46, 0.62, 0.27, 0xffffff);
     M.box(0, 0.35, 0, 0.5, 0.08, 0.29, 0xf0f0f0);                   // the collar
   });
-  const gHead = hkCrowdGeo((M) => {
+  const gHead = hkPersonGeo((M) => {
     M.box(0, 0, 0, 0.25, 0.29, 0.24, 0xffffff);
     M.box(0, 0.16, -0.01, 0.27, 0.09, 0.26, 0x9c9c9c);              // hair
     M.box(0, 0.0, 0.135, 0.05, 0.05, 0.05, 0xffffff);               // the nose
@@ -3280,6 +3295,7 @@ function hkBuildCrowd(game, root) {
     m.castShadow = true; m.frustumCulled = false;
     m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(hkCROWD_N * 3), 3);
     root.add(m);
+    if (game.personRound && geo.userData.roundTwin) game.personRound(m, geo.userData.roundTwin);
     return m;
   };
   // NAMED. qa/b6-crowds.js finds every crowd in the game by measuring its

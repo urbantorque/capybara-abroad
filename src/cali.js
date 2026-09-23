@@ -301,14 +301,32 @@ const caliPAX_N = 8;
 let caliPaxBody = null, caliPaxHead = null;
 const caliPaxData = new Float32Array(caliPAX_N * 3);   // lx, lz, phase
 
+// THE ROUNDED TWIN (AAA pass). A person's part is drawn twice, the second
+// time with makeMerger's `round` on, and the twin rides on the geometry to
+// caliPersonRound, which hands it to the rounded person's switch (npc.js,
+// game.personRound). The chiva's benches, the dancers and the ringside all
+// go through it: every figure in the chapter is one.
+function caliPersonGeo(parts) {
+  const M = caliMerger(); parts(M);
+  const g = M.build();
+  const R = caliMerger(); R.round = 0.36; parts(R);
+  g.userData.roundTwin = R.build();
+  return g;
+}
+function caliPersonRound(im) {
+  const tw = im.geometry.userData.roundTwin;
+  if (caliGame && caliGame.personRound && tw) caliGame.personRound(im, tw);
+}
 function caliBuildPax(group) {
   if (!group) return;
-  const B = caliMerger();
-  B.box(0, 0.30, 0, 0.42, 0.58, 0.24, 0xffffff);
-  B.box(0, -0.14, 0, 0.30, 0.34, 0.20, 0xffffff);
-  const H = caliMerger();
-  H.box(0, 0.66, 0, 0.23, 0.26, 0.22, PALETTE.skin2);
-  H.box(0, 0.81, -0.01, 0.25, 0.09, 0.24, PALETTE.hair1);
+  const gBody = caliPersonGeo((B) => {
+    B.box(0, 0.30, 0, 0.42, 0.58, 0.24, 0xffffff);
+    B.box(0, -0.14, 0, 0.30, 0.34, 0.20, 0xffffff);
+  });
+  const gHead = caliPersonGeo((H) => {
+    H.box(0, 0.66, 0, 0.23, 0.26, 0.22, PALETTE.skin2);
+    H.box(0, 0.81, -0.01, 0.25, 0.09, 0.24, PALETTE.hair1);
+  });
   const c = new THREE.Color();
   const SH = [PALETTE.caliNeonPink, PALETTE.caliNeonCyan, PALETTE.caliNeonGold, PALETTE.caliWall1];
   const mk = (geo, tint) => {
@@ -322,10 +340,11 @@ function caliBuildPax(group) {
       for (let i = 0; i < caliPAX_N; i++) { c.set(SH[i % SH.length]); im.setColorAt(i, c); }
       im.instanceColor.needsUpdate = true;
     }
+    caliPersonRound(im);
     return im;
   };
-  caliPaxBody = mk(B.build(), true);
-  caliPaxHead = mk(H.build(), false);
+  caliPaxBody = mk(gBody, true);
+  caliPaxHead = mk(gHead, false);
   group.add(caliPaxBody); group.add(caliPaxHead);
   for (let i = 0; i < caliPAX_N; i++) {
     caliPaxData[i * 3] = (i % 2 ? 1 : -1) * 0.86;
@@ -3116,22 +3135,23 @@ let caliDancerMesh = null, caliDancerData = null;
 let caliDanceCheer = 0;
 
 function caliBuildDancers(root) {
-  const D = caliMerger();
   // A DANCER IS A LINE AND A LEAN. Legs together and slightly apart, a torso
   // that is mostly shoulder, a head, and two arms held up and forward — a
   // couple in closed position is two people with their arms in a box, and at
   // ten metres that box is the entire silhouette.
-  D.box(0, 0.30, 0, 0.16, 0.62, 0.17, PALETTE.caliGrille);
-  D.box(0, 0.30, 0, 0.15, 0.62, 0.16, PALETTE.caliGrille, 0, 0, 0.10);
-  D.box(0, 0.86, 0, 0.44, 0.60, 0.27, PALETTE.caliWall4);
-  D.box(0, 1.16, 0, 0.46, 0.10, 0.29, PALETTE.caliWall4);
-  D.sph(0, 1.34, 0, 0.13, 0.15, 0.13, PALETTE.skin3);
-  D.sph(0, 1.40, -0.02, 0.135, 0.11, 0.135, PALETTE.hair2);
-  for (let s = -1; s <= 1; s += 2) {
-    D.box(s * 0.26, 1.02, 0.16, 0.11, 0.42, 0.11, PALETTE.skin3, -0.85, 0, -s * 0.30);
-    D.box(s * 0.30, 1.10, 0.42, 0.10, 0.10, 0.30, PALETTE.skin3);
-  }
-  caliDancerMesh = new THREE.InstancedMesh(D.build(), caliVC(), caliDANCERS);
+  const gDancer = caliPersonGeo((D) => {
+    D.box(0, 0.30, 0, 0.16, 0.62, 0.17, PALETTE.caliGrille);
+    D.box(0, 0.30, 0, 0.15, 0.62, 0.16, PALETTE.caliGrille, 0, 0, 0.10);
+    D.box(0, 0.86, 0, 0.44, 0.60, 0.27, PALETTE.caliWall4);
+    D.box(0, 1.16, 0, 0.46, 0.10, 0.29, PALETTE.caliWall4);
+    D.sph(0, 1.34, 0, 0.13, 0.15, 0.13, PALETTE.skin3);
+    D.sph(0, 1.40, -0.02, 0.135, 0.11, 0.135, PALETTE.hair2);
+    for (let s = -1; s <= 1; s += 2) {
+      D.box(s * 0.26, 1.02, 0.16, 0.11, 0.42, 0.11, PALETTE.skin3, -0.85, 0, -s * 0.30);
+      D.box(s * 0.30, 1.10, 0.42, 0.10, 0.10, 0.30, PALETTE.skin3);
+    }
+  });
+  caliDancerMesh = new THREE.InstancedMesh(gDancer, caliVC(), caliDANCERS);
   caliDancerMesh.castShadow = true;
   caliDancerMesh.frustumCulled = false;
   caliDancerMesh.instanceColor = new THREE.InstancedBufferAttribute(
@@ -3153,6 +3173,7 @@ function caliBuildDancers(root) {
   }
   if (caliDancerMesh.instanceColor) caliDancerMesh.instanceColor.needsUpdate = true;
   root.add(caliDancerMesh);
+  caliPersonRound(caliDancerMesh);
 }
 
 function caliUpdateDancers(game, dt) {
@@ -3559,21 +3580,23 @@ function caliBuildMiradorLife(game, root) {
 const caliWATCH_N = 18;
 let caliWatchMesh = null, caliWatchHead = null, caliWatchArm = null, caliWatchData = null;
 function caliBuildWatchers(game, root) {
-  const B = caliMerger();
-  B.box(-0.10, 0.34, 0, 0.16, 0.68, 0.18, 0xffffff);
-  B.box(0.10, 0.34, 0, 0.16, 0.68, 0.18, 0xffffff);
-  B.box(0, 0.94, 0, 0.46, 0.58, 0.27, 0xffffff);
-  B.box(0, 1.24, 0, 0.48, 0.08, 0.29, 0xffffff);
-  caliWatchMesh = new THREE.InstancedMesh(B.build(), caliVC(), caliWATCH_N);
+  const gBody = caliPersonGeo((B) => {
+    B.box(-0.10, 0.34, 0, 0.16, 0.68, 0.18, 0xffffff);
+    B.box(0.10, 0.34, 0, 0.16, 0.68, 0.18, 0xffffff);
+    B.box(0, 0.94, 0, 0.46, 0.58, 0.27, 0xffffff);
+    B.box(0, 1.24, 0, 0.48, 0.08, 0.29, 0xffffff);
+  });
+  caliWatchMesh = new THREE.InstancedMesh(gBody, caliVC(), caliWATCH_N);
   caliWatchMesh.castShadow = true;
   caliWatchMesh.frustumCulled = false;
   caliWatchMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(caliWATCH_N * 3), 3);
 
-  const H = caliMerger();
-  H.sph(0, 0, 0, 0.13, 0.15, 0.13, PALETTE.skin3);
-  H.sph(0, 0.07, -0.02, 0.135, 0.11, 0.135, PALETTE.hair2);
-  H.box(0, 0, 0.13, 0.05, 0.05, 0.05, PALETTE.skin3);
-  caliWatchHead = new THREE.InstancedMesh(H.build(), caliVC(), caliWATCH_N);
+  const gHead = caliPersonGeo((H) => {
+    H.sph(0, 0, 0, 0.13, 0.15, 0.13, PALETTE.skin3);
+    H.sph(0, 0.07, -0.02, 0.135, 0.11, 0.135, PALETTE.hair2);
+    H.box(0, 0, 0.13, 0.05, 0.05, 0.05, PALETTE.skin3);
+  });
+  caliWatchHead = new THREE.InstancedMesh(gHead, caliVC(), caliWATCH_N);
   caliWatchHead.frustumCulled = false;
 
   // THE HANDS ARE THEIR OWN INSTANCE. A clap is two hands coming together in
@@ -3581,11 +3604,12 @@ function caliBuildWatchers(game, root) {
   // to scale the gap — so the pair is a separate mesh whose x scale goes to
   // nearly nothing on the beat. One extra draw for the thing the whole crowd
   // is for.
-  const A = caliMerger();
-  for (let s = -1; s <= 1; s += 2) {
-    A.box(s * 0.5, 0, 0, 0.13, 0.13, 0.30, PALETTE.skin3);
-  }
-  caliWatchArm = new THREE.InstancedMesh(A.build(), caliVC(), caliWATCH_N);
+  const gHands = caliPersonGeo((A) => {
+    for (let s = -1; s <= 1; s += 2) {
+      A.box(s * 0.5, 0, 0, 0.13, 0.13, 0.30, PALETTE.skin3);
+    }
+  });
+  caliWatchArm = new THREE.InstancedMesh(gHands, caliVC(), caliWATCH_N);
   caliWatchArm.frustumCulled = false;
 
   const shirts = [PALETTE.caliWall1, PALETTE.caliWall2, PALETTE.caliWall3,
@@ -3621,6 +3645,9 @@ function caliBuildWatchers(game, root) {
   root.add(caliWatchMesh);
   root.add(caliWatchHead);
   root.add(caliWatchArm);
+  caliPersonRound(caliWatchMesh);
+  caliPersonRound(caliWatchHead);
+  caliPersonRound(caliWatchArm);
   // ---- ...AND THE RINGSIDE IS SOLID (v36) -------------------------------
   //
   // THE RING, AND DELIBERATELY NOT THE FLOOR. `qa/CROWDS.md` left Cali open

@@ -5984,8 +5984,24 @@ function physOnStartled(p) {
   physTakeAny = true;
   physTakeMesh.visible = true;
 }
+// ...AND THE ONE WHO IS COMING FOR YOU WEARS IT (AAA A3). npc.js publishes
+// the marcher (game.marcher); while there is one, the take pops over their
+// head every 0.9 s — the one person in the square the player must find, and
+// until now they had no mark at all (the pill in the corner said "somebody").
+const physMARK_GAP = 0.9;
+let physMarkT = 0;
 function physTakeUpdate(dt) {
-  if (!physTakeMesh || !physTakeAny) return;
+  if (!physTakeMesh) return;
+  const who = typeof physGame.marcher === 'function' ? physGame.marcher() : null;
+  if (who) {
+    physMarkT -= dt;
+    if (physMarkT <= 0) {
+      physMarkT = physMARK_GAP;
+      physTakeLast.delete(who);          // the mark is not a startle: no 1.4 s gate
+      physOnStartled({ npc: { group: who } });
+    }
+  } else physMarkT = 0;
+  if (!physTakeAny) return;
   const cam = physGame.camera;
   if (!cam) return;
   physTakeR.setFromMatrixColumn(cam.matrixWorld, 0);

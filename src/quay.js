@@ -4579,30 +4579,48 @@ let quayCrowdShirt = null;
  * mesh, and the shirt (drawn white, tinted per instance) on another — which is
  * one extra draw call and the only way this works at all.
  */
+// THE ROUNDED TWIN (AAA pass). Each part of a person is drawn twice, the
+// second time with makeMerger's `round` on, and the twin rides on the geometry
+// to mk(), which hands it to the rounded person's switch (npc.js,
+// game.personRound): the same people off the same code, no longer bricks.
+// The concourse and both ferries' rails go through it; nothing else does.
+function quayPersonGeo(parts) {
+  const M = quayMerger(); parts(M);
+  const g = M.build();
+  const R = quayMerger(); R.round = 0.36; parts(R);
+  g.userData.roundTwin = R.build();
+  return g;
+}
+function quayPersonRound(game, im) {
+  const tw = im.geometry.userData.roundTwin;
+  if (game && game.personRound && tw) game.personRound(im, tw);
+}
 function quayBuildCrowd(game, root) {
   // ---- the fixed half: head, hair, nose, hips. Hip is the origin. (The arms
   // used to be here too — L3-11 hung them from the shoulder instead.)
-  const B = quayMerger();
-  B.box(0, 0.78, 0, 0.25, 0.29, 0.24, PALETTE.skin2);
-  B.box(0, 0.94, -0.01, 0.27, 0.10, 0.26, PALETTE.hair1);
-  B.box(0, 0.78, 0.13, 0.05, 0.05, 0.05, PALETTE.skin2);
-  B.box(0, 0.01, 0, 0.44, 0.20, 0.25, PALETTE.stoneDark);
+  const gFixed = quayPersonGeo((B) => {
+    B.box(0, 0.78, 0, 0.25, 0.29, 0.24, PALETTE.skin2);
+    B.box(0, 0.94, -0.01, 0.27, 0.10, 0.26, PALETTE.hair1);
+    B.box(0, 0.78, 0.13, 0.05, 0.05, 0.05, PALETTE.skin2);
+    B.box(0, 0.01, 0, 0.44, 0.20, 0.25, PALETTE.stoneDark);
+  });
   // ---- the shirt: drawn white so the instance tint is the whole of it. The
   // sleeve is a cap at the shoulder now, sitting on the arm's pivot.
-  const S = quayMerger();
-  S.box(0, 0.36, 0, 0.48, 0.52, 0.27, 0xffffff);
-  S.box(0, 0.61, 0, 0.50, 0.06, 0.29, 0xffffff);
-  for (let s = -1; s <= 1; s += 2) S.box(s * 0.29, 0.49, 0, 0.14, 0.12, 0.15, 0xffffff);
+  const gShirt = quayPersonGeo((S) => {
+    S.box(0, 0.36, 0, 0.48, 0.52, 0.27, 0xffffff);
+    S.box(0, 0.61, 0, 0.50, 0.06, 0.29, 0xffffff);
+    for (let s = -1; s <= 1; s += 2) S.box(s * 0.29, 0.49, 0, 0.14, 0.12, 0.15, 0xffffff);
+  });
   // ---- a leg, hung from the hip so the pivot is at the top of it
-  const L = quayMerger();
-  L.box(0, -0.39, 0, 0.16, 0.74, 0.18, PALETTE.stoneDark);
-  L.box(0, -0.78, 0.04, 0.17, 0.09, 0.26, PALETTE.hair2);
-  const legGeo = L.build();
+  const legGeo = quayPersonGeo((L) => {
+    L.box(0, -0.39, 0, 0.16, 0.74, 0.18, PALETTE.stoneDark);
+    L.box(0, -0.78, 0.04, 0.17, 0.09, 0.26, PALETTE.hair2);
+  });
   // ---- an arm, hung from the shoulder the same way: bare, with a hand
-  const A = quayMerger();
-  A.box(0, -0.31, 0, 0.11, 0.44, 0.12, PALETTE.skin2);
-  A.box(0, -0.56, 0.01, 0.12, 0.10, 0.13, PALETTE.skin2);
-  const armGeo = A.build();
+  const armGeo = quayPersonGeo((A) => {
+    A.box(0, -0.31, 0, 0.11, 0.44, 0.12, PALETTE.skin2);
+    A.box(0, -0.56, 0.01, 0.12, 0.10, 0.13, PALETTE.skin2);
+  });
 
   const c = new THREE.Color();
   const mk = (geo, tint) => {
@@ -4618,10 +4636,11 @@ function quayBuildCrowd(game, root) {
       im.instanceColor.needsUpdate = true;
     }
     root.add(im);
+    quayPersonRound(game, im);
     return im;
   };
-  quayCrowd = mk(B.build(), false);
-  quayCrowdShirt = mk(S.build(), true);
+  quayCrowd = mk(gFixed, false);
+  quayCrowdShirt = mk(gShirt, true);
   quayCrowdLegA = mk(legGeo, false);
   quayCrowdLegB = mk(legGeo, false);
   quayCrowdArmA = mk(armGeo, false);
@@ -4783,19 +4802,22 @@ function quayUpdateCrowd(dt) {
  */
 const quayPAX_N = 14;
 let quayPaxArm = null;
-function quayBuildPax(root) {
+function quayBuildPax(root, game) {
   // one mesh, tinted per instance, and the head is the one thing on it that is
   // NOT the shirt — so it gets its own pass, same split as the concourse crowd
-  const B = quayMerger();
-  B.box(0, 0.30, 0, 0.42, 0.58, 0.24, 0xffffff);
-  B.box(0, -0.14, 0, 0.30, 0.34, 0.20, 0xffffff);
-  const H = quayMerger();
-  H.box(0, 0.66, 0, 0.23, 0.26, 0.22, PALETTE.skin2);
-  H.box(0, 0.81, -0.01, 0.25, 0.09, 0.24, PALETTE.hair1);
-  H.box(0, 0.66, 0.12, 0.05, 0.05, 0.05, PALETTE.skin2);
-  const A = quayMerger();
-  A.box(0, -0.24, 0, 0.11, 0.50, 0.12, PALETTE.skin2);
-  A.box(0, -0.54, 0, 0.12, 0.13, 0.13, PALETTE.skin2);
+  const gBody = quayPersonGeo((B) => {
+    B.box(0, 0.30, 0, 0.42, 0.58, 0.24, 0xffffff);
+    B.box(0, -0.14, 0, 0.30, 0.34, 0.20, 0xffffff);
+  });
+  const gHead = quayPersonGeo((H) => {
+    H.box(0, 0.66, 0, 0.23, 0.26, 0.22, PALETTE.skin2);
+    H.box(0, 0.81, -0.01, 0.25, 0.09, 0.24, PALETTE.hair1);
+    H.box(0, 0.66, 0.12, 0.05, 0.05, 0.05, PALETTE.skin2);
+  });
+  const gArm = quayPersonGeo((A) => {
+    A.box(0, -0.24, 0, 0.11, 0.50, 0.12, PALETTE.skin2);
+    A.box(0, -0.54, 0, 0.12, 0.13, 0.13, PALETTE.skin2);
+  });
   const c = new THREE.Color();
   const mk = (geo, tint) => {
     const im = new THREE.InstancedMesh(geo, quayVC(), quayPAX_N);
@@ -4810,11 +4832,12 @@ function quayBuildPax(root) {
       im.instanceColor.needsUpdate = true;
     }
     root.add(im);
+    quayPersonRound(game, im);
     return im;
   };
-  quayPaxMesh = mk(B.build(), true);
-  quayPaxHead = mk(H.build(), false);
-  quayPaxArm = mk(A.build(), false);
+  quayPaxMesh = mk(gBody, true);
+  quayPaxHead = mk(gHead, false);
+  quayPaxArm = mk(gArm, false);
   quayPaxData = new Float32Array(quayPAX_N * 3);        // local x, local z, phase
   for (let i = 0; i < quayPAX_N; i++) {
     // along both promenade rails, and a few on the top deck
@@ -4854,18 +4877,21 @@ const quayWPAX_N = 8;
 let quayWPaxMesh = null, quayWPaxHead = null, quayWPaxArm = null;
 const quayWPaxData = new Float32Array(quayWPAX_N * 4);   // lx, lz, yaw, phase
 
-function quayBuildWheekPax(group) {
+function quayBuildWheekPax(group, game) {
   if (!group) return;
-  const B = quayMerger();
-  B.box(0, 0.30, 0, 0.42, 0.58, 0.24, 0xffffff);
-  B.box(0, -0.14, 0, 0.30, 0.34, 0.20, 0xffffff);
-  const H = quayMerger();
-  H.box(0, 0.66, 0, 0.23, 0.26, 0.22, PALETTE.skin2);
-  H.box(0, 0.81, -0.01, 0.25, 0.09, 0.24, PALETTE.hair1);
-  H.box(0, 0.66, 0.12, 0.05, 0.05, 0.05, PALETTE.skin2);
-  const A = quayMerger();
-  A.box(0, -0.24, 0, 0.11, 0.50, 0.12, PALETTE.skin2);
-  A.box(0, -0.54, 0, 0.12, 0.13, 0.13, PALETTE.skin2);
+  const gBody = quayPersonGeo((B) => {
+    B.box(0, 0.30, 0, 0.42, 0.58, 0.24, 0xffffff);
+    B.box(0, -0.14, 0, 0.30, 0.34, 0.20, 0xffffff);
+  });
+  const gHead = quayPersonGeo((H) => {
+    H.box(0, 0.66, 0, 0.23, 0.26, 0.22, PALETTE.skin2);
+    H.box(0, 0.81, -0.01, 0.25, 0.09, 0.24, PALETTE.hair1);
+    H.box(0, 0.66, 0.12, 0.05, 0.05, 0.05, PALETTE.skin2);
+  });
+  const gArm = quayPersonGeo((A) => {
+    A.box(0, -0.24, 0, 0.11, 0.50, 0.12, PALETTE.skin2);
+    A.box(0, -0.54, 0, 0.12, 0.13, 0.13, PALETTE.skin2);
+  });
   const c = new THREE.Color();
   const mk = (geo, tint) => {
     const im = new THREE.InstancedMesh(geo, quayVC(), quayWPAX_N);
@@ -4883,11 +4909,12 @@ function quayBuildWheekPax(group) {
       im.instanceColor.needsUpdate = true;
     }
     group.add(im);
+    quayPersonRound(game, im);
     return im;
   };
-  quayWPaxMesh = mk(B.build(), true);
-  quayWPaxHead = mk(H.build(), false);
-  quayWPaxArm = mk(A.build(), false);
+  quayWPaxMesh = mk(gBody, true);
+  quayWPaxHead = mk(gHead, false);
+  quayWPaxArm = mk(gArm, false);
   for (let i = 0; i < quayWPAX_N; i++) {
     const side = i % 2 ? 1 : -1;
     const row = Math.floor(i / 2);
@@ -5925,7 +5952,7 @@ function quayBuild(game) {
   quayBuildFar(quayRoot);
   quayBuildBerthed(game, quayRoot);
   quayBuildCrowd(game, quayRoot);
-  quayBuildPax(quayRoot);
+  quayBuildPax(quayRoot, game);
   quayBuildLine(quayRoot);
   quayBuildChips(quayRoot);
   quayBuildBoat(game, quayRoot);
@@ -5933,7 +5960,7 @@ function quayBuild(game) {
   // has to come AFTER quayBuildBoat, which is what makes quayBoatGroup. Called
   // before it, quayBuildWheekPax takes a null group and returns silently, and
   // MV Wheek sails empty exactly as she did before with nothing to show why.
-  quayBuildWheekPax(quayBoatGroup);
+  quayBuildWheekPax(quayBoatGroup, game);
 
   // ---- WHAT THEY SAY WHEN SOMETHING HAPPENS ------------------------------
   // addLocal takes four optional reaction lists — startled / splash / thief /

@@ -1659,6 +1659,85 @@ function hanBikeGeo(bodyCol, riderCol, helmCol) {
   return K.build();
 }
 
+// ---- THE SECOND SCOOTER (AAA pass, 24 Sep 2026) ---------------------------
+// The author's note, verbatim: "the NPC bikers in Hanoi look really bad". The
+// first scooter was a plank on two wheels with a box on it, and its rider was
+// a box sitting on a box with two sticks out in front that met no handlebar
+// and two more that met no floor — at the chapter's resting boom, a stack.
+// This one is drawn the way a Hanoi step-through actually sits in the eye:
+//   - the machine: a leg shield leaning back from the front wheel, a head
+//     cowl with its lamp, a rear body that narrows to its floor, a seat, a
+//     floorboard between them, mirrors on stalks and a tail lamp;
+//   - the rider: sitting ON the seat, thighs forward to the knee, shins down
+//     to feet on the board, a body leaning a little into the bars, arms that
+//     go from the shoulder to the grips, a rounded helmet with its visor and,
+//     on every other colour, the cloth mask half the city rides in;
+//   - on the other three colours, a passenger behind instead of the crate.
+// Rounding (makeMerger's rbox) only where the silhouette carries it: the body,
+// the helmet, the shield, the cowls, the seat. Limbs are thin enough that a
+// box reads as a limb at twelve metres. ~630 triangles against 280: 240 of
+// them is +84 k in the scene. Cut: noBike2 (the first scooter, exact).
+function hanBikeGeo2(bodyCol, riderCol, helmCol, mask, passenger) {
+  const K = hanMerger();
+  const T = PALETTE.hanTyre, CH = PALETTE.hanChrome, DK = PALETTE.hanSeat, LEG = PALETTE.hanRiderLeg, SK = PALETTE.hanSkin;
+  // wheels, and the front fender over the front one
+  K.cyl(0, 0.28, 0.62, 0.28, 0.11, T, 0, 0, Math.PI / 2, 8);
+  K.cyl(0, 0.28, -0.58, 0.28, 0.12, T, 0, 0, Math.PI / 2, 8);
+  // a chrome hub each side, so a wheel reads as a wheel and not a dark lozenge
+  K.cyl(0, 0.28, 0.62, 0.1, 0.13, CH, 0, 0, Math.PI / 2, 8);
+  K.cyl(0, 0.28, -0.58, 0.1, 0.14, CH, 0, 0, Math.PI / 2, 8);
+  K.rbox(0, 0.55, 0.62, 0.15, 0.05, 0.34, bodyCol, 0.45);
+  // fork and bars
+  K.cyl(0, 0.74, 0.55, 0.03, 0.46, CH, 0.32, 0, 0, 4);
+  K.cyl(0, 1.00, 0.47, 0.02, 0.64, CH, 0, 0, Math.PI / 2, 4);
+  K.box(-0.31, 1.00, 0.47, 0.05, 0.05, 0.07, DK);
+  K.box(0.31, 1.00, 0.47, 0.05, 0.05, 0.07, DK);
+  // the head cowl, its lamp, and two mirrors on stalks
+  K.rbox(0, 0.97, 0.52, 0.30, 0.15, 0.20, bodyCol, 0.45);
+  K.box(0, 0.97, 0.625, 0.13, 0.08, 0.03, PALETTE.hanLampGlass);
+  K.cyl(-0.2, 1.1, 0.47, 0.01, 0.22, CH, 0, 0, 0.35, 4);
+  K.cyl(0.2, 1.1, 0.47, 0.01, 0.22, CH, 0, 0, -0.35, 4);
+  K.box(-0.25, 1.22, 0.47, 0.09, 0.06, 0.02, CH);
+  K.box(0.25, 1.22, 0.47, 0.09, 0.06, 0.02, CH);
+  // the leg shield, leaning back toward the rider
+  K.rbox(0, 0.63, 0.40, 0.42, 0.56, 0.09, bodyCol, 0.4, -0.22);
+  // floorboard, rear body (narrower at its foot), seat, tail lamp
+  K.box(0, 0.34, 0.06, 0.30, 0.07, 0.52, DK);
+  K.rbox(0, 0.52, -0.42, 0.38, 0.34, 0.64, bodyCol, 0.42, 0, 0, 0, 2, 0.84);
+  K.rbox(0, 0.735, -0.36, 0.31, 0.09, 0.58, DK, 0.45);
+  K.box(0, 0.6, -0.745, 0.16, 0.06, 0.03, PALETTE.hanTarpRed);
+  if (!passenger) K.box(0, 0.86, -0.82, 0.42, 0.34, 0.34, PALETTE.hanCrate);    // the box on the back
+  // ---- the rider, on the seat
+  K.box(0, 0.86, -0.28, 0.34, 0.17, 0.28, LEG);                     // pelvis
+  for (let s = -1; s <= 1; s += 2) {
+    K.box(s * 0.11, 0.84, -0.07, 0.13, 0.13, 0.40, LEG, 0.12);       // thigh, forward to the knee
+    K.box(s * 0.12, 0.61, 0.15, 0.12, 0.40, 0.12, LEG, -0.08);       // shin, down to the board
+    K.box(s * 0.12, 0.415, 0.2, 0.1, 0.07, 0.21, DK);                // shoe on the floorboard
+    K.box(s * 0.235, 1.24, -0.06, 0.1, 0.36, 0.1, riderCol, -1.0);   // upper arm, shoulder to elbow
+    K.box(s * 0.285, 1.085, 0.25, 0.085, 0.36, 0.085, riderCol, -1.2);// forearm, elbow to grip
+    K.box(s * 0.31, 1.01, 0.45, 0.08, 0.08, 0.08, SK);               // hand on the grip
+  }
+  K.rbox(0, 1.14, -0.22, 0.40, 0.52, 0.25, riderCol, 0.4, 0.12, 0, 0, 2, 0.9);   // the body, leaning in
+  K.box(0, 1.42, -0.17, 0.11, 0.1, 0.11, SK);                        // neck
+  K.box(0, 1.5, -0.08, 0.15, 0.13, 0.08, SK);                        // face under the helmet
+  K.sph(0, 1.57, -0.15, 0.16, 0.155, 0.17, helmCol, 8);
+  K.box(0, 1.585, -0.005, 0.2, 0.07, 0.03, PALETTE.hanVisor);
+  if (mask) K.box(0, 1.475, -0.035, 0.14, 0.065, 0.03, PALETTE.hanShirtW);
+  // ---- ...and a passenger on the back of every other colour
+  if (passenger) {
+    K.box(0, 0.86, -0.64, 0.3, 0.16, 0.26, LEG);
+    for (let s = -1; s <= 1; s += 2) {
+      K.box(s * 0.14, 0.8, -0.46, 0.12, 0.12, 0.34, LEG, 0.35);
+      K.box(s * 0.16, 0.55, -0.33, 0.11, 0.36, 0.11, LEG, 0.1);
+      K.box(s * 0.2, 1.1, -0.5, 0.08, 0.34, 0.09, PALETTE.hanWash2, -0.5);
+    }
+    K.rbox(0, 1.1, -0.62, 0.34, 0.46, 0.22, PALETTE.hanWash2, 0.4, 0.05, 0, 0, 2, 0.9);
+    K.box(0, 1.36, -0.6, 0.1, 0.09, 0.1, SK);
+    K.sph(0, 1.49, -0.6, 0.145, 0.145, 0.155, helmCol === PALETTE.hanHelmet ? PALETTE.hanCrowdLeg : PALETTE.hanHelmet, 8);
+  }
+  return K.build();
+}
+
 function hanBuildBikes(game, root) {
   hanInitLanes();
   hanBikeData = new Float32Array(hanBIKE_N * hanBIKE_STRIDE);
@@ -1696,10 +1775,13 @@ function hanBuildBikes(game, root) {
     const idx = [];
     for (let i = 0; i < n; i++) if ((hanBikeData[i * hanBIKE_STRIDE + 7] | 0) === c) idx.push(i);
     hanBikeGroups.push(idx);
-    const mm = new THREE.InstancedMesh(
-      hanBikeGeo(PALETTE[hanBIKE_COL[c]], PALETTE[hanRIDER_COL[c]],
-                 c % 2 ? PALETTE.hanHelmet : PALETTE.hanCrowdLeg),
-      hanVCF(), Math.max(1, idx.length));
+    const helm = c % 2 ? PALETTE.hanHelmet : PALETTE.hanCrowdLeg;
+    const g1 = hanBikeGeo(PALETTE[hanBIKE_COL[c]], PALETTE[hanRIDER_COL[c]], helm);
+    // the second scooter (AAA pass): a mask on the even colours, a passenger
+    // instead of the crate on the odd ones
+    const g2 = hanBikeGeo2(PALETTE[hanBIKE_COL[c]], PALETTE[hanRIDER_COL[c]], helm, c % 2 === 0, c % 2 === 1);
+    hanBikeGeos.push([g1, g2]);
+    const mm = new THREE.InstancedMesh(hanBike2On ? g2 : g1, hanVCF(), Math.max(1, idx.length));
     mm.count = idx.length;
     mm.castShadow = true; mm.receiveShadow = false;
     mm.frustumCulled = false;
@@ -1709,6 +1791,22 @@ function hanBuildBikes(game, root) {
   hanSyncBikes();
 }
 
+// THE SECOND SCOOTER'S SWITCH, and its ride (AAA pass). The lean was only
+// ever the swerve's, (offWant - off) x 0.28, and a damped offset sits on its
+// target: measured over 24 682 frames of 72 scooters, the roll was 0.000 on
+// every one of them — two hundred and forty machines taking the lake's
+// 42-degree bends bolt upright. Now a rider leans into a bend by what a bend
+// asks for, atan(v^2 k / g), off the lane's own smoothed heading four metres
+// ahead (so it is continuous exactly where the heading is), capped at 0.28
+// rad, and the machine rides a centimetre of suspension. Cut: noBike2.
+const hanBikeGeos = [];
+let hanBike2On = true;
+function hanBike2Tick(game) {
+  const on = !(game && game.state && game.state.noBike2);
+  if (on === hanBike2On) return;
+  hanBike2On = on;
+  for (let c = 0; c < hanBikeMeshes.length; c++) hanBikeMeshes[c].geometry = hanBikeGeos[c][on ? 1 : 0];
+}
 function hanSyncBikes() {
   if (!hanBikeMeshes.length) return;
   for (let c = 0; c < hanBikeMeshes.length; c++) {
@@ -1723,8 +1821,17 @@ function hanSyncBikes() {
       const yaw = dir > 0 ? yawS : yawS + Math.PI;
       const off = hanBikeData[o + 3];
       const lean = clamp((hanBikeData[o + 4] - off) * 0.28, -0.22, 0.22);
-      hanE.set(0, yaw, lean * dir, 'YXZ');
-      hanM.compose(hanV3.set(hanTmp.x + nx * off, hanGROUND + 0.04, hanTmp.z + nz * off),
+      let roll = lean * dir, bob = 0;
+      if (hanBike2On) {
+        const v = hanBikeData[o + 5];
+        let dy = hanLaneYawAt(L, hanBikeData[o + 1] + dir * 4) - yawS;
+        while (dy > Math.PI) dy -= Math.PI * 2;
+        while (dy < -Math.PI) dy += Math.PI * 2;
+        roll -= clamp(Math.atan(v * v * (dy / 4) / 9.8), -0.28, 0.28);
+        bob = 0.012 * Math.sin(hanTime * 11 + hanBikeData[o + 8]) * Math.min(1, v / 8);
+      }
+      hanE.set(0, yaw, roll, 'YXZ');
+      hanM.compose(hanV3.set(hanTmp.x + nx * off, hanGROUND + 0.04 + bob, hanTmp.z + nz * off),
                    hanQ.setFromEuler(hanE), hanSc.set(1, 1, 1));
       mm.setMatrixAt(k, hanM);
     }
@@ -5032,6 +5139,7 @@ export function createHanoi(game) {
         }
       }
       hanUpdateLake(dt);
+      hanBike2Tick(game);
       hanUpdateBikes(game, dt);
       hanUpdateCub(game, dt);   // X5
       if (!hanCubOn) hanUpdateRide(game, dt);   // ...and nobody's footwell takes a rider off her own scooter

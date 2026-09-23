@@ -4125,12 +4125,19 @@ function monBuildPalms(root) {
  * something is coming before you can see it.
  */
 function monBuildWatchers(game, root) {
-  const K = monMerger();
-  K.box(0, 0.42, 0, 0.44, 0.84, 0.30, PALETTE.monCrowdA);
-  K.box(0, 1.12, 0, 0.50, 0.60, 0.34, PALETTE.monCrowdB);
-  K.box(0, 1.52, 0, 0.20, 0.20, 0.20, PALETTE.monSkin);
-  K.sph(0, 1.72, 0, 0.19, 0.21, 0.19, PALETTE.monSkin, 6);
-  K.sph(0, 1.80, -0.02, 0.20, 0.16, 0.20, PALETTE.monHair, 6);
+  // THE ROUNDED TWIN (AAA pass): the figure is drawn twice, the second time
+  // with makeMerger's `round` on, and the twin is handed to the rounded
+  // person's switch (npc.js, game.personRound) once the mesh is in the scene.
+  const figure = (K) => {
+    K.box(0, 0.42, 0, 0.44, 0.84, 0.30, PALETTE.monCrowdA);
+    K.box(0, 1.12, 0, 0.50, 0.60, 0.34, PALETTE.monCrowdB);
+    K.box(0, 1.52, 0, 0.20, 0.20, 0.20, PALETTE.monSkin);
+    K.sph(0, 1.72, 0, 0.19, 0.21, 0.19, PALETTE.monSkin, 6);
+    K.sph(0, 1.80, -0.02, 0.20, 0.16, 0.20, PALETTE.monHair, 6);
+  };
+  const K = monMerger(); figure(K);
+  const R = monMerger(); R.round = 0.36; figure(R);
+  const gRound = R.build();
   const m = new THREE.InstancedMesh(K.build(), monVCF(), monWatchN);
   m.castShadow = true; m.receiveShadow = false;
   m.frustumCulled = false;
@@ -4168,6 +4175,7 @@ function monBuildWatchers(game, root) {
   m.instanceColor = new THREE.InstancedBufferAttribute(col, 3);
   monWatchMesh = m;
   root.add(m);
+  if (game && game.personRound) game.personRound(m, gRound);
   // ---- ...AND YOU CANNOT WALK THROUGH THEM (v36) ------------------------
   // `qa/CROWDS.md` put a ray through the forty-six and got 6% solid: the crowd
   // that exists to tell you a car is coming was scenery, and the animal went

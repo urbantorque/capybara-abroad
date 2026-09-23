@@ -2733,27 +2733,34 @@ function manBuildBoat(game, root) {
 
 // ------------------------------------------------------------- the bathers --
 function manBuildBathers(root) {
-  const M = manMerger();
-  // THE HEAD MUST NOT BE THE SAME VALUE AS THE COSTUME, or every bather on the
-  // beach reads as a skittle. An InstancedMesh multiplies its instance colour
-  // BY the vertex colour, so a warm dark head stays darker than the body
-  // whatever colour the towel-shop sold that one.
-  //
-  // AND A PERSON HAS LIMBS. One cylinder and one sphere is the shape of a
-  // chess pawn, and next to npc.js's articulated cast — legs, torso, collar,
-  // head, nose, two arms — a beach full of pawns is exactly the gap the second
-  // pass over Sydney and Pasto was about. This is still ONE instanced draw
-  // call; it is seven boxes instead of two primitives.
-  M.box(-0.09, 0.28, 0, 0.15, 0.56, 0.17, 0x8a6a48);        // legs, darker than the costume
-  M.box(0.09, 0.28, 0, 0.15, 0.56, 0.17, 0x8a6a48);
-  M.box(0, 0.82, 0, 0.42, 0.54, 0.25, 0xffffff);            // the costume: takes the instance colour
-  M.box(0, 1.10, 0, 0.44, 0.06, 0.27, 0xd8d0c0);            // a strap
-  M.box(-0.27, 0.82, 0, 0.11, 0.50, 0.13, 0x9a7a58);        // arms
-  M.box(0.27, 0.82, 0, 0.11, 0.50, 0.13, 0x9a7a58);
-  M.sph(0, 1.27, 0, 0.115, 0.14, 0.12, 0x9a7a58, 6);        // head
-  M.sph(0, 1.34, -0.02, 0.12, 0.09, 0.12, 0x4a3a2c, 6);     // and hair, so it has a front
-  M.box(0, 1.26, 0.11, 0.04, 0.04, 0.04, 0x9a7a58);         // the nose. npc.js's trick.
+  // THE ROUNDED TWIN (AAA pass): the figure is drawn twice, the second time
+  // with makeMerger's `round` on, and the twin is handed to the rounded
+  // person's switch (npc.js, game.personRound) once the mesh is in the scene.
+  const figure = (M) => {
+    // THE HEAD MUST NOT BE THE SAME VALUE AS THE COSTUME, or every bather on the
+    // beach reads as a skittle. An InstancedMesh multiplies its instance colour
+    // BY the vertex colour, so a warm dark head stays darker than the body
+    // whatever colour the towel-shop sold that one.
+    //
+    // AND A PERSON HAS LIMBS. One cylinder and one sphere is the shape of a
+    // chess pawn, and next to npc.js's articulated cast — legs, torso, collar,
+    // head, nose, two arms — a beach full of pawns is exactly the gap the second
+    // pass over Sydney and Pasto was about. This is still ONE instanced draw
+    // call; it is seven boxes instead of two primitives.
+    M.box(-0.09, 0.28, 0, 0.15, 0.56, 0.17, 0x8a6a48);        // legs, darker than the costume
+    M.box(0.09, 0.28, 0, 0.15, 0.56, 0.17, 0x8a6a48);
+    M.box(0, 0.82, 0, 0.42, 0.54, 0.25, 0xffffff);            // the costume: takes the instance colour
+    M.box(0, 1.10, 0, 0.44, 0.06, 0.27, 0xd8d0c0);            // a strap
+    M.box(-0.27, 0.82, 0, 0.11, 0.50, 0.13, 0x9a7a58);        // arms
+    M.box(0.27, 0.82, 0, 0.11, 0.50, 0.13, 0x9a7a58);
+    M.sph(0, 1.27, 0, 0.115, 0.14, 0.12, 0x9a7a58, 6);        // head
+    M.sph(0, 1.34, -0.02, 0.12, 0.09, 0.12, 0x4a3a2c, 6);     // and hair, so it has a front
+    M.box(0, 1.26, 0.11, 0.04, 0.04, 0.04, 0x9a7a58);         // the nose. npc.js's trick.
+  };
+  const M = manMerger(); figure(M);
   const g = M.build();
+  const R = manMerger(); R.round = 0.36; figure(R);
+  const gRound = R.build();
   manBathers = new THREE.InstancedMesh(g, manVC(), manBATHER_N);
   manBathers.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   manBathers.castShadow = true;
@@ -2778,6 +2785,7 @@ function manBuildBathers(root) {
   manBathers.instanceColor = new THREE.InstancedBufferAttribute(ca, 3);
   manScatterBathers(true);
   root.add(manBathers);
+  if (manGame && manGame.personRound) manGame.personRound(manBathers, gRound);
 }
 function manScatterBathers(snap) {
   for (let i = 0; i < manBATHER_N; i++) {

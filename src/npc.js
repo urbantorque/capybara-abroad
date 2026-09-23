@@ -295,8 +295,9 @@ function npcGarmentGeo(rings, tones, detail) {
 // qa/reimagine-person-contour.mjs, and the rounded twins are built FROM them.
 // `spec` is one [radiusFactor, taper] per part (taper: x/z scale at the
 // part's bottom, 1 at its top); a part thinner than 4.5 cm stays a box.
-function npcRoundBox(w, h, d, rf, taper) {
-  const g = new THREE.BoxGeometry(1, 1, 1, 3, 3, 3);
+function npcRoundBox(w, h, d, rf, taper, seg) {
+  const sg = seg === 2 ? 2 : 3;
+  const g = new THREE.BoxGeometry(1, 1, 1, sg, sg, sg);
   const r = Math.min(w, h, d) * rf;
   const hx = w / 2, hy = h / 2, hz = d / 2, ix = hx - r, iy = hy - r, iz = hz - r;
   const pos = g.attributes.position, nor = g.attributes.normal;
@@ -325,7 +326,7 @@ function npcRoundGeo(parts, spec) {
   for (let i = 0; i < parts.length; i++) {
     const p = parts[i], sp = (spec && spec[i]) || [0.3, 1];
     let g;
-    if (!p.k && Math.min(p.w, p.h, p.d) >= 0.045) g = npcRoundBox(p.w, p.h, p.d, sp[0], sp[1]);
+    if (!p.k && Math.min(p.w, p.h, p.d) >= 0.045) g = npcRoundBox(p.w, p.h, p.d, sp[0], sp[1], sp[2]);
     else g = npcMakeGeo([Object.assign({}, p, { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, c: undefined })]);
     npcM1.makeRotationFromEuler(npcE1.set(p.rx || 0, p.ry || 0, p.rz || 0));
     npcM1.setPosition(p.x || 0, p.y || 0, p.z || 0);
@@ -352,6 +353,19 @@ function npcRoundGeo(parts, spec) {
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   geo.computeBoundingBox(); geo.computeBoundingSphere();
   return geo;
+}
+/**
+ * A crowd's rounded twin of any part list (AAA pass): every box of 4.5 cm or
+ * more rounded at `rf` of its thinnest side, spheres/cylinders/cones as they
+ * were. Same attributes as npcMakeGeo, so it swaps in under the same mesh.
+ */
+// A CROWD'S twin is a chamfer (2, 48 triangles a box), not a rounding (3,
+// 108): measured on Rio's 302 and the Erg's 181, the rounding took a body
+// from 540 vertices to 4 572 — at thirty-five metres a bevel reads the same.
+export function npcRoundParts(parts, rf) {
+  const sp = [];
+  for (let i = 0; i < parts.length; i++) sp.push([rf === undefined ? 0.36 : rf, 1, 2]);
+  return npcRoundGeo(parts, sp);
 }
 // How round each of the shared person's parts goes, [radiusFactor, taper],
 // in the part lists' own order. Read by the roster and by Pasto's cast.
@@ -1527,6 +1541,7 @@ export function createNPCs(game) {
   // A/B in qa/aaa-people.mjs), and a governor stepping down on a busy frame
   // should not turn the whole population back into bricks.
   const npcRoundPeople = [];
+  let npcRoundDogB = null, npcRoundDogH = null, npcRoundDogL = null;   // shared with Pasto's dogs
   let npcRoundPplOn = !game.state.noPersonRound && (game.state.perfRung | 0) < 2;
   let npcRoundCtrOn = !game.state.noPersonContour && (game.state.perfRung | 0) < 1;
   function npcRoundApply(r) {
@@ -1625,6 +1640,14 @@ export function createNPCs(game) {
       if (geo) npcRoundRegister(o, geo, null);
     });
   }
+  // ...and the chapters' own crowds join it through the game object: a
+  // crowd builder draws its people twice (makeMerger's `round`) and hands
+  // each instanced mesh its rounded twin here. Crowd materials stay theirs.
+  game.personRound = function (mesh, geo) { return npcRoundRegister(mesh, geo, null); };
+  game.personRoundAudit = function () {
+    return { on: npcRoundPplOn, meshes: npcRoundPeople.length,
+      torsos: npcRoundPeople.filter(function (r) { return !!r.contour; }).length };
+  };
   game.personContourAudit = function () {
     return { on: npcPersonOn, meshes: npcPersonMeshes.length,
       rows: npcPersonMeshes.map(r => ({ uuid: r.mesh.uuid, kind: r.kind,
@@ -1778,6 +1801,27 @@ export function createNPCs(game) {
   const iDogL   = mkInst(gDogLeg, 4, true);
   const iDogT   = mkInst(gDogTail, 1, true);
   iGullB.name = 'npcGullBody'; iDogB.name = 'npcQuayDogBody';   // for the sheet
+  // THE LIVING ARE ROUND, ALL OF THEM (AAA pass): the dog's box torso, chest,
+  // snout and legs get their rounded twins on the rounded person's switch.
+  // They are already on the smooth material, so these go properly round.
+  // The gull's wings are 3 cm thick and stay planar (under npcRoundGeo's floor).
+  {
+    const rDogB = npcRoundGeo([{ w: 0.26, h: 0.26, d: 0.56 }, { w: 0.28, h: 0.28, d: 0.20, y: 0.02, z: 0.18 },
+      { k: 'cyl', rt: 0.09, rb: 0.09, h: 0.16, seg: 6, y: 0.10, z: 0.32, rx: 1.2 },
+      { w: 0.30, h: 0.06, d: 0.06, y: 0.10, z: 0.36 }], [[0.46, 1], [0.46, 1], [0.3, 1], [0.45, 1]]);
+    npcRoundDogB = rDogB;
+    npcRoundDogL = npcRoundGeo([{ w: 0.08, h: 0.30, d: 0.09, y: -0.15 }, { w: 0.09, h: 0.05, d: 0.13, y: -0.29, z: 0.02 }],
+      [[0.46, 0.8], [0.45, 1]]);
+    npcRoundDogH = npcRoundGeo([
+      { k: 'sph', sx: 0.115, sy: 0.105, sz: 0.115 },
+      { w: 0.13, h: 0.11, d: 0.17, y: -0.03, z: 0.17, c: npcSRGB(0.85) },
+      { w: 0.06, h: 0.03, d: 0.05, y: -0.05, z: 0.26 },
+      { w: 0.07, h: 0.13, d: 0.05, x: -0.10, y: 0.12, z: -0.02, rz: 0.3 },
+      { w: 0.07, h: 0.13, d: 0.05, x: 0.10, y: 0.12, z: -0.02, rz: -0.3 }], [[0, 1], [0.4, 1], [0.4, 1], [0.45, 1], [0.45, 1]]);
+    npcRoundRegister(iDogB, npcRoundDogB, null);
+    npcRoundRegister(iDogH, npcRoundDogH, null);
+    npcRoundRegister(iDogL, npcRoundDogL, null);
+  }
   const leadMesh = new THREE_.Mesh(gLead, mat(PALETTE.cloth1, { vertexColors: true }));
   leadMesh.castShadow = false;
   leadMesh.frustumCulled = false;
@@ -4821,6 +4865,13 @@ export function createNPCs(game) {
   function marAtRung()  { return npcNotoTier >= 2 ? 1 : npcMAR_AT; }
   function marGoRung()  { return npcNotoTier >= 5 ? 2 : npcNotoTier >= 3 ? 3 : npcMAR_GO; }
   const npcMAR_RUN_K  = 1.6;   // × npcOWN_V for a natural disaster's marcher
+  // ...and everybody else's JOGS (AAA A3). At 1.25 m/s a marcher was out-
+  // walked by an animal that had not noticed it was being marched at, so the
+  // march was a thing that happened behind you and ended. At 1.7 (2.2 for an
+  // authority) a walk still escapes — this is a cosy game — but only one
+  // that is going somewhere, and a player who stands admiring the mess is
+  // reached. Measured nothing; tuned by what the author said: no consequence.
+  const npcMAR_JOG_K  = 1.35;
   const npcMAR_R      = 18;    // m from the event inside which somebody saw it
   // ---- THE PATIENCE AND THE LEASH HAVE TO AGREE, AND AT FIRST THEY DID NOT
   // Seven seconds was chosen as "shorter than retrieval's ten, because they
@@ -6503,6 +6554,8 @@ export function createNPCs(game) {
       r.cd = r.cool * rand(0.8, 1.4);
       localReactLine(r, npcLOC_MARCH_GAVE);
     }
+    // GOT AWAY (AAA A3): out-walked or out-lasted — systems.js pays for it.
+    if (!caught && sayIt) emit('npc:gaveup', { x: r.x, z: r.z, authority: !!r.authority, role: r.role || '' });
     if (caught) {
       const cp = game.capy && game.capy.position;
       r.wary = Math.min(1, (r.wary || 0) + npcMAR_WARY);
@@ -6516,7 +6569,7 @@ export function createNPCs(game) {
       }
       // systems.js decides what reaching you is WORTH. See its npc:caught
       // handler: the chain closes, and the card already earned stays earned.
-      emit('npc:caught', { x: r.x, z: r.z, authority: !!r.authority });
+      emit('npc:caught', { x: r.x, z: r.z, authority: !!r.authority, role: r.role || '' });
     }
     marWho = null; marT = 0;
   }
@@ -6671,6 +6724,9 @@ export function createNPCs(game) {
       if (d2 > bd) continue;
       bd = d2; best = r;
     }
+    // ...and nobody near is not nobody at all (AAA A3): the authority's own
+    // reach is 40 m and it was never asked, because this returned first.
+    if (!best && e.n >= marGoRung() && !marWho) best = marAuthority(e.x, e.z);
     if (!best) { marWhy = 'nobody within ' + npcMAR_R + ' m'; return; }
     // AT TWO: they look up. Two numbers, and it is the same pair the witness
     // chain uses — a look, not a flinch.
@@ -6719,6 +6775,8 @@ export function createNPCs(game) {
   });
   const npcMAR_OWED_T = 4.0;    // s a refused go rung is retried for
   const marOwed = { t: 0, x: 0, z: 0, n: 0 };
+  /** Who is coming for the animal right now: their group, or null. */
+  game.marcher = function () { return marWho && marWho.group ? marWho.group : null; };
   function marGo(best, n) {
     marWho = best; marT = 0; marSayT = 0; marBlocked = 0; marWhy = "marching"; marOwed.t = 0;
     marLost = 0; marDecoyed = false;
@@ -8260,6 +8318,15 @@ export function createNPCs(game) {
           escStep(r, dt);
         } else if (r.own) {
           localOwnStep(r, dt);
+        } else if (r === marWho && !r.errPhase) {
+          // THE MARCH OUTRANKS THE ERRAND AND THE ROUTE (AAA A3). It sat below
+          // both, and a marcher with an errand clock or a walking route never
+          // took a step: measured in Kyoto, a march that stayed "marching" with
+          // its clock at zero for thirty seconds, and ended in no event at all.
+          // The route's own note (D2) already says it ranks BELOW the march; the
+          // order here said otherwise. An errand already under way (errPhase)
+          // keeps the cup in hand and finishes first, as before.
+          marStep(r, dt);
         } else if (r.errand && localErrandStep(r, dt)) {
           // THE ERRAND (L3-8): a plan you can interrupt. See localErrandStep.
         } else if (r.walk && localWalkStep(r, dt)) {
@@ -8303,7 +8370,7 @@ export function createNPCs(game) {
           const step = Math.min(sd,
             (r.escT >= 0 ? npcAUTH_ESC_V
              : r.errPhase ? (r.errand.v || npcERR_V)
-             : r === marWho ? npcOWN_V * (npcNotoTier >= 5 ? npcMAR_RUN_K : 1) * (r.authority ? npcAUTH_V_K : 1)
+             : r === marWho ? npcOWN_V * (npcNotoTier >= 5 ? npcMAR_RUN_K : npcMAR_JOG_K) * (r.authority ? npcAUTH_V_K : 1)
              : r.own || r.wel > 0 ? npcOWN_V
              : r.walkOk ? (r.walk.v || npcLOC_WALK_V)
              : npcLOC_STEP_V) * dt);
@@ -14183,6 +14250,22 @@ export function createNPCs(game) {
     pDogT = mkInst(gDogTail, PA_DG, true);
     pLlamaT = mkInst(gLlamaTail, PA_LL, true);
     pLlamaB.name = 'npcLlamaBody'; pDogB.name = 'npcDogBody';   // for the sheet
+    // ...and Pasto's llamas and dogs (AAA pass, see the Quay's dog)
+    npcRoundRegister(pLlamaB, npcRoundGeo([{ w: 0.52, h: 0.56, d: 1.10 }, { w: 0.46, h: 0.32, d: 0.36, y: 0.24, z: -0.54 }],
+      [[0.44, 1], [0.45, 1]]), null);
+    npcRoundRegister(pLlamaN, npcRoundGeo([
+      { k: 'cyl', rt: 0.15, rb: 0.20, h: 0.84, seg: 6, y: 0.42 },
+      { k: 'sph', sx: 0.125, sy: 0.135, sz: 0.155, y: 0.90, z: 0.05 },
+      { w: 0.15, h: 0.13, d: 0.20, y: 0.84, z: 0.22, c: npcSRGB(0.82) },
+      { w: 0.05, h: 0.21, d: 0.05, x: -0.09, y: 1.10, z: -0.02, rz: 0.16 },
+      { w: 0.05, h: 0.21, d: 0.05, x: 0.09, y: 1.10, z: -0.02, rz: -0.16 }], [[0, 1], [0, 1], [0.4, 1], [0.45, 1], [0.45, 1]]), null);
+    npcRoundRegister(pLlamaL, npcRoundGeo([{ w: 0.12, h: 0.62, d: 0.13, y: -0.31 }, { w: 0.14, h: 0.08, d: 0.18, y: -0.62, z: 0.02 }],
+      [[0.46, 0.8], [0.45, 1]]), null);
+    if (npcRoundDogB) {
+      npcRoundRegister(pDogB, npcRoundDogB, null);
+      npcRoundRegister(pDogH, npcRoundDogH, null);
+      npcRoundRegister(pDogL, npcRoundDogL, null);
+    }
 
     // ---- stall posts (Agent A publishes the real ones; ring the plaza) -----
     // x, z, yaw triples. The yaw is the whole point: a stall's nav footprint is

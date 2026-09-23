@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger, mergeWearBand, makeMover, warnOnce } from './shared.js';
-import { npcPERSON } from './npc.js';
+import { npcPERSON, npcRoundParts } from './npc.js';
 import { farLayer, farMover, farBundle, farTone } from './far.js';
 
 // ===========================================================================
@@ -321,12 +321,24 @@ const rioPaxData = new Float32Array(rioPAX_N * 3);
 
 function rioBuildPax(group) {
   if (!group) return;
-  const B = rioMerger();
-  B.box(0, 0.30, 0, 0.42, 0.58, 0.24, 0xffffff);
-  B.box(0, -0.14, 0, 0.30, 0.34, 0.20, 0xffffff);
-  const H = rioMerger();
-  H.box(0, 0.66, 0, 0.23, 0.26, 0.22, PALETTE.skin2);
-  H.box(0, 0.81, -0.01, 0.25, 0.09, 0.24, PALETTE.hair1);
+  // THE ROUNDED TWIN (AAA pass): each part drawn twice, the second time with
+  // makeMerger's `round` on, and the twin handed to the rounded person's
+  // switch (npc.js, game.personRound) in mk() below.
+  const two = (parts) => {
+    const M = rioMerger(); parts(M);
+    const g = M.build();
+    const R = rioMerger(); R.round = 0.36; parts(R);
+    g.userData.roundTwin = R.build();
+    return g;
+  };
+  const gBody = two((B) => {
+    B.box(0, 0.30, 0, 0.42, 0.58, 0.24, 0xffffff);
+    B.box(0, -0.14, 0, 0.30, 0.34, 0.20, 0xffffff);
+  });
+  const gHead = two((H) => {
+    H.box(0, 0.66, 0, 0.23, 0.26, 0.22, PALETTE.skin2);
+    H.box(0, 0.81, -0.01, 0.25, 0.09, 0.24, PALETTE.hair1);
+  });
   const c = new THREE.Color();
   const SH = [PALETTE.rioTileYellow, PALETTE.rioTileBlue, PALETTE.rioTileGreen, PALETTE.rioTileRed];
   const mk = (geo, tint) => {
@@ -340,10 +352,11 @@ function rioBuildPax(group) {
       for (let i = 0; i < rioPAX_N; i++) { c.set(SH[i % SH.length]); im.setColorAt(i, c); }
       im.instanceColor.needsUpdate = true;
     }
+    if (rioGame && rioGame.personRound) rioGame.personRound(im, geo.userData.roundTwin);
     return im;
   };
-  rioPaxBody = mk(B.build(), true);
-  rioPaxHead = mk(H.build(), false);
+  rioPaxBody = mk(gBody, true);
+  rioPaxHead = mk(gHead, false);
   group.add(rioPaxBody); group.add(rioPaxHead);
   for (let i = 0; i < rioPAX_N; i++) {
     const a = i * Math.PI * 0.5 + 0.4;
@@ -2802,11 +2815,17 @@ function rioBuildPeople(root) {
   // so the hips and the legs carry the grey the old leg boxes carried
   // (0x9aa0ac) and read as shorts in a darker tone of it. The hand box is left
   // off — a shirt-coloured fist on a bare arm reads as a mitten.
+  //
+  // THE ROUNDED TWIN (AAA pass): the same part lists again through
+  // npcRoundParts, handed to the rounded person's switch (npc.js,
+  // game.personRound) with each mesh below. The face is eyes and a mouth,
+  // all under 4.5 cm, so it has no twin: it would be the same buffer twice.
   const shorts = [0.33, 0.36, 0.41];    // 0x9aa0ac, linear
-  const bodyGeo = npcPERSON.geo(
-    npcPERSON.standing({ hands: false, hipsC: shorts, legsC: shorts }));
+  const bodyParts = npcPERSON.standing({ hands: false, hipsC: shorts, legsC: shorts });
+  const hairParts = npcPERSON.hair();
+  const bodyGeo = npcPERSON.geo(bodyParts);
   const headGeo = npcPERSON.geo(npcPERSON.head);
-  const hairGeo = npcPERSON.geo(npcPERSON.hair());
+  const hairGeo = npcPERSON.geo(hairParts);
   const faceGeo = npcPERSON.geo(npcPERSON.face());
 
   rioPplBody = new THREE.InstancedMesh(bodyGeo, rioVC(), rioPPL_MAX);
@@ -2837,6 +2856,13 @@ function rioBuildPeople(root) {
   // the hair and the face lie inside the head's own shadow
   rioPplHair.castShadow = false; rioPplHair.userData.noShadow = true;
   rioPplFace.castShadow = false; rioPplFace.userData.noShadow = true;
+  if (rioGame && rioGame.personRound) {
+    // the body keeps its boxes: 302 bodies of bevels measured +1.1 ms
+    // (qa/aaa-ab.mjs noPersonRound) for a difference of two pixels at 35 m.
+    // The head and the hair are what the eye reads as a person, and stay.
+    rioGame.personRound(rioPplHead, npcRoundParts(npcPERSON.head, 0.36));
+    rioGame.personRound(rioPplHair, npcRoundParts(hairParts, 0.36));
+  }
 }
 
 /**

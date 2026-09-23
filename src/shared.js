@@ -7752,6 +7752,44 @@ export function mergeWearBand(M, pts, w, yAt, color, seg, lift, k) {
 // Scratch for makeMerger's add(): one vector and one normal matrix, module-wide.
 const _mergeV = new THREE.Vector3();
 const _mergeNM = new THREE.Matrix3();
+// ---------------------------------------------------------------------------
+// A ROUNDED BOX (AAA pass, 24 Sep 2026). The same construction npc.js uses
+// for the rounded person (npcRoundBox): a subdivided unit box whose inner grid
+// lines are pulled out to the edge of the flat face and whose outer lines are
+// projected on to the rounding, normals from the inner box. `seg` 2 gives one
+// 45-degree facet per edge (a chamfer, 48 triangles), 3 gives a flat face
+// with two facets per edge (108). `taper` scales x and z at the bottom
+// (1 at the top). Cached by its numbers, because a street of scooters asks
+// for the same six shapes two hundred times.
+// ---------------------------------------------------------------------------
+const _rboxCache = new Map();
+export function roundBoxGeo(w, h, d, rf, seg, taper) {
+  const s = seg === 3 ? 3 : 2, tp = taper === undefined ? 1 : taper;
+  const key = w + '|' + h + '|' + d + '|' + rf + '|' + s + '|' + tp;
+  let g = _rboxCache.get(key);
+  if (g) return g;
+  g = new THREE.BoxGeometry(1, 1, 1, s, s, s);
+  const r = Math.min(w, h, d) * Math.max(0, Math.min(0.5, rf));
+  const hx = w / 2, hy = h / 2, hz = d / 2, ix = hx - r, iy = hy - r, iz = hz - r;
+  const pos = g.attributes.position, nor = g.attributes.normal;
+  const map = (u, hh, ii) => Math.abs(u) < 0.3 ? (Math.abs(u) < 1e-6 ? 0 : Math.sign(u) * ii) : Math.sign(u) * hh;
+  for (let i = 0; i < pos.count; i++) {
+    let x = map(pos.getX(i), hx, ix), y = map(pos.getY(i), hy, iy), z = map(pos.getZ(i), hz, iz);
+    const cx = Math.max(-ix, Math.min(ix, x)), cy = Math.max(-iy, Math.min(iy, y)), cz = Math.max(-iz, Math.min(iz, z));
+    let dx = x - cx, dy = y - cy, dz = z - cz;
+    const l = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (l > 1e-7) {
+      dx /= l; dy /= l; dz /= l;
+      x = cx + dx * r; y = cy + dy * r; z = cz + dz * r;
+      nor.setXYZ(i, dx, dy, dz);
+    }
+    if (tp !== 1) { const k = tp + (1 - tp) * (y + hy) / h; x *= k; z *= k; }
+    pos.setXYZ(i, x, y, z);
+  }
+  _rboxCache.set(key, g);
+  return g;
+}
+
 export function makeMerger(G, opts) {
   const o = opts || {};
   const xform = o.xform;
@@ -7803,6 +7841,7 @@ export function makeMerger(G, opts) {
   }
   const M = {
     n: 0,
+    round: 0,
     // For the bespoke shapes that write vertices themselves. See the note above.
     pos, nor, col, idx,
     // ---- NO CLONE (L6 owed, the build behind the white) --------------------
@@ -7863,6 +7902,11 @@ export function makeMerger(G, opts) {
       return M;
     },
     box(cx, cy, cz, sx, sy, sz, color, rx, ry, rz) {
+      // THE ROUNDED PERSON (AAA pass): a crowd builder sets `M.round` to a
+      // radius fraction and every box it draws of 4.5 cm or more comes out
+      // chamfered — the same people, drawn by the same code, twice.
+      if (M.round > 0 && Math.min(sx, sy, sz) >= 0.045)
+        return M.rbox(cx, cy, cz, sx, sy, sz, color, M.round, rx, ry, rz, 2);
       return M.add(G.box, xform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
     },
     cyl(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
@@ -7876,6 +7920,17 @@ export function makeMerger(G, opts) {
     sph(cx, cy, cz, sx, sy, sz, color, seg) {
       return M.add(pick('sph', seg, sphSegs),
                    xform(cx, cy, cz, 0, 0, 0, sx * 2, sy * 2, sz * 2), color);
+    },
+    /**
+     * A box with its edges taken off (AAA pass) — see roundBoxGeo. Built at
+     * its real size and only rotated and placed, because a unit rounded box
+     * under a non-uniform scale is an oval, not a rounded box. `rf` is the
+     * radius as a fraction of the thinnest side; `seg` 2 is a chamfer (48
+     * triangles), 3 a rounding (108).
+     */
+    rbox(cx, cy, cz, sx, sy, sz, color, rf, rx, ry, rz, seg, taper) {
+      return M.add(roundBoxGeo(sx, sy, sz, rf === undefined ? 0.3 : rf, seg || 2, taper),
+                   xform(cx, cy, cz, rx || 0, ry || 0, rz || 0, 1, 1, 1), color);
     },
     /** One vertex, returning its index. The floor-and-ceiling chapters build
      *  their terrain out of these and stitch it with tri(). */

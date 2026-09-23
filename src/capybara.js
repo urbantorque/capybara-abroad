@@ -5622,7 +5622,8 @@ export function createCapybara(game) {
   // at the put-down instead — see capyCarrierWas in the carry block — so
   // being carried off the square is one snort and not two.
   game.events.on('npc:caught', function (e) {
-    if (e && e.authority) return;
+    const d = (e && e.npc) || e;          // npc.js wraps its payloads (AAA A3)
+    if (d && d.authority) return;
     capySfxAt.volume = 0.6; capySfxAt.pitch = 1.0;
     game.sfx('snort', capySfxAt);
   });

@@ -6429,7 +6429,16 @@ let venCrowdBodies = null;   // one box each — see ...AND THEY ARE THERE
 const venCrowdData = new Float32Array(venCROWD_N * 10);
 const venCROWD_WALK = 0, venCROWD_TOBOARD = 1, venCROWD_ONBOARD = 2, venCROWD_WADE = 3;
 
-function venCrowdGeo(parts) { const M = venMerger(); parts(M); return M.build(); }
+// Each crowd shape is drawn twice, the second time with makeMerger's `round`
+// on, and the twin rides on the geometry to mk() below, which registers it
+// with the rounded person's switch (npc.js, game.personRound; AAA pass).
+function venCrowdGeo(parts) {
+  const M = venMerger(); parts(M);
+  const g = M.build();
+  const R = venMerger(); R.round = 0.36; parts(R);
+  g.userData.roundTwin = R.build();
+  return g;
+}
 
 // ---- ONE HEIGHT, EIGHTY TIMES (M14) --------------------------------------
 //
@@ -6511,6 +6520,7 @@ function venBuildCrowd(game, root) {
     m.castShadow = true; m.frustumCulled = false;
     m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(venCROWD_N * 3), 3);
     root.add(m);
+    if (game.personRound && geo.userData.roundTwin) game.personRound(m, geo.userData.roundTwin);
     return m;
   };
   venCrowd = { a: mk(limb(1)), b: mk(limb(-1)), body: mk(gBody), head: mk(gHead),

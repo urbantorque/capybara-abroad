@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, swayMesh, makeMerger, mergeWearBand, makeMover } from './shared.js';
-import { npcPERSON } from './npc.js';
+import { npcPERSON, npcRoundParts } from './npc.js';
 
 // ===========================================================================
 // CHAPTER 8 — MARRAKECH AND THE ERG
@@ -2063,11 +2063,12 @@ function sahBuildPeople(root) {
   //
   // A ROBE HAS NO HANDS SHOWING, so the forearm's hand box is left off: a
   // merged body has one instance colour and it is the cloth's.
-  const bodyGeo = npcPERSON.geo(
-    npcPERSON.standing({ legs: false, hips: false, hands: false }).concat(sahDJELLABA));
+  const bodyParts = npcPERSON.standing({ legs: false, hips: false, hands: false }).concat(sahDJELLABA);
+  const hairParts = npcPERSON.hair();
+  const bodyGeo = npcPERSON.geo(bodyParts);
   // the head: skull, nose, neck — the skin colour is the instance's
   const headGeo = npcPERSON.geo(npcPERSON.head);
-  const hairGeo = npcPERSON.geo(npcPERSON.hair());
+  const hairGeo = npcPERSON.geo(hairParts);
   const faceGeo = npcPERSON.geo(npcPERSON.face());
 
   sahPplBody = new THREE.InstancedMesh(bodyGeo, sahVC(), sahPPL_MAX);
@@ -2126,6 +2127,17 @@ function sahBuildPeople(root) {
   root.add(sahPplHead);
   root.add(sahPplHair);
   root.add(sahPplFace);
+  // THE ROUNDED TWIN (AAA pass): the same part lists again through
+  // npcRoundParts, handed to the rounded person's switch (npc.js,
+  // game.personRound). The robe and the hood are a cylinder and a cone and
+  // come through as they were; the face is all under 4.5 cm, so no twin.
+  if (sahGame && sahGame.personRound) {
+    // the body keeps its boxes: 181 bodies of bevels measured +1.1 ms
+    // (qa/aaa-ab.mjs noPersonRound) for a difference of two pixels at 35 m.
+    // The head and the hair are what the eye reads as a person, and stay.
+    sahGame.personRound(sahPplHead, npcRoundParts(npcPERSON.head, 0.36));
+    sahGame.personRound(sahPplHair, npcRoundParts(hairParts, 0.36));
+  }
 }
 
 function sahAddPerson(x, y, z, yaw, kind) {
@@ -2488,6 +2500,11 @@ function sahBuildPursuers(root) {
   hd.frustumCulled = false;
   root.add(hd);
   sahPursuerHeads = hd;
+  // and both rounded, as the square's crowd is (AAA pass)
+  if (sahGame && sahGame.personRound) {
+    sahGame.personRound(im, npcRoundParts(pParts, 0.36));
+    sahGame.personRound(hd, npcRoundParts(hParts, 0.36));
+  }
   // THEY STAND ON THE SOUTH SIDE OF THE SQUARE, NOT ALL ROUND IT.
   // A full ring reads as fair and is not: the souk is north, so a ring puts one
   // trader directly across the only door out and the chase is decided before it
