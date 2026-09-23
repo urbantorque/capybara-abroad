@@ -1,4 +1,5 @@
 async page => {
+  const traceTail = process.env.CAPY_QA_TRACE_TAIL === '1';
   // ---- THE CROSSING, TIMED FROM BOTH SIDES OF THE WHITE (L6, E8) ----------
   // Shape of qa/l6r-qa-load.js with two more columns per chapter. That probe
   // measured the longest rAF gap in the nine seconds after hud.cross and the
@@ -63,7 +64,8 @@ async page => {
       // unfocused browser can throttle rAF to 1 Hz and counterfeit a hitch.
       await page.bringToFront()
       const r = await page.evaluate(async (arg) => {
-        const name = arg.name, win = arg.win
+        const name = arg.name, win = arg.win, trace = arg.trace &&
+          (name === 'hanoi' || name === 'pantanal')
         const g = window.__capy
         const fadeEl = document.querySelector('.capyui-fade')
         const t0 = performance.now()
@@ -72,6 +74,33 @@ async page => {
         const focusStart = document.hasFocus(), hiddenStart = document.hidden
         let unfocusedFrames = 0, hiddenFrames = 0
         const prog0 = g.renderer.info.programs.length, geo0 = g.renderer.info.memory.geometries
+        const slowTicks = [], longtasks = []
+        let maxTick = 0, observer = null
+        const rawTick = g.tick
+        if (trace) {
+          g.tick = function (...args) {
+            const before = { ...g.state.perf?.ms }, t = performance.now()
+            try { return rawTick.apply(this, args) }
+            finally {
+              const ms = performance.now() - t
+              maxTick = Math.max(maxTick, ms)
+              if (ms > 25 && slowTicks.length < 24) {
+                const leaders = Object.entries(g.state.perf?.ms || {}).map(([key, value]) =>
+                  [key, before[key] === undefined ? value : (value - before[key] * .965) / .035])
+                  .sort((a, b) => b[1] - a[1]).slice(0, 6)
+                slowTicks.push({ at: +(t - t0).toFixed(1), ms: +ms.toFixed(1),
+                  white: !!fadeEl?.classList.contains('on'), rung: g.state.perfRung, leaders })
+              }
+            }
+          }
+          if (PerformanceObserver.supportedEntryTypes?.includes('longtask')) {
+            observer = new PerformanceObserver(list => {
+              for (const e of list.getEntries()) if (longtasks.length < 24)
+                longtasks.push({ at: +(e.startTime - t0).toFixed(1), ms: +e.duration.toFixed(1) })
+            })
+            observer.observe({ type: 'longtask', buffered: false })
+          }
+        }
         const p = new Promise(res => {
           const f = (t) => {
             const gap = t - last; last = t; gaps.push(gap)
@@ -85,8 +114,8 @@ async page => {
           }
           requestAnimationFrame(f)
         })
-        g.hud.cross(name)
-        await p
+        try { g.hud.cross(name); await p }
+        finally { if (trace) { g.tick = rawTick; observer?.disconnect() } }
         let maxGap = 0, over100 = 0, over250 = 0, sumOver = 0, maxAfter = 0, over100After = 0
         for (let i = 0; i < gaps.length; i++) {
           const x = gaps[i]
@@ -105,8 +134,9 @@ async page => {
           progFade: progOff >= 0 ? progOff - prog0 : -1, progAfter: progOff >= 0 ? progN - progOff : -1,
           programsNew: progN - prog0, geomNew: g.renderer.info.memory.geometries - geo0,
           calls: g.state.perf ? g.state.perf.calls : -1, tris: g.state.perf ? g.state.perf.triangles : -1,
-          frames: gaps.length, rung: g.state.perfRung, lastError: g.state.lastError || null }
-      }, { name: n, win: lap === 0 ? 9000 : 6000 })
+          frames: gaps.length, rung: g.state.perfRung, lastError: g.state.lastError || null,
+          ...(trace ? { maxTick: +maxTick.toFixed(1), slowTicks, longtasks } : {}) }
+      }, { name: n, win: lap === 0 ? 9000 : 6000, trace: traceTail })
       rows.push(r)
       console.log('load lap ' + (lap + 1) + ' ' + n + ' ' + JSON.stringify({
         ok: r.ok, focused: r.focused, visible: r.visible, frames: r.frames,

@@ -1998,6 +1998,26 @@ Pantanal gaps before any public-master promotion. Human listening, novice
 playtesting and physical-device coverage remain unavailable. Weekly
 allowance: 16% remaining.
 
+### M6q: instrument the intermittent warm tail in the load probe
+
+A fresh nine-crossing Hanoi↔Sydney trace did not repeat the full-soak warm
+Hanoi 250 ms interval: four warm Hanoi returns peaked at 33.3, 50.0, 16.9
+and 33.3 ms. The first cold Hanoi arrival reached 150.1 ms after white,
+without a late shader program; one 120 ms browser long task began just after
+reveal, outside any recorded >25 ms game tick. That does not identify its
+caller or prove a GPU cause.
+
+The existing 38-crossing load probe now has an opt-in `CAPY_QA_TRACE_TAIL=1`
+mode that records tick-module leaders and browser long tasks for Pantanal
+and Hanoi only. A traced load-only run passed 38/38, with warm Pantanal at
+50 ms and Hanoi at 33 ms. Its largest grass scans in those two places were
+under white, including a 72.4 ms parked-rung Pantanal tick; a warm Hanoi
+42.3 ms systems tick happened in visible play without a >33 ms rAF gap.
+This independent replay does not reproduce or dismiss the previous 150/250 ms
+full-soak tails. Run the same opt-in trace after the long fuzz and packaged
+stages, then attribute any repeat before public master. The partial history
+row is retained and marked with the skipped stages.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

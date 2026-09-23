@@ -5,19 +5,22 @@ import { openHarness } from './reimagine-harness.mjs';
 
 const pretty = process.argv.includes('--pretty');
 const cali = process.argv.includes('--cali');
+const chapterArg = process.argv.find(arg => arg.startsWith('--chapter='));
+const destination = chapterArg?.slice('--chapter='.length) || (cali ? 'cali' : 'cave');
+if (!['cave', 'cali', 'hanoi', 'pantanal'].includes(destination))
+  throw new Error('Profile chapter must be cave, cali, hanoi or pantanal');
 const h = await openHarness({ pinRung: pretty });
 const out = { metadata: h.metadata, rows: [],
-  scope: `${cali ? 'Five Cali' : 'Four Cave'} arrivals separated by Sydney, headful Edge; rAF gaps, whole-tick CPU and browser longtasks. No GPU timing claim.`,
+  scope: `${destination} arrivals separated by Sydney, headful Edge; rAF gaps, whole-tick CPU and browser longtasks. No GPU timing claim.`,
   profile: pretty ? 'fixed Pretty rung 0' : 'Auto governor' };
 try {
   await h.start();
   await h.page.evaluate(() => { window.__qaRoomIds = new WeakMap(); window.__qaRoomNext = 1; });
   const seenRoomIds = new Map();
-  const destination = cali ? 'cali' : 'cave';
   const route = process.argv.includes('--short')
     ? [destination, 'sydney', destination]
     : [destination, 'sydney', destination, 'sydney', destination,
-        'sydney', destination, ...(cali ? ['sydney', destination] : [])];
+        'sydney', destination, ...(destination !== 'cave' ? ['sydney', destination] : [])];
   for (const chapter of route) {
     await h.page.bringToFront();
     const row = await h.page.evaluate(async ({ chapter, win }) => {
