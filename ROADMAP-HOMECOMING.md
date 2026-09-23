@@ -1693,6 +1693,38 @@ ran on the passes, but no crash under it produced a dump. No root cause has
 been established, and three successful reruns do not erase the initial
 failure. Public master remains held at the release gate.
 
+### M6f: bounded built-game startup discrimination
+
+The first post-M6e Chrome smoke of the locally served, self-contained HTML
+passed all twelve release checks, including trusted movement, running score,
+Settings quality, a Kyoto reflection mask with 169,727 changed pixels out of
+189,112, Hanoi travel and a saved reload. The earlier renderer crash remains a
+failed gate; this is a successful rerun, not a repair.
+
+A new QA-only startup instrument launches one owned visible browser at a time
+and records game readiness, title start, trusted input, the first quarter
+second and settlement, including renderer resource counts and browser errors.
+Eight fresh Chrome starts with a real pointer click passed. That was not the
+release smoke's start path: its DOM-triggered Free Roam choice first receives
+a trusted Shift key to unlock audio. The instrument was therefore corrected
+to reproduce that exact sequence. Twelve more fresh Chrome starts with that
+path passed, zero renderer crashes or page errors, and all reached trusted
+input and settlement. The crash-capture flag was enabled for these runs; no
+crash occurred and no dump was produced. This sample is too small to establish
+a safe crash rate or attribute the one observed failure to audio, warm-up,
+post-processing, the driver or the test harness. Keep public master held.
+
+The same exact twelve-start sequence was then repeated without the optional
+crash-capture flag: all twelve passed and reached settlement with zero page or
+renderer errors. The capture switch is therefore not required for a clean
+short-start batch. It does not address the earlier long-route reload crashes;
+no speculative renderer or browser-lifecycle change was made. During this
+checkpoint the Windows CodexSandboxOffline runner account temporarily
+locked, preventing normal commands and patches. Its configured ten-minute
+lockout expired without a policy or account change, but the account relocked
+after the next browser batch. This tool outage is separate from the game
+renderer crash.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
