@@ -1725,6 +1725,27 @@ lockout expired without a policy or account change, but the account relocked
 after the next browser batch. This tool outage is separate from the game
 renderer crash.
 
+### M6g: same-build Kyoto reload replay from an earned earlier gate
+
+The existing cumulative driver's source-hash guard correctly refused the old
+fresh-v7 Pantanal save after later production edits; it was not bypassed. A
+QA-only `--resume-gate=pantanal` selector now chooses an *earlier actual
+complete saved gate* from a same-build failed run, rather than only its last
+gate. It still checks every production and driver source hash, keeps the
+unchanged saved task set and replays the real Kyoto actions. No save or game
+code changed.
+
+Two owned headful Chrome replays used the Pantanal gate from the current-build
+v4 failure, one with crash capture and one without. Each earned Kyoto's golden
+swim, Uji run and matcha task through real input, saved the memory, reloaded and
+started in Kyoto with 22 persisted task IDs and zero page/browser errors. The
+reloaded-page trace recorded 19/21 samples respectively; the shader hold
+cleared in 133/131 ms, ending at 63 programs and 200/201 geometries. No crash
+dump appeared. These are paired three-minute route fixtures, not a full fresh
+journey or evidence that the earlier intermittent renderer crash is repaired.
+Stop repeating this exact replay without a new diagnostic lead; public master
+remains held for the failed release gate.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

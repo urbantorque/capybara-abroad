@@ -10,13 +10,16 @@ import { stripComments } from '../strip-comments.mjs';
 const args=process.argv.slice(2),prepare=args.includes('--prepare'),homecoming=args.includes('--homecoming');
 const resumeArg=args.find(a=>a.startsWith('--resume='));
 const resumeTag=resumeArg?.slice(9);
-const resumeGate=args.includes('--resume-gate');
+const resumeGateArg=args.find(a=>a==='--resume-gate'||a.startsWith('--resume-gate='));
+const resumeGate=!!resumeGateArg;
+const resumeGateChapter=resumeGateArg?.startsWith('--resume-gate=')?resumeGateArg.slice(14):null;
 const stopArg=args.find(a=>a.startsWith('--stop-after='));
 const stopAfter=stopArg?.slice(13);
 if(resumeArg)assert(homecoming&&/^[\w-]+$/.test(resumeTag),'resume requires a safe Homecoming artifact tag');
 if(resumeGate)assert(resumeArg,'--resume-gate requires --resume');
+if(resumeGateArg?.startsWith('--resume-gate='))assert(/^[a-z]+$/.test(resumeGateChapter),'named gate requires a chapter');
 if(stopArg)assert(homecoming&&stopAfter==='kyoto','bounded earned-route diagnostic stops only after Kyoto');
-const labels=args.filter(a=>a!=='--prepare'&&a!=='--homecoming'&&a!=='--resume-gate'&&a!==resumeArg&&a!==stopArg);
+const labels=args.filter(a=>a!=='--prepare'&&a!=='--homecoming'&&a!==resumeGateArg&&a!==resumeArg&&a!==stopArg);
 assert.ok(labels.length<=1,'usage: node qa/reimagine-journey-chain.mjs [tag] [--prepare] [--homecoming]');
 const tag=labels[0]||'first';assert.match(tag,/^[\w-]+$/);
 const prefix=(homecoming?'homecoming':'reimagine')+'-journey-chain-'+tag;
@@ -135,15 +138,19 @@ if(resumeTag){
   const file='homecoming-journey-chain-'+resumeTag+'-failure.json.png',raw=read(file),prior=JSON.parse(raw);
   // A failed stage can persist a partial task set that its fresh driver cannot
   // replay. The last completed gate is an earned, unmodified checkpoint too.
-  const priorSave=resumeGate?prior.gates?.at(-1)?.saved:(prior.lastSave||prior.gates?.at(-1)?.saved);
+  // Rewind only to a gate the same-build driver actually earned and saved.
+  const selectedGate=resumeGateChapter?prior.gates?.find(g=>g.label===resumeGateChapter+' earned and persisted'):
+    prior.gates?.at(-1);
+  const priorSave=resumeGate?selectedGate?.saved:(prior.lastSave||prior.gates?.at(-1)?.saved);
+  const priorGates=resumeGate?prior.gates.slice(0,prior.gates.indexOf(selectedGate)+1):prior.gates;
   assert(prior.homecoming&&priorSave&&prior.failure,'an actual failed earned Story checkpoint is required');
   assert.equal(prior.manifest.sharedSha256,manifest.sharedSha256,'same progression authoring');
   for(const item of prior.manifest.supportSources.filter(s=>s.file.startsWith('../src/')))
     assert.equal(item.sha256,hash(read(item.file)),'same production source '+item.file);
   assert.equal(priorSave.arcV1,1);assert.equal(priorSave.journeyMode,'story');assert(!priorSave.fin);
-  for(const gate of prior.gates)assert((gate.saved.tasks||[]).every(id=>priorSave.tasks.includes(id)),'checkpoint retains earlier earned tasks');
-  resume={file,sha256:hash(raw),save:priorSave,priorGates:prior.gates,priorFailure:prior.failure,
-    checkpointSource:resumeGate||!prior.lastSave?'last-complete-gate':'failure-capture'};
+  for(const gate of priorGates)assert((gate.saved.tasks||[]).every(id=>priorSave.tasks.includes(id)),'checkpoint retains earlier earned tasks');
+  resume={file,sha256:hash(raw),save:priorSave,priorGates,priorFailure:prior.failure,
+    checkpointSource:resumeGateChapter?'named-complete-gate':resumeGate||!prior.lastSave?'last-complete-gate':'failure-capture'};
   manifest.traps.push('Resumed mode restores the exact persisted save from a prior failed test; this is cross-session earned continuity, not a fresh single-context completion.');
 }
 if(prepare){console.log(JSON.stringify({prepared:true,browserLaunched:false,...manifest},null,2));process.exit(0);}
