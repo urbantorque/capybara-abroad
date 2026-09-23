@@ -2158,6 +2158,34 @@ remained at rung 2 or 3 through most rooms. Keep the visible tail, sustained
 frame-rate target and intermittent crash in the release gate. Weekly allowance:
 13% remaining; the 6% floor still applies.
 
+### M6v: published Homecoming playtest (23 Sep 2026)
+
+The user directed publication to master and asked for the live game link.
+Fresh `origin/master` was an ancestor of the Homecoming branch; local master
+fast-forwarded 55 commits from `b593602` to `038dc39` and was pushed without
+a merge commit. `node build.mjs` and all 77 `npm test` checks passed immediately
+before publication. The Pages workflow run `35860761608` completed successfully
+for that exact head. The [public game](https://urbantorque.github.io/capybara-abroad/)
+serves 7,220,951 bytes of HTML with
+SHA-256 `2ec33f1f3d80e638df4267c0b3c72faf98e3983f7c3b03e4e7dd15c937e7540a`,
+identical to the tested local single-file build.
+
+A fresh muted Edge profile opened the public HTTPS game and passed all twelve
+hosted smoke checks: real-key movement, running audio context and scheduled
+score, Settings' Pretty/Fast modes, Kyoto's reflection pixels, saved Hanoi
+arrival, reload, retained preference, and no console/runtime or request
+errors. The Kyoto mask covered 190,624 water pixels; 174,128 changed by at
+least twelve levels, and the screenshot was inspected by eye. The first
+hosted smoke stopped at a stale reflection-probe read after its own manual A/B
+draw; the QA probe now draws the selected Fast frame before reading
+`reflectInfo()`. The full rerun passed. This follow-up changes only the test.
+
+The published build is available for playtesting. Earlier intermittent Edge
+startup crashes, Venice's 13 solver saves in one fuzz window, the traced
+117 ms visible Kowloon tail, and human listening, novice and physical-device
+checks remain open. Publication at the user's direction is not a claim that
+those release-quality gates passed.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

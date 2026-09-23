@@ -1,3 +1,18 @@
+## HOMECOMING M6v — PUBLIC PLAYTEST (23 Sep 2026)
+
+The user directed publication of the Homecoming candidate. Master
+fast-forwarded from `b593602` to `038dc39`; GitHub Pages built that head and
+served an HTML file byte-identical to the tested local build. The
+[published game](https://urbantorque.github.io/capybara-abroad/) passed twelve hosted
+checks in a fresh muted Edge profile: movement, score, quality, reflection,
+save and reload, without runtime or request errors. The reflection smoke probe
+now reads the current Fast frame after its own manual A/B draw. No production
+game source changed in this publication follow-up.
+
+This is a public playtest build. The earlier intermittent renderer crash,
+Venice solver saves, visible frame tail, human listening, novice discovery
+and physical-device checks remain open in ROADMAP-HOMECOMING.md M6v.
+
 ## HOMECOMING M1e — FIRST-USE SHADER HITCHES (22 Sep 2026)
 
 The longer Sydney route reproduced 146–181ms CPU stalls with newly created

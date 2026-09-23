@@ -1,6 +1,17 @@
-# HANDOFF — state of play, 21 Sep 2026
+# HANDOFF — state of play, 23 Sep 2026
 
-## Resumed Homecoming mandate (22 Sep, newest)
+## Homecoming published for playtest (23 Sep, newest)
+
+At the user's direction, master fast-forwarded 55 Homecoming commits to
+`038dc39` and was pushed. Pages run `35860761608` succeeded; the
+[public game](https://urbantorque.github.io/capybara-abroad/) has HTML matching the
+local build, and twelve muted, hosted Edge smoke checks pass. The latest
+roadmap evidence is ROADMAP-HOMECOMING.md M6v. Earlier intermittent renderer
+crash, Venice solver-save spike and visible frame tails remain open, as do
+human listening, novice and physical-device checks. The 6% weekly Codex
+allowance floor still applies. Return visits remain parked.
+
+## Resumed Homecoming mandate (22 Sep, historical)
 
 The user explicitly resumed autonomous work with a hard stop at 6% weekly
 Codex remaining, superseding all older 25% stop/20% reserve text below.

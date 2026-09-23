@@ -97,7 +97,14 @@ try {
   await pickQuality(2);
   await h.page.keyboard.press('Escape');
   await h.page.waitForTimeout(600);
-  out.fast = await h.page.evaluate(() => ({ perf: window.__capy.perfAudit(), reflection: window.__capy.reflectInfo() }));
+  // The masked A/B above draws manually. Sample the new quality setting on
+  // its own draw; reflectInfo otherwise still describes that A/B frame while
+  // the Settings sheet has the normal render loop paused.
+  out.fast = await h.page.evaluate(() => {
+    const g = window.__capy;
+    g.reflectDraw();
+    return { perf: g.perfAudit(), stateRung: g.state.perfRung, reflection: g.reflectInfo() };
+  });
   check(out.fast.perf.mode === 'fast' && out.fast.reflection.why === 'parked rung 3', 'Fast intentionally parks mirrors');
   await settings();
   await pickQuality(1);
