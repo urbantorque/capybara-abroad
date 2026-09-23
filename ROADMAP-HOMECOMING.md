@@ -2137,6 +2137,27 @@ remains held for those intermittent failures, sustained performance, human
 listening and novice playtests, and physical-device coverage. Weekly
 allowance: 14% remaining at this checkpoint, above the user's 6% floor.
 
+### M6u: traced arrival stalls remain masked or outside the game tick
+
+A muted, owned-port load-only replay with `CAPY_QA_TRACE_ALL=1` passed 38/38
+focused visible crossings and the runtime gate. It intentionally skipped fuzz
+and the packaged-file stage, so it is diagnostic rather than another full
+release soak. The long cold intervals occurred while the arrival white was
+still up: Cave's 417 ms gap included a 380.4 ms Cave module tick; Manly's
+467 ms gap included a 271 ms game tick with 264.9 ms in systems; Antarctica's
+767 ms gap included a 703 ms browser long task before the first recorded slow
+game tick. Antarctica also had a separate 171.9 ms systems tick under white.
+Those intervals explain why the previous full soak could pass the visible-gap
+gate while its cold `longest` column grew.
+
+The return to Kowloon had a 117 ms visible gap. Its largest measured game tick
+was 14.4 ms; a 100 ms browser long task aligned with the interval. That trace
+does not identify the browser task's owner, so no production change is justified
+from this sample. A separate return to Monaco reached 83 ms. The governor
+remained at rung 2 or 3 through most rooms. Keep the visible tail, sustained
+frame-rate target and intermittent crash in the release gate. Weekly allowance:
+13% remaining; the 6% floor still applies.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
