@@ -1980,6 +1980,24 @@ this patch does not close that independent tail or the earlier intermittent
 renderer crash. The source-frozen full three-stage soak must be rerun before
 public master. Human listening, novice and physical-device gates remain open.
 
+### M6p: full post-grass soak passes, Hanoi tail blocks release
+
+The source-frozen `5abe0fa` candidate passed a second complete headful Edge
+soak in 22.9 minutes: nineteen 45-second fuzz windows, the packaged-file
+probe and 38/38 focused, visible load crossings. No NaN, below-world state,
+runtime error or renderer crash was reported. This is stronger cumulative
+evidence than the earlier pairwise isolations, but does not establish that
+the intermittent renderer crash cannot recur.
+
+The warm Cali load return peaked at 67 ms and warm Cave at 67 ms, consistent
+with the focused grass and reflection fixes. Other tails still block the
+proposed frame-pacing gate: warm Pantanal reached 150 ms and warm Hanoi
+250 ms; cold Kowloon reached 134 ms and cold Iceland 117 ms. The soak
+reports interval maxima, not a CPU/GPU cause. Attribute the warm Hanoi and
+Pantanal gaps before any public-master promotion. Human listening, novice
+playtesting and physical-device coverage remain unavailable. Weekly
+allowance: 16% remaining.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
