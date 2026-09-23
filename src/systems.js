@@ -48823,6 +48823,15 @@ export function createSystems(game) {
     // showed — no empty slot, no dash, nothing to notice.
     const named = repName(x, z);
     const sentence = pool[randInt(0, pool.length - 1)];
+    // ---- THE TAKINGS (AAA A3b) --------------------------------------------
+    // An incident was a card and confetti and nothing you could spend, so the
+    // only thing mischief ever earned was the chance of being caught. Now the
+    // chain carries a pot — three for AN INCIDENT, five more for A SCENE, one
+    // on top for a chain with a name — shown on the row, and banked when the
+    // chain closes with you still free. Reached first, and it is gone with the
+    // fine. That is the loop the game was missing: cause trouble, then get
+    // away with it. Cut: noTakings.
+    if (!game.state.noTakings) incPot += (tier === 2 ? 5 : 3) + (named ? 1 : 0);
     // A named chain is its own reward; only the generic caption yields space.
     showMoment(tier === 2 ? 'A SCENE' : 'AN INCIDENT',
                named ? named.name : sentence,
@@ -48893,6 +48902,7 @@ export function createSystems(game) {
   // `e.authority` here was always undefined and the "picked up" line never
   // once showed. Unwrapped, as the decoy handler already does.
   const sysESC_GAP = 25, sysFINE_AUTH = 3, sysFINE_WIT = 1, sysESC_PAY = 2;
+  let incPot = 0;                      // THE TAKINGS (AAA A3b), see incAdd
   let sysEscAt = -1e9;
   function sysGotAway(how) {
     const t = game.state.time || 0;
@@ -48908,12 +48918,15 @@ export function createSystems(game) {
   });
   game.events.on('npc:gaveup', function (e) {
     const d = (e && e.npc) || e || {};
-    sysGotAway(d.authority ? 'got away from the ' + (d.role || 'authority') : 'got away');
+    // a role is written with its article: 'the monk', 'the lifeguard'
+    sysGotAway(d.authority ? 'got away from ' + (d.role || 'the authority') : 'got away');
   });
   game.events.on('npc:caught', function (e) {
     const d = (e && e.npc) || e || {};
     const fine = Math.min(jrYuzu, d.authority ? sysFINE_AUTH : sysFINE_WIT);
-    const who = d.authority ? 'picked up by the ' + (d.role || 'authority') : 'they reached you';
+    const who = (d.authority ? 'picked up by ' + (d.role || 'the authority') : 'they reached you') +
+                (incPot > 0 ? '  ·  the ' + incPot + ' yuzu of takings are gone' : '');
+    incPot = 0;
     const cp = game.capy && game.capy.position;
     if (fine > 0) yuzuAdd(-fine, null, cp ? cp.x : undefined, cp ? cp.y + 0.8 : undefined, cp ? cp.z : undefined);
     toast(who + (fine > 0 ? '  ·  −' + fine + ' yuzu' : '') +
@@ -49392,6 +49405,15 @@ export function createSystems(game) {
         // got out of hand rather than as a slot machine. A chain that never
         // reached three costs nothing.
         if (incCarded > 0) incCool = sysINC_COOL;
+        // THE TAKINGS, BANKED (AAA A3b): the chain closed and nobody reached
+        // you, so what it was worth is yours. A catch zeroes the pot first
+        // (see npc:caught), so this only pays a clean getaway.
+        if (incPot > 0) {
+          const cpp = game.capy && game.capy.position;
+          yuzuAdd(incPot, 'got away with it', cpp ? cpp.x : undefined, cpp ? cpp.y + 0.8 : undefined, cpp ? cpp.z : undefined);
+          sfx('chime', { volume: 0.42, pitch: 1.26, force: true });
+          incPot = 0;
+        }
         // ...and a chain that got close and then stopped says so, once, going
         // DOWN. It is the other half of the climb above: without it a player
         // who reached two and wandered off is told nothing, and the pattern is
@@ -49469,7 +49491,8 @@ export function createSystems(game) {
       // moment somebody sets off, whatever rung that was, the row says so.
       const st = incMarchOn ? (lit >= sysINC_N2 ? 'A SCENE · ' + sysCHAIN_MARCH : sysCHAIN_MARCH)
                             : (sysCHAIN_STATE[lit] || '');
-      pipsLbl.textContent = lit + ' of ' + sysINC_N2 + (st ? '  ·  ' + st : '') + (eye ? '  ·  ' + eye : '');
+      pipsLbl.textContent = lit + ' of ' + sysINC_N2 + (st ? '  ·  ' + st : '') + (eye ? '  ·  ' + eye : '') +
+        (incPot > 0 ? '  ·  ' + incPot + ' yuzu on it' : '');
       pipsEl.classList.toggle('warn', incMarchOn && eye !== '' && eye.indexOf('hidden') !== 0);
       pipsEl.classList.toggle('hid', eye.indexOf('hidden') === 0);
     }
@@ -49589,6 +49612,9 @@ export function createSystems(game) {
     // Sydney and a third in Venice is not three things in a row, and the
     // coordinates would agree with it if nothing said otherwise, because every
     // chapter is authored in the same ones. See THE INCIDENT.
+    // ...and leaving the square with takings on the chain is getting away with
+    // them (AAA A3b): banked before the chain is forgotten.
+    if (incPot > 0) { yuzuAdd(incPot, 'got away with it'); incPot = 0; }
     incN = 0; incT = -1; incCarded = 0; incCool = 0;
     for (const k in incSeen) delete incSeen[k];
     // ...AND SO DOES THE NAME IT WAS GIVEN (W1). `repLast` is "the thing that

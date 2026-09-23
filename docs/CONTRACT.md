@@ -1,3 +1,35 @@
+## AAA A3b — THE TAKINGS: CAUSE TROUBLE, THEN GET AWAY WITH IT (24 Sep 2026)
+
+An incident was a card and confetti and nothing you could spend. The only
+thing mischief ever earned was the chance of being caught, so the chain had
+no reason to be played for.
+
+A carded chain now carries a pot:
+
+- 3 yuzu for AN INCIDENT;
+- 5 more for A SCENE;
+- 1 on top for a chain with a name.
+
+The pip row shows it ("5 of 5 · A SCENE · somebody is coming · seen ·
+10 yuzu on it").
+
+- **Banked** when the chain closes with you free, as "got away with it". It
+  is also banked if you leave the place mid-chain.
+- **Lost** when somebody reaches you first: "the 10 yuzu of takings are
+  gone", together with the fine.
+
+The pot follows the cards, so the 50 s card cooldown also bounds how fast it
+can fill. Cut: `noTakings`.
+
+qa/aaa-takings.mjs (Kyoto, through the real prop:impact path, 5 checks):
+
+- Running: 16 → 28, which is the pot of 10 plus the escape bonus of 2.
+- Standing still: the monk picked the animal up, the pot was lost and 3
+  were fined.
+
+Also fixed "picked up by the the monk": role strings carry their article.
+npm test: 77/0.
+
 ## AAA A6 — THE REPOSITORY, TIDIED (24 Sep 2026)
 
 The author's note: "the GitHub page is really detailed … theres so many old
