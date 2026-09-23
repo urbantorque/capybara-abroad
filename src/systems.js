@@ -49696,10 +49696,12 @@ export function createSystems(game) {
       if (keys.KeyZ) { camYawTarget += dt * sysCAM_KEY_RATE * sysLookMul(); camHandT = sysCAM_HAND_T; }
       if (keys.KeyX) { camYawTarget -= dt * sysCAM_KEY_RATE * sysLookMul(); camHandT = sysCAM_HAND_T; }
     }
-    // Hanoi asks for one committed walk across traffic. Auto-recentring the
-    // rig mid-crossing rotates camera-relative W and can steer the animal into
-    // a shopfront. A bearing the player just set stays theirs until the kerb.
-    if (camHandT > 0 && !(started && game.biome.isActive('hanoi') && game.hanoi?.crossing?.()))
+    // Hanoi asks for one committed walk across traffic. The road state starts
+    // after the approach, so preserve a chosen bearing while the stick walks
+    // toward it too. Recentring camera-relative W before the kerb steers the
+    // animal into a shopfront; the hand clock resumes after it stops moving.
+    if (camHandT > 0 && !(started && game.biome.isActive('hanoi') &&
+        (game.hanoi?.crossing?.() || Math.hypot(input.x, input.z) > 0.2)))
       camHandT -= dt;
     // ---- THE FRAMING ENVELOPE (v26) -----------------------------------
     // Aged on the RAW clock and not on `dt`. A marquee is the one moment that

@@ -1634,6 +1634,41 @@ including a saved Hanoi reload. The optional browser crash-capture launch is
 diagnostic only; no crash occurred under it, so dump collection is unproven.
 Public master remains held pending coherent release verification.
 
+### M6d: complete the approach hold and make earned-route evidence honest
+
+A later Chrome route found the remaining camera gap: the 1.6-second hand
+clock could expire on the short pavement approach *before* Hanoi declared the
+crossing active. The camera then turned a straight held W toward z=33 rather
+than the bowl at z=15. The hand clock now also waits while a player-chosen
+bearing is being walked in Hanoi; it resumes after movement and the crossing
+stop. A fresh Chrome chapter run held about -1.600 to -1.602 radians across
+37 steady-crossing samples and completed three deliveries, saved the memory
+and reloaded with zero browser errors. This is camera consent during movement,
+not a new camera writer or a changed authored road threshold.
+
+The bowl trace separated a second intermittent failure from the protected
+kerb bowl. A real E grab earned `pho-raid`, then `localOwnStep` in npc.js
+released it when the cook caught the capybara near its stall. That authored
+retrieval is legitimate play. The test now accepts either the player's own
+release or a traced owner retrieval, requiring the real grab and saved task
+in both cases. A Chrome single-chapter run passed through an owner retrieval
+on its first attempt, another actual pickup, release and all deliveries.
+
+One fresh Chrome cumulative context then earned Sydney through Palawan,
+including Kyoto and Hanoi reloads, with zero browser errors. The updated
+Sydney test approached the picnic from the open east path after a prior run
+walked into a tree/bench. That context stopped at Son Doong because the test
+aimed through a randomly placed entrance boulder. The cave driver now enters
+at the authored river edge instead; a fresh Chrome chapter test passed. A
+second Chrome context restored the *last complete Palawan gate* from the
+failed run, then earned Son Doong, Monaco and Iceland, finished the twenty-
+note home coda, persisted `fin=1`, reloaded and repeated the rest without
+duplicate state or browser error. This is cross-session continuity over ten
+earned memories, not an uninterrupted current-build route or unaided
+discovery. The optional `--resume-gate` takes an actual saved complete gate;
+it does not seed progress. Earlier intermittent renderer crashes remain
+counterevidence, so public master is still held.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

@@ -211,7 +211,11 @@ try{
       if(prop?.type==='phobowl')window.__hanoiBowlEvents.push({name,t:window.__capy.state.time,
         x:prop.body?.position.x,y:prop.body?.position.y,z:prop.body?.position.z,
         speed:e?.speed||null,held:!!prop.held,pending:prop.pendingImpact||0,
-        hidden:!!prop.hidden,capyHeld:window.__capy.capy.heldProp?.type||null});});});
+        hidden:!!prop.hidden,capyHeld:window.__capy.capy.heldProp?.type||null,
+        threwAt:window.__capy.capy.threwAt||0,
+        input:{action:!!window.__capy.input.action,pressed:!!window.__capy.input.actionPressed},
+        keys:(window.__hanoiKeys||[]).slice(-8),
+        stack:name==='capy:drop'?new Error('bowl drop').stack:null});});});
   assert.ok(ids.every(id=>!arrival.tasks[id]));
   const pho=await h.page.evaluate(()=>{const p=window.__capy.hanoi.pho();return{x:p.x,y:p.y,z:p.z};});
   // Reach the lake's northern street through its actual western ring.
@@ -246,10 +250,20 @@ try{
   out.bowlEvents.push(...await h.page.evaluate(()=>window.__hanoiBowlEvents||[]));
   assert.ok((await state()).tasks['pho-raid'],'actual nearby bowl grabbed');
   await sample('pho raid earned');await h.screenshot(name+'-bowl');
-  assert.equal((await state()).held,'phobowl','real bowl remains held before release');
-  await h.hold('e',90);await h.page.waitForTimeout(550);
-  const dropped=await sample('bowl release observed');
-  assert.equal(dropped.bag,false,'throw does not also open the traveller bag');running(dropped);
+  if((await state()).held==='phobowl'){
+    await h.hold('e',90);await h.page.waitForTimeout(550);
+    const dropped=await sample('bowl release observed');
+    assert.equal(dropped.bag,false,'throw does not also open the traveller bag');running(dropped);
+  }else{
+    // The cook can reach its own bowl half a second after the theft. That is
+    // the authored retrieval verb, not a failed pickup or a vanished object.
+    assert.ok(out.bowlEvents.some(e=>e.name==='capy:grab'&&e.capyHeld==='phobowl'),
+      'task came from an actual bowl grab');
+    assert.ok(out.bowlEvents.some(e=>e.name==='capy:drop'&&e.stack?.includes('localOwnStep')),
+      'the owner, not a queued impact, reclaimed the bowl');
+    const reclaimed=await sample('cook reclaimed bowl');
+    assert.equal(reclaimed.bag,false,'retrieval did not open the traveller bag');running(reclaimed);
+  }
   const stall=await h.page.evaluate(()=>window.__capy.hanoi.cubStall());
   await walk({x:stall.x+1.5,z:stall.z},.55);await h.hold('e',90);
   await h.page.waitForFunction(()=>window.__capy.hanoi.cub().on,null,{timeout:3500});
@@ -272,6 +286,7 @@ try{
   out.scope='Chapter arrival fixture, shipped-road navigation telemetry and actual keyboard walking/grab/Cub steering/braking/horn. No task/body/clock/vehicle/debug-state writes. Not novice or unguided pacing proof.';
   await h.result(name,out);console.log(JSON.stringify({pass:true,samples:out.navigation.length,errors:h.metadata.errors}));
 }catch(error){await collectJumpTrace(true);await release();out.failure=String(error.stack||error);try{
-    out.bowlEvents.push(...await h.page.evaluate(()=>window.__hanoiBowlEvents||[]));
+    out.bowlEvents=out.bowlEvents.filter(e=>!e.name).concat(await h.page.evaluate(()=>window.__hanoiBowlEvents||[]));
+    out.keys=await h.page.evaluate(()=>window.__hanoiKeys||[]);
     await sample('failure');await h.screenshot(name+'-failure');}catch{}
   await h.result(name+'-failure',out);throw error;}finally{await collectJumpTrace(true);await h.close();}

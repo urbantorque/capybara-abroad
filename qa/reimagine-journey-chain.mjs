@@ -10,11 +10,13 @@ import { stripComments } from '../strip-comments.mjs';
 const args=process.argv.slice(2),prepare=args.includes('--prepare'),homecoming=args.includes('--homecoming');
 const resumeArg=args.find(a=>a.startsWith('--resume='));
 const resumeTag=resumeArg?.slice(9);
+const resumeGate=args.includes('--resume-gate');
 const stopArg=args.find(a=>a.startsWith('--stop-after='));
 const stopAfter=stopArg?.slice(13);
 if(resumeArg)assert(homecoming&&/^[\w-]+$/.test(resumeTag),'resume requires a safe Homecoming artifact tag');
+if(resumeGate)assert(resumeArg,'--resume-gate requires --resume');
 if(stopArg)assert(homecoming&&stopAfter==='kyoto','bounded earned-route diagnostic stops only after Kyoto');
-const labels=args.filter(a=>a!=='--prepare'&&a!=='--homecoming'&&a!==resumeArg&&a!==stopArg);
+const labels=args.filter(a=>a!=='--prepare'&&a!=='--homecoming'&&a!=='--resume-gate'&&a!==resumeArg&&a!==stopArg);
 assert.ok(labels.length<=1,'usage: node qa/reimagine-journey-chain.mjs [tag] [--prepare] [--homecoming]');
 const tag=labels[0]||'first';assert.match(tag,/^[\w-]+$/);
 const prefix=(homecoming?'homecoming':'reimagine')+'-journey-chain-'+tag;
@@ -131,7 +133,9 @@ const manifest={route,sources:[...drivers.values(),home].map(d=>d.manifest),
 let resume=null;
 if(resumeTag){
   const file='homecoming-journey-chain-'+resumeTag+'-failure.json.png',raw=read(file),prior=JSON.parse(raw);
-  const priorSave=prior.lastSave||prior.gates?.at(-1)?.saved;
+  // A failed stage can persist a partial task set that its fresh driver cannot
+  // replay. The last completed gate is an earned, unmodified checkpoint too.
+  const priorSave=resumeGate?prior.gates?.at(-1)?.saved:(prior.lastSave||prior.gates?.at(-1)?.saved);
   assert(prior.homecoming&&priorSave&&prior.failure,'an actual failed earned Story checkpoint is required');
   assert.equal(prior.manifest.sharedSha256,manifest.sharedSha256,'same progression authoring');
   for(const item of prior.manifest.supportSources.filter(s=>s.file.startsWith('../src/')))
@@ -139,7 +143,7 @@ if(resumeTag){
   assert.equal(priorSave.arcV1,1);assert.equal(priorSave.journeyMode,'story');assert(!priorSave.fin);
   for(const gate of prior.gates)assert((gate.saved.tasks||[]).every(id=>priorSave.tasks.includes(id)),'checkpoint retains earlier earned tasks');
   resume={file,sha256:hash(raw),save:priorSave,priorGates:prior.gates,priorFailure:prior.failure,
-    checkpointSource:prior.lastSave?'failure-capture':'last-complete-gate'};
+    checkpointSource:resumeGate||!prior.lastSave?'last-complete-gate':'failure-capture'};
   manifest.traps.push('Resumed mode restores the exact persisted save from a prior failed test; this is cross-session earned continuity, not a fresh single-context completion.');
 }
 if(prepare){console.log(JSON.stringify({prepared:true,browserLaunched:false,...manifest},null,2));process.exit(0);}

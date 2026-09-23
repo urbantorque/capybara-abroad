@@ -90,6 +90,9 @@ try {
   let stolen = false;
   for (let attempt = 1; attempt <= 3 && !stolen; attempt++) {
     await go({ x: 12, z: 10 }); await go({ x: 30, z: 10 });
+    // The fig and its bench block a southwest line into the picnic lawn.
+    // Come round the east path, then approach the live sandwich from behind.
+    await go({ x: 34, z: 18 }, 1.5); await go({ x: 34, z: 29 }, 1.5);
     await go('picnic-thief', .7, 35000, true);
     await h.page.keyboard.press('e');
     await h.page.waitForTimeout(300);

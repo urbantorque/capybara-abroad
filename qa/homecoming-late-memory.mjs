@@ -52,9 +52,11 @@ export async function lateMemory(h, chapter, tag='v5') {
     await h.start();await h.arrive(chapter);await h.page.bringToFront();
     out.steps.push(await state());
     if(chapter==='cave'){
-      // The entrance floor has solid breakdown. The authored river corridor
-      // excludes those rocks and provides a real swimming route to the light.
-      await walk({x:-20,z:56},8);await walk({x:-20,z:20});
+      // The mouth's west jamb blocks x=-20 at z=56. The east-bank breakdown
+      // can also block x=0 below z=49; join the rock-free river edge at x=-7.
+      await walk({x:-7,z:50},3);await walk({x:-10,z:42},3);
+      await walk({x:-20,z:36},3);
+      await walk({x:-20,z:20});
       await h.page.keyboard.press('KeyQ');await h.page.waitForTimeout(1200);
       assert((await state()).tasks['first-echo'],'actual wheek earns dark-cave support');
       await walk({x:-20,z:-48});await walk(point('cavDOLINE'),8);
