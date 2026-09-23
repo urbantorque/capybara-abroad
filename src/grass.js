@@ -507,7 +507,8 @@ export function createGrass(game) {
     uLawnComposition.value = lawnRequested && !lawnDirty ? 1 : 0;
     const capy = game.capy;
     const p = capy && capy.position;
-    if (state.noGrass || rung >= 2 || !p) { mesh.visible = false; return; }
+    if (state.noGrass || !p) { mesh.visible = false; return; }
+    if (rung >= 2) mesh.visible = false;
 
     // The ground, once per chapter. A chapter that has not finished putting
     // its meshes in the scene on the frame it is entered reads as empty here,
@@ -524,7 +525,10 @@ export function createGrass(game) {
       }
       if (scanDue !== -1) return;
     }
-    if (!table) return;
+    // Even if this rung parks the blades, scan while the arrival card is
+    // opaque. Waiting for Auto to recover to rung 1 can expose a 30–70 ms
+    // terrain-table build several seconds after the player has regained view.
+    if (!table || rung >= 2) return;
     // A dormant field may have moved. Refill its existing four slices once,
     // keeping the original view until all scales match the current layout.
     if (lawnRequested && lawnDirty && !lawnRefresh) { slice = 0; lawnRefresh = true; }

@@ -1960,6 +1960,26 @@ history row and crash-capture controls, and preserve the prior failed row.
 No human listening, novice playtest or physical-device gate was performed.
 Public master remains held. Weekly allowance: 16% remaining.
 
+### M6o: scan dormant grass while the destination is masked
+
+A focused nine-crossing Cali↔Sydney Auto trace on `7708718` attributed one
+66.6 ms warm Cali visible gap to a 75.4 ms game tick, with 65.1 ms in the
+grass module, zero late shader programs and no camera-ray spike. Grass had
+been parked at governor rung 2 while the destination card was opaque; its
+terrain-table scan waited until a later visible rung-1 recovery. A second
+trace showed the same deferred-scan mechanism in Sydney after reveal.
+
+Grass now builds that one-time table on arrival even when rung 2 or 3 parks
+the blades. `noGrass` still returns before the scan, and the parked mesh
+stays invisible; no new visual term, save field or audio writer is involved.
+On the changed source, all nine Cali/Sydney scans occurred under the opaque
+card, including seven at rung 2 or 3. Four warm Cali returns had visible maxima
+50.1, 49.9, 16.9 and 33.4 ms, with no late grass scan. A first cold Cali
+entry still reached 116.7 ms after reveal without a new shader program;
+this patch does not close that independent tail or the earlier intermittent
+renderer crash. The source-frozen full three-stage soak must be rerun before
+public master. Human listening, novice and physical-device gates remain open.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

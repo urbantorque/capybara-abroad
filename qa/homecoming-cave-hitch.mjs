@@ -4,17 +4,20 @@ import assert from 'node:assert/strict';
 import { openHarness } from './reimagine-harness.mjs';
 
 const pretty = process.argv.includes('--pretty');
+const cali = process.argv.includes('--cali');
 const h = await openHarness({ pinRung: pretty });
 const out = { metadata: h.metadata, rows: [],
-  scope: 'Four Cave arrivals separated by Sydney, headful Edge; rAF gaps, whole-tick CPU and browser longtasks. No GPU timing claim.',
+  scope: `${cali ? 'Five Cali' : 'Four Cave'} arrivals separated by Sydney, headful Edge; rAF gaps, whole-tick CPU and browser longtasks. No GPU timing claim.`,
   profile: pretty ? 'fixed Pretty rung 0' : 'Auto governor' };
 try {
   await h.start();
   await h.page.evaluate(() => { window.__qaRoomIds = new WeakMap(); window.__qaRoomNext = 1; });
   const seenRoomIds = new Map();
+  const destination = cali ? 'cali' : 'cave';
   const route = process.argv.includes('--short')
-    ? ['cave', 'sydney', 'cave']
-    : ['cave', 'sydney', 'cave', 'sydney', 'cave', 'sydney', 'cave'];
+    ? [destination, 'sydney', destination]
+    : [destination, 'sydney', destination, 'sydney', destination,
+        'sydney', destination, ...(cali ? ['sydney', destination] : [])];
   for (const chapter of route) {
     await h.page.bringToFront();
     const row = await h.page.evaluate(async ({ chapter, win }) => {
@@ -60,6 +63,7 @@ try {
         }
         rayMs = 0; rayCalls = 0;
         const beforeMs = { ...g.state.perf?.ms }, t = performance.now();
+        const grassBefore = g.grass?.audit?.();
         try { return raw.apply(this, args); }
         finally {
           const ms = performance.now() - t;
@@ -77,6 +81,7 @@ try {
             tickSlow.push({ at: t - began, ms, chapter: g.biome.current,
               white: fade?.classList.contains('on') || false,
               hold: !!g.state.renderHold, rung: g.state.perfRung,
+              grassBefore, grassAfter: g.grass?.audit?.(),
               rayMs, rayCalls, worldBodies: g.world?.bodies?.length,
               measuredModulesMs: Object.values(modules).reduce((sum, n) => sum + n, 0), leaders });
           }
@@ -161,7 +166,7 @@ try {
         tickSlow, longtasks, compileRows, roomNodeId: roomNode ? window.__qaRoomIds.get(roomNode) : null,
         roomSeconds: roomNode?.buffer?.duration || 0, audioState: audio.ac?.state || null,
         rung: g.state.perfRung, error: g.state.lastError || null };
-    }, { chapter, win: chapter === 'cave' && out.rows.length === 0 ? 20000 : 6000 });
+    }, { chapter, win: chapter === destination && out.rows.length === 0 ? 20000 : 6000 });
     out.rows.push(row);
     await h.result('homecoming-cave-hitch', out);
     console.log(JSON.stringify({ chapter, arrived: row.arrived, focused: row.focused,
