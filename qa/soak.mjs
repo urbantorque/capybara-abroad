@@ -152,18 +152,19 @@ try {
     const probeHash = createHash('sha256').update(readFileSync(file)).digest('hex');
     const since = Date.now();
     log('running ' + name + '  ' + new Date().toISOString());
-    let r;
+    let r, directData = null;
     if (harness) {
       try {
         // These are the same trusted repository probes run by playwright-cli,
         // staged only for the local port, built file path and long fuzz window.
         const probe = new Function('return (' + readFileSync(file, 'utf8') + '\n);')();
-        await probe(harness.page); r = { code: 0, out: '' };
+        directData = await probe(harness.page); r = { code: 0, out: '' };
       } catch (error) { r = { code: 1, out: String(error.stack || error) }; }
     } else r = pw(['run-code', '--filename=' + file]);
-    const data = fresh(json, since) ? readJson(json) : null;
+    const fromSink = fresh(json, since);
+    const data = fromSink ? readJson(json) : directData;
     const threw = /Error|error:/i.test(r.out) && r.code !== 0;
-    results[name] = { code: r.code, threw, data, stale: !data, probeHash };
+    results[name] = { code: r.code, threw, data, stale: !data, directFallback: !!data && !fromSink, probeHash };
     log((r.code === 0 && data ? 'pass  ' : 'FAIL  ') + name.padEnd(6) + src.padEnd(16) +
         ((Date.now() - since) / 1000).toFixed(0) + ' s' + (data ? '' : '  (no fresh ' + json + ')'));
     if (r.code !== 0) log(r.out.split('\n').filter(Boolean).slice(-6).map(l => '        ' + l).join('\n'));
@@ -206,7 +207,8 @@ const row = {
   skipped: Array.from(SKIP),
   runner: harness ? 'direct' : 'cli', browser: browserMetadata,
   probes: Object.fromEntries(Object.entries(results).map(([name, r]) => [name,
-    { skipped: !!r.skipped, sha256: r.probeHash || null, code: r.code ?? null, stale: r.stale ?? null }])),
+    { skipped: !!r.skipped, sha256: r.probeHash || null, code: r.code ?? null,
+      stale: r.stale ?? null, directFallback: !!r.directFallback }])),
   chapters,
 };
 appendFileSync(HISTORY, JSON.stringify(row) + '\n');

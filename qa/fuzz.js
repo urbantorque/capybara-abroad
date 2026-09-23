@@ -1,4 +1,5 @@
 async page => {
+  const traceFall = process.env.CAPY_QA_TRACE_FALL === '1';
   // ---- IT STARTS THE GAME NOW ------------------------------------------
   // This assumed it was being run after something else had already booted and
   // pressed past the title card, and if it was not, all seventeen chapters came
@@ -78,7 +79,7 @@ async page => {
                  'manly', 'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi'];
   const res = {};
   for (const n of names) {
-    res[n] = await page.evaluate(async ([name, fuzzSec, speedCap, fallPhysics]) => {
+    res[n] = await page.evaluate(async ([name, fuzzSec, speedCap, fallPhysics, traceFall]) => {
       function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       // FUZZ_FALL_BEGIN: pure, source-extracted by reimagine-fuzz-fall.mjs.
       function fuzzFallClassifier(cap, physics) {
@@ -95,7 +96,7 @@ async page => {
             [...s.p, ...s.v, ...s.frame, ...s.motion, s.t, s.wall, s.tick, s.gravity, s.steps, s.worldStep].every(Number.isFinite);
           const speed = finite ? Math.hypot(...s.v) : Infinity, h = finite ? Math.hypot(s.v[0], s.v[2]) : Infinity;
           const carried = s.carried || s.mounted, dt = previous ? s.t - previous.t : 0;
-          let reason = 'no observed release', certified = false;
+          let reason = 'no observed release', certified = false, releaseHandoff = false;
           const continuous = previous && s.tick === previous.tick + 1 && dt >= 0 && dt <= .05 &&
             s.wall >= previous.wall && s.wall - previous.wall <= 100 && s.steps >= 0 &&
             s.steps <= Math.ceil(dt / physics.step) + 1 && Number.isInteger(s.steps) &&
@@ -118,6 +119,7 @@ async page => {
               !previous.blocked && !previous.contacts && !previous.grounded && !previous.swimming &&
               previous.impulseT === s.impulseT) {
               anchor = { p: s.p.slice(), expected: s.p.slice(), v: s.v.slice(), speed, h, t: s.t, gravity: s.gravity, impulseT: s.impulseT };
+              releaseHandoff = true;
               out.releases++; reason = 'release anchor';
             }
             if (anchor) {
@@ -131,7 +133,11 @@ async page => {
               else if (h > horizontal || h - previous.h > physics.accel * dt + .05) reason = invalidate('horizontal acceleration');
               else if (s.v[1] < anchor.v[1] - g * (elapsed + physics.step) - .05 ||
                 s.v[1] < previous.v[1] - g * (dt + physics.step) - .05 ||
-                s.v[1] > previous.v[1] + .05) reason = invalidate('vertical impulse');
+                // Talon-point velocity replaces the constrained body's solver
+                // velocity at release. One gravity step plus 0.1 m/s covers
+                // that handoff; later airborne ticks retain the 0.05 bound.
+                s.v[1] > previous.v[1] + (releaseHandoff ? g * physics.step + .1 : .05))
+                reason = invalidate('vertical impulse');
               else if (speed ** 2 > energy + tolerance) reason = invalidate('energy gain');
               else if (s.v[1] < 0 && s.p[1] <= anchor.p[1]) { certified = true; reason = 'certified release fall'; }
               else reason = 'not descending below release';
@@ -195,6 +201,8 @@ async page => {
       const saves0 = g.state.solverSaves || 0;     // cumulative; see the header
       const t0 = performance.now();
       const fall = fuzzFallClassifier(speedCap, fallPhysics), rawTick = g.tick;
+      const fallTrail = [], fallTrailMax = 180;
+      let firstUnexplained = null;
       let fallTick = 0, fallContacts = false, fallSteps = 0;
       const fallMotion = [0, 0, 0];
       const fallContact = () => {
@@ -219,7 +227,18 @@ async page => {
       function fallTickObserver(...args) {
         fallContacts = false; fallSteps = 0; fallMotion.fill(0);
         try { return rawTick.apply(this, args); } finally {
-          fallTick++; fall.sample(fallState());
+          fallTick++;
+          const row = fallState(), verdict = fall.sample(row);
+          if (traceFall) {
+            fallTrail.push({ t: row.t, p: row.p, v: row.v, grounded: row.grounded,
+              carried: row.carried, mounted: row.mounted, condorCarrier: row.condorCarrier,
+              contacts: row.contacts, frame: row.frame, impulseT: row.impulseT,
+              terrain: name === 'pasto' ? g.pasto?.terrainHeight?.(row.p[0], row.p[2]) ?? null : null,
+              certified: verdict.certified, reason: verdict.reason });
+            if (fallTrail.length > fallTrailMax) fallTrail.shift();
+            if (!firstUnexplained && Math.hypot(...row.v) > speedCap && !verdict.certified)
+              firstUnexplained = fallTrail.slice();
+          }
           const saves = g.state.solverSaves || 0;
           if (saves > observedSaves) {
             // Post-clamp candidates, not a claim of exact pre-solver cause.
@@ -283,6 +302,7 @@ async page => {
         for (const k of held) up(k);
       }
       const fallSpeed = fall.report();
+      if (traceFall) fallSpeed.firstUnexplainedTrail = firstUnexplained;
       maxSpeed = Math.max(maxSpeed, fallSpeed.maxObservedSpeed);
       for (const k of held) up(k);
       const saves1 = g.state.solverSaves || 0;     // read BEFORE the keepsake teleport
@@ -430,7 +450,7 @@ async page => {
         errs: errs.slice(0, 6), lastError: g.state.lastError || null,
       };
       } finally { console.error = oe; }
-    }, [n, sysFUZZ_SEC, sysFUZZ_SPEED_BY[n] || sysFUZZ_SPEED_MAX, fallPhysics]);
+    }, [n, sysFUZZ_SEC, sysFUZZ_SPEED_BY[n] || sysFUZZ_SPEED_MAX, fallPhysics, traceFall]);
     console.log('fuzz ' + n + ' ' + JSON.stringify({ started: res[n].started,
       maxSpeed: res[n].maxSpeed, nan: res[n].nanFrames, void: res[n].belowVoid }));
   }

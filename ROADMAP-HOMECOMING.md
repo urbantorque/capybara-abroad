@@ -2039,6 +2039,49 @@ and browser-longtask trace to every load row for one bounded diagnostic run.
 The production source remains unchanged from M6o; public master stays held.
 Weekly allowance: 16% remaining.
 
+### M6s: condor handoff classified, renderer crash still blocks release
+
+Two full-soak runs overlapped in this checkout before the older heartbeat stood
+down. One recorded a cold Quay 567 ms visible gap and lost its reused port 5188
+server at the final QA upload; its history row correctly fails load/runtime.
+The other completed, with cold Rio 416 ms, Iceland 433 ms and Venice 299 ms
+gaps. Their overlap prevents attributing those particular intervals to the
+game. Later runs used an owned port and one browser at a time. The direct soak
+runner now retains the load result in Node if its optional `/shot` upload dies;
+it still records browser errors and fails that runtime gate.
+
+An isolated all-place trace passed 38/38 load crossings but found a warm Monaco
+133 ms visible gap alongside a 125 ms browser long task, outside its largest
+37 ms game tick. The same run failed physics in Pasto at 30.25 m/s unexplained.
+A focused Sydney-to-Pasto replay reproduced 36.04 m/s over 22 observed frames.
+Its opt-in three-second trail showed the condor carrying the animal, then a
+0.133 m/s upward change when the talon-point velocity replaced the constrained
+body velocity at release. The old classifier's 0.05 m/s upward allowance
+invalidated that witnessed release. The animal then descended continuously
+under gravity with no contact or external impulse while the edge terrain fell
+away. `qa/fuzz.js` now allows one gravity step plus 0.1 m/s on that exact
+observed handoff tick; the 30 m/s general ceiling and all later-tick limits
+remain. The source-extracted test passes 201 checks, including rejection of a
+larger handoff jump. An untraced full fuzz run then certified Pasto's 33.30 m/s
+peak across 12 fall frames, with 29.73 m/s unexplained maximum and zero
+unexplained frames or polls. The packaged-file probe passed.
+
+That full run still failed its release gate: the Edge renderer target crashed
+three seconds into the hosted load stage, after the Free Roam choice and trusted
+start gesture, before a fresh load row. CDP reported `Target.targetCrashed`
+with error code -2147483645; there was no JavaScript exception. The row is
+preserved as `fuzz ok, ks ok, load FAIL, runtime FAIL`. A following source-frozen
+run with opt-in startup trace and crash capture passed all three stages in
+22.3 minutes, including 38/38 focused visible crossings, no >100 ms visible
+load gap and no reported browser error. Its startup samples showed no WebGL
+context loss and up to 135 MB reported JavaScript heap; no crash dump was
+produced. This pass does not erase the preceding crash or establish its cause.
+
+Production source is unchanged from M6o. No public-master promotion or hosted
+candidate check has occurred. The intermittent renderer crash, sustained frame
+targets, human listening and novice playtests, and physical-device coverage
+remain open. Weekly allowance: 15% remaining; the user's 6% floor still applies.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

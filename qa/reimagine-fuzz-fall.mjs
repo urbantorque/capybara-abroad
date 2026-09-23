@@ -48,6 +48,27 @@ for (const cap of [30, 34, 50]) {
   eq(f.report().unexplainedFrames, 0, 'no unexplained ballistic samples');
   ok(f.report().maxUnexplainedSpeed <= cap, 'unexplained maximum excludes only proven fall');
 }
+function handoff(verticalDelta) {
+  const f = make(30, physics), before = initial({ v: [8, 11, 0] });
+  f.sample(before);
+  const v = [8, before.v[1] + verticalDelta, 0];
+  const s = next(before, { v, motion: v.map(x => x * step),
+    p: before.p.map((x, i) => x + v[i] * step) });
+  f.sample(s);
+  fall(f, s, 160);
+  return f.report();
+}
+{
+  const r = handoff(.133);
+  eq(r.releases, 1, 'observed condor handoff anchors');
+  ok(r.certifiedFallFrames > 0, 'small talon-point correction certifies later gravity fall');
+  eq(r.unexplainedFrames, 0, 'small handoff does not erase the 30 m/s ceiling');
+}
+{
+  const r = handoff(.8);
+  ok(r.invalidations['vertical impulse'] > 0, 'larger upward handoff still invalidates');
+  ok(r.unexplainedFrames > 0, 'later overspeed remains a failure after invalid handoff');
+}
 rejects({ grounded: true }, 'ground contact');
 rejects({ contacts: true }, 'airborne contact');
 rejects({ swimming: true }, 'water');
