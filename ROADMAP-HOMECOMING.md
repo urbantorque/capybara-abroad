@@ -1845,6 +1845,39 @@ the wet signal path after node reuse, then tackle cold-first-entry room work
 under the transition mask without changing the musical handoff; rerun the
 release soak before public master. Weekly allowance: 17% remaining.
 
+### M6k: prepare cold rooms under white; shader fault isolated
+
+The chapter switch already has an opaque, GPU-warm-held phase. `biome:enter`
+now prepares the destination's effects-room node and music IR during that
+phase. Music assigns its buffer early only to a fully released, unfed inactive
+slot; an old tail still ringing is left alone. The existing effects-room send
+switch and musical crossfade remain at their old clocks. This is event-only
+work, bounded by the three-entry caches; no save change or new audio term.
+
+A headful live-bus fixture injected the shipped `thud` voice and measured the
+effects-return tap after Cave, Sydney and Cave. On the candidate after masked
+preparation, peak RMS was 0.03939, 0.00281 and 0.03305 respectively, all over
+three times their local baseline; both room keys and the running AudioContext
+agreed with the chapter. This proves a signal reaches the reused wet bus, not
+that it sounds right to a listener. Syntax, build and all 77 repository checks
+pass. Two separate Auto-profile focused traces saw 83.4 ms first visible Cave
+gaps, but the samples do not establish a durable cold-arrival improvement.
+
+The next bottleneck is distinct and still open. Fixed Pretty, rung 0, repeated
+Cave crossings produced 383–534 ms visible draw ticks in several owned Edge
+runs even though the warm pass had run. A late program was consistently
+`lambert`/`rim2s` on the global, soil-coloured, twelve-vertex tetrahedron
+(the effects dust pool in `props.js`); its nearest compiled key differed by
+point-light count 0→6. In another run, a 4.6 s draw happened under the mask
+and the first visible rAF still had a 233.5 ms gap. One later diagnostic
+browser target crashed before the start assertion, and another white crossing
+delivered only two rAFs in fourteen seconds. These failures are retained as
+failures, not averaged into a pass. The new room preparation had not run at
+the pre-start crash; attribution of that crash remains open. Release work
+should identify why the dust's six-point-light variant escapes the warm pass,
+then rerun a source-frozen full soak and real-device/listening gates. Public
+master stays unchanged. Weekly allowance: 17% remaining.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,

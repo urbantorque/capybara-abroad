@@ -13674,14 +13674,8 @@ export function createSystems(game) {
     return entry;
   }
 
-  /**
-   * Point the convolver at this chapter's room. Once per border crossing.
-   * A failure here is not fatal: the dry path remains the whole signal.
-   */
-  function sysRoomLoad(name) {
-    if (!ac || !acRoomConv) return;
-    const key = name || 'sydney';
-    if (acRoomFor === key) return;
+  function sysRoomPrepare(key) {
+    if (!ac || !acRoomConv) return null;
     const R = sysROOMS[key] || sysROOM_DEF;
     let entry = acRoomCache.get(key);
     if (entry) acRoomCache.delete(key);
@@ -13702,9 +13696,36 @@ export function createSystems(game) {
         entry = { conv, out, buffer: buf, makeup: sysRoomMakeup(buf) };
       } catch (e) {
         if (!first) { try { conv && conv.disconnect(); out && out.disconnect(); } catch (_) {} }
-        return;               // keep the old room and its dry path alive
+        return null;          // keep the old room and its dry path alive
       }
     }
+    acRoomCache.set(key, entry);
+    if (acRoomCache.size > sysIR_CACHE_ROOMS) {
+      // Preparation may run before the old room's send is disconnected.
+      // Evict an inactive node; the live one remains until sysRoomLoad swaps.
+      let oldKey = acRoomCache.keys().next().value;
+      if (acRoomCache.get(oldKey).conv === acRoomConv) {
+        for (const k of acRoomCache.keys()) {
+          if (acRoomCache.get(k).conv !== acRoomConv && k !== key) { oldKey = k; break; }
+        }
+      }
+      const old = acRoomCache.get(oldKey);
+      acRoomCache.delete(oldKey);
+      try { old.conv.disconnect(); old.out.disconnect(); } catch (e) { /* an evicted tail is optional */ }
+    }
+    return entry;
+  }
+
+  /**
+   * Point the convolver at this chapter's room. Once per border crossing.
+   * A failure here is not fatal: the dry path remains the whole signal.
+   */
+  function sysRoomLoad(name) {
+    if (!ac || !acRoomConv) return;
+    const key = name || 'sydney';
+    if (acRoomFor === key) return;
+    const entry = sysRoomPrepare(key);
+    if (!entry) return;
     if (entry.conv !== acRoomConv) {
       acRoomSend.disconnect();
       acRoomConv = entry.conv;
@@ -13718,13 +13739,6 @@ export function createSystems(game) {
     acRoomMakeup = entry.makeup;
     if (acRoomOut) acRoomOut.gain.setTargetAtTime(acRoomMakeup, ac.currentTime, 0.25);
     acRoomFor = key;
-    acRoomCache.set(key, entry);
-    if (acRoomCache.size > sysIR_CACHE_ROOMS) {
-      const oldKey = acRoomCache.keys().next().value;
-      const old = acRoomCache.get(oldKey);
-      acRoomCache.delete(oldKey);
-      old.conv.disconnect(); old.out.disconnect();
-    }
   }
   /**
    * What the convolver's normaliser leaves of this impulse's head, and the
@@ -18634,9 +18648,29 @@ export function createSystems(game) {
   const musRoomCache = new Map();
   let musRoomCur = 0, musRoomFor = '', musRoomWant = sysMUS_WET, musRoomFadeT = 0;
 
+  function musRoomShape(key) {
+    const R = sysROOMS[key] || sysROOM_DEF;
+    return { R,
+      secs: clamp(sysMUS_ROOM_A + R.size * sysMUS_ROOM_B, sysMUS_ROOM_MIN, sysMUS_ROOM_MAX),
+      dec: clamp(R.decay * 0.85 + 0.5, 1.4, 3.6) };
+  }
+
+  function musRoomPrepare(key) {
+    if (!ac || musRoomSlot.length < 2 || !musSend || musRoomFor === key) return;
+    const shape = musRoomShape(key);
+    let buf;
+    try { buf = sysIRCached(musRoomCache, key, shape.secs, shape.dec).buffer; } catch (e) { return; }
+    const nxt = musRoomSlot[1 - musRoomCur];
+    // Only a fully released inactive slot may be prepared before its crossfade.
+    // A still-ringing slot keeps its old impulse until musRoomLoad owns it.
+    if (musRoomFadeT <= 0 && !nxt.fed && nxt.conv.buffer !== buf) {
+      try { nxt.conv.buffer = buf; } catch (e) { /* musRoomLoad keeps the old score */ }
+    }
+  }
+
   /**
-   * Move the score into `name`'s room. Once per border crossing, and it is the
-   * only thing in the audio graph that allocates on a chapter change.
+   * Move the score into `name`'s room. Once per border crossing; preparation
+   * may already have built its buffer behind the transition mask.
    *
    * Nothing here is fatal: if musIR throws, the live slot keeps the room it has
    * and the score goes on sounding exactly as it did, which is the same
@@ -18646,13 +18680,12 @@ export function createSystems(game) {
     if (!ac || musRoomSlot.length < 2 || !musSend) return;
     const key = name || 'sydney';
     if (musRoomFor === key) return;
-    const R = sysROOMS[key] || sysROOM_DEF;
+    const shape = musRoomShape(key);
+    const R = shape.R;
     // Stretched out of the sfx table: a score wants a longer tail and a wetter
     // send than a footstep does, and the ORDERING in that table is the part
     // that was worth having — Manly driest, the cave wettest, by a long way.
-    const secs = clamp(sysMUS_ROOM_A + R.size * sysMUS_ROOM_B,
-                       sysMUS_ROOM_MIN, sysMUS_ROOM_MAX);
-    const dec  = clamp(R.decay * 0.85 + 0.5, 1.4, 3.6);
+    const secs = shape.secs, dec = shape.dec;
     // ---- WHICH ROOM AND HOW LOUD ARE NOT THE SAME QUESTION ----------------
     //
     // The first version set the send straight off sysROOMS' `wet` column and
@@ -49250,6 +49283,13 @@ export function createSystems(game) {
   // (see the atmosphere block in update); the frustum depth is a one-off swap.
   game.events.on('biome:enter', function (p) {
     const name = (p && p.name) || 'sydney';
+    // The new place is built behind the crossing's white mask. Build its room
+    // nodes here too; their first Web Audio buffer assignment otherwise lands
+    // 50–70 ms into the visible arrival, after the graphics are already ready.
+    if (ac && fadeEl.classList.contains('on')) {
+      sysRoomPrepare(name);
+      musRoomPrepare(name);
+    }
     jrMarkSeen(chapterOf(name));
     saveSoon();
     // The small-caster sweep on the new chapter's first rendered frame, not
