@@ -93,7 +93,11 @@ try {
     await go('picnic-thief', .7, 35000, true);
     await h.page.keyboard.press('e');
     await h.page.waitForTimeout(300);
-    assert.equal((await sample('sandwich grabbed, attempt ' + attempt)).held, 'sandwich');
+    const grabbed = await sample('sandwich grabbed, attempt ' + attempt);
+    // The gardener can pick the animal up between arrival and E. That
+    // interrupts the pickup, not the task; the next loop waits for release.
+    if (grabbed.carried && grabbed.held !== 'sandwich') continue;
+    assert.equal(grabbed.held, 'sandwich');
     await go({ x: 30, z: 10 }, 1.1, 35000, true); await go({ x: 12, z: 10 }, 1.1, 35000, true);
     await h.page.waitForFunction(() => window.__capy.taskDone('picnic-thief') ||
       window.__capy.capy.heldProp?.type !== 'sandwich', null, { timeout: 20000 });

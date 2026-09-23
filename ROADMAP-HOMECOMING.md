@@ -1571,6 +1571,34 @@ player's volume settings or perceived spectral masking. No blanket music
 gain or world-noise cut is justified by these numbers, and human listening
 and cultural fit remain open gates.
 
+### M6b: one uninterrupted earned journey and built-artifact smoke
+
+The current single-file HTML passed the existing headful release smoke at its
+local served URL: trusted movement, running score, settings quality changes,
+Kyoto reflection A/B, travel to Hanoi, save reload and preserved preference.
+The pinned Kyoto water mask contained 192,221 pixels; 172,779 changed by at
+least twelve channel levels when reflections were cut, and a screenshot was
+read by eye. No page error or failed request appeared. This is the generated
+artifact on localhost, not the public host or an independent browser/device.
+
+The first current-build cumulative Story attempt stopped in Sydney because a
+gardener carried the capybara between reaching the sandwich and pressing E.
+The QA driver now treats that observed carry as a bounded retry, still using
+the actual pickup, getaway, task writer and earned gate. It does not seed a
+task or move a body. On the next fresh run, one headful Edge context earned
+Sydney, Quay, Pasto, Pantanal, Kyoto, Hanoi, Palawan, Cave, Monaco and Iceland
+in order, with each memory saved and checked before travel. It completed the
+actual home-lawn rest, all twenty coda notes, persisted `fin=1`, reloaded and
+repeated the rest without duplicate finale state. The last gate held forty
+saved task IDs; there were no page/target errors in this 17-minute run.
+
+This is the first complete uninterrupted automated Homecoming route, not
+novice discovery, all nineteen places, physical touch testing or a measured
+retention result. Earlier intermittent Edge/Chrome renderer crashes on earned
+reloads remain counterevidence. One successful current-build route cannot
+establish a safe crash frequency or root-cause repair. Public master remains
+held while the release gate is assessed; the pushed branch is the candidate.
+
 ## Explicit cuts (scope)
 
 No conventional villain campaign, combat tree, paid/daily retention system,
