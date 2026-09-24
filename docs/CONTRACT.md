@@ -101,6 +101,74 @@ on every changed file; build 7282.7 KB, no collisions.
   `noTravArc`, `noKyoFar`, `noToriiWood`, `noHanWillow` and
   `noHkBakeGlyph`, and a headful look at the sign under bloom.
 
+**The proof slot (after the merge, alone on the Arc GPU, headful Edge,
+rung 0 pinned by `capy3.prefs.v1` pf 1, fresh server on the merged tree
+at 8b14a03).**
+
+GPU cost, live minus cut in ms, post.render timer queries in 30-frame
+blocks alternating (96-128 samples a side). `qa/aaa-ab.mjs` at the
+arrival lens; `qa/ten-t3-proof-ab.mjs` is the same loop with a spot
+(`torii:k`) and a part of a term in place of a flag. The noise floor, a
+flag nothing reads: Hanoi +0.15, −0.10; Kowloon +0.06; Kyoto on the torii
+path +0.63. Scene time moves between launches (8.2 or 12.4-13.2 ms in
+Hanoi, the same lens), so only a within-run delta means anything.
+- `noHkBakeGlyph` (Kowloon arrival, the sign in frame): −0.04. Noise.
+- `noHkArcadeCam` (Kowloon arrival): +0.28 against a +0.06 null. A lens
+  term with no draw; noise.
+- `noKyoFar` (Kyoto arrival, the pagoda at the lane's end): +0.08.
+- `noToriiWood`: arrival −0.04; the animal set on gate 5, the rail lens
+  on it, −0.07; on gate 20, +0.09. Noise.
+- `noFlashStar` (Sydney) +0.14, `noTravArc` (Sydney) +0.02. Neither
+  draws at rest (a 90 ms star; a figure after a memory), so these are
+  the idle cost only, and noise.
+- **`noHanWillow` is the one T3 term above the floor:** +0.39, +1.01,
+  +0.91, +0.91 at the Hanoi arrival. Split with the same loop: the
+  crowns', trunks' and boat's shadows +0.40, +0.35, +0.15; the sway
+  against the game's own plain crown material (the one the tick swaps in
+  at rung 1) +0.13, −0.04, so the sway is free and the rest is 34 crowns
+  drawn over 17 % of the frame. Cut, the group is hidden (0 by
+  construction) and at rung 1 the shadows and sway park, so it is inside
+  the law, but it misses the roadmap's own "aaa-ab 0.1 ms or less" for
+  T3e by 0.3-0.9 ms. A first split that copied the crown material by hand
+  read the sway at +0.77, +0.45, +0.60: the copy dropped mat()'s hooks.
+
+Payoff pictures, `qa/ten-t3-proof-shots.mjs <mode>`, page.screenshot
+with the HUD, 1280×720, 0 page errors in all six:
+- T3a (`-free-kyoto.png`, `-hanoi-arrive.png`): THE SKETCHBOOK paper,
+  the place, "nobody here has noticed it yet", three barred names with
+  wants (bowls, coffee, handbags), "0 OF 50 NAMES · 0 OF 2 NOTICED", "if
+  it wants: the river run"; no tick boxes. In Sydney at 6 s the paper is
+  hidden by `#hud.opening-quiet` (`-free-sydney.png`), as T2 meant.
+- T3b (`-ibis-watch.png`): fresh story file, act 1, grace on. After
+  `rivalSoon` the bird stands on the green bin lid by the Opera House
+  steps (perch bin, top 2.73), on screen at (897, 151). Small at 20 m,
+  but it reads as a bird on a bin.
+- T3c (`-cameo-memory.png`, `-memory-later.png`): the memory card is
+  clean and one bubble at most was up in every frame. The traveller was
+  placed 22 m off, faceErr 0, at (984, 239) in the card's frame, which is
+  behind the jacaranda crown: not visible, the miss the builder named.
+  4 s later they are at x 1580, off the frame. The later frame also has
+  the premise card ("FIVE FOLDS OF A MAP") laid over the "YOU ARE TAKING"
+  card with a bubble under both, because the memory was fired inside the
+  first ten seconds.
+- T3d (`-kyoto-arrive.png`, `-kyoto-torii5.png`): the lane ends on the
+  pagoda in the haze, the ridges faint behind; on gate 5 the gaps between
+  the posts are dark understory, no lawn.
+- T3e (`-hanoi-arrive.png`): willows along the right of the ring road
+  leaning out over the lake, crowns hanging; 33 trees this load (34 on
+  the builder's), 8 lotus. The pedalo is not in this frame.
+- T3f (`-kowloon-arrive.png`, `-kowloon-arcade.png`): the bakery sign
+  carries its strokes under bloom and is not the brightest thing; the
+  arrival frame is a red double-decker passing between lens and animal. Under the
+  scaffold after 5 s still: arcade on, yaw 1.571, the lens out over the
+  road, the animal whole in the middle, two poles either side of it.
+
+Nothing was fixed in the proof slot. A render-side sight ray for the
+cameo was probed (`qa/ten-t3-proof-ray.mjs`): 1.6-4.8 ms a ray in Sydney
+and no hit from the arrival lens, so the hiding is the lens moving after
+the placement as much as the canopy, and a per-candidate ray is not a
+small fix.
+
 ## TEN T2 — THE STORY SHOWS ITSELF (25 Sep 2026)
 
 Six builders on six disjoint files, merged into `ten-pass` with no
