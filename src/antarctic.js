@@ -4568,7 +4568,7 @@ function antUpdatePod(game, dt) {
     // WITH THEM: ice under 0.12 is still twenty metres off the lead's middle,
     // so a wait released on the ice alone let them go at 11 from 22 m off a
     // boat still turning into the lead, and lost it in six seconds (measured,
-    // second helm run). The wait holds until the boat is inside 13 m.
+    // third helm run). The wait holds until the boat is inside 13 m.
     const runWait = !(game.state && game.state.noPodLead) &&
       (antBoatIce > 0.12 || (antPodWaiting && antPodGap > antPOD_HOLD * 0.8));
     antPodWaiting = runWait;
