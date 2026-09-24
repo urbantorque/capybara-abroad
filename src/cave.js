@@ -87,6 +87,16 @@ let cavEchoX = 0, cavEchoY = 0, cavEchoZ = 0;
 const cavECHO_LIFE = 2.3;
 const cavECHO_REACH = 46;
 const cavECHO_COOL = 1.05;
+// ---- THE PING (T2f, `noEchoPing`). See cavBuildPing ----------------------
+const cavPING_RAYS = 24;             // a flat fan, one every fifteen degrees
+const cavPING_PER = 6;               // three on the floor, three up the face it hits
+const cavPING_ROOF = 12;             // ...and the roof, where the roof is in reach
+const cavPING_N = cavPING_RAYS * cavPING_PER + cavPING_ROOF;
+const cavPING_LIFE = 0.62;           // s a glint stays lit after the ring reaches it
+let cavPing = null;
+const cavPingD = new Float32Array(cavPING_N * 5);   // x, y, z, arrives at (s), size
+let cavPingN = 0, cavPingT = -1, cavPingEnd = 0, cavPingWallN = 0, cavPingPeak = 0, cavPingLit = 0;
+let cavToldDay = false;              // the first-echo miss, said once (T2f)
 
 // the glow-worms
 let cavWorms = null, cavWormMat = null;
@@ -209,6 +219,8 @@ let cavFallLeaf = null, cavFallLeafD = null;
 // which is the first green thing you meet coming down the passage.
 const cavPHY_N = 104;
 let cavPhyBlades = null, cavPhyD = null;
+// the ferns on the doline floor (T2f, `noFern`), and the cones they replace
+let cavFernMesh = null, cavFernOld = null, cavFernN = 0;
 let cavPhyShake = 0, cavPhyDone = false;
 const cavSPORE_N = 54;
 let cavSpores = null, cavSporeD = null;
@@ -236,6 +248,11 @@ let cavSwiftX = null, cavSwiftY = null, cavSwiftZ = null, cavSwiftPh = null;
 let cavSwiftHX = null, cavSwiftHY = null, cavSwiftHZ = null;   // where each one lives
 let cavSwiftUp = 0, cavSwiftBest = 0, cavSwiftPeak = 0, cavSwiftOwn = 24;
 let cavSwiftClick = 0, cavRoostFace = -40, cavSwiftMine = false;
+// the crescent, level and wings-up, for the column's sixteen and the roost's
+// ninety (T2f, `noSwiftShape`). See cavSwiftGeo
+let cavSwirlA = null, cavSwirlB = null, cavSwiftA = null, cavSwiftB = null;
+let cavSwiftShapeOn = false, cavSwiftFlick = 0;
+const cavM0 = new THREE.Matrix4().makeScale(0, 0, 0);
 let cavRiverT = 0, cavFallT = 0;   // positional ambience clocks. See cavUpdateSound
 
 // tasks
@@ -2569,19 +2586,35 @@ function cavBuildDoline(game, root) {
   // SMALL IN THE GLADE. At 1.4 m across and 2.6 m tall these are the size of
   // a capybara, and ninety of them standing in the one place the marquee is
   // photographed from filled the frame with green traffic cones.
+  // ...AND THEY ARE FERNS NOW (T2f, `noFern`). Reviewed from the arrival and
+  // the column, these hundred and thirty cones were the most saturated value
+  // in a chapter of mossy browns — six-sided lime spikes that read as plastic.
+  // The cones are kept, in their own merged mesh, as the flag's picture and
+  // the rung-1 fallback; the ferns stand on the same spots, same lean.
+  const MF = cavMerger();
+  const fernAt = new Float32Array(130 * 6);   // x, y, z, size, lean x, lean z
   for (let i = 0; i < 130; i++) {
     const a = rand(0, Math.PI * 2), rr = rand(0, D.r + 11);
     const x = D.x + Math.cos(a) * rr, z = D.z + Math.sin(a) * rr * 0.9;
     const h = cavTerrain(x, z);
     const lean = clamp(rr / D.r, 0, 1.3) * 0.6;
     const near = clamp(rr / GLADE, 0.42, 1);     // half-size inside the glade
-    M.cone(x, h + 0.55 * near, z, rand(0.4, 1.1) * near, rand(1.0, 2.2) * near,
-           i % 3 ? PALETTE.cavFern : PALETTE.cavPhyto,
-           -Math.sin(a) * lean, rand(0, 3), Math.cos(a) * lean, 6);
+    const cr = rand(0.4, 1.1) * near;
+    MF.cone(x, h + 0.55 * near, z, cr, rand(1.0, 2.2) * near,
+            i % 3 ? PALETTE.cavFern : PALETTE.cavPhyto,
+            -Math.sin(a) * lean, rand(0, 3), Math.cos(a) * lean, 6);
+    fernAt[i * 6] = x; fernAt[i * 6 + 1] = h; fernAt[i * 6 + 2] = z;
+    fernAt[i * 6 + 3] = cr * 1.7 + 0.3;
+    fernAt[i * 6 + 4] = -Math.sin(a) * lean * 0.45; fernAt[i * 6 + 5] = Math.cos(a) * lean * 0.45;
   }
   const mesh = new THREE.Mesh(M.build(), cavVC());
   mesh.castShadow = true;
   root.add(mesh);
+  cavFernOld = new THREE.Mesh(MF.build(), cavVC());
+  cavFernOld.castShadow = true;
+  cavFernOld.visible = false;
+  root.add(cavFernOld);
+  cavBuildFerns(root, fernAt, 130);
 
   // 5. the mist that sits under it, which is what the cave breathing looks like
   {
@@ -2606,6 +2639,59 @@ function cavBuildDoline(game, root) {
   cavBuildColumn(game, root);
   cavBuildShaftLife(root);
   cavBuildPhyto(game, root);
+}
+
+/**
+ * THE FERNS UNDER THE HOLE (T2f, `noFern`).
+ *
+ * The real doline floor is ferns and moss under a shaft of light, and what
+ * stood there was a hundred and thirty lime cones. One cluster, drawn once:
+ * nine fronds, each a stalk rising at forty degrees and a blade arching back
+ * down, dark at the heart (`cavJungleDk`) and `caveFern` at the tips. It is
+ * instanced on the cones' own spots at the cones' own lean, and the colour is
+ * lifted only where the daylight falls — full under the hole, half at the
+ * rim — so the green is brightest exactly where the light lands on it.
+ *
+ * One draw, no shadow. Parks at rung 1 and up, where the cones come back:
+ * they are one merged mesh and the fallback costs what it always cost.
+ */
+function cavBuildFerns(root, at, n) {
+  const M = cavMerger();
+  // six spreading low and three standing up in the middle, which is the
+  // shuttlecock a ground fern actually is; the low ring alone read as a star
+  // painted on the floor from the rig's eight metres
+  for (let f = 0; f < 9; f++) {
+    const up = f >= 6;
+    const yaw = up ? (f - 6) * 2.094 + 0.5 : f * 1.0472 + (f % 2) * 0.3;
+    const L1 = up ? 0.40 : 0.46 + (f % 3) * 0.05, L2 = up ? 0.36 : 0.52 + (f % 2) * 0.10;
+    const p1 = up ? 1.12 : 0.70, p2 = up ? 0.30 : -0.34;   // up, then arching over
+    const e1 = Math.cos(p1) * L1, y1 = Math.sin(p1) * L1;
+    const c = Math.cos(yaw), s = -Math.sin(yaw);
+    M.box(c * e1 * 0.5, y1 * 0.5, s * e1 * 0.5, L1, 0.035, 0.10, PALETTE.cavJungleDk, 0, yaw, p1);
+    const r2 = e1 + Math.cos(p2) * L2 * 0.5;
+    M.box(c * r2, y1 + Math.sin(p2) * L2 * 0.5, s * r2, L2, 0.03, 0.26, PALETTE.caveFern, 0, yaw, p2);
+  }
+  M.cone(0, 0.10, 0, 0.16, 0.22, PALETTE.cavJungleDk, 0, 0, 0, 6);   // the crown
+  cavFernMesh = new THREE.InstancedMesh(M.build(), cavVC(), n);
+  cavFernMesh.frustumCulled = false;
+  const k = new THREE.Color();
+  for (let i = 0; i < n; i++) {
+    const o = i * 6, sz = at[o + 3];
+    cavM.compose(cavV3.set(at[o], at[o + 1] - 0.04, at[o + 2]),
+                 cavQ.setFromEuler(cavE.set(at[o + 4], rand(0, 6.283), at[o + 5])),
+                 cavSc.set(sz, sz * rand(0.8, 1.15), sz));
+    cavFernMesh.setMatrixAt(i, cavM);
+    cavFernMesh.setColorAt(i, k.setScalar(lerp(0.5, 1.0, cavDaylightAt(at[o], at[o + 2]))));
+  }
+  cavFernMesh.instanceMatrix.needsUpdate = true;
+  if (cavFernMesh.instanceColor) cavFernMesh.instanceColor.needsUpdate = true;
+  cavFernN = n;
+  root.add(cavFernMesh);
+}
+function cavUpdateFern(game) {
+  if (!cavFernMesh) return;
+  const on = !game.state.noFern && (game.state.perfRung | 0) < 1;
+  if (cavFernMesh.visible !== on) { cavFernMesh.visible = on; cavFernOld.visible = !on; }
 }
 
 /** See cavPHY_N. A field of rock fins, all of them pointed at the hole. */
@@ -2835,6 +2921,8 @@ function cavBuildShaftLife(root) {
     }
     root.add(cavSwirl);
     cavRoundOn(cavSwirl);
+    cavSwirlA = cavSwiftPair(root, 0.10, 1, cavSWIRL_N);
+    cavSwirlB = cavSwiftPair(root, 0.62, 1, cavSWIRL_N);
   }
   // ---- and the litter coming down the hole -------------------------------
   {
@@ -2946,8 +3034,20 @@ function cavUpdateShaftLife(dt) {
                    cavQ.setFromEuler(cavE.set(0.18, yaw, pbank, 'YXZ')),
                    cavSc.set(psc, psc, psc));
       cavSwirl.setMatrixAt(i, cavM);
+      if (cavSwiftShapeOn && cavSwirlA) {
+        // bursts of flicker between glides; on a falling capybara, all flicker
+        const f = (cavColFall > 0.02 || Math.sin(cavTime * 1.1 + i * 0.9) > -0.1)
+                  && Math.sin(cavTime * 26 + i * 2.3) > 0;
+        cavSwirlA.setMatrixAt(i, f ? cavM0 : cavM);
+        cavSwirlB.setMatrixAt(i, f ? cavM : cavM0);
+        if (f) cavSwiftFlick++;
+      }
     }
     cavSwirl.instanceMatrix.needsUpdate = true;
+    if (cavSwiftShapeOn && cavSwirlA) {
+      cavSwirlA.instanceMatrix.needsUpdate = true;
+      cavSwirlB.instanceMatrix.needsUpdate = true;
+    }
   }
   if (cavFallLeaf) {
     for (let i = 0; i < cavFALL_N; i++) {
@@ -4016,6 +4116,67 @@ function cavBuildSwifts(root) {
     cavSwiftPh[i] = rand(0, 6.28);
   }
   root.add(cavSwifts);
+  cavSwiftA = cavSwiftPair(root, 0.06, 0.55, cavSWIFT_N);
+  cavSwiftB = cavSwiftPair(root, 0.62, 0.55, cavSWIFT_N);
+}
+
+/**
+ * THE CRESCENT (T2f, `noSwiftShape`).
+ *
+ * Reviewed mid-drop off the column, the sixteen swifts that form on the animal
+ * read as straight black bars, thrown sticks: a flat pair of wings seen from
+ * above against two hundred metres of bright shaft is a line, and nothing on
+ * them moved. A swift is a scimitar — the arm short and nearly square to the
+ * body, the hand long and raked hard back, a fork in the tail — and it flies
+ * in bursts of very fast flicker between glides. So the crescent is drawn
+ * twice, once level and once with the wings up, and each bird is written into
+ * one or the other on its own clock: a flicker at about four beats a second
+ * that costs a matrix, not a bone. The roost's ninety are the same bird at its
+ * own size, and they only flicker while they are off the wall.
+ *
+ * Four draws (two for the column, two for the roost), the old two hidden.
+ * Parks at rung 1 and up, where the old birds come back.
+ */
+function cavSwiftGeo(dih, k) {
+  const M = cavMerger();
+  const C = PALETTE.cavSwiftlet;
+  M.sph(0, 0, 0.03 * k, 0.15 * k, 0.12 * k, 0.56 * k, C, 6);
+  for (let s = -1; s <= 1; s += 2) {
+    M.box(s * 0.05 * k, 0, -0.36 * k, 0.03 * k, 0.02 * k, 0.24 * k, C, 0, s * 0.32, 0);
+  }
+  for (let s = -1; s <= 1; s += 2) {
+    // [length, chord, rake] from the shoulder: the arm, then the hand
+    let ox = 0, oz = 0;
+    for (let j = 0; j < 2; j++) {
+      const L = j ? 0.50 : 0.40, w = j ? 0.10 : 0.17, sw = j ? 0.95 : 0.22;
+      const cx = ox + Math.cos(sw) * L * 0.5, cz = oz - Math.sin(sw) * L * 0.5;
+      // the dihedral, turned about the shoulder
+      const x = (0.06 + cx) * Math.cos(dih), y = (0.06 + cx) * Math.sin(dih);
+      M.box(s * x * k, (0.02 + y) * k, cz * k, L * k, 0.03 * k, w * k, C, 0, s * sw, s * dih);
+      ox += Math.cos(sw) * L; oz -= Math.sin(sw) * L;
+    }
+  }
+  return M.build();
+}
+function cavSwiftPair(root, dih, k, n) {
+  const m = new THREE.InstancedMesh(cavSwiftGeo(dih, k), cavVC(), n);
+  m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  m.frustumCulled = false;
+  m.visible = false;
+  for (let i = 0; i < n; i++) m.setMatrixAt(i, cavM0);
+  root.add(m);
+  return m;
+}
+/** Which birds are drawn. Read once a frame, before either flock moves. */
+function cavSwiftShapeSync(game) {
+  if (!cavSwirlA || !cavSwiftA) return;
+  const on = !game.state.noSwiftShape && (game.state.perfRung | 0) < 1;
+  cavSwiftFlick = 0;
+  if (on === cavSwiftShapeOn) return;
+  cavSwiftShapeOn = on;
+  cavSwirl.visible = !on; cavSwifts.visible = !on;
+  cavSwirlA.visible = on; cavSwirlB.visible = on;
+  cavSwiftA.visible = on; cavSwiftB.visible = on;
 }
 
 /** Cave pearls: rimstone pools with something in them worth having. */
@@ -4113,6 +4274,146 @@ function cavBuildEcho(root) {
   cavEchoRing.frustumCulled = false;
   cavEchoRing.visible = false;
   root.add(cavEchoRing);
+  cavBuildPing(root);
+}
+
+/**
+ * THE ROCK ANSWERS (T2f, `noEchoPing`).
+ *
+ * Reviewed in the dark passage 1.4 s after a wheek, the chapter's torch was a
+ * three-pixel cyan arc in the middle distance and walls that stayed black: the
+ * one PointLight falls off before it reaches anything, because the passage is
+ * ninety metres across and the reach is forty-six. So the wet rock the ring
+ * crosses GLINTS for a moment as it goes — a fan of twenty-four rays marched
+ * at the wheek against the floor law, the drawn side walls and the Great Wall,
+ * three marks down each on the floor and three up whatever face it meets, and
+ * the roof where the roof is low enough to answer. Each one lights on the
+ * frame the ring reaches it (the ring's own smoothstep, inverted), so the
+ * reveal travels out as the ring does and the room is drawn in dots.
+ *
+ * One instanced draw of 156 octahedra, all of them written only while an echo
+ * is out. Parks at rung 1 and up; the flag hides it and the ring is as it was.
+ */
+function cavBuildPing(root) {
+  const m = cavGlow(PALETTE.caveGlint, 2.4).clone();
+  m.fog = false;                       // a light source, not a surface in the haze
+  cavPing = new THREE.InstancedMesh(new THREE.OctahedronGeometry(1, 0), m, cavPING_N);
+  cavPing.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  cavPing.frustumCulled = false;
+  cavPing.renderOrder = 7;
+  cavPing.count = 0;
+  cavPing.visible = false;
+  root.add(cavPing);
+}
+/** The drawn inner face of the side wall at z, on side s. cavBuildWalls' law. */
+function cavWallFace(s, z) {
+  return s * (49 + 7 * Math.sin(z * 0.031 + (s > 0 ? 0 : 1.9)) + 3.4 * Math.sin(z * 0.097 + s));
+}
+/** When the ring is at distance d, in s after the wheek. Smoothstep, inverted. */
+function cavRingAt(d, reach) {
+  const u = clamp((d - 1.5) / (reach * 0.95 - 1.5), 0, 1);
+  return cavECHO_LIFE * (0.5 - Math.sin(Math.asin(1 - 2 * u) / 3));
+}
+function cavPingAdd(x, y, z, d, reach, size) {
+  if (cavPingN >= cavPING_N || d > reach * 0.95) return false;
+  if (cavDaylightAt(x, z) > 0.45) return false;   // lit rock has nothing to show you
+  const o = cavPingN * 5;
+  const t = cavRingAt(d, reach);
+  cavPingD[o] = x; cavPingD[o + 1] = y; cavPingD[o + 2] = z;
+  cavPingD[o + 3] = t; cavPingD[o + 4] = size;
+  if (t + cavPING_LIFE > cavPingEnd) cavPingEnd = t + cavPING_LIFE;
+  cavPingN++;
+  return true;
+}
+/** Cast the fan from where the wheek was. See cavBuildPing. */
+function cavPingCast(game) {
+  cavPingN = 0; cavPingEnd = 0; cavPingWallN = 0; cavPingPeak = 0;
+  const reach = cavECHO_REACH * ((game.capy && game.capy.worn === 'cavehelm') ? 1.25
+                              : (game.capy && game.capy.worn === 'lantern') ? 1.5 : 1);
+  const x0 = cavEchoX, z0 = cavEchoZ;
+  const g0 = cavTerrain(x0, z0);
+  if (!(g0 === g0)) return;
+  const eye = Math.max(g0, cavEchoY) + 1.2;
+  const spin = rand(0, 6.283 / cavPING_RAYS);
+  for (let r = 0; r < cavPING_RAYS; r++) {
+    const a = spin + (r / cavPING_RAYS) * 6.283;
+    const dx = Math.cos(a), dz = Math.sin(a);
+    // three marks on the floor, at their own jittered distances
+    const m0 = rand(5, 8), m1 = rand(15, 20), m2 = rand(26, 33);
+    let mark = 0, px = x0, pz = z0;
+    for (let d = 2; d < reach; d += 1.5) {
+      const x = x0 + dx * d, z = z0 + dz * d;
+      const h = cavTerrain(x, z);
+      if (!(h === h)) break;
+      let hit = false;
+      if (z < 52 && z > -184 && Math.abs(x) >= Math.abs(cavWallFace(x < 0 ? -1 : 1, z))) hit = true;
+      else if (pz > -100 && z <= -100 && eye < cavWALL.top) hit = true;   // the Great Wall
+      else if (z < -183) hit = true;                                     // the far end
+      else if (h > eye + 0.4) hit = true;                                // rock rising into it
+      if (hit) {
+        // three up the face from the floor at its foot, each a beat after the
+        // last, so the answer CLIMBS the wall. Backed off half a metre along
+        // the ray, so the glint is on the face and not inside it.
+        const hx = px, hz = pz, f = cavTerrain(hx, hz), foot = f === f ? f : eye;
+        for (let k = 0; k < 3; k++) {
+          if (cavPingAdd(hx, foot + 0.7 + k * rand(1.8, 2.8), hz, d + k * 1.6, reach, 0.24 + d * 0.009)) cavPingWallN++;
+        }
+        break;
+      }
+      const want = mark === 0 ? m0 : mark === 1 ? m1 : mark === 2 ? m2 : 1e9;
+      if (d >= want) {
+        mark++;
+        if (!cavIsOverWater(x, z)) cavPingAdd(x, h + 0.10, z, d, reach, 0.18 + d * 0.008);
+      }
+      px = x0 + dx * (d - 0.5); pz = z0 + dz * (d - 0.5);
+    }
+  }
+  // ...and the roof, past the Great Wall and at the entrance, where it is low
+  // enough for the ring to reach. Under the hole there is nothing to answer.
+  for (let i = 0; i < cavPING_ROOF; i++) {
+    const a = rand(0, 6.283), rr = rand(3, 16);
+    const x = x0 + Math.cos(a) * rr, z = z0 + Math.sin(a) * rr;
+    if (cavHole(x, z) > 0.2 || z > cavMOUTH_Z) continue;
+    const y = Math.min(cavRoofH(x, z), 92) - 0.4;
+    const d = Math.sqrt(rr * rr + (y - eye) * (y - eye));
+    cavPingAdd(x, y, z, d, reach, 0.40 + d * 0.009);
+  }
+  cavPingT = cavPingN > 0 ? 0 : -1;
+}
+/** On the frame clock: each glint pops as the ring reaches it, then goes. */
+function cavUpdatePing(game, dt) {
+  if (!cavPing) return;
+  const st = game.state;
+  if (cavPingT < 0 || st.noEchoPing || (st.perfRung | 0) >= 1) {
+    if (cavPing.visible) { cavPing.visible = false; cavPing.count = 0; }
+    if (cavPingT >= 0 && (st.noEchoPing || (st.perfRung | 0) >= 1)) cavPingT = -1;
+    return;
+  }
+  cavPingT += dt;
+  if (cavPingT > cavPingEnd) {
+    cavPingT = -1; cavPing.visible = false; cavPing.count = 0;
+    return;
+  }
+  let lit = 0;
+  for (let i = 0; i < cavPingN; i++) {
+    const o = i * 5;
+    const u = (cavPingT - cavPingD[o + 3]) / cavPING_LIFE;
+    let s = 0;
+    if (u >= 0 && u < 1) {
+      // a hard attack and a tail, the echo's own envelope in miniature
+      s = cavPingD[o + 4] * (u < 0.08 ? u / 0.08 : Math.pow(1 - (u - 0.08) / 0.92, 1.4));
+      lit++;
+    }
+    cavM.compose(cavV3.set(cavPingD[o], cavPingD[o + 1], cavPingD[o + 2]),
+                 cavQ.setFromEuler(cavE.set(0, cavPingT * 2.2 + i, 0)),
+                 cavSc.set(s, s * 1.5, s));
+    cavPing.setMatrixAt(i, cavM);
+  }
+  cavPingLit = lit;
+  if (lit > cavPingPeak) cavPingPeak = lit;
+  cavPing.count = cavPingN;
+  cavPing.instanceMatrix.needsUpdate = true;
+  if (!cavPing.visible) cavPing.visible = true;
 }
 
 // =================================================================== UPDATE ==
@@ -4130,10 +4431,19 @@ function cavWheek(game) {
   cavEchoY = capy.body.position.y;
   cavEchoZ = capy.body.position.z;
   if (cavEchoRing) cavEchoRing.visible = true;
+  if (!game.state.noEchoPing && (game.state.perfRung | 0) < 1) cavPingCast(game);
+  else { cavPingN = 0; cavPingT = -1; }
   if (!cavToldEcho && cavDaylightAt(cavEchoX, cavEchoZ) < 0.25) {
     cavToldEcho = true;
     cavTask(game, 'first-echo');
     game.toast('it comes back. that is how you see in here.');
+  } else if (!cavToldEcho && !cavToldDay) {
+    // THE LESSON THAT FAILED IN SILENCE (T2f). Reviewed on the hint arrow's
+    // own spot, twenty presses over fifteen seconds, and nothing: the tick
+    // wants daylight under a quarter and the arrow stood twelve metres out in
+    // the green. One line, once, the first time the noise is spent on light.
+    cavToldDay = true;
+    game.toast('too much daylight here for it to come back. further in.');
   }
   // the swiftlets steer on sound too, which is the joke and is also true
   if (cavInZone('roost', cavEchoX, cavEchoZ)) { cavSwiftUp = 1; cavSwiftMine = true; }
@@ -4648,9 +4958,19 @@ function cavUpdateSwifts(game, dt) {
                                             Math.sin(cavTime * 14 + i) * 0.5 * k)),
                  cavSc.set(1, 1, 1));
     cavSwifts.setMatrixAt(i, cavM);
+    if (cavSwiftShapeOn && cavSwiftA) {
+      // on the wall the wings are level; off it, the flicker
+      const f = k > 0.05 && Math.sin(cavTime * 24 + i * 1.9) > 0;
+      cavSwiftA.setMatrixAt(i, f ? cavM0 : cavM);
+      cavSwiftB.setMatrixAt(i, f ? cavM : cavM0);
+    }
     if (k > 0.3) up++;
   }
   cavSwifts.instanceMatrix.needsUpdate = true;
+  if (cavSwiftShapeOn && cavSwiftA) {
+    cavSwiftA.instanceMatrix.needsUpdate = true;
+    cavSwiftB.instanceMatrix.needsUpdate = true;
+  }
   // THE COUNT IS TAKEN WHILE THEY ARE UP AND FILED WHEN THEY SETTLE. Recording
   // on every new maximum fires a personal best ninety times as the roost lifts.
   if (up > cavSwiftPeak) cavSwiftPeak = up;
@@ -4930,6 +5250,8 @@ export function createCave(game) {
       cavEchoBack[0] = -1; cavEchoBack[1] = -1; cavEchoBack[2] = -1;
       cavToldEcho = false; cavToldWorms = false; cavToldDim = false; cavToldOpen = false;
       cavToldPhyto = false; cavPhyShake = 0;
+      cavToldDay = false; cavPingT = -1; cavPingN = 0;
+      if (cavPing) { cavPing.visible = false; cavPing.count = 0; }
       cavSeenSlot = false; cavSwiftMine = false;
       cavRiverT = 0; cavFallT = 0;
       cavSkyK = 0;
@@ -4948,7 +5270,8 @@ export function createCave(game) {
       // anything stateful that could hold the player, cleared on the way out
       cavLogCarrying = false;
       cavWallT = -1;
-      cavEchoT = -1;
+      cavEchoT = -1; cavPingT = -1;
+      if (cavPing) { cavPing.visible = false; cavPing.count = 0; }
       cavColFall = 0; cavColP = null; cavColOn = false;   // D4.10, see onEnter
       if (cavEchoLight) cavEchoLight.intensity = 0;
     },
@@ -5093,8 +5416,19 @@ export function createCave(game) {
     seenLight() { return cavSeenLight; },
     echoReady() { return cavEchoCool <= 0; },
 
+    /** THE PING (T2f), for the harness: marks cast, how many on a face, the most lit at once, live now. */
+    /** THE FERNS (T2f), for the harness: how many, and which of the two is drawn. */
+    /** THE CRESCENT (T2f), for the harness: drawn, and how many of the column were mid-flick this frame. */
+    swiftShape() { return { on: cavSwiftShapeOn, flick: cavSwiftFlick, old: !!(cavSwirl && cavSwirl.visible), roostOld: !!(cavSwifts && cavSwifts.visible) }; },
+    fern() { return { n: cavFernN, on: !!(cavFernMesh && cavFernMesh.visible), cones: !!(cavFernOld && cavFernOld.visible) }; },
+    ping() { return { n: cavPingN, wall: cavPingWallN, peak: cavPingPeak, lit: cavPingT >= 0 ? cavPingLit : 0, live: cavPingT >= 0, shown: !!(cavPing && cavPing.visible) }; },
+
     // landmarks
-    mouth: { x: 0, z: cavMOUTH_Z - 4 },
+    // ...AND `mouth` IS THE FIRST DARK, NOT THE MOUTH (T2f). Its one reader is
+    // the 'first-echo' hint arrow (systems.js), and at z 46 it stood the player
+    // in daylight 0.9, where the tick (daylight under 0.25) can never fire.
+    // Twenty-two metres in, daylight is 0 and the lesson works on first press.
+    mouth: { x: 2, z: cavMOUTH_Z - 22 },
     river: { x: cavRIVER_X, z: 20 },
     hand: { x: cavHAND.x, z: cavHAND.z },
     /** THE WINDOW (L6, F2): the big drip's spot, and seconds until the roof lets go (-1 while it is). */
@@ -5141,10 +5475,13 @@ export function createCave(game) {
         cavRiverMover.set(0.55);
       }
       cavUpdateEcho(game, dt);
+      cavUpdatePing(game, dt);
+      cavUpdateFern(game);
       cavUpdateEchoBack(game, dt);
       cavUpdateWorms(dt);
       cavUpdateLog(game, dt);
       cavUpdateFish(game, dt);
+      cavSwiftShapeSync(game);
       cavUpdateSwifts(game, dt);
       cavUpdateDrips(game, dt);
       cavUpdateCrickets(dt);
