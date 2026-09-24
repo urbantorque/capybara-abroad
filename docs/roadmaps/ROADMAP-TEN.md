@@ -487,6 +487,44 @@ open water. find the lead." Flag `noPodLead`. Proof: the closed-loop helm run
 belly crescent, and 6 blow sparks at each surfacing (2351-2440). Proof: a PNG from the chase lens
 where the white patch reads. Stretch (`noKelvin`): a V wake replaces the ring stack (1464).
 
+### T2b — shipped
+
+Commit 1f7df07 on the T2b worktree branch. One file, src/antarctic.js, plus `qa/ten-t2b-*`.
+
+- **`noPodLead`.** The patrol is `antLeadX(pz) + 10 sin 2a`. `packAt` round the loop peaks at 0.086
+  (mean 0.058), where the old ellipse peaked at 0.72 (mean 0.27), sampled at 360 points. The run gate
+  is `sp > 4.0 (1 − 0.6 antBoatIce)`. "they want open water. find the lead." plays once per visit, at
+  `RUN_AT + 4` s of escort while the gate is still shut. **One addition the roadmap did not name:** a
+  run that breaks while the hull is still in pack (ice > 0.12, where the tender's top speed falls
+  below the pod's 11 m/s) now *waits*. The pod holds in the lead 8 m north of the boat and never
+  swims back south. The lose and ride clocks both stop until the boat is within 13 m. Helm run 2 had
+  no wait: the pod broke in 0.72 pack and was lost within 8 s. Run 3 released the wait on the ice
+  reading alone: the pod left 22 m off the boat and was lost again, which is why the wait now holds
+  to 13 m. A pod that stops
+  moving keeps its last heading; before, `atan2(0,0)` turned it to face south.
+- **Proof, `qa/ten-t2b-helm.js`.** Fresh profile, real keys, headless at rung 3. orca-ride ticked in
+  3 of 3 runs, at 52, 43 and 49 s wall (38.7, 41.1 and 41.7 game s). The pod waited 9.4, 14.4 and
+  9.1 s. The same harness with `noPodLead` (`qa/ten-t2b-helm-off.js`) got no tick in 150 s. The
+  harness has one change from b3m: during `escort` it steers 40 m up the lead instead of at the pod.
+  Steering at a pod that sits on the boat saturates the rudder, and the boat circles at 1 m/s in
+  open water. That happened in the one run without the change, which failed.
+- **`noOrcaRound`.** Each orca is built from three sph12 lobes under `matRound`. The eye patch sits
+  at +0.34 s, is 0.34 tall and leans up toward the lens. The belly crescent (`antOrcaBelly`) is wider
+  than the torso at the waterline. The dorsal is a 3-sided cone, 0.18 wide and swept back 0.35 rad
+  (the bull's is straight). The flukes are two swept lobes, and the saddle is narrowed to 0.84 m. Each
+  animal still has the same three meshes, in the same child order (qa/wow-movers.js). One writer,
+  `antOrcaRoundTick`, swaps geometry and material and parks at rung 2 (the `noPersonRound`
+  precedent: triangles only). The body is 2016 triangles, against 248 for the crate. Six white
+  sparks at each blow, parked at rung 1.
+- **Proof, `qa/ten-t2b-orca.js`.** The swap reads back through every state: round, crate, round
+  again and rung 2. `qa/ten-t2b-orca-round.png` against `-crate.png`, both from the chase lens:
+  eye patches, saddles and belly flash read, and the bull's fin stands. No console errors and no
+  lastError.
+- **Missed:** `noKelvin` (the V wake). Out of budget, and the ring stack is unchanged. **For the
+  proof slot:** the rung-0 A/B for `noOrcaRound` (triangles plus the blow sparks) and `noPodLead`
+  (behaviour only, no GPU term). `podDebug()` now also returns `round`, `blows`, `toldLead`, `waitT`
+  and `pack`.
+
 **T2c · iceland.js · the aurora is the sky.** The ramp (`noAuroraRamp`): PlaneGeometry(len,h,40,4)
 with vertex colours from 1.0 at the hem down to 0 at the top, MeshBasicMaterial with additive
 blending and no depth write, ends tapered, crown tinted iceAuroraMag, parked at 2 rows at rung 2 or
