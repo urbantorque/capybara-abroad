@@ -4601,6 +4601,9 @@ function gorUpdateDust(dt, moving) {
  */
 const gorCHASE_LAG = 0.30;           // lambda: about four seconds of being wrong
 const gorCHASE_TOP = 9.0;            // m/s flat out on the valley floor
+const gorCHASE_OFF = 7.0;            // m, basket to the aim once it is down: he
+                                     // stops 3 short of that, the trailer 2.4 on,
+                                     // so the bed is 6.4+ out and the basket 1.5 wide
 function gorUpdateTruck(dt) {
   if (!gorTruck) return;
   // where they THINK it is going: the wind it is in now, for as long as it
@@ -4612,8 +4615,35 @@ function gorUpdateTruck(dt) {
   gorChaseZ = damp(gorChaseZ, clamp(gorBalZ + w.z * fall, -104, 56), gorCHASE_LAG, dt);
   // ...unless somebody is in the back, in which case they stop chasing and
   // drive to the square. See gorTrailerRide.
-  const tx = gorRideHome ? gorPLAZA.x : gorChaseX;
-  const tz = gorRideHome ? gorPLAZA.z - 9 : gorChaseZ;
+  let tx = gorRideHome ? gorPLAZA.x : gorChaseX;
+  let tz = gorRideHome ? gorPLAZA.z - 9 : gorChaseZ;
+  // ---- AND A BALLOON ON THE GROUND IS NOT A CHASE (TEN T1c) --------------
+  // With nothing in the air `fall` is zero, so the prediction above is the
+  // basket itself: the truck left its spot at (20, 10) on arrival, stopped
+  // three metres short and swung the trailer 2.4 m on, onto the basket. Two
+  // reviewer runs stood 2.2 m from the basket for forty seconds and never got
+  // in. So, on the ground: before the first flight the crew stay parked, and
+  // after one they pull up at least gorCHASE_OFF from the basket on the side
+  // they came from. In the air, and all the way down to the touch, the chase
+  // is exactly what it was — 'on-the-trailer' is a landing ON the trailer.
+  // A bed still over an EMPTY basket after that (5 m, bed centre to basket
+  // centre) pulls out further; with the animal in the basket it stays put
+  // rather than sweep a kinematic box through the passenger.
+  if (!gorRideHome && gorBalY - gy0 <= 2 && (!gorFlown || gorGroundedT > 0.5)) {
+    if (!gorFlown) { tx = 20; tz = 10; }
+    else {
+      const ox = gorTruckX - gorBalX, oz = gorTruckZ - gorBalZ;
+      const ol = Math.hypot(ox, oz);
+      // on the exact centre (nobody has seen it, but a divide by zero parks
+      // the truck at NaN for the rest of the chapter): back out along +x
+      const ux = ol > 0.01 ? ox / ol : 1, uz = ol > 0.01 ? oz / ol : 0;
+      const over = Math.hypot(gorTruckX + Math.sin(gorTruckYaw) * 2.4 - gorBalX,
+                              gorTruckZ + Math.cos(gorTruckYaw) * 2.4 - gorBalZ) < 5;
+      const off = over ? gorCHASE_OFF + 5 : gorCHASE_OFF;
+      tx = over && gorAboard ? gorTruckX : gorBalX + ux * off;
+      tz = over && gorAboard ? gorTruckZ : gorBalZ + uz * off;
+    }
+  }
   const dx = tx - gorTruckX, dz = tz - gorTruckZ;
   const d = Math.hypot(dx, dz);
   if (d > 3) {
