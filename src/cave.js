@@ -248,6 +248,11 @@ let cavSwiftX = null, cavSwiftY = null, cavSwiftZ = null, cavSwiftPh = null;
 let cavSwiftHX = null, cavSwiftHY = null, cavSwiftHZ = null;   // where each one lives
 let cavSwiftUp = 0, cavSwiftBest = 0, cavSwiftPeak = 0, cavSwiftOwn = 24;
 let cavSwiftClick = 0, cavRoostFace = -40, cavSwiftMine = false;
+// the crescent, level and wings-up, for the column's sixteen and the roost's
+// ninety (T2f, `noSwiftShape`). See cavSwiftGeo
+let cavSwirlA = null, cavSwirlB = null, cavSwiftA = null, cavSwiftB = null;
+let cavSwiftShapeOn = false, cavSwiftFlick = 0;
+const cavM0 = new THREE.Matrix4().makeScale(0, 0, 0);
 let cavRiverT = 0, cavFallT = 0;   // positional ambience clocks. See cavUpdateSound
 
 // tasks
@@ -2916,6 +2921,8 @@ function cavBuildShaftLife(root) {
     }
     root.add(cavSwirl);
     cavRoundOn(cavSwirl);
+    cavSwirlA = cavSwiftPair(root, 0.10, 1, cavSWIRL_N);
+    cavSwirlB = cavSwiftPair(root, 0.62, 1, cavSWIRL_N);
   }
   // ---- and the litter coming down the hole -------------------------------
   {
@@ -3027,8 +3034,20 @@ function cavUpdateShaftLife(dt) {
                    cavQ.setFromEuler(cavE.set(0.18, yaw, pbank, 'YXZ')),
                    cavSc.set(psc, psc, psc));
       cavSwirl.setMatrixAt(i, cavM);
+      if (cavSwiftShapeOn && cavSwirlA) {
+        // bursts of flicker between glides; on a falling capybara, all flicker
+        const f = (cavColFall > 0.02 || Math.sin(cavTime * 1.1 + i * 0.9) > -0.1)
+                  && Math.sin(cavTime * 26 + i * 2.3) > 0;
+        cavSwirlA.setMatrixAt(i, f ? cavM0 : cavM);
+        cavSwirlB.setMatrixAt(i, f ? cavM : cavM0);
+        if (f) cavSwiftFlick++;
+      }
     }
     cavSwirl.instanceMatrix.needsUpdate = true;
+    if (cavSwiftShapeOn && cavSwirlA) {
+      cavSwirlA.instanceMatrix.needsUpdate = true;
+      cavSwirlB.instanceMatrix.needsUpdate = true;
+    }
   }
   if (cavFallLeaf) {
     for (let i = 0; i < cavFALL_N; i++) {
@@ -4097,6 +4116,67 @@ function cavBuildSwifts(root) {
     cavSwiftPh[i] = rand(0, 6.28);
   }
   root.add(cavSwifts);
+  cavSwiftA = cavSwiftPair(root, 0.06, 0.55, cavSWIFT_N);
+  cavSwiftB = cavSwiftPair(root, 0.62, 0.55, cavSWIFT_N);
+}
+
+/**
+ * THE CRESCENT (T2f, `noSwiftShape`).
+ *
+ * Reviewed mid-drop off the column, the sixteen swifts that form on the animal
+ * read as straight black bars, thrown sticks: a flat pair of wings seen from
+ * above against two hundred metres of bright shaft is a line, and nothing on
+ * them moved. A swift is a scimitar — the arm short and nearly square to the
+ * body, the hand long and raked hard back, a fork in the tail — and it flies
+ * in bursts of very fast flicker between glides. So the crescent is drawn
+ * twice, once level and once with the wings up, and each bird is written into
+ * one or the other on its own clock: a flicker at about four beats a second
+ * that costs a matrix, not a bone. The roost's ninety are the same bird at its
+ * own size, and they only flicker while they are off the wall.
+ *
+ * Four draws (two for the column, two for the roost), the old two hidden.
+ * Parks at rung 1 and up, where the old birds come back.
+ */
+function cavSwiftGeo(dih, k) {
+  const M = cavMerger();
+  const C = PALETTE.cavSwiftlet;
+  M.sph(0, 0, 0.03 * k, 0.15 * k, 0.12 * k, 0.56 * k, C, 6);
+  for (let s = -1; s <= 1; s += 2) {
+    M.box(s * 0.05 * k, 0, -0.36 * k, 0.03 * k, 0.02 * k, 0.24 * k, C, 0, s * 0.32, 0);
+  }
+  for (let s = -1; s <= 1; s += 2) {
+    // [length, chord, rake] from the shoulder: the arm, then the hand
+    let ox = 0, oz = 0;
+    for (let j = 0; j < 2; j++) {
+      const L = j ? 0.50 : 0.40, w = j ? 0.10 : 0.17, sw = j ? 0.95 : 0.22;
+      const cx = ox + Math.cos(sw) * L * 0.5, cz = oz - Math.sin(sw) * L * 0.5;
+      // the dihedral, turned about the shoulder
+      const x = (0.06 + cx) * Math.cos(dih), y = (0.06 + cx) * Math.sin(dih);
+      M.box(s * x * k, (0.02 + y) * k, cz * k, L * k, 0.03 * k, w * k, C, 0, s * sw, s * dih);
+      ox += Math.cos(sw) * L; oz -= Math.sin(sw) * L;
+    }
+  }
+  return M.build();
+}
+function cavSwiftPair(root, dih, k, n) {
+  const m = new THREE.InstancedMesh(cavSwiftGeo(dih, k), cavVC(), n);
+  m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  m.frustumCulled = false;
+  m.visible = false;
+  for (let i = 0; i < n; i++) m.setMatrixAt(i, cavM0);
+  root.add(m);
+  return m;
+}
+/** Which birds are drawn. Read once a frame, before either flock moves. */
+function cavSwiftShapeSync(game) {
+  if (!cavSwirlA || !cavSwiftA) return;
+  const on = !game.state.noSwiftShape && (game.state.perfRung | 0) < 1;
+  cavSwiftFlick = 0;
+  if (on === cavSwiftShapeOn) return;
+  cavSwiftShapeOn = on;
+  cavSwirl.visible = !on; cavSwifts.visible = !on;
+  cavSwirlA.visible = on; cavSwirlB.visible = on;
+  cavSwiftA.visible = on; cavSwiftB.visible = on;
 }
 
 /** Cave pearls: rimstone pools with something in them worth having. */
@@ -4878,9 +4958,19 @@ function cavUpdateSwifts(game, dt) {
                                             Math.sin(cavTime * 14 + i) * 0.5 * k)),
                  cavSc.set(1, 1, 1));
     cavSwifts.setMatrixAt(i, cavM);
+    if (cavSwiftShapeOn && cavSwiftA) {
+      // on the wall the wings are level; off it, the flicker
+      const f = k > 0.05 && Math.sin(cavTime * 24 + i * 1.9) > 0;
+      cavSwiftA.setMatrixAt(i, f ? cavM0 : cavM);
+      cavSwiftB.setMatrixAt(i, f ? cavM : cavM0);
+    }
     if (k > 0.3) up++;
   }
   cavSwifts.instanceMatrix.needsUpdate = true;
+  if (cavSwiftShapeOn && cavSwiftA) {
+    cavSwiftA.instanceMatrix.needsUpdate = true;
+    cavSwiftB.instanceMatrix.needsUpdate = true;
+  }
   // THE COUNT IS TAKEN WHILE THEY ARE UP AND FILED WHEN THEY SETTLE. Recording
   // on every new maximum fires a personal best ninety times as the roost lifts.
   if (up > cavSwiftPeak) cavSwiftPeak = up;
@@ -5328,6 +5418,8 @@ export function createCave(game) {
 
     /** THE PING (T2f), for the harness: marks cast, how many on a face, the most lit at once, live now. */
     /** THE FERNS (T2f), for the harness: how many, and which of the two is drawn. */
+    /** THE CRESCENT (T2f), for the harness: drawn, and how many of the column were mid-flick this frame. */
+    swiftShape() { return { on: cavSwiftShapeOn, flick: cavSwiftFlick, old: !!(cavSwirl && cavSwirl.visible), roostOld: !!(cavSwifts && cavSwifts.visible) }; },
     fern() { return { n: cavFernN, on: !!(cavFernMesh && cavFernMesh.visible), cones: !!(cavFernOld && cavFernOld.visible) }; },
     ping() { return { n: cavPingN, wall: cavPingWallN, peak: cavPingPeak, lit: cavPingT >= 0 ? cavPingLit : 0, live: cavPingT >= 0, shown: !!(cavPing && cavPing.visible) }; },
 
@@ -5389,6 +5481,7 @@ export function createCave(game) {
       cavUpdateWorms(dt);
       cavUpdateLog(game, dt);
       cavUpdateFish(game, dt);
+      cavSwiftShapeSync(game);
       cavUpdateSwifts(game, dt);
       cavUpdateDrips(game, dt);
       cavUpdateCrickets(dt);

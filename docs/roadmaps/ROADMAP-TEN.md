@@ -677,7 +677,23 @@ Pulled forward from T6a into T2, owner cave.js only.
   one draw. Proof `qa/ten-t2f-fern.js`, pinned lens from the rim and the glade: 130 ferns drawn and
   the cones hidden when live, and the reverse flagged and at rung 1. PNGs `-glade-live` /
   `-glade-off`.
-- Rung-0 GPU cost for both flags is owed to the proof slot.
+- **The crescent (`noSwiftShape`, parked at rung 1 and up).** This is the highest-impact cave
+  finding left in cave.js. The swifts that form on the animal in the drop read as black bars.
+  A swift is now drawn as a scimitar in `cavSwiftlet`: a short arm, a hand raked 0.95 rad back,
+  and a forked tail. It is drawn twice, level and wings-up, and each bird goes into one or the
+  other on its own clock, a flicker at about 4 beats a second (a matrix, not a bone). The column's
+  16 flicker in bursts between glides, and all the time on a falling capybara. The roost's 90 are
+  the same bird at 0.55, level on the wall and flickering only when off it. There are four
+  instanced draws and the old two are hidden. Proof `qa/ten-t2f-swift.js`, hand clock, pinned
+  lens: live, the new meshes draw and the old are hidden. A mean of 3.8 of the 16 were mid-flick
+  per frame in the column, and 4.5 with the roost up. Flagged and at rung 1 it is the reverse,
+  with 0 flicking. The swiftlets task still ticks off the wheek (true live and flagged). PNGs
+  `-col-live`, `-roost-live` / `-roost-off`.
+- **Misses.** The lime cones outside the mouth (cave.js ~1210, 1544, 1554) are still cones, because
+  the brief named the doline floor. The finding's "thicker ring" and "cap the lamp glow near the
+  lens" were not done. The hint arrow's paper line ('Q. in the dark. that is it.') is systems.js
+  and unchanged.
+- Rung-0 GPU cost for all three flags is owed to the proof slot.
 
 **T6b · the stranger's hour.** Two fresh profiles with real keys, one per mode, for 30 minutes each:
 premise to the first act turn (story), and the picker to three places (free). Every card, bubble and
