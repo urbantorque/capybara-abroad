@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger, makeMover, hangThing } from './shared.js';
+import { farLayer, farBundle, farTone } from './far.js';
 
 // ===========================================================================
 // CHAPTER 4 — KYOTO & UJI
@@ -747,8 +748,12 @@ function kyoBuildZen(game, root) {
   // the gravel bed, and the raked lines in it: thin ridges, all parallel, which
   // is exactly what makes a single paw print across them read as vandalism
   Zg.box(x, y + 0.08, z, hx * 2, 0.16, hz * 2, PALETTE.gravelZen);
+  // A THIRD AS WIDE, AND THE GRAVEL'S OWN SHADE (T3d). 30 cm of granite grey
+  // every 90 cm was a zebra crossing: a stripe as wide as the gap, at road
+  // paint contrast. 10 cm in kyoGravelShade, 8 % under the bed, is a furrow.
+  // The paw prints stay granite, so the mischief reads harder than it did.
   for (let i = -Math.floor(hz / 0.9); i <= Math.floor(hz / 0.9); i++) {
-    Zg.box(x, y + 0.19, z + i * 0.9, hx * 2 - 0.4, 0.06, 0.30, PALETTE.granite);
+    Zg.box(x, y + 0.19, z + i * 0.9, hx * 2 - 0.4, 0.06, 0.10, PALETTE.kyoGravelShade);
   }
   kyoStaticBox(game, x, y - 0.2, z, hx, 0.35, hz);
   // the wall around it: earth-coloured, tiled top, the way they always are
@@ -2610,6 +2615,191 @@ function kyoBuildSugi(game, root) {
   kyoInstance(root, kyoG.cone6, PALETTE.sugiDeep, spires, true, false);
   kyoInstance(root, kyoG.cone6, PALETTE.sugi, caps, true, false);
   kyoInstance(root, kyoG.plane, PALETTE.sugiFloor, litter, false, true);
+  // every trunk, x z pairs, so the wood by the path (kyoBuildToriiWood) does
+  // not plant a cedar through one that is already standing
+  for (let i = 0; i < trunks.length; i += 9) kyoSugiAt.push(trunks[i], trunks[i + 2]);
+}
+
+// ============================================== THE WOOD COMES TO THE GATES ==
+/**
+ * ROADMAP-TEN T3d (noToriiWood). THE TUNNEL STOOD ON A LAWN, STILL.
+ *
+ * kyoBuildSugi cuts its corridor at kyoTORII_CAM_R + 2.4 = 7.0 m from every
+ * gate, and fills the hill at random past that: about one cedar per hundred
+ * square metres. Run the lower tunnel and the gaps between the posts were
+ * bright moss all the way up, with a trunk now and then — the reviewer's
+ * "scaffolding on a golf course", in the one frame the chapter is for.
+ *
+ * Three things, all at the path, all from gate 0:
+ *  - two rows of cedars, the first at CAM_R + 1.2 (5.8 m, clear of the rail's
+ *    4.6 by a trunk and a half), the second 8.5-11 m out, spaced so the eye
+ *    down the tunnel meets a trunk between every pair of posts;
+ *  - a ring of low dark understory 3-6 m from the centreline, in kyoUnder,
+ *    under the eye (1.75 m) and outside the legs (2.5 m);
+ *  - the ground's own colour, pulled toward the litter and then kyoUnder
+ *    inside thirteen metres of the path — a second colour buffer on the one
+ *    ground mesh, swapped the way the machiya are (zero cost either way).
+ *
+ * Cut, or at rung 1 and up, the rows and the understory hide and the rows'
+ * trunks leave the physics world with them (a hidden tree is not a wall).
+ * The ground swap follows the flag only: it costs nothing to keep.
+ */
+const kyoWOOD_ROW1 = kyoTORII_CAM_R + 1.2;   // 5.8 m: the first row, nearest the gates
+const kyoWOOD_ROW2 = [8.5, 11.0];            // the second row's band
+const kyoWOOD_UNDER = [3.0, 6.0];            // the understory's band
+const kyoWOOD_GROUND = 13;                   // m from the path the floor goes dark over
+const kyoSugiAt = [];
+let kyoWood = null;                          // { group, bodies, on, trunks, shrubs }
+let kyoGroundMesh = null, kyoGroundBase = null, kyoGroundWood = null, kyoGroundOn = false;
+
+/** Distance from (x, z) to the gate polyline. */
+function kyoPathDist(x, z) {
+  let best = Infinity;
+  for (let i = 0; i < kyoTORII_N - 1; i++) {
+    const ax = kyoTORII[i * 2], az = kyoTORII[i * 2 + 1];
+    const ex = kyoTORII[(i + 1) * 2] - ax, ez = kyoTORII[(i + 1) * 2 + 1] - az;
+    const l2 = ex * ex + ez * ez || 1;
+    const t = clamp(((x - ax) * ex + (z - az) * ez) / l2, 0, 1);
+    const dx = x - ax - ex * t, dz = z - az - ez * t;
+    const d2 = dx * dx + dz * dz;
+    if (d2 < best) best = d2;
+  }
+  return Math.sqrt(best);
+}
+
+function kyoBuildToriiWood(game, root) {
+  const trunks = [], spires = [], caps = [], shrubs = [], solid = [];
+  const group = new THREE.Group();
+  group.name = 'kyoToriiWood';
+  const sx = kyoHILL_X + 2, sz = kyoHILL_Z + 18;          // the summit shrine
+  const clear = (x, z, dMin) => {
+    if (kyoPathDist(x, z) < dMin) return false;
+    // the gate legs themselves, where the path turns under a tree
+    for (let i = 0; i < kyoTORII_N; i++) {
+      const dx = x - kyoTORII[i * 2], dz = z - kyoTORII[i * 2 + 1];
+      if (dx * dx + dz * dz < dMin * dMin) return false;
+    }
+    if (Math.abs(x - sx) < 10 && Math.abs(z - sz) < 12) return false;
+    if (Math.abs(x - kyoBAMBOO.x) < kyoBAMBOO.hx + 3 && Math.abs(z - kyoBAMBOO.z) < kyoBAMBOO.hz + 3) return false;
+    if (Math.abs(x - kyoBELL.x) < 9 && Math.abs(z - kyoBELL.z) < 9) return false;
+    if (kyoSlope(x, z) > 0.95) return false;
+    return true;
+  };
+  const free = (x, z, r) => {
+    for (let i = 0; i < kyoSugiAt.length; i += 2) {
+      const dx = x - kyoSugiAt[i], dz = z - kyoSugiAt[i + 1];
+      if (dx * dx + dz * dz < r * r) return false;
+    }
+    return true;
+  };
+  const tree = (x, z, h) => {
+    const y = kyoTerrain(x, z);
+    const cw = h * rand(0.105, 0.145), yaw = rand(0, 3);
+    kyoPush9(trunks, x, y + h * 0.26, z, 0, yaw, 0, h * 0.044, h * 0.52, h * 0.044);
+    kyoPush9(spires, x, y + h * 0.50, z, 0, yaw, 0, cw, h * 0.40, cw);
+    kyoPush9(spires, x, y + h * 0.70, z, 0, yaw + 1.1, 0, cw * 0.84, h * 0.36, cw * 0.84);
+    kyoPush9(caps, x, y + h * 0.885, z, 0, yaw + 0.7, 0, cw * 0.60, h * 0.32, cw * 0.60);
+    solid.push(x, y, z, h * 0.044, h * 0.52);
+    kyoSugiAt.push(x, z);
+  };
+  // walk the path in arclength, both sides, and plant
+  for (let i = 0; i < kyoTORII_N - 1; i++) {
+    const ax = kyoTORII[i * 2], az = kyoTORII[i * 2 + 1];
+    const ex = kyoTORII[(i + 1) * 2] - ax, ez = kyoTORII[(i + 1) * 2 + 1] - az;
+    const len = Math.hypot(ex, ez) || 1;
+    const nx = ez / len, nz = -ex / len;            // the path's left hand
+    for (let s = -1; s <= 1; s += 2) {
+      // a first-row cedar about every 2.6 m of path a side: one between every
+      // pair of posts, which is what the eye down the tunnel meets
+      if ((i + (s > 0 ? 1 : 0)) % 2 === 0 || rand(0, 1) < 0.35) {
+        const t = rand(0.1, 0.9), off = kyoWOOD_ROW1 + rand(0, 1.4);
+        const x = ax + ex * t + nx * s * off, z = az + ez * t + nz * s * off;
+        if (clear(x, z, kyoWOOD_ROW1) && free(x, z, 2.2)) tree(x, z, rand(17, 26));
+      }
+      if (i % 2 === 0) {
+        const t = rand(0, 1), off = rand(kyoWOOD_ROW2[0], kyoWOOD_ROW2[1]);
+        const x = ax + ex * t + nx * s * off, z = az + ez * t + nz * s * off;
+        if (clear(x, z, kyoWOOD_ROW2[0] - 0.6) && free(x, z, 2.6)) tree(x, z, rand(18, 27));
+      }
+      // the understory: two or three low dark mounds a side per panel
+      const nU = 2 + (rand(0, 1) < 0.5 ? 1 : 0);
+      for (let k = 0; k < nU; k++) {
+        const t = rand(0, 1), off = rand(kyoWOOD_UNDER[0], kyoWOOD_UNDER[1]);
+        const x = ax + ex * t + nx * s * off, z = az + ez * t + nz * s * off;
+        if (!clear(x, z, kyoWOOD_UNDER[0])) continue;
+        // lower near the legs, where the lens looks between them
+        const d = kyoPathDist(x, z), hh = lerp(0.55, 1.25, clamp((d - 3) / 3, 0, 1)) * rand(0.8, 1.1);
+        const w = rand(1.1, 1.8);
+        kyoPush9(shrubs, x, kyoTerrain(x, z) + hh * 0.35, z, 0, rand(0, 3), 0, w, hh, w * rand(0.8, 1.1));
+      }
+    }
+  }
+  kyoInstance(group, kyoG.cyl6, PALETTE.sugiBark, trunks, false, false);
+  kyoInstance(group, kyoG.cone6, PALETTE.sugiDeep, spires, false, false);
+  kyoInstance(group, kyoG.cone6, PALETTE.sugi, caps, false, false);
+  kyoInstance(group, kyoG.sph6, PALETTE.kyoUnder, shrubs, false, false);
+  root.add(group);
+  // The rows' trunks are solid the way every other cedar is (kyoTrunkSolid's
+  // box), but built here and held rather than added, so the switch can take
+  // them out of the world with the drawing. Nav-solid always: a crowd that
+  // steps round a hidden tree is a thing nobody can see.
+  const bodies = [];
+  for (let i = 0; i < solid.length; i += 5) {
+    const x = solid[i], y = solid[i + 1], z = solid[i + 2], r = solid[i + 3], h = solid[i + 4];
+    const hx = r * 0.82, hy = h * 0.5;
+    kyoSolids.add(x, y + hy, z, hx, hy, hx, 0);
+    const b = new CANNON.Body({ mass: 0, material: (game.mats && game.mats.ground) || undefined });
+    b.addShape(new CANNON.Box(new CANNON.Vec3(hx, hy, hx)));
+    b.position.set(x, y + hy, z);
+    b.previousPosition.copy(b.position);
+    b.interpolatedPosition.copy(b.position);
+    bodies.push(b);
+  }
+  kyoWood = { group, bodies, on: false, trunks: trunks.length / 9, shrubs: shrubs.length / 9 };
+  group.visible = false;
+
+  // THE FLOOR. A second colour buffer on the ground mesh: inside 13 m of the
+  // path the moss goes to litter, and inside 7 m to the understory's dark.
+  if (kyoGroundMesh) {
+    const geo = kyoGroundMesh.geometry;
+    const p = geo.attributes.position.array;
+    kyoGroundBase = geo.attributes.color;
+    kyoGroundWood = kyoGroundBase.clone();
+    const c = new THREE.Color(), lit = new THREE.Color(PALETTE.sugiFloor), dk = new THREE.Color(PALETTE.kyoUnder);
+    for (let i = 0; i < kyoGroundWood.count; i++) {
+      const x = p[i * 3], z = p[i * 3 + 2];
+      // cheap reject: the tunnel's box, plus the band
+      if (x < -60 || x > 20 || z < -120 || z > -30) continue;
+      const d = kyoPathDist(x, z);
+      if (d > kyoWOOD_GROUND) continue;
+      const k = 1 - clamp((d - 4) / (kyoWOOD_GROUND - 4), 0, 1);
+      c.setRGB(kyoGroundWood.getX(i), kyoGroundWood.getY(i), kyoGroundWood.getZ(i));
+      c.lerp(lit, k * 0.85).lerp(dk, clamp((k - 0.4) / 0.6, 0, 1) * 0.55);
+      kyoGroundWood.setXYZ(i, c.r, c.g, c.b);
+    }
+  }
+}
+
+function kyoUpdateToriiWood(game) {
+  if (!kyoWood) return;
+  const st = game.state;
+  const ground = !st.noToriiWood;
+  if (kyoGroundMesh && kyoGroundWood && ground !== kyoGroundOn) {
+    kyoGroundMesh.geometry.setAttribute('color', ground ? kyoGroundWood : kyoGroundBase);
+    kyoGroundOn = ground;
+  }
+  const on = ground && (st.perfRung | 0) < 1;
+  if (on === kyoWood.on) return;
+  kyoWood.on = on;
+  kyoWood.group.visible = on;
+  // Asked of each body, not assumed: an addBody while Kyoto is live files the
+  // body under the chapter (main.js _patchWorld), so biome.attach puts it back
+  // on every return whatever this switch last said. onEnter clears `on` to
+  // null, and the first frame back settles it.
+  for (const b of kyoWood.bodies) {
+    if (on && !b.world) game.world.addBody(b);
+    else if (!on && b.world) game.world.removeBody(b);
+  }
 }
 
 // ========================================================= THE POND'S EDGE ==
@@ -4799,6 +4989,7 @@ export function createKyoto(game) {
     // the clock both hang off it — so it is cleared on the way in and on the way
     // out, per the shared-coordinate-space rule.
     onEnter() {
+      if (kyoWood) kyoWood.on = null;   // biome.attach re-added its trunks; the next frame settles them
       kyoRunT = -1; kyoInRiver = false; kyoRunFlow = 0; kyoRunOutT = 0;
       // THE HEAP COMES BACK. kyoMatchaDone hides the pile beside the mill and
       // is set once for the life of the page, so the second time you came to
@@ -4950,6 +5141,24 @@ export function createKyoto(game) {
     toriiProgress() { return kyoToriiSeq / kyoTORII_N; },
     /** Where the eye belongs inside the torii tunnel; null anywhere else. */
     toriiCam: kyoToriiCam,
+    /** The gate polyline, x z pairs — the live array; read it, never edit it (T3d probes). */
+    toriiPath() { return kyoTORII; },
+    /** The wood at the gates (T3d): what was planted and whether it is standing. */
+    toriiWood() {
+      if (!kyoWood) return null;
+      let inWorld = 0;
+      for (const b of kyoWood.bodies) if (b.world) inWorld++;
+      return { on: kyoWood.on, visible: kyoWood.group.visible, trunks: kyoWood.trunks, shrubs: kyoWood.shrubs,
+               bodies: kyoWood.bodies.length, inWorld, ground: kyoGroundOn };
+    },
+    /** The far bowl (T3d): far.js's audit, plus the pagoda and this chapter's own switch. */
+    farAudit() {
+      if (!kyoFar) return null;
+      const a = kyoFar.audit();
+      a.pagodaTris = kyoFarPagodaTris;
+      a.visible = kyoFar.group.visible;
+      return a;
+    },
 
     pond: kyoPOND,
     /**
@@ -5066,6 +5275,8 @@ export function createKyoto(game) {
       if (!game.biome.isActive('kyoto')) return;
       kyoUpdateMachiya(game);
       kyoUpdateChute(game);
+      kyoUpdateToriiWood(game);
+      kyoUpdateFar(game, dt);
       kyoTime += dt;
 
       // ---- THE WATERLINE USED TO FOLLOW THE ANIMAL, AND NOW IT DOES NOT ----
@@ -5125,6 +5336,126 @@ export function createKyoto(game) {
   return api;
 }
 
+// ---- ROADMAP-TEN T3d, THE FAR PLANE: THE BOWL ------------------------------
+// Kyoto is a valley with hills on three sides — Arashiyama to the west,
+// Kitayama to the north, Higashiyama to the east — and this chapter had
+// none of them: every view out ended where the ground mesh does, a flat
+// green edge at ±170 m under a bleached sky. It was the one chapter of the
+// four in its group that never called far.js.
+//
+// Seven rounded ridges, 24-40 m, no peaks: the hills here are old and
+// wooded, and a crest is a curve. NOT at 300-420 m, which was the brief:
+// Kyoto's fog is the closest in the game (46-330, sysKYO_FOG, never
+// re-based), and at 300 m from the Gion lane a wedge is 90 % fog — the
+// sky's own colour. They stand just past the ground's edge instead, at
+// 200-260 m from where the player stands, which reads 55-75 % fog: a blue
+// shape in the haze and not a set piece. The south-east is left open: that
+// is where the Uji goes, and a river that ran into a hill would be a lake.
+//
+// And one pagoda, Yasaka's five storeys, on the Gion lane's own axis in
+// front of the eastern ridge (x 194, 221 m from the resting lens), so the
+// arrival frame down the lane ends on the thing every photograph of that
+// lane ends on. No jitter, in the ridge's air, and in the ridges' own draw.
+//
+// noKyoFar cuts the lot (and game.state.noFar, far.js's own switch, still
+// does). A static merged silhouette is kept at every rung, the way far.js
+// keeps every chapter's: it is drawn once and there is nothing to park.
+let kyoFar = null, kyoFarPagodaTris = 0;
+const kyoFAR_PAGODA = { x: 194, z: 52 };
+/** A rounded crest: nine points, a cosine shoulder, a little unevenness. */
+function kyoFarRound(H, lump, seed) {
+  const prof = [];
+  for (let i = 0; i <= 8; i++) {
+    const t = -1 + i * 0.25;
+    const k = Math.pow(Math.cos(t * Math.PI * 0.5), 0.55);
+    prof.push([t, H * k * (1 + lump * Math.sin(seed + t * 3.1))]);
+  }
+  return prof;
+}
+function kyoBuildFar(root) {
+  const tone = farTone(PALETTE.kyoRidge, PALETTE.kyotoHaze, 0.35);
+  const Q = Math.PI * 0.5;
+  kyoFar = farBundle({
+    name: 'kyoto',
+    layer: farLayer({
+      name: 'far-kyoto', color: tone,
+      wedges: [
+        // Arashiyama, west
+        { x: -238, z: -110, w: 210, d: 90, yaw: Q + 0.12, profile: kyoFarRound(38, 0.10, 0.4) },
+        { x: -232, z: 95, w: 200, d: 90, yaw: Q - 0.10, profile: kyoFarRound(30, 0.12, 2.1) },
+        // Kitayama, north, over the shrine hill
+        { x: -110, z: -305, w: 250, d: 90, yaw: 0.08, profile: kyoFarRound(40, 0.08, 1.3) },
+        { x: 115, z: -290, w: 230, d: 90, yaw: -0.18, profile: kyoFarRound(34, 0.12, 3.7) },
+        // Higashiyama, east; the second one stands behind the pagoda
+        { x: 232, z: -140, w: 200, d: 90, yaw: Q - 0.22, profile: kyoFarRound(36, 0.10, 5.0) },
+        { x: 226, z: 30, w: 170, d: 80, yaw: Q, profile: kyoFarRound(27, 0.08, 0.9) },
+        // the hills round Uji, south; the south-east stays open for the river
+        { x: -70, z: 325, w: 270, d: 90, yaw: 0.06, profile: kyoFarRound(24, 0.14, 2.6) },
+      ],
+    }),
+  });
+  // THE PAGODA. Five storeys of 4.4 m under 0.9 m eaves, a 2.5 m cap and an
+  // 8 m finial: 38.5 m, which is Yasaka's 46 less the hill it stands on.
+  const M = makeMerger(kyoG, { xform: kyoXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [], normals: 'recompute', jitter: 0 });
+  const body = farTone(PALETTE.templeWoodDk, PALETTE.kyotoHaze, 0.35);
+  const roof = farTone(PALETTE.kawaraDark, PALETTE.kyotoHaze, 0.35);
+  const px = kyoFAR_PAGODA.x, pz = kyoFAR_PAGODA.z;
+  let y = 0;
+  M.box(px, y + 0.75, pz, 11, 1.5, 11, roof);
+  y += 1.5;
+  for (let s = 0; s < 5; s++) {
+    const w = 8.2 - s * 0.7;
+    M.box(px, y + 2.2, pz, w, 4.4, w, body);
+    M.box(px, y + 4.55, pz, w + 6.0, 0.5, w + 6.0, roof);
+    M.box(px, y + 4.95, pz, w + 3.4, 0.4, w + 3.4, roof);
+    y += 5.3;
+  }
+  M.cone(px, y + 1.25, pz, (8.2 - 4 * 0.7) * 0.72, 2.5, roof, 0, Math.PI * 0.25, 0, 4);
+  M.cyl(px, y + 2.5 + 4.0, pz, 0.35, 8.0, body, 0, 0, 0, 4);
+  // ONE DRAW, NOT TWO: the pagoda is merged into the ridges' own mesh, which
+  // takes a vertex colour for it (the ridge tone everywhere else), so the far
+  // bowl is a single call like every other chapter's far layer.
+  //
+  // THE FOG IS LIGHTER THAN THE SKY HERE, so the bowl opts out of it. far.js
+  // lets scene.fog carry the distance, and in Kyoto that paints a ridge in
+  // kyotoHaze (0xdfe7e4) against a dome the composite has taken a third off:
+  // measured through game.post on the west lens (qa/ten-t3d-far-tone.js), the
+  // fogged ridge came out at luminance 0.60 under a 0.54 sky — snow on a hill
+  // that has none — and unfogged at 0.45 under 0.52, a wooded hill in haze.
+  // The composite's own air still lays its distance over them.
+  const lg = kyoFar.layer.geometry, pg = M.build();
+  const ln = lg.attributes.position.count, pn = pg.attributes.position.count;
+  const pos = new Float32Array((ln + pn) * 3), nor = new Float32Array((ln + pn) * 3), col = new Float32Array((ln + pn) * 3);
+  pos.set(lg.attributes.position.array, 0); pos.set(pg.attributes.position.array, ln * 3);
+  nor.set(lg.attributes.normal.array, 0); nor.set(pg.attributes.normal.array, ln * 3);
+  const tc = new THREE.Color(tone);
+  for (let i = 0; i < ln; i++) { col[i * 3] = tc.r; col[i * 3 + 1] = tc.g; col[i * 3 + 2] = tc.b; }
+  col.set(pg.attributes.color.array, ln * 3);
+  const li = lg.index.array, pi = pg.index.array, idx = new Uint32Array(li.length + pi.length);
+  idx.set(li, 0);
+  for (let i = 0; i < pi.length; i++) idx[li.length + i] = pi[i] + ln;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  g.computeBoundingSphere();
+  lg.dispose(); pg.dispose();
+  kyoFar.layer.geometry = g;
+  kyoFar.layer.material = mat(0xffffff, { vertexColors: true, fog: false });
+  kyoFarPagodaTris = pi.length / 3;
+  kyoFar.layer.userData.farTris = idx.length / 3;
+  root.add(kyoFar.group);
+}
+function kyoUpdateFar(game, dt) {
+  if (!kyoFar) return;
+  if (game.state.noKyoFar) {
+    if (kyoFar.group.visible) kyoFar.group.visible = false;
+    return;
+  }
+  kyoFar.update(game, dt);
+}
+
 // ---- ROADMAP-WOW A2, THE FOREGROUND (W1) ----------------------------------
 //
 // The arrival frame at Uji street has nothing in its own near 0-4 m: lens,
@@ -5178,7 +5509,8 @@ function kyoBuild(game) {
   kyoRoot.name = 'kyoto';
   game.scene.add(kyoRoot);
 
-  kyoRoot.add(kyoBuildGroundMesh());
+  kyoGroundMesh = kyoBuildGroundMesh();
+  kyoRoot.add(kyoGroundMesh);
   kyoBuildGroundBody(game);
 
   // THE POND IS NOT THE RIVER. Both were drawn in the Uji's pale glacial blue,
@@ -5248,6 +5580,10 @@ function kyoBuild(game) {
   // THE WOOD, and it goes in after the maples so its rejection list is read
   // against a hill that is otherwise finished. See kyoBuildSugi.
   kyoBuildSugi(game, kyoRoot);
+  // ...and then brought to the gates, from gate 0 (T3d, noToriiWood)
+  kyoBuildToriiWood(game, kyoRoot);
+  // the bowl the valley sits in (T3d, noKyoFar)
+  kyoBuildFar(kyoRoot);
   kyoBuildPondEdge(kyoRoot);
   kyoBuildKoi(kyoRoot);
   kyoBuildPetals(kyoRoot);
