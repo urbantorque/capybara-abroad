@@ -23,6 +23,11 @@ What is new in play:
 
 qa/aaa-*.mjs are the instruments.
 
+**Published:** master is at d78cd7e (Pages run 35945627179). The
+hosted HTML matches the local build byte for byte, and the soak is clean.
+Still open: Hanoi's frame pacing (grain() fill cost), and a blind human
+playtest.
+
 ## Homecoming published for playtest (23 Sep, newest)
 
 At the user's direction, master fast-forwarded 55 Homecoming commits to

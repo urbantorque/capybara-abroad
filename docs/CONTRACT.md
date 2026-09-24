@@ -1,3 +1,26 @@
+## AAA A7 — PUBLISHED (24 Sep 2026)
+
+master was fast-forwarded from `971e5bd` to `d78cd7e` (the aaa-polish branch)
+and pushed. Pages run 35945627179 succeeded, and the hosted HTML is
+byte-identical to the local build (sha256 6444815950289b93…).
+
+A fresh Edge profile against the public URL checked Free Roam through Kyoto,
+Hanoi and Monte Carlo: started, the rival present, 448 rounded meshes
+registered, and no page errors.
+
+Release gates:
+
+- npm test 77/0.
+- A clean soak on `50fb8c6`: fuzz, ks and load all pass. Monte Carlo's peak
+  went from 39.4 to 12.4 m/s after the car-bump fix. Crossing longest frames
+  are down 40–80 % against the three rows before this pass.
+- The AAA browser checks pass: free roam 9, march 8, rival 7, takings 5,
+  HUD 5.
+- homecoming-hud-breath passes 16 and homecoming-opening-live 15.
+
+Still open: Hanoi's 13 ms world pass (grain() fill cost), and play by a
+person who has never seen the game.
+
 ## AAA A1b — THE ANIMALS, ROUNDED; THE IBIS INTRODUCED AND DISCUSSED (24 Sep 2026)
 
 **The animals.** Boxy animals in fifteen chapter files now have rounded
