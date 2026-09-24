@@ -1135,6 +1135,50 @@ Q×3 gives a house of 10 or more and off-beat Q×3 gives 6 to 9 (the tick still 
 of sails before and after, luminance +10% or more. Lens walks under the colonnade with no dithered
 frame over 40%.
 
+### T4c — shipped
+
+One flag, `noConcertBeat` (falsy = live), environment.js only. Instruments: `qa/ten-t4c-concert.js`
+(and `-off.js`), `qa/ten-t4c-shellbox.js`, `qa/ten-t4c-colonnade.js`. All at rung 0 (prefs `pf 1`).
+
+- **Audit first: the score has no beat in Sydney.** The gardens' palette is `rhythm: null`, so
+  `musBeatLen` stays 0 and `game.music.off()` answers 1 (every note off) for the whole chapter. The
+  sidechain is the world's envelope, not a clock. The podium keeps its own pulse instead
+  (`envBEAT` 0.9 s), judged on the frame clock the ring is drawn from.
+- **The ring.** Two gold rings (`PALETTE.gold`) lie on the carpet. A wide one closes on a fixed one
+  round the animal's feet, and the beat is when they meet. They show within 16 m of the stage
+  *before* the first wheek, a soft `tick` sounds on the beat while the animal is on the red, and the
+  marquee line reads "on stage · wheek as the gold rings meet". The fixed ring flashes on an
+  on-beat note. Off-beat notes say "a touch early/late … wheek as the rings meet". The judge looks
+  back `envBEAT_LAG` 0.15 s from the call to the press (the 0.12 s inhale plus a frame), ±0.12 s.
+  At rung ≥ 1 the ring parks and every note counts as on the beat.
+- **Reach.** Each note adds 1 (on the beat) or 0.4 (off) to a carry, and the carry is what goes to
+  `game.concert.call` as the note number. Measured through the real Q path: on the beat, judged
+  offsets +0.06..+0.11 s, 3/3 hits, carry 3. Off the beat, offsets −0.37..−0.44, 0/3, carry 1.2.
+  The tick still fires off the beat (house 8, done).
+- **Stretch.** Stage glow is 1.0 per note (was 0.7), with pulse decay 0.6/s (was 1.6). The sails
+  get their own additive glow (the shell geometry drawn twice, one draw call only while a concert
+  is on, hidden at rung ≥ 1). It builds note by note, holds at 0.75 after the tick, and is full for
+  the encore. Opera-shot PNG, masked to the sails by hide-and-diff: luminance 160.6 → 181.8,
+  **+13.2 %**. The grade could never show this, because stageGlow is already 1 while the animal
+  stands on the red. The first note kicks the carpet's 2 bins, 2 cones and sign off the red (5 of
+  5, up to 3.7 m). Three of the seven shells fire on the tick (sparks 120 on the next sample), and
+  the encore window is 12 s (was 8).
+- **Colliders.** The colonnade's entablature and awning, all 11 bays, are one camSolid compound
+  body over 3.5 m. Probe: 16 poses at four arcade spots and four yaws, and the band lies between the
+  eye and the animal in 0 of them. The sails: measured, no opening at the deck is missed, but the
+  three boxes stop at 8.0/6.4/3.2 m while the sails run on to 11.63/8.94/4.20 m (686/556/144
+  vertices above). An eye up there is inside the vault, so three camSolid crown boxes now cover the
+  measured overhang.
+- **Missed, honestly: the house number.** On the beat the peak house was 8 (a first run gave 7), and
+  off the beat it was 8. The forecourt already holds eight people inside npc.js's 26 m floor on the
+  first note, and `npcCONCERT_N = 8` caps the house. So "on-beat ≥ 10, off-beat 6–9" cannot be
+  reached from environment.js, and T4a's par of 10 is unreachable too. Two changes in npc.js
+  (`npcConcert`, ~5732) make the carry bite as built. `reach = MAX_D * (note < 1 ? note : 1 +
+  0.5 * (note − 1))` (an off-beat first note then calls 10.5 m, not 26). `npcCONCERT_N` 8 → 12,
+  with a third row of seats (`row = i < 5 ? 0 : i < 8 ? 1 : 2`). Also left: under the arcade at
+  (−45.2, 10.9) the lens is still cramped against the terminal façade's pier (2.3 m, no camSolid
+  on `bTerr`), which is a different occluder from the awning this item fixed.
+
 **T4d · pantanal.js · the herd falls in behind.** The cascade (`noHerdCascade`): after the third
 recruit, each wheek takes up to 3, including grazers within 5 m of a follower, with answers 0.12 s
 apart; 5 or more followers make grazers within 16 m trail (4040-4061). The crossing opens in 4

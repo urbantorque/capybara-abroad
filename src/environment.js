@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, dampAngle, lerp, grain, swayMesh, leafMesh, makeMerger, mergeWearBand, warnOnce, skyDomeLit } from './shared.js';
+import { PALETTE, mat, matOwn, TASKS, rand, randInt, clamp, damp, dampAngle, lerp, grain, swayMesh, leafMesh, makeMerger, mergeWearBand, warnOnce, skyDomeLit } from './shared.js';
 import { farLayer, farBundle, farTone } from './far.js';
 
 // ===========================================================================
@@ -87,6 +87,49 @@ function envConcertFile(game) {
 // podium, and the score all the way up. Once per concert.
 const envENCORE_WIN = 8;
 let envEncoreT = 0, envEncoreDone = false;
+// ---- THE BEAT (ROADMAP-TEN T4c, `noConcertBeat`) ----------------------------
+// Three wheeks at any speed drew the same eight people, so the marquee had
+// nothing in it to get better at. The house now answers TIMING: a note that
+// lands on the beat calls as wide as it always did, one off it calls
+// envBEAT_OFF as far (the carry, below — npc.js widens by the note number, so
+// an off-beat note adds 0.4 of a note to it instead of a whole one).
+//
+// THE BEAT IS THE STAGE'S OWN. The brief said "the score's beat, already
+// running for the sidechain", and neither exists in Sydney: the gardens'
+// palette is `rhythm: null`, musBeatLen stays 0, and game.music.off() answers
+// 1 — every note off — for the whole chapter. The sidechain is the world's
+// envelope, not a clock. So the podium keeps a pulse of its own, and a gold
+// ring on the carpet SHOWS it before the first wheek: a wide ring closes on a
+// fixed one, and the beat is the moment they meet. Judged on the frame clock
+// the ring is drawn from, so what is seen and what is judged cannot drift.
+//
+// The press, not the call: a wheek sounds capyWHEEK_INHALE (0.12 s) after Q,
+// plus the frame the key waits for, so the judge looks back envBEAT_LAG — a
+// player who presses as the rings meet is dead on (measured headless at slow
+// frames: +0.09..0.11 s against a 0.12 lag, which is the frame showing).
+// ±envBEAT_WIN either side of that is the whole beat.
+//
+// At rung ≥ 1 the ring parks and EVERY note counts as on the beat: nobody is
+// judged against a cue that is not drawn.
+const envBEAT = 0.9;          // s — 67 to the minute, a stroll not a march
+const envBEAT_WIN = 0.12;     // s either side of the press
+const envBEAT_LAG = 0.15;     // s — capyWHEEK_INHALE and the frame the key waits for
+const envBEAT_OFF = 0.4;      // an off-beat note's share of a full call
+const envBEAT_NEAR = 16;      // m from the carpet the ring is shown at
+const envBEAT_R = 1.2;        // m — the fixed ring, round the animal's feet
+const envBEAT_R0 = 2.7;       // m — where the closing ring starts each beat
+const envENCORE_WIN_BEAT = 12;   // s — the encore window under the flag (was 8)
+const envTICK_SHELLS = 3;     // of the seven: fired on the tick itself
+let envBeatT = 0;             // s since the stage's last beat
+let envBeatHit = 0;           // 0..1, the fixed ring's flash on an on-beat note
+let envBeatShow = 0;          // 0..1, the ring's fade
+let envBeatOff = null;        // the last note's offset from the beat, s (harness)
+let envBeatHits = 0;          // notes on the beat, this concert (harness)
+let envConcertCarry = 0;      // the sum of the notes' shares — see envBEAT_OFF
+let envSailLit = 0;           // 0..1, the sails' own glow, built note by note
+let envBeatX = 0, envBeatZ = 1.45;   // the ring's centre, eased after the animal
+let envBeatRing = null, envBeatClose = null, envSailGlow = null;
+let envCarpetKicked = 0;      // carpet props sent flying on this concert's first note
 // ---- THE HARBOUR ANSWERS (L5) ------------------------------------------------
 // A note from the stage was a pulse on the sails and a count. Now it is a
 // call, and things answer it a beat later: the house in place cheers back
@@ -117,6 +160,104 @@ function envFireworkStep(game, dt) {
   const fx = -34 + Math.random() * 68, fz = -34 - Math.random() * 22, fy = 15 + Math.random() * 9;
   const pal = [[2.4, 1.2, 0.7], [2.4, 1.9, 0.8], [1.2, 1.6, 2.4], [2.2, 1.0, 1.6]];
   game.firework(fx, fy, fz, { n: 56, size: 1.5, spd: 10, rgb: pal[envEncoreFwN % pal.length] });
+}
+// ---- THE BEAT, EVERY FRAME (T4c) ---------------------------------------------
+/** Is the beat judged at all: the flag live and the ring drawn. See envBEAT. */
+function envBeatLive(game) {
+  return !game.state.noConcertBeat && (game.state.perfRung | 0) < 1;
+}
+/** Where the press that made this call sat against the beat, in s: 0 is dead on. */
+function envBeatOffset() {
+  let ph = (envBeatT - envBEAT_LAG) % envBEAT;
+  if (ph < 0) ph += envBEAT;
+  return ph > envBEAT * 0.5 ? ph - envBEAT : ph;
+}
+/**
+ * THE STAGE IS CLEARED (T4c). The review's frame of the concert had two green
+ * wheelie bins and two cones on the red — props.js scatters them onto the
+ * operaStage zone — so the stage read as a bin area. On the concert's first
+ * note they go over: outward from the animal, up and toward the steps, a
+ * velocity rather than an impulse so a 12 kg bin and a 4.5 kg cone travel the
+ * same. Anything held (by the animal or anyone) is left where it is.
+ */
+function envCarpetKick(game) {
+  const arr = game.props, cp = game.capy && game.capy.position;
+  if (!arr || !cp) return 0;
+  let n = 0;
+  for (let i = 0; i < arr.length; i++) {
+    const pr = arr[i];
+    if (!pr || !pr.body || pr.held || pr.removed || (pr.biome && pr.biome !== 'sydney')) continue;
+    if (pr.type !== 'bin' && pr.type !== 'cone' && pr.type !== 'sign') continue;
+    const b = pr.body, bp = b.position;
+    if (bp.y < envSTAGE_Y - 0.3 || bp.x < -7.1 || bp.x > 7.1 || bp.z < -0.7 || bp.z > 4.1) continue;
+    let dx = bp.x - cp.x, dz = bp.z - cp.z;
+    const d = Math.sqrt(dx * dx + dz * dz) || 1;
+    dx /= d; dz /= d;
+    if (typeof b.wakeUp === 'function') b.wakeUp();
+    b.velocity.x += dx * 3.6;
+    b.velocity.z += dz * 3.6 + 1.4;   // ...and toward the forecourt, off the front of the red
+    b.velocity.y += 2.8;
+    b.angularVelocity.x += rand(-5, 5); b.angularVelocity.z += rand(-5, 5);
+    n++;
+  }
+  return n;
+}
+function envBeatStep(game, dt, on) {
+  const st = game.state;
+  // the clock runs whether or not anything is drawn, so the judge always has one
+  envBeatT += dt;
+  const beat = envBeatT >= envBEAT;
+  if (beat) envBeatT -= envBEAT * Math.floor(envBeatT / envBEAT);
+  envBeatHit *= Math.exp(-3.2 * dt);
+  // ---- the sails: half from how many notes are in, half from the last one,
+  // held at 0.7 once the house has paid and full through the encore
+  let want = 0;
+  if (!st.noConcertBeat) {
+    if (envConcertOn) {
+      want = 0.55 * Math.min(envConcertNotes, envCONCERT_NOTES) / envCONCERT_NOTES + 0.45 * envStagePulse;
+      if (envConcertDone) want = Math.max(want, 0.75);
+    }
+    if (envEncoreGlowT > 0) want = 1;
+  }
+  envSailLit += (want - envSailLit) * (1 - Math.exp(-4 * dt));
+  if (envSailGlow) {
+    const show = envSailLit > 0.01 && (st.perfRung | 0) < 1;
+    envSailGlow.visible = show;
+    if (show) envSailGlow.material.opacity = 0.42 * envSailLit;
+  }
+  // ---- the ring: from envBEAT_NEAR out, and gone once this concert has paid
+  // and its encore window has closed (back for the next concert)
+  const p = game.capy && game.capy.position;
+  let near = false;
+  if (p && envBeatLive(game) && (!envConcertOn || !envConcertDone || envEncoreT > 0)) {
+    const dx = p.x, dz = p.z - 1.45;
+    near = dx * dx + dz * dz < envBEAT_NEAR * envBEAT_NEAR;
+  }
+  envBeatShow += ((near ? 1 : 0) - envBeatShow) * (1 - Math.exp(-5 * dt));
+  const vis = envBeatShow > 0.02 && !!envBeatRing;
+  if (envBeatRing) { envBeatRing.visible = vis; envBeatClose.visible = vis; }
+  if (!vis) return;
+  // round the animal's feet while it is on the red; the middle of the carpet
+  // otherwise, so it is the carpet that is pulsing from the forecourt
+  const tx = on ? clamp(p.x, -5.4, 5.4) : 0, tz = on ? clamp(p.z, 0.3, 2.6) : 1.45;
+  const k = 1 - Math.exp(-10 * dt);
+  envBeatX += (tx - envBeatX) * k; envBeatZ += (tz - envBeatZ) * k;
+  const u = envBeatT / envBEAT;
+  const flash = Math.exp(-envBeatT * 7);
+  const y = envSTAGE_Y + 0.02;
+  const r0 = envBEAT_R * (1 + 0.35 * envBeatHit + 0.08 * flash);
+  envBeatRing.position.set(envBeatX, y, envBeatZ);
+  envBeatRing.scale.set(r0, 1, r0);
+  envBeatRing.material.opacity = envBeatShow * Math.min(1, 0.6 + 0.4 * flash + 0.5 * envBeatHit);
+  const r1 = envBEAT_R + (envBEAT_R0 - envBEAT_R) * (1 - u);
+  envBeatClose.position.set(envBeatX, y + 0.004, envBeatZ);
+  envBeatClose.scale.set(r1, 1, r1);
+  envBeatClose.material.opacity = envBeatShow * (0.22 + 0.7 * u);
+  // ...and heard: a soft tap on the beat while the animal is on the red and
+  // the house has not yet paid. Nothing anywhere else in the chapter.
+  if (beat && on && !(envConcertOn && envConcertDone) && typeof game.sfx === 'function') {
+    game.sfx('tick', { volume: 0.13, pitch: 1.35, at: { x: envBeatX, y: y + 0.3, z: envBeatZ }, near: 4, far: 30 });
+  }
 }
 
 // ---- Circular Quay (chapter 1) -----------------------------------------------
@@ -1054,6 +1195,14 @@ function envBuildQuay(game, root, A) {
   // shorter and no longer reaches over the tables at z 5.2-5.4.
   const colN = 12;
   let pcx = 0, pcz = 0;
+  // THE LENS STOPS UNDER IT (T4c). The review's frame at (-45.2, 0.3, 10.9),
+  // behind the arcade: 70 % of it the dithered underside of the awning, the
+  // boom having passed straight through a band nothing had told it was there.
+  // One compound body, camSolid like the podium plinth: the entablature and
+  // the awning of every bay, exactly as drawn. All of it is over 3.5 m, above
+  // anything the animal reaches, so nothing about walking under it changes.
+  const colCam = envPoolBody();
+  const colQ = new CANNON.Quaternion();
   for (let i = 0; i < colN; i++) {
     const t = i / (colN - 1);
     const cx = -45.0 + t * 21.0;
@@ -1075,9 +1224,17 @@ function envBuildQuay(game, root, A) {
       const ox = -1.15 * Math.sin(yaw), oz = -1.15 * Math.cos(yaw);
       A.box(mx + ox, 3.70, mz + oz, len + 0.34, 0.10, 1.90,
             i % 2 ? PALETTE.cloth3 : PALETTE.cloth6, 0.20, yaw, 0);
+      colQ.setFromEuler(0, yaw, 0, 'YXZ');
+      colCam.addShape(new CANNON.Box(new CANNON.Vec3((len + 0.34) * 0.5, 0.30, 0.58)),
+                      new CANNON.Vec3(mx, 3.80, mz), colQ.clone());
+      colQ.setFromEuler(0.20, yaw, 0, 'YXZ');
+      colCam.addShape(new CANNON.Box(new CANNON.Vec3((len + 0.34) * 0.5, 0.05, 0.95)),
+                      new CANNON.Vec3(mx + ox, 3.70, mz + oz), colQ.clone());
     }
     pcx = cx; pcz = cz;
   }
+  colCam.userData = { camSolid: true };
+  envPoolDone(game, colCam);
   // Terminal façade behind the arcade — pure backdrop, but it gives the quay a
   // back wall so the camera never looks straight through to the far shore.
   // Single storey, parapet at 5.16: at the old 6.36 the default-zoom eye for a
@@ -3077,6 +3234,39 @@ export function createEnvironment(game) {
   shells.castShadow = true;
   shells.receiveShadow = false;   // open double-sided surfaces self-shadow-acne
   root.add(shells);
+  // ---- THE SAILS ANSWER, AND THE BEAT ON THE CARPET (T4c, noConcertBeat) --
+  // The review's "the sails look the same before and after the notes" is the
+  // grade's arithmetic: stageGlow is min(1, standing + pulse), and standing on
+  // the red is already 1, so a note added nothing. The glow is now on the
+  // sails themselves: the SAME geometry a second time, additive, the opacity
+  // written from envSailLit and nothing drawn at all while it is zero. One
+  // draw call, only while a concert is on; hidden at rung ≥ 1.
+  envSailGlow = new THREE.Mesh(shells.geometry, matOwn(PALETTE.sail, {
+    vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0,
+    depthWrite: false, depthFunc: THREE.LessEqualDepth, blending: THREE.AdditiveBlending,
+    emissive: PALETTE.sail, emissiveIntensity: 0.55 }));
+  envSailGlow.name = 'envSailGlow';
+  envSailGlow.castShadow = false; envSailGlow.receiveShadow = false;
+  envSailGlow.renderOrder = 3;
+  envSailGlow.visible = false;
+  root.add(envSailGlow);
+  // Two gold rings flat on the carpet: the fixed one round the animal's feet
+  // and the one that closes on it every envBEAT. One geometry, two meshes,
+  // both hidden unless the animal is within envBEAT_NEAR of the stage.
+  {
+    const rg = new THREE.RingGeometry(0.82, 1.0, 40, 1);
+    rg.rotateX(-Math.PI / 2);
+    const rm = (o) => matOwn(PALETTE.gold, { transparent: true, opacity: o, depthWrite: false,
+                                             emissive: PALETTE.gold, emissiveIntensity: 0.6 });
+    envBeatRing = new THREE.Mesh(rg, rm(0));
+    envBeatClose = new THREE.Mesh(rg, rm(0));
+    for (const m of [envBeatRing, envBeatClose]) {
+      m.name = 'envBeatRing'; m.castShadow = false; m.receiveShadow = false;
+      m.renderOrder = 4; m.visible = false;
+      m.position.set(0, envSTAGE_Y + 0.02, 1.45);
+      root.add(m);
+    }
+  }
 
   // One collider per cluster, measured off the vault footprints above and
   // still stopping well short of z = 1.05, so the whole stage carpet — and the
@@ -3091,6 +3281,20 @@ export function createEnvironment(game) {
   envStaticBox(game, 5.94, 4.0, -5.40, 6.30, 4.0, 5.60).userData = { camSolid: true };
   envStaticBox(game, -7.61, 3.2, -5.93, 5.14, 3.2, 4.08).userData = { camSolid: true };
   envStaticBox(game, -10.69, 1.6, 1.36, 1.87, 1.6, 1.46).userData = { camSolid: true };
+  // ...AND THEIR CROWNS (T4c). The review's lens "inside a sail vault" from the
+  // harbour side is not an opening the colliders miss at the deck — measured
+  // (qa/ten-t4c-shellbox.js), every drawn vertex below the three boxes' tops
+  // is inside them, and 686 + 556 + 144 are ABOVE: the three boxes stop at
+  // 8.0, 6.4 and 3.2 and the sails go on to 11.63, 8.94 and 4.20. An eye up
+  // there is in the vault. One more camSolid box over each, on the measured
+  // extent of what sticks out; all of it is metres over anything the animal
+  // can reach, so only the lens ever meets them.
+  //   hall     x 1.34..9.02   y 8.0..11.63  z -6.51..-1.58
+  //   theatre  x -9.39..-3.65 y 6.4..8.94   z -7.21..-3.39
+  //   restaurant x -11.70..-9.29 y 3.2..4.20 z -0.09..1.93
+  envStaticBox(game, 5.18, 9.86, -4.05, 3.94, 1.86, 2.57).userData = { camSolid: true };
+  envStaticBox(game, -6.52, 7.70, -5.30, 2.97, 1.30, 2.01).userData = { camSolid: true };
+  envStaticBox(game, -10.50, 3.72, 0.92, 1.31, 0.52, 1.11).userData = { camSolid: true };
 
   const arch = new THREE.Mesh(A.build(), matVC);
   arch.castShadow = true;
@@ -3832,6 +4036,11 @@ export function createEnvironment(game) {
       // same trap `opera-stage` itself is gated against in systems.js.
       envStageT = 0;
       envStagePulse = 0;
+      // ...and the ring and the sails' glow, drawn in every other chapter's
+      // shared space otherwise (T4c)
+      envSailLit = 0; envBeatShow = 0;
+      if (envSailGlow) envSailGlow.visible = false;
+      if (envBeatRing) { envBeatRing.visible = false; envBeatClose.visible = false; }
       if (envConcertOn) {
         envConcertOn = false; envConcertNotes = 0;
         if (game.concert && typeof game.concert.end === 'function') game.concert.end();
@@ -3847,7 +4056,9 @@ export function createEnvironment(game) {
       const on = !!(capy && capy.position && envInZone('operaStage', capy.position.x, capy.position.z) &&
                     capy.position.y > 0.9);
       envStageT += (( on ? 1 : 0) - envStageT) * (1 - Math.exp(-2.4 * dt));
-      envStagePulse *= Math.exp(-1.6 * dt);
+      // T4c: held longer (0.6/s, was 1.6) so a note is still on the sails when
+      // the next one lands — see envSailLit
+      envStagePulse *= Math.exp(-(game.state.noConcertBeat ? 1.6 : 0.6) * dt);
       // ---- THE SECOND ASK (L6, F2): `ibis-parade` reads game.herdCount() —
       // the herd skill the bin teaches, consumed here for the first time.
       // The led birds walk the trail behind the animal, so "on the podium
@@ -3860,6 +4071,11 @@ export function createEnvironment(game) {
           if (typeof game.completeTask === 'function') game.completeTask('ibis-parade');
           if (typeof game.toast === 'function') game.toast('two ibis on the steps of the Opera House. nobody minds. nobody ever minds the ibis.');
         }
+      }
+      // ---- before the first note (T4c): the marquee's own line says what the
+      // ring is for, while the animal stands on the red and nothing has begun
+      if (!envConcertOn && on && envBeatLive(game) && typeof game.wowLive === 'function') {
+        game.wowLive('on stage · wheek as the gold rings meet', 0);
       }
       // ---- the concert's clock (W1). See stageNote above. -------------------
       if (envConcertOn) {
@@ -3878,14 +4094,20 @@ export function createEnvironment(game) {
           if (typeof game.wowLive === 'function') {
             const nn = Math.min(envConcertNotes, envCONCERT_NOTES);
             const line = 'on stage · ' + nn + ' of ' + envCONCERT_NOTES + ' wheeks · ' +
-                         (house > 0 ? house + ' listening' : coming > 0 ? coming + ' coming over' : 'nobody yet');
+                         (house > 0 ? house + ' listening' : coming > 0 ? coming + ' coming over' : 'nobody yet') +
+                         // T4c: how many landed as the rings met, once there is one to count
+                         (envBeatLive(game) && envConcertNotes > 0 ? ' · ' + envBeatHits + ' on the beat' : '');
             game.wowLive(line, 0.5 * nn / envCONCERT_NOTES + 0.5 * Math.min(house, 4) / 4);
           }
           if (envConcertNotes >= envCONCERT_NOTES && house >= envCONCERT_HOUSE && on) {
             envConcertDone = true;
             envStagePulse = 1;
-            envEncoreT = envENCORE_WIN; envEncoreDone = false;
+            envEncoreT = game.state.noConcertBeat ? envENCORE_WIN : envENCORE_WIN_BEAT; envEncoreDone = false;
             if (game.concert && typeof game.concert.cheer === 'function') game.concert.cheer(4.5);
+            // T4c: the harbour answers once for everybody — three of the seven
+            // shells on the tick itself, no slow-motion; the full show is still
+            // the encore's
+            if (!game.state.noConcertBeat) { envEncoreFwN = envTICK_SHELLS; envEncoreFwNext = 0.5; }
             if (typeof game.completeTask === 'function') game.completeTask('opera-stage');
             if (typeof game.toast === 'function') game.toast('they liked that. once more, while they are here — the encore.');
           }
@@ -3919,6 +4141,10 @@ export function createEnvironment(game) {
       }
     }
     envTime += dt;
+    {
+      const cp = game.capy && game.capy.position;
+      envBeatStep(game, dt, !!(cp && envInZone('operaStage', cp.x, cp.z) && cp.y > 0.9));
+    }
     envFireworkStep(game, dt);
     envFerryStep(game, dt);
     envVanStep(game, dt);
@@ -4104,7 +4330,18 @@ export function createEnvironment(game) {
      * Damped here rather than in the grade so the chapter owns the shape of its
      * own signal; the grade only decides what to do with it.
      */
-    stageGlow: function () { return Math.min(1, envStageT + envStagePulse * 0.7 + (envEncoreGlowT > 0 ? 1 : 0)); },
+    stageGlow: function () {
+      // T4c: a whole unit per note (was 0.7), for the reader off the podium
+      return Math.min(1, envStageT + envStagePulse * (game.state.noConcertBeat ? 0.7 : 1.0) + (envEncoreGlowT > 0 ? 1 : 0));
+    },
+    /** THE BEAT, for the harness (T4c): the clock, the ring, the last judge. */
+    beatAudit: function () {
+      return { live: envBeatLive(game), beat: envBEAT, win: envBEAT_WIN, lag: envBEAT_LAG,
+               t: +envBeatT.toFixed(3), off: envBeatOffset(), lastOff: envBeatOff, hits: envBeatHits,
+               carry: +envConcertCarry.toFixed(2), show: +envBeatShow.toFixed(2),
+               ring: !!(envBeatRing && envBeatRing.visible), sail: +envSailLit.toFixed(3),
+               sailOn: !!(envSailGlow && envSailGlow.visible), kicked: envCarpetKicked };
+    },
     /**
      * A WHEEK FROM THE STAGE (W1). capybara.js calls this instead of ticking
      * the task itself. Returns the note count so the caller can toast.
@@ -4118,18 +4355,41 @@ export function createEnvironment(game) {
         envConcertDone = false;
         envConcertOff = 0;
         envConcertPeak = 0;            // a new concert is a new house
+        envConcertCarry = 0; envBeatHits = 0; envBeatOff = null;
         // opened with no figure: the paper shows the standing best alone until
         // somebody is actually in place (the documented opening call)
         if (typeof game.recordLive === 'function') game.recordLive('opera-stage');
+        // T4c: the first note clears the red of its bins and cones
+        envCarpetKicked = game.state.noConcertBeat ? 0 : envCarpetKick(game);
       }
       envConcertNotes++;
+      // ---- ON THE BEAT (T4c): a whole note's reach, or envBEAT_OFF of one.
+      // Not judged at all when the ring is not drawn — see envBEAT.
+      const judged = envBeatLive(game);
+      let onBeat = true;
+      if (judged) {
+        const off = envBeatOffset();
+        envBeatOff = +off.toFixed(3);
+        onBeat = Math.abs(off) <= envBEAT_WIN;
+        if (onBeat) { envBeatHits++; envBeatHit = 1; }
+      }
+      envConcertCarry += onBeat ? 1 : envBEAT_OFF;
       // EVERY NOTE CALLS WIDER (L5): the first from the forecourt, the second
-      // from the far end of it, the third from the quay
-      const coming = (game.concert && typeof game.concert.call === 'function') ? game.concert.call(0, 2.5, envConcertNotes) : 0;
+      // from the far end of it, the third from the quay. Under the flag the
+      // call is the carry — the notes' shares summed, npc.js floors it at one.
+      const callAt = game.state.noConcertBeat ? envConcertNotes : envConcertCarry;
+      const coming = (game.concert && typeof game.concert.call === 'function') ? game.concert.call(0, 2.5, callAt) : 0;
       if (envConcertNotes <= 3 && typeof game.toast === 'function') {
-        game.toast(coming > 0 ? (envConcertNotes === 1 ? 'they are coming over. keep going' : coming + ' coming. again — louder carries further')
-                              : envConcertNotes < 3 ? 'nobody in reach yet. again — a wheek carries further each time'
-                              : 'nobody about at all. wheek from the podium with people on the forecourt');
+        if (judged && !onBeat) {
+          // said instead of the count, so the fix is on screen when it is wanted
+          game.toast(envBeatOff < 0 ? 'a touch early. that one carried less — wheek as the rings meet'
+                                    : 'a touch late. that one carried less — wheek as the rings meet');
+        } else {
+          game.toast((judged ? 'on the beat. ' : '') +
+                     (coming > 0 ? (envConcertNotes === 1 ? 'they are coming over. keep going' : coming + ' coming. again — louder carries further')
+                                 : envConcertNotes < 3 ? 'nobody in reach yet. again — a wheek carries further each time'
+                                 : 'nobody about at all. wheek from the podium with people on the forecourt'));
+        }
       }
       // ...and the house answers, a beat later
       envAnswerT = envANSWER_LAG; envAnswerNote = envConcertNotes;
