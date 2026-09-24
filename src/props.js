@@ -1932,8 +1932,11 @@ function physSquashStep(prop, dt) {
     if (Math.abs(pop - 1) < 0.004) pop = 1;
     prop.pop = pop;
   }
-  const bulge = (1 - s * 0.5) * pop;
-  prop.mesh.scale.set(bulge, (1 + s) * pop, bulge);
+  // ...and the plinth's 2.2 is a factor ON that write, not a second writer
+  // (T4b): a staged keepsake the animal bumps still squashes, at its own size.
+  const k = prop.show || 1;
+  const bulge = (1 - s * 0.5) * pop * k;
+  prop.mesh.scale.set(bulge, (1 + s) * pop * k, bulge);
   return true;
 }
 
@@ -1941,7 +1944,8 @@ function physSquashStep(prop, dt) {
 function physSquashClear(prop) {
   if (!prop.sq && !prop.sqV && (prop.pop === undefined || prop.pop === 1)) return;
   prop.sq = 0; prop.sqV = 0; prop.pop = 1;
-  prop.mesh.scale.set(1, 1, 1);
+  const k = prop.show || 1;
+  prop.mesh.scale.set(k, k, k);
 }
 
 function physStampVoice(prop) {
@@ -2082,7 +2086,10 @@ export function createProps(game) {
     nearestGrabbable: physNearestGrabbable,
     spawnProp: physSpawnProp,
     spawnKeep: physSpawnKeep,
+    // (place, x, z, restY, show) — `show` true/false forces the plinth either
+    // way; left out, the finale's lawn gets one and the shelf does not (T4b)
     stageKeep: physStageKeep,
+    plinthAudit: physPlinthAudit,
     keepOut: physKeepOut,
     flash: physFlash,          // the coda flashes each keepsake as its note sounds (L4, F4)
     removeProp: physRemoveProp,
@@ -2383,7 +2390,9 @@ function physSyncMesh(prop, exact) {
   const b = prop.body;
   const bp = exact ? b.position : b.interpolatedPosition;
   const bq = exact ? b.quaternion : b.interpolatedQuaternion;
-  prop.mesh.position.set(bp.x, bp.y, bp.z);
+  // `showDy` is the plinth's lift (T4b): a keepsake drawn at 2.2x round its
+  // own middle would sink its lower 1.2 into the stone. 0 on everything else.
+  prop.mesh.position.set(bp.x, bp.y + (prop.showDy || 0), bp.z);
   prop.mesh.quaternion.set(bq.x, bq.y, bq.z, bq.w);
 }
 
@@ -2690,15 +2699,34 @@ function physSpawnKeep(place, x, z, restY) {
  *    bodies otherwise, and an arrangement that is nudging itself apart on the
  *    frame you first see it is not an arrangement.
  * A held keepsake is left alone: the animal's mouth outranks the display.
+ *
+ * `show` (T4b) puts it on a plinth at 2.2x: true asks for one, false refuses
+ * one, and left out it is the finale's call — `finaleOn` is up and no restY
+ * was given, which is exactly sysFinaleStage's lawn and never the shelf's
+ * 0.84. See THE PLINTHS below.
  */
-function physStageKeep(place, x, z, restY) {
+function physStageKeep(place, x, z, restY, show) {
   const p = physSpawnKeep(place, x, z, restY);
   if (!p || p.held) return p;
   // `homeY` is a SURFACE, not a body centre — physRescue adds originY back on
   // (see physRescue), and physMakeProp stores `homeY: surfY` for the same
   // reason. Setting it to the body's own y here would raise the prop by its own
   // half-height on every rescue, one half-height per rescue, for ever.
-  const surfY = (typeof restY === 'number' && restY === restY) ? restY : physSurfaceY(x, z);
+  let surfY = (typeof restY === 'number' && restY === restY) ? restY : physSurfaceY(x, z);
+  // On a plinth the surface IS the plinth's top, for the body and for the
+  // rescue alike; off one, any slot this place had goes with it.
+  const onPlinth = physPlinthAsk(restY, show);
+  if (onPlinth) surfY = physPlinthPut(place, x, z, surfY, p);
+  else physPlinthLeave(place);
+  physShowSet(p, onPlinth);
+  // ...and on a plinth it stands UP, on its own heading: a hat that was last
+  // knocked over on the grass is not put on a pedestal upside down.
+  if (onPlinth) {
+    const q = p.body.quaternion;
+    const yaw = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.x * q.x));
+    physQ1.setFromAxisAngle(physUp, yaw === yaw ? yaw : 0);
+    q.set(physQ1.x, physQ1.y, physQ1.z, physQ1.w);
+  }
   p.body.position.set(x, surfY + p.originY + 0.015, z);
   p.body.velocity.set(0, 0, 0);
   p.body.angularVelocity.set(0, 0, 0);
@@ -2718,6 +2746,233 @@ function physKeepOut(place) {
     if (!arr[i].removed && arr[i].keep === place) return arr[i];
   }
   return null;
+}
+
+// ---- THE PLINTHS (ROADMAP-TEN T4b) ------------------------------------------
+// The finale's ten keepsakes were 24 cm boxes on the grass, and from the coda
+// lens they read as litter (arc-3-12-close: "a red box, a book stack and a
+// basket among the lawn clutter"). Two terms, both only while the keepsake is
+// staged on the lawn:
+//  - THE MESH at 2.2x, round its own middle and lifted by 1.2 half-heights so
+//    it still stands on what it stood on. The body is NOT scaled: it is what
+//    the mouth, the ibis and the solver hold, and a 53 cm collider would be a
+//    different prop to all three. `show` is a factor on the one scale writer
+//    (physSquashStep) and `showDy` an offset on the one position writer
+//    (physSyncMesh), so neither gets a second hand.
+//  - A PLINTH under each, dressed sandstone (PALETTE.finPlinth), one instanced
+//    draw for all of them and no shadow of its own. And a collider, one static
+//    body with a box per plinth, because a keepsake raised 16 cm onto stone
+//    the animal can walk through is a keepsake hovering over grass the moment
+//    it is nudged — with the collider it is nudged ON the stone, and a real
+//    shove knocks it off, where it is its own size again.
+// The plinth belongs to the SLOT, not the keepsake: take the thing off it
+// (grab, the ibis's beak, a barge) and the plinth stays, empty, until the lawn
+// is laid again. That gap is the mischief showing, which is the game.
+// Cut: noFinPlinth (no plinth, no scale, the lawn as it was). The draw parks
+// at rung 1 or above, decided when the lawn is laid so a flapping governor
+// cannot pop the stone in and out under the coda: parked, the keepsake is
+// drawn standing on the grass and the collider under it is its own footprint.
+const physPLINTH_K = 2.2;           // drawn size of a staged keepsake
+const physPLINTH_H = 0.16;          // m of stone under it
+const physPLINTH_W = 0.58;          // m across the flats, when the ring allows it
+const physPLINTH_SINK = 0.03;       // m below the lawn, so a slope shows no gap
+const physPLINTH_N = 20;            // instances: nineteen, and one spare
+const physPlinthSlots = [];         // { place, x, z, y, top, w, prop }
+let physPlinthMesh = null;
+let physPlinthBody = null;
+let physPlinthBiome = '';           // where the lawn was laid; leave it and it is cleared
+let physPlinthDrawn = true;         // the rung's say, taken when the first slot went down
+let physPlinthDirty = false;
+let physPlinthOffN = 0;             // keepsakes that have come off a plinth, for the audit
+const physPlinthQ = new THREE.Quaternion();
+const physPlinthCQ = new CANNON.Quaternion();
+
+/** Does this staging want a plinth? See physStageKeep's `show`. */
+function physPlinthAsk(restY, show) {
+  const st = physGame.state;
+  if (!st || st.noFinPlinth || show === false) return false;
+  if (show === true) return true;
+  return !!st.finaleOn && !(typeof restY === 'number' && restY === restY);
+}
+
+function physPlinthInit() {
+  if (physPlinthMesh) return;
+  // eight flats and a slight taper: a pedestal from every side of the ring,
+  // where a box would turn its corner to half of them. Base at the origin.
+  const g = new THREE.CylinderGeometry(0.47, 0.5, 1, 8);
+  g.translate(0, 0.5, 0);
+  g.rotateY(Math.PI / 8);              // a flat, not a corner, down each local axis
+  physPlinthMesh = new THREE.InstancedMesh(g, mat(PALETTE.finPlinth), physPLINTH_N);
+  physPlinthMesh.castShadow = false;   // the +1 is the colour pass only
+  physPlinthMesh.receiveShadow = true; // ...and the keepsake's shadow lands on it
+  physPlinthMesh.frustumCulled = false;
+  physPlinthMesh.count = 0;
+  physPlinthMesh.visible = false;
+  physPlinthMesh.name = 'finPlinths';
+  physSceneAddLoose(physPlinthMesh);
+}
+
+/** Lay (or move) this place's plinth; returns the top, which is the new surface. */
+function physPlinthPut(place, x, z, surfY, prop) {
+  physPlinthInit();
+  const live = physLiveBiome();
+  if (physPlinthSlots.length && physPlinthBiome !== live) physPlinthClear();
+  if (!physPlinthSlots.length) {
+    physPlinthBiome = live;
+    const st = physGame.state;
+    physPlinthDrawn = !(st && (st.perfRung | 0) >= 1);
+  }
+  let s = null;
+  for (let i = 0; i < physPlinthSlots.length; i++) if (physPlinthSlots[i].place === place) { s = physPlinthSlots[i]; break; }
+  if (!s) {
+    if (physPlinthSlots.length >= physPLINTH_N) return surfY;
+    s = { place: place, x: 0, z: 0, y: 0, top: 0, w: physPLINTH_W, prop: null };
+    physPlinthSlots.push(s);
+  }
+  s.x = x; s.z = z; s.y = surfY; s.top = surfY + physPLINTH_H; s.prop = prop;
+  physPlinthDirty = true;
+  return s.top;
+}
+
+/** This place is being staged somewhere with no plinth: its slot goes. */
+function physPlinthLeave(place) {
+  for (let i = 0; i < physPlinthSlots.length; i++) {
+    if (physPlinthSlots[i].place !== place) continue;
+    physPlinthSlots.splice(i, 1);
+    physPlinthDirty = true;
+    if (!physPlinthSlots.length) physPlinthClear();
+    return;
+  }
+}
+
+/**
+ * A keepsake on or off its plinth. The scale is written here only when no one
+ * else owns it — the mouth's path rewrites it every frame (physUpdateHeld), so
+ * a held keepsake is left to that, and one frame of 1.0 would eat the grab-pop.
+ */
+function physShowSet(p, on) {
+  const k = on ? physPLINTH_K : 0;
+  if ((p.show || 0) === k) return;
+  p.show = k;
+  // drawn standing on whatever is really under it: the stone, or with the
+  // stone parked, the grass the stone's collider stands on
+  p.showDy = on ? p.originY * (physPLINTH_K - 1) - (physPlinthDrawn ? 0 : physPLINTH_H) : 0;
+  if (p.held) return;
+  p.sq = 0; p.sqV = 0; p.pop = 1;
+  p.mesh.scale.setScalar(on ? k : 1);
+  if (!p.frozen && !p.owner && p.mesh.parent === physGame.scene) physSyncMesh(p, true);
+}
+
+/** The stone and its collider, from the slots. Only when a slot has changed. */
+function physPlinthBuild() {
+  physPlinthDirty = false;
+  const n = physPlinthSlots.length;
+  if (physPlinthBody) { physGame.world.removeBody(physPlinthBody); physPlinthBody = null; }
+  if (!n) { physPlinthMesh.count = 0; physPlinthMesh.visible = false; return; }
+  // Face the middle of the arrangement, and give way to the neighbours: ten
+  // on a 2.6 m horseshoe are 1.3 m apart and take the full width, nineteen
+  // are 65 cm apart and must not become a wall.
+  let cx = 0, cz = 0;
+  for (let i = 0; i < n; i++) { cx += physPlinthSlots[i].x; cz += physPlinthSlots[i].z; }
+  cx /= n; cz /= n;
+  const b = new CANNON.Body({ mass: 0, type: CANNON.Body.STATIC });
+  const hh = (physPLINTH_H + physPLINTH_SINK) * 0.5;
+  for (let i = 0; i < n; i++) {
+    const s = physPlinthSlots[i];
+    let nn = 1e9;
+    for (let j = 0; j < n; j++) {
+      if (j === i) continue;
+      const d = Math.hypot(physPlinthSlots[j].x - s.x, physPlinthSlots[j].z - s.z);
+      if (d < nn) nn = d;
+    }
+    s.w = clamp(nn * 0.8, 0.34, physPLINTH_W);
+    const yaw = Math.atan2(cx - s.x, cz - s.z);
+    physPlinthQ.setFromAxisAngle(physUp, yaw);
+    physM4.compose(physV3.set(s.x, s.y - physPLINTH_SINK, s.z), physPlinthQ,
+                   physV2.set(s.w, physPLINTH_H + physPLINTH_SINK, s.w));
+    physPlinthMesh.setMatrixAt(i, physM4);
+    // a box inside the eight flats (0.46 of the width across them, not 0.5)
+    physPlinthCQ.set(physPlinthQ.x, physPlinthQ.y, physPlinthQ.z, physPlinthQ.w);
+    b.addShape(new CANNON.Box(new CANNON.Vec3(s.w * 0.46, hh, s.w * 0.46)),
+               new CANNON.Vec3(s.x, s.y - physPLINTH_SINK + hh, s.z), physPlinthCQ);
+  }
+  physPlinthMesh.count = n;
+  physPlinthMesh.instanceMatrix.needsUpdate = true;
+  physPlinthMesh.visible = physPlinthDrawn;
+  b.allowSleep = true;
+  b.userData = { plinth: true };
+  physSyncBodyTransform(b);
+  physWorldAddLoose(b);
+  physPlinthBody = b;
+}
+
+/** The lawn is taken up: every keepsake its own size, the stone and the body gone. */
+function physPlinthClear() {
+  for (let i = 0; i < physPlinthSlots.length; i++) {
+    const p = physPlinthSlots[i].prop;
+    if (!p || p.removed) continue;
+    physShowSet(p, false);
+    // it was asleep on a collider that is about to go; let it find the grass
+    if (!p.frozen && !p.held && p.body.wakeUp) p.body.wakeUp();
+  }
+  physPlinthSlots.length = 0;
+  physPlinthDirty = false;
+  if (physPlinthBody) { physGame.world.removeBody(physPlinthBody); physPlinthBody = null; }
+  if (physPlinthMesh) { physPlinthMesh.count = 0; physPlinthMesh.visible = false; }
+}
+
+/**
+ * Once a frame, and nothing at all with no lawn laid. A keepsake stays on its
+ * plinth while it is free, in the world, and over the stone; the mouth, the
+ * ibis (`frozen`, KINEMATIC — rival.js's pin), a person, a bin or a shove
+ * off the edge each take it back to its own size and leave the plinth empty.
+ */
+function physPlinthStep(live) {
+  if (!physPlinthSlots.length) return;
+  const st = physGame.state;
+  if ((st && st.noFinPlinth) || live !== physPlinthBiome) { physPlinthClear(); return; }
+  for (let i = 0; i < physPlinthSlots.length; i++) {
+    const s = physPlinthSlots[i];
+    const p = s.prop;
+    if (!p) continue;
+    const b = p.body;
+    const dx = b.position.x - s.x, dz = b.position.z - s.z;
+    const r = s.w * 0.5;
+    if (p.removed || p.held || p.owner || p.frozen || p.hidden || p.inVessel || p.spilled ||
+        p.mesh.parent !== physGame.scene || dx * dx + dz * dz > r * r ||
+        b.position.y < s.top + p.originY - 0.08) {
+      if (!p.removed) physShowSet(p, false);
+      s.prop = null;
+      physPlinthOffN++;
+    }
+  }
+  if (physPlinthDirty) physPlinthBuild();
+}
+
+/** For the harness: the slots, what is on them, and what is drawn. */
+function physPlinthAudit() {
+  const out = {
+    slots: physPlinthSlots.length,
+    on: 0,
+    drawn: !!(physPlinthMesh && physPlinthMesh.visible) ? physPlinthMesh.count : 0,
+    parked: !physPlinthDrawn,
+    body: physPlinthBody ? physPlinthBody.shapes.length : 0,
+    off: physPlinthOffN,
+    biome: physPlinthBiome,
+    list: [],
+  };
+  for (let i = 0; i < physPlinthSlots.length; i++) {
+    const s = physPlinthSlots[i], p = s.prop;
+    if (p) out.on++;
+    out.list.push({
+      place: s.place, x: +s.x.toFixed(2), z: +s.z.toFixed(2), top: +s.top.toFixed(3), w: +s.w.toFixed(2),
+      keep: p ? p.keep : null,
+      scale: p ? +p.mesh.scale.x.toFixed(3) : null,
+      bodyY: p ? +p.body.position.y.toFixed(3) : null,
+      meshBottom: p ? +(p.mesh.position.y - p.originY * p.mesh.scale.y).toFixed(3) : null,
+    });
+  }
+  return out;
 }
 
 function physRemoveProp(prop) {
@@ -7082,6 +7337,9 @@ function physUpdate(dt) {
 
     if (!p.solo) physWriteInstance(p);
   }
+  // After the props, so a keepsake grabbed, pinned or shoved this frame comes
+  // off its plinth on the frame it happened. See THE PLINTHS.
+  physPlinthStep(live);
 
   // No tip may register during the opening settle — nothing the player has done
   // yet can have caused one.

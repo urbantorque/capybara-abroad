@@ -1182,6 +1182,50 @@ test 81/0. Screenshots: `qa/ten-t4a-{bag,coda-0,coda-1,last,ledger,ledger-foot}.
 only, not the body), on one instanced PALETTE.stone plinth per keepsake (2694). Proof: the finale
 PNG, and a draw-call count of +1.
 
+### T4b — shipped
+
+- **The hook.** `game.physics.stageKeep(place, x, z, restY, show)` (props.js `physStageKeep`),
+  the same export name as before with one new trailing argument. `show` true forces a plinth,
+  false refuses one, and when it is left out the finale decides: `game.state.finaleOn` is up and
+  no `restY` was given. That is exactly `sysFinaleStage`'s call and never `sysShelfStage`'s 0.84,
+  so systems.js needs no change for this item to work. `game.physics.plinthAudit()` is there for
+  the harness.
+- **The keepsake.** The mesh is drawn at 2.2x and the body stays at 1x. `prop.show` is a factor on
+  the one scale writer (physSquashStep and physSquashClear), and `prop.showDy` (1.2 x originY) is an
+  offset on the one position writer (physSyncMesh), so the drawn base sits on the stone. On a plinth
+  it is stood upright on its own heading.
+- **The plinth.** It is an octagonal sandstone pedestal in `PALETTE.finPlinth` (the seed), 16 cm
+  tall and 58 cm across the flats. It narrows to 0.8 of the nearest-neighbour gap, so nineteen do
+  not become a wall. It faces the arrangement's centroid. All the plinths are one InstancedMesh with
+  castShadow off, plus one static body with a box per plinth. The keepsake body rests on that
+  collider, so a nudge leaves it on the stone and a shove knocks it off. The plinth belongs to the
+  slot: when the keepsake leaves it, the plinth stays empty until the lawn is laid again.
+- **Coming off.** It is held, it is `frozen` (rival.js's KINEMATIC pin), it has an owner, it is in
+  a vessel, it is hidden or spilled, or it is more than half a plinth off centre or below the top.
+  Each of these returns it to 1.0 on the same frame. A held one is left to physUpdateHeld's scale,
+  so the grab-pop survives. When the biome is left or the flag is cut, everything is cleared, and
+  the bodies are woken so nothing sleeps on a collider that has gone.
+- **Flag** `noFinPlinth`: no plinth, no scale, and the lawn as it was. **Rung**: the choice is
+  made when the first slot goes down, so a flapping governor cannot pop the stone in and out under
+  the coda. At rung 1 or above the stone is not drawn. The keepsake is still at 2.2x, but it is
+  drawn standing on the grass, and the collider under it lies within its own footprint.
+- **Proof** (`qa/ten-t4b-plinth.js`, hand clock, rung pinned, laid the same way as
+  sysFinaleStage). For ten keepsakes: 10 slots, 10 on, 10 drawn and 10 collider boxes. Every
+  keepsake is at 2.2 and its drawn base is at top + 0.015 m. The worst body up-axis is 1.000. The
+  render from the coda lens is **+1 draw call** (185 against 184) and +320 triangles. World bodies
+  go up by exactly 1 (the other +10 were the ten keepsakes spawned on a fresh file). The rival path
+  (keepOut, then frozen and KINEMATIC for 20 frames, then dropOwned) was checked: keepOut finds it,
+  the scale is 1.0 in the beak, the slot is empty, dropOwned returns it DYNAMIC and it falls 1.36 m
+  at 1.0, and it is grabbable again. The grab takes it to 1.0 and empties the slot. A 3 m/s shove
+  sends it off at 1.0. A 0.36 m/s nudge leaves it on the stone at 2.2. Shelf staging (restY 0.84)
+  gives 1.0 and no slot. The cut clears to 0 slots, bodies go down by 1, and all at 1.0. At rung 1
+  there are 10 slots and 0 drawn, with the drawn base at +0.015 on the grass. lastError is null.
+  PNGs: `qa/ten-t4b-plinth-{live,close,after,cut,rung1}.png`. In the live and close shots the ten
+  read as objects, and in the cut shot they are specks.
+- **Not measured here:** GPU cost. That waits for the rung-0 headful A/B in the proof slot (one
+  instanced draw, 320 triangles, no shadow caster). Nothing was changed in systems.js. The T4a
+  checks for keepsake screen height and "10 plinths" should read `plinthAudit()`.
+
 **T4c · environment.js · the concert is a performance** (`noConcertBeat`). Reach scales with how
 close each wheek lands to the score's beat: within ±120 ms gives full reach, otherwise 40%. A
 pulsing ring decal on the carpet from stageGlow (4110, 4130). Three of the seven shells fire on the
