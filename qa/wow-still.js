@@ -13,7 +13,11 @@ async page => {
   await page.setViewportSize({ width: 1280, height: 760 })
   await page.goto('http://localhost:5188/')
   await page.waitForTimeout(5200)
-  await page.keyboard.press('Digit1')
+  // Begin, by its button (ROADMAP-TEN T1a). Digit1 here started FREE ROAM
+  // Sydney, because a digit on the title's front was a tile press; the
+  // shimmer floor is the story's frame, and page one's only digit is now
+  // Begin anyway. The button says so without depending on that.
+  await page.evaluate(() => [...document.querySelectorAll('.capyui-go')].find(b => !b.classList.contains('alt')).click())
   await page.waitForTimeout(9000)
   const NAMES = ['sydney', 'pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland', 'sahara', 'drift', 'venice',
                  'kowloon', 'palawan', 'goreme', 'manly', 'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi']

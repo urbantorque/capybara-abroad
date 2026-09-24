@@ -148,6 +148,44 @@ guard or a prop move, never a respawn.
   `qa/aaa-freeroam.mjs` stays at 9/9. Screenshots `ten-t1a-p2-free.png` and `ten-t1a-p2-atlas.png`.
 - Payoff: the owner's picker, and two doors that say what they are.
 
+### T1a — shipped
+
+- **The flat wall.** `.capyui-picks.flat` holds the 18 after the hero in CHAPTERS order, using
+  4cc6e5e^'s loop and its `pickCols()` grid walk. On a desktop window (≥640 wide, ≥600 tall)
+  the shelf drops its scroll budget and the hero's picture becomes a strip sized
+  `clamp(84px, 100vh − 588px, 210px)`. Measured by `qa/ten-t1a-shots.mjs`: **19 of 19 tiles in
+  view, no pill, one tile height, three rows of 6, at both 1280x720 and 1440x900**. A phone
+  (390x844) keeps the scrolling shelf in two columns. The atlas is built only for a story file
+  (`jrHasFile && journeyMode==='story'`) and is reached from pause's "choose a place".
+  `shelfUse()` swaps the two shelves, the heading ("Where to?" / "Where next?"), the stat and
+  `titleFree`. It also gets its own compact hero, four columns in every fold, the
+  firstGate/actGate split, and a pill that counts places. The atlas at 1280x720 now ends
+  inside the window: before, it ran 64 px past it with the footer under it.
+- **Digits** act on page two only, where each press is a click on the live shelf's tile.
+  Digit1 on page one with no file is Begin.
+- **Doors.** Begin and Free roam carry italic sublines from sysHOME_UI, and the `title=`
+  tooltip is gone. Carry on names the act (story) or says "free roam". A free arcV1 file gets
+  "Carry on the story". A story restore outside `open` lands in the frontier's first open
+  place.
+- **The toggle.** Pause has "back to the story" for a free arcV1 file (it crosses to the
+  frontier if the current place is shut). The story-to-free switch asks once per session:
+  "every place opens. the story waits.".
+- **Free gates.** The paper's memory count and the journal head are gated on journeyMode.
+  `sysFinaleAll` is false for a free arcV1 file, and legacy files keep the JOURNEY ending.
+  The free guided walk ends at beat 7 (`tutBeats()`).
+- **Free departures** (`noFreeDepart`, not a GPU term). Tab and J in free open `jrShow(true)`
+  with the head line "anywhere. it is not in a hurry." and the title "Where to?". Pause
+  "choose a place" opens the same board with no reload.
+- **Proof.** `qa/ten-modes.mjs` gives 23/23 (live, fresh profile, real keys). `qa/aaa-freeroam.mjs` gives 9/9, and npm test gives 78 checks with 0 failed.
+  `qa/ten-t1a-modes-static.mjs` gives 21 checks and is registered in `qa/run.mjs`.
+  `qa/wow-still.js` begins the story by its button. `qa/aaa-freeroam.mjs` counts the live
+  shelf and reads a door's `<b>`, which are the two deliberate changes.
+  `qa/homecoming-atlas-live.mjs` reaches the atlas from a story file. Screenshots:
+  `qa/ten-t1a-p2-free.png` and `qa/ten-t1a-p2-atlas.png`.
+- **Misses.** The in-play story-to-free question is per session and not per file, because no
+  new save field was allowed. The atlas at 1280x720 still leaves a 1-2 px title scroll.
+  The free paper still says "a memory kept" on a chapter row, and T3a owns the free paper.
+
 **T1b · monaco.js · the car keeps its driver.** In `monMePlace(dt>0)`, set
 `b.position.set(tx,ty,tz)` (keep the velocity for contacts). Draw monMeG from monMeTX/TY/TZ and
 monMeYaw, not from interpolatedPosition (3050, 3493, 3507). Treat the pack cars the same way. Proof:

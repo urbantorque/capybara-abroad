@@ -6572,6 +6572,16 @@ const sysHOME_UI = {
   returnHome: 'Visit the garden shelf · Sydney',
   returnHint: 'The souvenirs have a place in the garden. A visit home leaves every onward route open.',
   openingReplay: 'replay the opening',
+  // ---- TWO GAMES, AND THE DOORS SAY WHICH (ROADMAP-TEN T1a) ---------------
+  // Each door's subline is the whole of what it is, said once: Begin is the
+  // story, Free roam is the sketchbook. The act name rides Carry on.
+  beginLine: 'the bag, the shelf at home, and an ibis',
+  freeLine: 'every place open. no list. only trouble.',
+  storyCarry: 'Carry on the story', storyBack: 'back to the story',
+  storySaid: 'The story picks up where the bag is.',
+  freeAsk: 'every place opens. the story waits.', freeAskYes: 'open every place', freeAskNo: 'stay in the story',
+  freeDepart: 'anywhere. it is not in a hurry.',
+  whereFree: 'Where to?', whereStory: 'Where next?',
 };
 const sysLEARN_SHOP = {
   open: 'Try a practice purchase', wallet: 'Practice wallet: {n} yuzu',
@@ -8947,6 +8957,37 @@ function sysBuildCSS() {
 '.capyui-act .capyui-pick:disabled{cursor:default;transform:none;box-shadow:none;}',
 '.capyui-act .capyui-pick:disabled .capyui-pickart{opacity:.6;}',
 '@media(min-width:640px){.capyui-actplaces{grid-template-columns:repeat(var(--act-cols,4),minmax(0,1fr));}}',
+/* (T1a) Inside the HOMECOMING brackets on purpose: qa/reimagine-earned-card.mjs
+   compares the rest of the sheet with 2891ecc. Everything below wins on
+   specificity, never on source order, so it can sit this far up. */
+/* ---- FREE ROAM'S SHELF IS A WALL, NOT A WINDOW (ROADMAP-TEN T1a) --------
+   The owner's picture (qa/F1-title-p2.png): a hero and eighteen tiles, all
+   in view, nothing to open and nothing to scroll. On a desktop window the
+   flat shelf drops the scroll budget above — it was sized for folds — and
+   the HERO is what gives: its picture is a strip whose height is what the
+   window has left once three rows of tiles, the heading and the footer are
+   paid for. Every number below is read off a screenshot, not derived.
+   The compound selectors outrank the one-class budgets above whatever the
+   source order, which is the trap the short-screen notes up there record. */
+/* Two shelves are built and one is live, by the `hidden` attribute — which a
+   class's own display:grid / display:flex outranks, so the attribute has to
+   be restated here or both shelves draw (measured: 38 tiles on the atlas). */
+'.capyui-p2 .capyui-picks[hidden],.capyui-p2 .capyui-pick[hidden]{display:none !important;}',
+'@media (min-width:640px) and (min-height:600px){',
+  '.capyui-picks.flat{max-height:none;overflow:visible;}',
+  '.capyui-pick.hero.flat{min-height:0;}',
+  '.capyui-pick.hero.flat .capyui-pickart{aspect-ratio:auto;',
+    'height:clamp(84px,calc(100vh - 588px),210px);}',
+  /* ...and the atlas's hero comes down with it, a step shorter because a
+     story file also carries the start-over row: at 1280x720 the atlas card
+     ran 64 px past the bottom of the window with the footer under it. */
+  '.capyui-pick.hero.compact{min-height:0;}',
+  '.capyui-pick.hero.compact .capyui-pickart{aspect-ratio:auto;',
+    'height:clamp(84px,calc(100vh - 620px),170px);}}',
+/* A phone keeps the scrolling shelf (two columns, nine rows) and a shorter
+   hero, so the first row of places is on screen under it. */
+'@media (max-width:639px){.capyui-pick.hero.flat .capyui-pickart,.capyui-pick.hero.compact .capyui-pickart{aspect-ratio:64 / 16;}}',
+'@media (min-width:360px) and (max-width:639px){.capyui-picks.flat{grid-template-columns:repeat(2,minmax(0,1fr));}}',
 /* HOMECOMING atlas end. */
 /* ---------- THE REPERTOIRE, ON THE JOURNAL (Q2) ----------
    THE SHELF’S OWN RULE, applied to the forty names: always forty, and the
@@ -11536,6 +11577,16 @@ function sysBuildCSS() {
   '.capyui-p1 .capyui-sub{margin-top:18px;}}',
 '@media (max-width:520px) and (orientation:portrait){',
   '.capyui-card:not(.two){margin:clamp(24px,6vh,52px) auto auto;}}',
+/* ---- EACH DOOR SAYS WHAT IT IS (ROADMAP-TEN T1a) ------------------------
+   The two doors were one word each and a hover tooltip, which a touch player
+   never sees and a mouse player sees only after deciding. An italic line
+   under the word, in the hint voice the tiles already use, and at full
+   opacity on the filled door: paper on accentDeep is the M6 pair, and a
+   translucent subline on it would be the one line under 4.5:1. */
+'.capyui-go .capyui-goline{font-style:italic;font-weight:400;font-size:' + tMd + ';',
+  'letter-spacing:.01em;text-transform:none;opacity:1;}',
+'.capyui-go.alt .capyui-goline{color:' + inkSoft + ';opacity:1;}',
+'.capyui-go.alt.story{margin-top:2px;}',
 /* HOMECOMING title end. */
 ''
   ].join('');
@@ -25173,7 +25224,11 @@ export function createSystems(game) {
     el.type = 'button';
     const cl = sysEl('span', 'capyui-carryl');
     cl.appendChild(sysEl('b', null, 'Carry on'));
-    cl.appendChild(sysEl('i', null, 'you were last in ' + cd.name));
+    // ...and WHICH GAME it carries on (T1a): the act for a story file, the
+    // word for a free one. The same row starts either, so it says which.
+    const hpNow = homecomingProgress(function (id) { return !!jrFileDone[id]; });
+    cl.appendChild(sysEl('i', null, 'you were last in ' + cd.name + ' · ' +
+      (journeyMode === 'story' ? HOMECOMING_ACTS[hpNow.actIndex].title : 'free roam')));
     el.appendChild(cl);
     el.appendChild(sysEl('span', 'capyui-carryn',
       jrFileCount + ' / ' + TASKS.length));
@@ -25195,10 +25250,10 @@ export function createSystems(game) {
   // label now says so, and starting over is its own control on page two.
   const goFree = !jrHasFile || journeyMode === 'story';
   goEl.appendChild(sysEl('b', null, goFree ? sysHOME_UI.free : 'Go somewhere else'));
-  if (goFree) {
-    goEl.dataset.free = '1';
-    goEl.setAttribute('title', jrHasFile ? sysHOME_UI.freeKeep : sysHOME_UI.freeHint);
-  }
+  // No `title=` tooltip any more (T1a): what it said is the subline now, on
+  // the door, where a thumb and a first glance both find it.
+  if (goFree) goEl.dataset.free = '1';
+  goEl.appendChild(sysEl('em', 'capyui-goline', sysHOME_UI.freeLine));
   // TWO FILLED ACCENT BUTTONS ON ONE CARD IS NO HIERARCHY AT ALL, and as of T2
   // this one is ALWAYS the outline: on a fresh file the filled button above it
   // is Begin, and on a file it is Carry on. There is no longer a state in
@@ -25214,16 +25269,9 @@ export function createSystems(game) {
   goEl.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
   goEl.addEventListener('click', function (e) {
     e.preventDefault(); e.stopPropagation();
-    if (jrHasFile && journeyMode === 'story') {
-      titleFree = true;
-      const gated = titleEl.querySelectorAll('.capyui-pick[data-gate="1"]');
-      for (let i = 0; i < gated.length; i++) {
-        gated[i].disabled = false;
-        delete gated[i].dataset.gate;
-        const note = gated[i].querySelector('.capyui-pickgate');
-        if (note) note.remove();
-      }
-    }
+    // The flat shelf, always (T1a). On a story file it is Free Roam's shelf
+    // and the file only changes mode when a place is chosen from it.
+    shelfUse(false);
     titlePage(2);
   });
   // ---- THE DECISION SITS ABOVE THE REFERENCE (T2) ------------------------
@@ -25242,6 +25290,7 @@ export function createSystems(game) {
     const beginEl = sysEl('button', 'capyui-go');
     beginEl.type = 'button';
     beginEl.appendChild(sysEl('b', null, sysHOME_UI.begin));
+    beginEl.appendChild(sysEl('em', 'capyui-goline', sysHOME_UI.beginLine));
     beginEl.addEventListener('pointerdown', function (e) {
       e.stopPropagation(); titleAudio();
     });
@@ -25255,6 +25304,25 @@ export function createSystems(game) {
     titleFirstEl = beginEl;
   }
   p1El.appendChild(goEl);
+  // ---- THE WAY BACK TO THE STORY (T1a) -----------------------------------
+  // A free file that was a story once (arcV1) had no road back: the toggle
+  // went one way. The same file, flipped to story before startGame reads it,
+  // and startGame's restore puts it in the frontier if the place it was left
+  // in is not open to the story yet. Legacy files (no arcV1) have no story.
+  if (jrHasFile && journeyMode === 'free' && jrFile.arcV1 === 1) {
+    const storyEl = sysEl('button', 'capyui-go alt story');
+    storyEl.type = 'button';
+    storyEl.appendChild(sysEl('b', null, sysHOME_UI.storyCarry));
+    storyEl.appendChild(sysEl('em', 'capyui-goline', sysHOME_UI.beginLine));
+    storyEl.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
+    storyEl.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      jrFile.journeyMode = 'story';
+      journeyMode = 'story';
+      startGame(jrFile.biome || 'sydney', true);
+    });
+    p1El.appendChild(storyEl);
+  }
   // ...AND THE LEGEND COMES DOWN ONE SIZE to pay for the button above it. It
   // is reference now rather than the content of the page, and the card still
   // has to fit a 1280x720 laptop with its footer above the fold.
@@ -25329,15 +25397,23 @@ export function createSystems(game) {
     titlePage(1);
   });
   p2Head.appendChild(backEl);
-  p2Head.appendChild(sysEl('h1', 'capyui-h2', 'Where would you like to start?'));
+  // The question is the shelf's, and shelfUse rewrites it (T1a): "Where to?"
+  // over the flat wall, "Where next?" over the story's atlas.
+  const p2H = sysEl('h1', 'capyui-h2', sysHOME_UI.whereFree);
+  p2Head.appendChild(p2H);
   // ---- WHERE THE JOURNEY HAS GOT TO ---------------------------------------
   // The third column of the header. On a fresh file it says how many places
   // there are and that the order is yours; once there is anything on the file
   // it says how much of the whole game has actually been seen, which is the
   // one number the picker is the right screen for — it is the only screen
   // where every place is on show at once.
+  // ...and the stat is the shelf's too (T1a). The flat wall counts places
+  // seen, which is the one number Free Roam keeps; the atlas counts the
+  // story's memories and names the act, because that is what it is a map of.
+  const p2Stat = sysEl('span', 'capyui-p2stat');
+  let p2StatFlat = null, p2StatAtlas = null;
   {
-    const st = sysEl('span', 'capyui-p2stat');
+    const st = p2Stat;
     if (jrHasFile) {
       let placesSeen = 0;
       for (let n = 1; n <= CHAPTERS.length; n++) {
@@ -25346,9 +25422,12 @@ export function createSystems(game) {
         for (let k = 0; k < ids.length && !any; k++) if (jrFileDone[ids[k]]) any = 1;
         placesSeen += any;
       }
-      st.appendChild(sysEl('b', null, jrFileCount + ' of ' + TASKS.length + ' done'));
-      st.appendChild(document.createTextNode(
-        placesSeen + ' of ' + CHAPTERS.length + ' places seen'));
+      p2StatFlat = [placesSeen + ' of ' + CHAPTERS.length, 'places seen'];
+      const isDone = function (id) { return !!jrFileDone[id]; };
+      const hp = homecomingProgress(isDone);
+      let mem = 0;
+      for (let n = 1; n <= CHAPTERS.length; n++) { const m = homecomingMemory(n, isDone); if (m && m.enough) mem++; }
+      p2StatAtlas = [mem + ' of ' + CHAPTERS.length + ' memories', HOMECOMING_ACTS[hp.actIndex].title];
     }
     // ...AND ON A FRESH FILE IT SAYS NOTHING (T2). It used to say "19 PLACES /
     // IN ANY ORDER", which is the third printing of a sentence the page-one
@@ -25405,13 +25484,15 @@ export function createSystems(game) {
     titleLeanAt = '';
     glowEl.style.color = '';
   }
-  function buildPick(d, i, hero) {
+  function buildPick(d, i, hero, atlas) {
     const ids = tasksInChapter(d.n);
     let done = 0;
     for (let k = 0; k < ids.length; k++) if (jrFileDone[ids[k]]) done++;
     const el = sysEl('button', 'capyui-pick');
     el.type = 'button';
     if (hero) el.classList.add('hero');
+    if (hero) el.classList.add(atlas ? 'compact' : 'flat');   // compact heroes (T1a)
+    el.dataset.n = String(d.n);                     // the digit's tile (T1a)
     el.style.setProperty('--i', String(i));
     // ...and the tile's own colour, for the wash that runs out of the bottom
     // of the picture and into the words. Off the SAME tint the picture is
@@ -25456,7 +25537,9 @@ export function createSystems(game) {
       body.appendChild(sysEl('em', 'capyui-pickeyebrow',
         // Single spaces round the dot. The double-spaced ` · ` was doing a
         // job on a rail of unrelated chips and is just a wide gap here.
-        done > 0 ? 'chapter one' : 'chapter one · start here'));
+        // Free Roam's hero is a place like the others, and says which game
+        // this is instead of which chapter (T1a).
+        !atlas ? 'free roam' : done > 0 ? 'chapter one' : 'chapter one · start here'));
     }
     // ---- ON A FRESH FILE THE OTHER EIGHTEEN SAY WHERE THEY COME (L3-13) --
     // Nothing is locked — a stranger may still open on Antarctica ("too cold
@@ -25464,14 +25547,17 @@ export function createSystems(game) {
     // equals, and the hero tile was the only thing saying it was the door.
     // A soft eyebrow on the rest, gone the moment there is anything on the
     // file, so the shelf reads as one door and eighteen places behind it.
-    if (!hero && !jrHasFile) body.appendChild(sysEl('em', 'capyui-pickeyebrow soft', 'after Sydney'));
+    // ...AND IN FREE ROAM THEY DO NOT (T1a). "After Sydney" is the story's
+    // order, printed eighteen times over a shelf whose whole point is that
+    // there is none; the atlas is only built for a story file, which already
+    // has something on it, so the line has no shelf left to stand on.
     body.appendChild(sysEl('b', null, d.name));
     body.appendChild(sysEl('i', null, d.hint));
     // The hero is the only one with room for a third line, and there is
     // exactly one thing worth telling a player who has never played this.
     if (hero) {
       body.appendChild(sysEl('em', 'capyui-pickfirst',
-        ids.length + ' things to do, and nobody watching'));
+        atlas ? ids.length + ' things to do, and nobody watching' : 'nobody watching'));
     }
     el.appendChild(body);
     if (hero) {
@@ -25545,17 +25631,23 @@ export function createSystems(game) {
           rd.label + ' ' + fileRecs[bestId].toFixed(rd.dp) + rd.unit));
       }
     }
-    const fileOpen = !jrHasFile || journeyMode !== 'story' ||
-      homecomingProgress(function (id) { return !!jrFileDone[id]; }).open.indexOf(d.n) >= 0;
+    // Only the atlas has gates; the flat shelf is Free Roam's and every tile
+    // on it goes (T1a). A gate says what opens it: before the Sydney memory
+    // that is Sydney, and after it the act's two memories (the in-game
+    // board already chose between the two lines this way).
+    const isDoneF = function (id) { return !!jrFileDone[id]; };
+    const fileOpen = !atlas || homecomingProgress(isDoneF).open.indexOf(d.n) >= 0;
     el.disabled = !fileOpen;
     if (!fileOpen) {
       el.dataset.gate = '1';
-      body.appendChild(sysEl('em', 'capyui-pickfirst capyui-pickgate', sysHOME_UI.actGate));
+      body.appendChild(sysEl('em', 'capyui-pickfirst capyui-pickgate',
+        homecomingMemory(1, isDoneF).enough ? sysHOME_UI.actGate : sysHOME_UI.firstGate));
     }
     el.setAttribute('aria-label', d.name + ', chapter ' + d.n +
       (d.key ? ', key ' + d.key : '') +
       (done > 0 ? ', ' + done + ' of ' + ids.length + ' done' : '') +
-      (jrHasFile ? ', carry on from here' : ''));
+      // A flat tile on a story file switches it to Free Roam, and says so.
+      (jrHasFile ? (atlas || journeyMode !== 'story' ? ', carry on from here' : ', in free roam') : ''));
     // stopPropagation, or the card's own catch-all listener starts Sydney first
     el.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
     el.addEventListener('click', function (e) {
@@ -25575,6 +25667,10 @@ export function createSystems(game) {
       // behaviour and the one every part of this tile already implied.
       // Starting over is still possible and is its own clearly-labelled
       // control, below the shelf, and it asks first.
+      // The atlas carries the story on; the flat shelf is Free Roam, and on a
+      // story file choosing from it is the moment the file changes mode.
+      if (atlas) { startGame(d.biome, true, 'story'); return; }
+      titleFree = jrHasFile && journeyMode === 'story';
       titleFreeCommit();
       startGame(d.biome, jrHasFile, 'free');
     });
@@ -25599,8 +25695,17 @@ export function createSystems(game) {
   // bottom. That held for precisely as long as there were thirteen places.
   // Out here it is a row of its own, it gets more space than it ever had, and
   // the number of chapters no longer has to divide by anything.
-  const heroEl = buildPick(pickDefs[0], 0, true);
-  p2El.appendChild(heroEl);
+  // ---- TWO SHELVES, ONE CARD (ROADMAP-TEN T1a) ---------------------------
+  // Free Roam and the story are two games that share a world, and the owner
+  // asked for Free Roam's picker to be the flat grid again: nineteen tiles in
+  // chapter order, every one of them in view at 1280x720 with no fold to open
+  // and nothing to scroll (qa/F1-title-p2.png). The act atlas stays, and is
+  // the story's alone: it is built only for a story file. Both are built at
+  // boot and one is live — shelfUse swaps them, so turning the page never
+  // rebuilds a tile, and the digits, the arrows and the "more below" pill
+  // all read whichever shelf is showing.
+  const heroFlat = buildPick(pickDefs[0], 0, true, false);
+  p2El.appendChild(heroFlat);
 
   // ---- NO LABEL OVER THE SHELF (T2) -------------------------------------
   // It said "OR GO STRAIGHT SOMEWHERE ELSE" — a fourth line of small caps on a
@@ -25608,41 +25713,78 @@ export function createSystems(game) {
   // a hero that says START HERE, and eighteen other places under it. A label
   // whose whole content is the word "or" is a label the design does not need.
   // ---- THE SHELF --------------------------------------------------------
-  const picksEl = sysEl('div', 'capyui-picks');
-  // A SCROLL REGION, not a taller card. Fifteen tiles is three rows; thirty
-  // would be six, and a card that grows without limit pushes its own footer —
-  // the key legend, which is the only statement of the control scheme this
-  // game has — off the bottom of a laptop screen. The shelf scrolls; the
-  // masthead, the carry-on button and the controls never move.
-  picksEl.style.setProperty('--cols', String(sysPickCols(pickDefs.length - 1)));
-  picksEl.setAttribute('role', 'group');
-  picksEl.setAttribute('aria-label', 'the other places');
-  const atlasHere = jrFile && jrFile.biome ? chapterOf(jrFile.biome) : 1;
-  for (let i = 0; i < HOMECOMING_ACTS.length; i++) {
-    const act = HOMECOMING_ACTS[i];
-    const fold = sysEl('details', 'capyui-act');
-    fold.open = act.places.indexOf(atlasHere) >= 0;
-    const label = sysEl('summary');
-    label.appendChild(sysEl('b', null, act.title));
-    const defs = act.places.map(function (n) { return pickDefs.find(function (d) { return d.n === n; }); });
-    label.appendChild(sysEl('small', null, defs.map(function (d) { return d.name; }).join(' · ')));
-    fold.appendChild(label);
-    const places = sysEl('div', 'capyui-actplaces');
-    const shown = defs.filter(function (d) { return d.n !== 1; });
-    places.style.setProperty('--act-cols', String(shown.length));
-    for (let k = 0; k < shown.length; k++) places.appendChild(buildPick(shown[k], k, false));
-    fold.appendChild(places);
-    // A disclosure is never Begin. Its native keyboard activation must not
-    // reach the title's Enter/Space shortcuts, including from a postcard.
-    fold.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
-    fold.addEventListener('click', function (e) { e.stopPropagation(); });
-    fold.addEventListener('keydown', function (e) {
-      if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') e.stopPropagation();
-    });
-    fold.addEventListener('toggle', function () { requestAnimationFrame(picksFade); });
-    picksEl.appendChild(fold);
+  // A SCROLL REGION, not a taller card — on a phone. Fifteen tiles is three
+  // rows; thirty would be six, and a card that grows without limit pushes its
+  // own footer off the bottom of a laptop screen. On a desktop window the flat
+  // shelf is sized to hold all eighteen (see .capyui-picks.flat in the sheet)
+  // and the scroll is the safety net, never the design.
+  // The loop is 4cc6e5e^'s, the last build that had the flat grid.
+  const flatEl = sysEl('div', 'capyui-picks flat');
+  flatEl.style.setProperty('--cols', String(sysPickCols(pickDefs.length - 1)));
+  flatEl.setAttribute('role', 'group');
+  flatEl.setAttribute('aria-label', 'the other places');
+  for (let i = 1; i < pickDefs.length; i++) {
+    flatEl.appendChild(buildPick(pickDefs[i], i, false, false));
   }
-  p2El.appendChild(picksEl);
+  p2El.appendChild(flatEl);
+
+  // ---- THE STORY'S ATLAS: five folds, built only for a story file --------
+  let heroAtlas = null, atlasEl = null;
+  if (jrHasFile && journeyMode === 'story') {
+    heroAtlas = buildPick(pickDefs[0], 0, true, true);
+    p2El.appendChild(heroAtlas);
+    const picksEl = atlasEl = sysEl('div', 'capyui-picks');
+    picksEl.style.setProperty('--cols', String(sysPickCols(pickDefs.length - 1)));
+    picksEl.setAttribute('role', 'group');
+    picksEl.setAttribute('aria-label', 'the other places');
+    const atlasHere = jrFile && jrFile.biome ? chapterOf(jrFile.biome) : 1;
+    for (let i = 0; i < HOMECOMING_ACTS.length; i++) {
+      const act = HOMECOMING_ACTS[i];
+      const fold = sysEl('details', 'capyui-act');
+      fold.open = act.places.indexOf(atlasHere) >= 0;
+      const label = sysEl('summary');
+      label.appendChild(sysEl('b', null, act.title));
+      const defs = act.places.map(function (n) { return pickDefs.find(function (d) { return d.n === n; }); });
+      label.appendChild(sysEl('small', null, defs.map(function (d) { return d.name; }).join(' · ')));
+      fold.appendChild(label);
+      const places = sysEl('div', 'capyui-actplaces');
+      const shown = defs.filter(function (d) { return d.n !== 1; });
+      // FOUR COLUMNS IN EVERY FOLD (T1a), the widest act's count less Sydney.
+      // At its own count the first act drew two 500 px postcards and the
+      // second four 250 px ones: a map whose places change size by the fold.
+      places.style.setProperty('--act-cols', '4');
+      for (let k = 0; k < shown.length; k++) places.appendChild(buildPick(shown[k], k, false, true));
+      fold.appendChild(places);
+      // A disclosure is never Begin. Its native keyboard activation must not
+      // reach the title's Enter/Space shortcuts, including from a postcard.
+      fold.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
+      fold.addEventListener('click', function (e) { e.stopPropagation(); });
+      fold.addEventListener('keydown', function (e) {
+        if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') e.stopPropagation();
+      });
+      fold.addEventListener('toggle', function () { requestAnimationFrame(picksFade); });
+      picksEl.appendChild(fold);
+    }
+    p2El.appendChild(picksEl);
+  }
+  // The live shelf. The flat one is the default: a fresh file has no atlas,
+  // and every door but pause's "choose a place" on a story file is Free
+  // Roam's. titleFree is the old name for "the flat shelf on a story file".
+  let heroEl = heroFlat, picksEl = flatEl, shelfAtlas = false;
+  function shelfUse(atlas) {
+    shelfAtlas = !!(atlas && atlasEl);
+    heroEl = shelfAtlas ? heroAtlas : heroFlat;
+    picksEl = shelfAtlas ? atlasEl : flatEl;
+    heroFlat.hidden = shelfAtlas; flatEl.hidden = shelfAtlas;
+    if (atlasEl) { heroAtlas.hidden = !shelfAtlas; atlasEl.hidden = !shelfAtlas; }
+    titleFree = !shelfAtlas && jrHasFile && journeyMode === 'story';
+    p2H.textContent = shelfAtlas ? sysHOME_UI.whereStory : sysHOME_UI.whereFree;
+    p2El.classList.toggle('flatlive', !shelfAtlas);
+    const st = shelfAtlas ? p2StatAtlas : p2StatFlat;
+    p2Stat.textContent = '';
+    if (st) { p2Stat.appendChild(sysEl('b', null, st[0])); p2Stat.appendChild(document.createTextNode(st[1])); }
+  }
+  shelfUse(false);
 
   // ---- IS THERE MORE BELOW THE FOLD, OR IS THAT THE END OF THE SHELF? ----
   // Two classes and a scroll listener. The mask they turn on is in the sheet;
@@ -25719,10 +25861,25 @@ export function createSystems(game) {
       // offsetParent is the CARD and offsetTop is measured from the masthead:
       // the count came out as twelve when four were hidden. Viewport rects are
       // in one frame of reference by construction.
+      // ...and it counts PLACES (T1a). On the atlas it counted fold
+      // headings as well, so "7 more below" could be two places and five
+      // summaries; a closed fold below the edge now counts the places in it.
       const pr = picksEl.getBoundingClientRect();
-      const kids = picksEl.querySelectorAll('summary,.capyui-act[open] .capyui-pick');
-      for (let i = 0; i < kids.length; i++) {
-        if (kids[i].getBoundingClientRect().bottom > pr.bottom - 10) n++;
+      if (!shelfAtlas) {
+        const kids = picksEl.children;
+        for (let i = 0; i < kids.length; i++) {
+          if (kids[i].getBoundingClientRect().bottom > pr.bottom - 10) n++;
+        }
+      } else {
+        const folds = picksEl.children;
+        for (let i = 0; i < folds.length; i++) {
+          const picks = folds[i].querySelectorAll('.capyui-pick');
+          if (folds[i].firstChild.getBoundingClientRect().bottom > pr.bottom - 10) { n += picks.length; continue; }
+          if (!folds[i].open) continue;
+          for (let k = 0; k < picks.length; k++) {
+            if (picks[k].getBoundingClientRect().bottom > pr.bottom - 10) n++;
+          }
+        }
       }
     }
     picksEl.classList.toggle('more', below);
@@ -25734,13 +25891,29 @@ export function createSystems(game) {
     }
     moreEl.hidden = !n;
   }
-  picksEl.addEventListener('scroll', picksFade, { passive: true });
+  flatEl.addEventListener('scroll', picksFade, { passive: true });
+  if (atlasEl) atlasEl.addEventListener('scroll', picksFade, { passive: true });
 
   // ---- THE ARROWS WALK THE SHELF ------------------------------------------
-  // Summary rows join the visible postcards. Reading their rectangles keeps
-  // keyboard movement aligned with both desktop rows and the two-column phone.
+  // Two walks, one per shelf (T1a). The flat shelf is genuinely a grid, so
+  // the arrows are 4cc6e5e^'s two-dimensional walk with the column count READ
+  // off the resolved layout — right in every media query the shelf has. The
+  // atlas is folds and postcards of different widths, so it keeps the walk
+  // over rectangles, summary rows included.
+  function pickCols() {
+    try {
+      const t = getComputedStyle(picksEl).gridTemplateColumns;
+      const n = t ? t.trim().split(/\s+/).length : 1;
+      return n > 0 ? n : 1;
+    } catch (e) { return 1; }
+  }
   function pickList() {
     const l = [heroEl];
+    if (!shelfAtlas) {
+      const kids = picksEl.children;
+      for (let i = 0; i < kids.length; i++) l.push(kids[i]);
+      return l;
+    }
     const kids = picksEl.querySelectorAll('summary,.capyui-act[open] .capyui-pick');
     for (let i = 0; i < kids.length; i++) if (!kids[i].disabled) l.push(kids[i]);
     return l;
@@ -25754,7 +25927,15 @@ export function createSystems(game) {
     const l = pickList();
     let i = l.indexOf(document.activeElement);
     if (i < 0) { l[0].focus(); return true; }
-    if (dy) {
+    if (dy && !shelfAtlas) {
+      // The hero is a row of its own above the grid: up from the first row
+      // lands on it, and down from it enters the shelf.
+      if (i === 0) { if (dy < 0) return true; i = 1; }
+      else {
+        const g = i - 1 + dy * pickCols();
+        i = g < 0 ? 0 : (g > l.length - 2 ? i : g + 1);
+      }
+    } else if (dy) {
       // Folds and postcard rows have different widths. Follow the actual
       // rectangles; a closed fold never contributes a hidden focus target.
       const here = l[i].getBoundingClientRect();
@@ -25961,7 +26142,9 @@ export function createSystems(game) {
   // about the journey.
   let pickWanted = false;
   try { pickWanted = sessionStorage.getItem('capy3.pick') === '1'; sessionStorage.removeItem('capy3.pick'); } catch (e) { pickWanted = false; }
-  if (pickWanted) setTimeout(function () { if (!started) titlePage(2); }, 60);
+  // ...and on a story file that shelf is the atlas (T1a): pause's door is the
+  // story's own map. A free file has no atlas and shelfUse falls to the wall.
+  if (pickWanted) setTimeout(function () { if (!started) { shelfUse(true); titlePage(2); } }, 60);
   // ---- THE ORDER THE PAGE ARRIVES IN (T3) --------------------------------
   // One index per child, written once, because the number of children is not
   // fixed: a file adds the carry-on row and takes the Begin button away.
@@ -26141,18 +26324,81 @@ export function createSystems(game) {
   // locked and the title's "Choose a place" — which travels anywhere with a
   // file on it — was a reload away with nothing in play saying so. Same two
   // flushes quit does, then the title opens on the shelf (see pickWanted).
+  // ...AND IN FREE ROAM IT IS THE BOARD (T1a, noFreeDepart). Free Roam has no
+  // gates, so the reload to the title's shelf was a round trip to a picture
+  // of the departures board that is already here. On a story file it is
+  // still the atlas, which is the one screen that shows the acts.
   pauseBtn('', 'choose a place', function () {
+    if (jrFreeDepart()) { pauseHide(); jrShow(true); return; }
     saveFlush();
     prefsFlush();
     try { sessionStorage.setItem('capy3.pick', '1'); } catch (e) { /* the title's front, then */ }
     location.reload();
   });
   const pauseQuitBtn = pauseBtn('warn', 'quit to the title', function () { pauseAskOpen(); });
-  const pauseFree = pauseBtn('', sysHOME_UI.freeSwitch, function () {
+  // ---- THE TOGGLE, BOTH WAYS (T1a) ---------------------------------------
+  // Story to free asks, once a session, because it changes what the paper,
+  // the board and the ending are; the answer is in the question. Free to
+  // story does not ask — nothing is lost that way — and if the place it is
+  // standing in is not open to the story yet, it is carried to the frontier.
+  let pauseFreeAsked = false;
+  function pauseGoFree() {
     journeyMode = 'free'; game.state.journeyMode = journeyMode;
     saveSoon(); todoRefresh(); pauseHide(); toast(sysHOME_UI.freeSaid);
+  }
+  const pauseFree = pauseBtn('', sysHOME_UI.freeSwitch, function () {
+    if (pauseFreeAsked) { pauseGoFree(); return; }
+    pauseFree.hidden = true; pauseFreeAskEl.hidden = false;
+    try { pauseFreeYes.focus(); } catch (e) {}
+  });
+  const pauseStory = pauseBtn('', sysHOME_UI.storyBack, function () {
+    journeyMode = 'story'; game.state.journeyMode = journeyMode;
+    homeProgressN = -1;
+    saveSoon(); todoRefresh(); pauseHide();
+    const here = game.biome ? chapterOf(game.biome.current) : 1;
+    const hp = journeyProgress();
+    if (hp.open.indexOf(here) < 0 && !transBusy && !leaveBusy) {
+      const act = HOMECOMING_ACTS[hp.actIndex].places;
+      let n = 1;
+      for (let i = 0; i < act.length; i++) if (hp.open.indexOf(act[i]) >= 0) { n = act[i]; break; }
+      const d = chapterDef(n);
+      biomeFadeTo(d.biome, d.name.toUpperCase(), sysHOME_UI.storySaid);
+    } else toast(sysHOME_UI.storySaid);
   });
   pauseSetBtn.setAttribute('aria-expanded', 'false');
+  // The free switch's question (T1a). Built here, after the menu's buttons,
+  // so the button block stays a list of pauseBtn calls and nothing else.
+  const pauseFreeAskEl = sysEl('div', 'capyui-pauseask');
+  pauseFreeAskEl.hidden = true;
+  pauseFreeAskEl.setAttribute('role', 'group');
+  pauseFreeAskEl.setAttribute('aria-label', sysHOME_UI.freeAsk);
+  pauseFreeAskEl.appendChild(sysEl('div', 'capyui-pauseaskline', sysHOME_UI.freeAsk));
+  const pauseFreeRow = sysEl('div', 'capyui-pauseaskrow');
+  const pauseFreeYes = sysEl('button', null, sysHOME_UI.freeAskYes);
+  pauseFreeYes.type = 'button';
+  const pauseFreeNo = sysEl('button', null, sysHOME_UI.freeAskNo);
+  pauseFreeNo.type = 'button';
+  pauseFreeRow.appendChild(pauseFreeYes);
+  pauseFreeRow.appendChild(pauseFreeNo);
+  pauseFreeAskEl.appendChild(pauseFreeRow);
+  pauseMenu.insertBefore(pauseFreeAskEl, pauseFree.nextSibling);   // in the switch's place
+  function pauseFreeShut() {
+    if (pauseFreeAskEl.hidden) return false;
+    pauseFreeAskEl.hidden = true;
+    pauseFree.hidden = game.state.journeyMode !== 'story';
+    return true;
+  }
+  pauseFreeYes.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+  pauseFreeYes.addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    pauseFreeAsked = true; pauseFreeAskEl.hidden = true; pauseGoFree();
+  });
+  pauseFreeNo.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+  pauseFreeNo.addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    pauseFreeShut();
+    try { pauseFree.focus(); } catch (err) {}
+  });
   pauseCard.appendChild(pauseMenu);
 
   // ---- the question, and it is the only destructive control on the card ----
@@ -26656,6 +26902,12 @@ export function createSystems(game) {
       r.mute.setAttribute('aria-label', (m ? 'unmute ' : 'mute ') + r.rng.getAttribute('aria-label'));
     }
     pauseCalmBox.checked = calmOn();
+    // ...and the mode rows (T1a), which change under the card with nothing
+    // else to redraw them. Back to the story is for a free file that was a
+    // story file; a stale question from a card closed mid-ask goes when the
+    // switch it replaced is showing again (pauseShow unhides it first).
+    pauseStory.hidden = pausePre || game.state.journeyMode === 'story' || !game.state.homecomingArc;
+    if (!pauseFree.hidden) pauseFreeAskEl.hidden = true;
   }
 
   /**
@@ -31880,7 +32132,11 @@ export function createSystems(game) {
     const routeKept = JOURNEY.filter(function (n) { return keepHeld(n); }).length;
     jrCountPre = routeKept + ' of ' + JOURNEY.length + ' journey memories  ·  ' +
       'all tasks: ' + done + ' of ' + TASKS.length + '  ·  ';
-    if (game.state.homecomingArc) {
+    // ...and in Free Roam it counts nothing it does not keep (T1a): no
+    // memories and no act, only that it is going anywhere, and when.
+    if (game.state.journeyMode !== 'story') {
+      jrCountPre = sysHOME_UI.freeDepart + '  ·  ';
+    } else if (game.state.homecomingArc) {
       const p = journeyProgress();
       jrCountPre = HOMECOMING_ACTS[p.actIndex].title + '  ·  ' +
         (p.ready ? sysHOME_UI.ready : p.memories[p.actIndex].length + ' of 2 memories') + '  ·  ';
@@ -32004,6 +32260,7 @@ export function createSystems(game) {
   function jrShow(depart) {
     jrCard.insertBefore(jrKeys, jrFoot);
     jrDepart = !!depart;
+    jrTitle.textContent = jrDepart && game.state.journeyMode !== 'story' ? sysHOME_UI.whereFree : 'The journey so far';
     if (!jrShown && tutOn) tutTabN++;   // beat six's answer (ROADMAP-WOW2, T)
     jrShown = true;
     jrRefresh();
@@ -32059,7 +32316,13 @@ export function createSystems(game) {
     jrReturnFocus = null;
     if (!document.hidden && !ledShown && !albShown && !pauseShown) game.state.paused = false;
   }
-  function jrToggle() { if (jrShown) jrHide(); else jrShow(false); }
+  // ---- FREE ROAM'S BOARD IS ALWAYS A DEPARTURES BOARD (T1a) ---------------
+  // In the story the journal is a ledger and the board is three wheeks at the
+  // way out, because the way out is part of the story. Free Roam has no way
+  // out to earn, so the same card opens ready to go: every row live, the
+  // key beside each one. `noFreeDepart` puts back the ledger.
+  function jrFreeDepart() { return !game.state.noFreeDepart && game.state.journeyMode !== 'story'; }
+  function jrToggle() { if (jrShown) jrHide(); else jrShow(jrFreeDepart()); }
 
   /**
    * THE DEPARTURES BOARD.
@@ -34511,7 +34774,10 @@ export function createSystems(game) {
         (experience.signatureDone ? 'signature done' : 'the signature') +
         (experience.supportMissing ? ' + ' + experience.supportMissing + ' small moments' : ' still to find'))
       : done + ' of ' + rec.ids.length + ' done');
-    if (game.state.homecomingArc && experience && !experience.enough) {
+    // The story's count, in the story only (T1a): gated on homecomingArc it
+    // was on every Free Roam paper too, counting memories for a game that
+    // keeps none.
+    if (game.state.journeyMode === 'story' && game.state.homecomingArc && experience && !experience.enough) {
       // PLAIN WORDS (AAA A5): "the big experience or the quieter route + one
       // small moment" was the design document, not an instruction.
       // ...and the whole of the story's progress, in front of the chapter's
@@ -38174,6 +38440,9 @@ export function createSystems(game) {
 
   /** Every keepsake earned. Optional boxes are not part of coming home. */
   function sysFinaleAll() {
+    // The ending is the story's (T1a). Free Roam has none; a legacy file (no
+    // arcV1, so free by definition) keeps the JOURNEY ending it always had.
+    if (game.state.homecomingArc && game.state.journeyMode !== 'story') return false;
     if (game.state.homecomingArc) return journeyProgress().ready;
     for (let i = 0; i < JOURNEY.length; i++) if (!keepHeld(JOURNEY[i])) return false;
     return true;
@@ -38809,7 +39078,7 @@ export function createSystems(game) {
     tutEndAt = tutT;
     if (tutEl) { sysToastOut(tutEl); tutEl = null; }
     tutAim = null; tutSay = ''; tutSayT = 0;
-    tutEver = tutSkipped || (how === 'walked' && tutHitN === sysTUT_LINES.length);
+    tutEver = tutSkipped || (how === 'walked' && tutHitN >= (game.state.journeyMode === 'free' ? sysTUT_LINES.length - 1 : sysTUT_LINES.length));
     saveSoon();
   }
   /** A deliberate retry, from the beginning, without changing any task. */
@@ -38823,9 +39092,18 @@ export function createSystems(game) {
     tutEndAt = -1; tutPill = ''; tutHow = ''; tutHitN = 0;
     saveSoon();
   }
+  /**
+   * How many beats this walk has (T1a). Beat eight is the board by the gate
+   * and three wheeks "when you have done enough here" — the story's exit.
+   * Free Roam has no exit to earn (Tab is its departures board), so its walk
+   * is the first seven, and it ends 'walked' where the story's goes on.
+   */
+  // Written inline in tutEnd and tutBeatClose too: qa/reimagine-trust.mjs
+  // runs those two on their own, and a helper they call is not in its room.
+  function tutBeats() { return game.state.journeyMode === 'free' ? sysTUT_LINES.length - 1 : sysTUT_LINES.length; }
   /** Beat `n` begins: the counters it measures from, its arrow, its pill. */
   function tutBeatStart(n) {
-    if (n > sysTUT_LINES.length) { tutEnd(tutHitN === sysTUT_LINES.length ? 'walked' : 'offered'); return; }
+    if (n > tutBeats()) { tutEnd(tutHitN >= tutBeats() ? 'walked' : 'offered'); return; }
     tutBeat = n; tutBeatT = 0; tutWait = 0; tutOn = true;
     tutWalk = 0; tutRunT = 0; tutYaw = 0; tutYawLast = NaN;
     tut0 = { wheek: tutWheekN, grab: tutGrabN, yuzu: tutYuzuN, tab: tutTabN, bump: tutBumpN };
@@ -38850,7 +39128,8 @@ export function createSystems(game) {
     // counts as a borrowed word — this is Sydney's, in Sydney
     if (hit) { tutHitN++; sfx('pop', { volume: 0.22, pitch: 1.38 }); }
     if (tutBeat === 5 && tutBumpN > tut0.bump) tutSay = sysTUT_SHOP;
-    if (tutBeat >= sysTUT_LINES.length) tutEnd(tutHitN === sysTUT_LINES.length ? 'walked' : 'offered');
+    const beats = game.state.journeyMode === 'free' ? sysTUT_LINES.length - 1 : sysTUT_LINES.length;   // tutBeats(), inline
+    if (tutBeat >= beats) tutEnd(tutHitN >= beats ? 'walked' : 'offered');
   }
   /** Only the explicit skip button dismisses unfinished guidance. */
   function tutSkip(how) { if (tutLive()) tutEnd(how); }
@@ -39225,8 +39504,21 @@ export function createSystems(game) {
   /** `where` is 'sydney' (default) or 'pasto' — whichever the player picked. */
   function startGame(where, restore, mode) {
     if (started) return;
-    if (restore && jrFile && jrFile.arcV1 === 1 && jrFile.journeyMode === 'story' &&
-        homecomingProgress(function (id) { return !!jrFileDone[id]; }).open.indexOf(chapterOf(where || 'sydney')) < 0) return;
+    // ---- A STORY RESTORE LANDS INSIDE THE STORY (T1a) ----------------------
+    // This returned silently when the saved place was not open to the story,
+    // which was unreachable while the toggle went one way and is the common
+    // case now it goes both: a free file left in Hanoi, switched back to the
+    // story, pressed Carry on and nothing happened. It restores into the
+    // frontier's first open place instead — the act the story is on.
+    if (restore && jrFile && jrFile.arcV1 === 1 && jrFile.journeyMode === 'story') {
+      const hp = homecomingProgress(function (id) { return !!jrFileDone[id]; });
+      if (hp.open.indexOf(chapterOf(where || 'sydney')) < 0) {
+        const act = HOMECOMING_ACTS[hp.actIndex].places;
+        let n = 1;
+        for (let i = 0; i < act.length; i++) if (hp.open.indexOf(act[i]) >= 0) { n = act[i]; break; }
+        where = chapterDef(n).biome;
+      }
+    }
     homecomingArc = !restore || !jrFile || jrFile.arcV1 === 1;
     journeyMode = restore && jrFile ? (homecomingArc && jrFile.journeyMode === 'story' ? 'story' : 'free') : (mode === 'free' ? 'free' : 'story');
     game.state.journeyMode = journeyMode;
@@ -39683,8 +39975,22 @@ export function createSystems(game) {
       // a digit is "go there", not "throw it away". See the note on the tile's
       // click listener — this was the second door into the same data loss and
       // it was the quicker one.
+      // ---- ...ON PAGE TWO, AND THE SHELF SAYS WHICH GAME (T1a) ------------
+      // A digit on page one started Free Roam on a fresh profile: the key
+      // printed on a tile the player could not see yet, pressed by somebody
+      // reaching for "1" to begin. Page one now has one digit, and it is
+      // Begin; on page two a digit is a press on the live shelf's tile, so
+      // the atlas carries the story on, a gated tile stays shut, and the flat
+      // wall is Free Roam — the mode comes from the shelf, not from here.
       const pick = sysPickFromKey(c);
-      if (pick > 0) { titleFreeCommit(); startGame(CHAPTERS[pick - 1].biome, jrHasFile, 'free'); return; }
+      if (pick > 0) {
+        if (titlePageN === 2) {
+          const t = +heroEl.dataset.n === pick ? heroEl :
+            picksEl.querySelector('.capyui-pick[data-n="' + pick + '"]');
+          if (t && !t.disabled) t.click();
+        } else if (pick === 1 && !jrHasFile) startResume();
+        return;
+      }
       // THE PAGE TURNS BOTH WAYS FROM THE KEYBOARD. Escape is the one key
       // every player already tries when a screen has gone somewhere they did
       // not mean, and it did nothing at all on this card until now.
@@ -39700,8 +40006,10 @@ export function createSystems(game) {
         pauseShow(true);
         return;
       }
+      // The arrow is the Free roam door's shortcut, so it opens the same
+      // shelf the door does (T1a) — the flat one, whatever the file is.
       if (titlePageN === 1 && (c === 'ArrowRight' || c === 'ArrowDown')) {
-        e.preventDefault(); titlePage(2); return;
+        e.preventDefault(); shelfUse(false); titlePage(2); return;
       }
       // ...and on page two they steer the shelf. Off the left-hand edge of the
       // first tile is the one move that leaves the grid, and it goes back to
@@ -39814,7 +40122,7 @@ export function createSystems(game) {
     // closed it instead. It now opens the card and is then handed straight back
     // to the browser; Escape (or J) closes.
     if (started && c === 'KeyJ') { e.preventDefault(); jrToggle(); return; }
-    if (started && c === 'Tab' && !jrShown) { e.preventDefault(); jrShow(false); return; }
+    if (started && c === 'Tab' && !jrShown) { e.preventDefault(); jrShow(jrFreeDepart()); return; }
     // H (and ?, which is Shift+/ and therefore still 'Slash') is the key every
     // player tries first when they cannot remember a control. It opens the same
     // card Tab does, with the fold already open.
