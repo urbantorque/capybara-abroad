@@ -16,6 +16,7 @@ const withoutLearning = css(source)
   .replace(/\/\* HOMECOMING learning reference:[^]*?\/\* HOMECOMING learning reference end\. \*\/\r?\n/, '')
   .replace(/\/\* TEN T2a story beats:[^]*?\/\* TEN T2a story beats end\. \*\/\r?\n/, '')
   .replace(/\/\* TEN T3a sketchbook:[^]*?\/\* TEN T3a sketchbook end\. \*\/\r?\n/, '')
+  .replace(/\/\* TEN T4a finale:[^]*?\/\* TEN T4a finale end\. \*\/\r?\n/g, '')
   .replace(/\/\* HOMECOMING atlas:[^]*?\/\* HOMECOMING atlas end\. \*\/\r?\n/, '')
   .replace('overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;', 'overflow-y:auto;overscroll-behavior:contain;');
 const withoutHomecomingTab = withoutLearning.replace(
