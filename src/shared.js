@@ -284,6 +284,7 @@ export const PALETTE = {
   caliCityLite: 0xffd48a,      // one window, a hundred and fifty metres away
   caliCityCool: 0xbfe4ff,      // and the mercury lamps along the avenues
   caliCable:    0x33302c,      // the tangle of it over every barrio street
+  caliWire:     0x3c3d3f,      // the line itself: dark metal, a shade off the cable so it reads on the sky
   caliRoad:     0xa39a8c,      // asphalt, patched, pale with dust
   caliRoadLine: 0xdccfae,
   caliMirador:  0xd2c6ab,      // the parapet you look at the whole valley over
@@ -892,12 +893,15 @@ export const PALETTE = {
   gorTuffShadow: 0x5c5c74,     // the valley floor before the sun gets to it — and
                                // it is BLUE, because at that hour the only thing
                                // lighting a shadow is the sky
+  gorTuffLo:    0xcfa88e,      // the ramp for anything cut into the cliff: rose low down,
+  gorTuffHi:    0xeed8b8,      //   and cream high enough to catch the sun first
   gorBasalt:    0x584f4c,      // the cap that stopped the cone eroding
   gorBasaltDk:  0x3d3634,
   gorSoil:      0xab9781,
   gorVine:      0x6d8a52,      // the vineyards, which are everywhere down there
   gorPoplar:    0xc8c05a,      // and the poplars, which are the only tall thing
   gorPoplarDk:  0x8f9243,
+  gorPoplarOlive: 0x8a8a5c,    // the same tree before dawn, not yet the brightest thing in the valley
   gorScrub:     0x7d8a63,
   gorRoad:      0xb8a488,
   gorDoor:      0x3f6b7a,      // every cave door in Göreme is painted blue
@@ -1280,6 +1284,7 @@ export const PALETTE = {
   monTailLamp:   0xd6483f,
   monHull:       0xf2efe6,      // a hundred and thirty feet of somebody else's money
   monHullDk:     0xd6d0c2,
+  monYachtNavy:  0x27344a,      // the motor yachts that are not white: a navy hull, and dusk does the rest of the blue
   monTeak:       0xb08a55,
   monTeakDk:     0x8a6a3f,
   monMast:       0x9aa0a4,
