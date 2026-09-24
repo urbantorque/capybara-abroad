@@ -756,6 +756,61 @@ Pulled forward from T6a into T2, owner cave.js only.
 - Payoff: Free Roam has a reason to go back to every place, and the paper stops pointing across a
   lake.
 
+### T3a — shipped
+
+- **The sketchbook** (`noFreePaper`). On a free file todoRefresh empties the window (tasks
+  still tick, silently) and hands the card to `freePaperRefresh(n)`. The kicker reads "the
+  sketchbook". Under it sit the place's name and what it calls the animal, from
+  `sysPlaceWord`. That is the place's own ladder (1/3/6/10/16 on incidents plus scenes, less
+  half the charm), or "they are fond of it here" when notoWarm. Next come three unearned
+  names as repPage's bars, each with a one-word want (`sysREP_WANT`, all 50 ids). The order
+  is the place's own names first, then a named prop that is lying about here (walked off
+  `game.props`), then verbs, then moves and breadth, with a per-place hash for order within
+  each class. The foot reads "n of 50 names · n of m noticed", and the marquee is one soft
+  line, "if it wants: the opera house concert". The story's "a memory kept" tally is
+  overwritten on a free file. The tucked tab reads the place and its word, with the first
+  want under it. The CSS sits in the marked block `TEN T3a sketchbook`, which
+  `qa/reimagine-earned-card.mjs` strips.
+- **A name is stamped.** The first time a name is earned on a free file, the moment card
+  gets `.stamp`: it lands a size too big and a few degrees off, with a double rule in the
+  accent ink. The card is rank 2 and reads INTO THE SKETCHBOOK / the name / "<sentence> ·
+  n of 50". Two chimes rise a fourth, the paper takes the stamp and redraws. At 15, 30
+  and 45 names a rank-2 card follows it, with the notoriety name and a `sysFREE_MILE`
+  line. A restored count is seeded and is not news. `showMoment` takes a 7th argument,
+  `cls`.
+- **The free wall.** A visited tile carries the place's word and "n/m noticed" as one chip
+  on its picture. The hero also gets a "2 secrets · 0 noticed" line. A body line would have
+  grown the rows: the first cut measured 92/94/107 px, so it moved to the chip. p2stat
+  reads "A RUMOUR / 1 OF 50 NAMES", from `notoScore(jrFile)`, which is now one formula for
+  the live journey and the file.
+- **The place remembers** (`noFreeRemember`). A free arrival with 5+ incidents here says a
+  pooled line 4.6 s in. A notoWarm place has the nearest person within 26 m toss a snack.
+- **Door guard.** The three-wheek count ignores a wheek while `flierWhistleT > 0`, while
+  `game.condor.active`, or within 15 m of the place's unfinished marquee mark. It is a guard,
+  not a move.
+- **Paper clarity.** The small moment offered is the nearest open one. It is sorted when the
+  open set changes and held, so the arrow does not flip. HOMECOMING_EXPERIENCES[4] opens
+  on torii-run, then zen-ruin, bamboo-dash, matcha-raid and the-bell. "here" becomes
+  "↓ 6 m" when the target is more than sysHINT_RISE below or above. While a marquee is
+  live, the tucked tab carries its name and live line, where the orca ride's tab had read
+  the calving clock. Skill cards wait while climbing, riding, at a helm or on a condor.
+  THE HERD taught by the ibis has its own `altLine`. The Manly duck-dive clue reads
+  "under, not over".
+- **Proof.** `qa/ten-t3a-free.mjs` passes 18/18 on a fresh free file (headful, 1280x720).
+  The Sydney, Kyoto and Hanoi pages each show three silhouettes with wants and 0 tick boxes.
+  A name earned through three real spills in front of a person is stamped at rank 2. After
+  a reload the wall shows 19 tiles, one row set, no pill, "A RUMOUR / 1 OF 50 NAMES", and
+  0 runtime errors. `qa/ten-t3a-paper.mjs` reads the aimed row at arrival on the list paper:
+  Kyoto 18 m, Hanoi 7 m, Palawan 32 m. `qa/ten-t3a-static.mjs` gives 86 checks and is
+  registered. Screenshots: `qa/ten-t3a-{sydney,kyoto,hanoi,stamp,wall}-b.png`.
+- **Misses.** Hong Kong's nearest open small moment is still 99+ m from the arrival, which a
+  sort cannot fix. The cave's first-echo `where()` was already at z 28 (cave.js
+  `mouth: { x: 2, z: cavMOUTH_Z - 22 }`), so it was stale. Not done: the Hanoi pho-run
+  tab over the whole ride and Rio Q×3 at Arpoador live (the guard is static-checked only),
+  the RECORDS `liveLabel`, tips queued under a climb, and the bubble clamp off the paper and
+  the wallet. `web-design-guidelines` was run on the block, and only tabular numerals were
+  added.
+
 **T3b · rival.js · the ibis has an arc** (`noRivalArc`). Read `game.journeyAct()` and the
 `'story:act'` bus. Act I: it watches from a high point near the arrival and leaves when the animal
 comes within 10 m. Act II: steals, as now. Act III: once per chapter it snatches the fresh keepsake

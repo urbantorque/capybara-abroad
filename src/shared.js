@@ -4361,7 +4361,10 @@ export const HOMECOMING_EXPERIENCES = {
   1: { signature: 'opera-stage', alternative: 'picnic-thief', supports: ['steal-hat', 'swim', 'bin-chicken', 'photo-op'] },
   2: { signature: 'condor-ride', alternative: 'carroza', supports: ['steal-empanada', 'whistle-condor', 'church-bell', 'ruana-thief'] },
   3: { signature: 'manly-voyage', alternative: 'under-bridge', supports: ['take-helm', 'to-quay', 'ferry-salute', 'dolphin-escort'] },
-  4: { signature: 'uji-run', alternative: 'golden-swim', supports: ['matcha-raid', 'zen-ruin', 'bamboo-dash', 'the-bell'] },
+  // Kyoto opens on Gion (T3a): an act-one row first, and the torii tunnel,
+  // which is on the way in; the Uji rows follow. Order is the tie-break the
+  // paper's nearest-first sort falls back on.
+  4: { signature: 'uji-run', alternative: 'golden-swim', supports: ['torii-run', 'zen-ruin', 'bamboo-dash', 'matcha-raid', 'the-bell'] },
   5: { signature: 'chiva-mirador', alternative: 'gato-sit', supports: ['lulada', 'chiva-ride', 'puente-ortiz', 'cristo-rey'] },
   6: { signature: 'fragata-ride', alternative: 'bondinho', supports: ['globo-biscuit', 'kiosk', 'bateria', 'calcadao', 'arpoador'] },
   7: { signature: 'aurora', alternative: 'hot-spring', supports: ['organ', 'pylsa', 'the-whale', 'snowcat'] },
