@@ -3535,6 +3535,7 @@ function monUpdateRace(game, dt) {
  * twenty-six metres a second: a world-space box round a car doing seventy miles
  * an hour is the wrong shape by half a car's length within one frame.
  */
+const monPACK_SHOVE_MAX = 12;   // m/s: what a car bump may leave the animal at (AAA A7)
 function monUpdateRide(game, dt) {
   const capy = game.capy;
   if (!capy || !capy.position || monRaceOn) { monRider = -1; return; }
@@ -3561,8 +3562,17 @@ function monUpdateRide(game, dt) {
     if (cv) {
       const carSpd = Math.hypot(cv.x, cv.z);
       const mySpd = Math.hypot(capy.velocity.x, capy.velocity.z);
-      if (mySpd > carSpd + 4) {
-        const s = (carSpd + 4) / mySpd;
+      // ...AND A BUMP IS A BUMP, NOT A LIFT (AAA A7). carSpd + 4 is a ceiling
+      // a car at full chat puts at 30-39 m/s, and the animal rode along at it
+      // on the car's nose: the soak measured 39.4 m/s for 31 frames, grounded,
+      // no frame — the open "Monaco speed gate" item. Knocked aside, not
+      // carried: off a car it is held to monPACK_SHOVE_MAX. On a moving frame
+      // (riding one) the car's own speed is the animal's and the old ceiling
+      // stands.
+      const riding = !!(capy.frameVX || capy.frameVZ);
+      const ceil = riding ? carSpd + 4 : Math.min(carSpd + 4, monPACK_SHOVE_MAX);
+      if (mySpd > ceil) {
+        const s = ceil / mySpd;
         capy.velocity.x *= s; capy.velocity.z *= s;
         if (typeof capy.shove === 'function') capy.shove(0, 0, capy.swimming ? 'the harbour' : 'the pack');
       }
