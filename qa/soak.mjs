@@ -121,6 +121,13 @@ function stage(src) {
   // THE SOAK WANTS THE LONG FUZZ (L7, E7): the assert-suite's callers want
   // fuzz.js fast (8 s/chapter); this run wants the roadmap's 45.
   if (src === 'qa/fuzz.js') code = code.replace('const sysFUZZ_SEC = 8;', 'const sysFUZZ_SEC = 45;');
+  // OPT-IN, FOR A REPEAT OF ONE CHAPTER (AAA A7): SOAK_FUZZ_ONLY=pasto,monaco
+  // narrows the fuzz; such a run is a diagnosis, not a soak, so it writes no
+  // history row (see SOAK_NO_HISTORY below, which it implies).
+  if (src === 'qa/fuzz.js' && process.env.SOAK_FUZZ_ONLY) {
+    const only = process.env.SOAK_FUZZ_ONLY.split(',').map(x => "'" + x.trim() + "'").join(', ');
+    code = code.replace(/const names = \[[^\]]*\];/, 'const names = [' + only + '];');
+  }
   const out = join(TMP, src.split('/').pop());
   writeFileSync(out, code);
   return out;
@@ -211,7 +218,8 @@ const row = {
       stale: r.stale ?? null, directFallback: !!r.directFallback }])),
   chapters,
 };
-appendFileSync(HISTORY, JSON.stringify(row) + '\n');
+if (process.env.SOAK_NO_HISTORY === '1' || process.env.SOAK_FUZZ_ONLY) log('history  not written (SOAK_NO_HISTORY / SOAK_FUZZ_ONLY)');
+else appendFileSync(HISTORY, JSON.stringify(row) + '\n');
 log('history  +1 row -> qa/soak-history.jsonl  (' + (row.ms / 1000 / 60).toFixed(1) + ' min)');
 
 // ---- and the diff, as a report ----------------------------------------------------
