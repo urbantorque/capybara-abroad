@@ -97,6 +97,90 @@ on every changed file; build 7194.8 KB, no collisions.
   `atRio` and the CHAPTERS way line point at posto6 if the door moves off
   the rock; the `flierWhistleT` travel-door guard from T1.
 
+**The proof slot (after the merge, alone on the Arc GPU, headful Edge,
+rung 0 pinned by `capy3.prefs.v1` pf 1, fresh server on the merged tree
+at 460a28a).**
+
+GPU cost, `qa/ten-t2-proof-ab.mjs`: aaa-ab's timer queries round
+post.render, the flag alternating in blocks, but each case stages its
+moment and pins the lens in post.render, because a term that is not in
+the frame costs nothing. Three runs (14, 24 and 30 s a case, 112-270
+samples a side), live minus cut in ms. The noise floor is a flag nothing
+reads, timed on the same lens in every chapter: twelve readings from
+−0.20 to +0.44 (Sahara sits at +0.25 to +0.38 in all three runs).
+- `noOrcaRound` (lens 9 m off the pod): +0.12, +0.46, −0.05. Noise.
+- `noAuroraRamp` (the tick frame, pinned): −0.23, −0.22. Live is cheaper;
+  6 ribbon draws where the bands drew 12.
+- `noSteamSoft` (resting lens in the pool): −0.39, −0.26. Live is cheaper;
+  the near-lens cull removes the overdraw.
+- `noAuroraFrame` (camera only): +0.07, −0.26. Noise.
+- `noRioBounce` (frontage lens): −0.14, −0.03 (a 3 s smoke run −0.11).
+  Baked colour, no GPU term, as claimed.
+- `noSahZenith` (resting lens): +0.37, −0.08, +0.44 against that
+  chapter's null +0.38, +0.25, +0.26. Noise.
+- `noSahRingBeam` (150 m from ring 2): −0.30, +0.33, −0.13. Noise.
+- `noSahStallSmoke` (resting lens): +0.15, −0.08. Noise; the joint mesh
+  draws either way.
+- `noEchoPing` (east-wall lens, a wheek at the start of every 2 s block,
+  cut or live): +0.71, −0.06, −0.07. Noise after the first run.
+- `noSwiftShape`: the column +0.41, +0.14, −0.00; the roost +0.19, +0.15,
+  +0.30. At the noise floor.
+- **`noFern` is the one term above the floor:** +1.32, +0.59, +0.37 on
+  the glade lens, where the null read +0.04, −0.05, +0.08 on the same
+  lens. That is about 0.4-0.6 ms live with the doline floor filling the
+  frame. It parks at rung 1, so it is inside the law, but it is the most
+  expensive T2 term.
+- Cut, every drawing term hides its mesh or skips its function, so its
+  cut cost is zero by construction. The A/B cannot resolve anything under
+  about 0.3 ms, so the 0.1 ms budget is only shown by the code path. The
+  T2a flags (`noMomentPriority`, `noMemBeat`, `noActTurn`,
+  `noFirstGrace`, `noHeldWow`) and `noPodLead` draw nothing and were not
+  timed.
+
+Payoff pictures, rung 0, headful, read by eye (all under `qa/`, ignored):
+- T2a, `ten-t2a-story.mjs` rerun: 22/22, premise up 4.89 s, keepsake
+  0.9 m, 0 errors. `ten-t2-proof-t2a-memory.png`: one gilt A MEMORY
+  card, legible. The card sits over the animal, the marquee's name banner
+  top right repeats its title, and the paper stays expanded under it.
+  `-act2.png`: ACT II / IN GOOD COMPANY with the traveller's line and the
+  four places, legible. The paper eyebrow still reads "part 1 of 3".
+- T2b, `ten-t2b-orca.js` through `qa/ten-t2-proof-run.mjs`: helm taken,
+  escort at 15 m/s, round 2016 against crate 248 triangles, 0 errors.
+  `ten-t2-proof-ten-t2b-orca-round.png`: four round orcas flank the boat,
+  eye patches, saddles and belly flash read, the bull's fin stands, and
+  the paper is tucked to THE ORCA POD 3.1 s of 9. The wake is still the
+  ring stack (`noKelvin` not built).
+- T2c, `ten-t2-proof-aurora-{shot,on,off}.png`: live, the curtains are soft
+  green columns with no top edge. Flagged, the old panes are hard green
+  and violet slabs. The church's lit bulk takes the right half of the
+  frame, and the aurora reads as a glow behind the town, not a sky. The
+  steam puffs at the left edge still show their facets.
+- T2d, `ten-t2-proof-bounce-shot.png`: warm, lifted frontage faces.
+  `qa/ten-t2-proof-rock.mjs`, real keys from posto6 at the summit: up
+  from the sand to 4.9 m at 4.7 m from the centre in 8 s, where it was
+  held for 22 s by the sunset crowd, not by a stone
+  (`ten-t2-proof-rock-top.png`). The travel board and "wheek three times
+  to go home" are still on the summit.
+- T2e, `ten-t2-proof-zenith-shot.png`: a blue zenith over the souk,
+  clearly apart from the sand. `-beam-shot.png` (150 m): thin pale beams
+  over the hoops. They read, but only just, against a day sky.
+- T2f, `qa/ten-t2-proof-ping.mjs`, the real clock:
+  `ten-t2-proof-ping-wall-t1600.png` has 31 of 84 glints lit as white
+  diamonds down the passage, and first-echo ticked. On this clock the
+  first glint lit between 1.2 and 1.8 s after the wheek, not at the hand
+  clock's 0.5 s. `-fern-{on,off}.png`: fern rosettes in place of the lime
+  cones. `-swift-on.png` and `-roost-shot.png`: crescent swifts, and no
+  bars.
+
+Fixes: none. Nothing was broken in a way that is small and belongs to a
+chapter file.
+
+For T3 and after: on the memory card, one set of words (the banner
+off, the paper tucked, the animal not under the card) (systems.js). The
+aurora frame is dominated by the church. The ferns' live cost. The ping's
+real-clock delay. The rock's sunset crowd blocks the last 2 m on the
+calçadão side. All T2 builder misses above still stand.
+
 ## TEN T1 — THE SPLIT, AND THE BROKEN MARQUEES (25 Sep 2026)
 
 Six builders on six disjoint files, merged into `ten-pass` with no
