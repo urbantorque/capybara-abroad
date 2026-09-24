@@ -4462,7 +4462,12 @@ function gorTrailerRide(game, dt) {
   const p = capy.position;
   // Height plus a radius, the bangka's lesson: an axis-aligned rectangle reads
   // aboard on a fraction of the frames of a ride nobody ever falls off.
-  const aboard = Math.hypot(p.x - tx, p.z - tz) < 2.4 && p.y > ty && p.y < ty + 2.6;
+  // NOT WHILE IN THE BASKET (TEN T1c). A landing ON the trailer puts the
+  // basket inside this radius and its floor inside this height band, so the
+  // ride home fired on the touch itself: the toast said hold the ropes and
+  // the truck drove to the square with the animal still in the basket.
+  const aboard = !gorAboard &&
+                 Math.hypot(p.x - tx, p.z - tz) < 2.4 && p.y > ty && p.y < ty + 2.6;
   gorTrailerCarrying = aboard;
   if (aboard) {
     gorTrailerCarry.x = gorTrailerBody.velocity.x;
@@ -4626,8 +4631,8 @@ function gorUpdateTruck(dt) {
   // after one they pull up at least gorCHASE_OFF from the basket on the side
   // they came from. In the air, and all the way down to the touch, the chase
   // is exactly what it was — 'on-the-trailer' is a landing ON the trailer.
-  // A bed still over an EMPTY basket after that (5 m, bed centre to basket
-  // centre) pulls out further; with the animal in the basket it stays put
+  // A bed nearer an EMPTY basket than that (gorCHASE_OFF - 0.6, bed centre to
+  // basket centre) pulls out further; with the animal in the basket it stays put
   // rather than sweep a kinematic box through the passenger.
   if (!gorRideHome && gorBalY - gy0 <= 2 && (!gorFlown || gorGroundedT > 0.5)) {
     if (!gorFlown) { tx = 20; tz = 10; }
@@ -4638,7 +4643,7 @@ function gorUpdateTruck(dt) {
       // the truck at NaN for the rest of the chapter): back out along +x
       const ux = ol > 0.01 ? ox / ol : 1, uz = ol > 0.01 ? oz / ol : 0;
       const over = Math.hypot(gorTruckX + Math.sin(gorTruckYaw) * 2.4 - gorBalX,
-                              gorTruckZ + Math.cos(gorTruckYaw) * 2.4 - gorBalZ) < 5;
+                              gorTruckZ + Math.cos(gorTruckYaw) * 2.4 - gorBalZ) < gorCHASE_OFF - 0.6;
       const off = over ? gorCHASE_OFF + 5 : gorCHASE_OFF;
       tx = over && gorAboard ? gorTruckX : gorBalX + ux * off;
       tz = over && gorAboard ? gorTruckZ : gorBalZ + uz * off;
@@ -6193,6 +6198,13 @@ export function createGoreme(game) {
     onMare() { return !!(gorGame && gorGame.capy && gorOnMare(gorGame.capy.position)); },
     balloon() { gorV3b.set(gorBalX, gorBalY, gorBalZ); return gorV3b; },
     truck() { gorV3b.set(gorTruckX, gorTerrain(gorTruckX, gorTruckZ), gorTruckZ); return gorV3b; },
+    // the bed and the ride (TEN T1c). Nothing in src reads these; the harness
+    // does — the bed is 2.4 m off the truck along a yaw nothing else publishes.
+    trailer() {
+      const x = gorTruckX + Math.sin(gorTruckYaw) * 2.4, z = gorTruckZ + Math.cos(gorTruckYaw) * 2.4;
+      gorV3b.set(x, gorTerrain(x, z) + 0.97, z); return gorV3b;
+    },
+    riding() { return gorRideHome; },
 
     update(dt) {
       if (!gorBuilt) return;
