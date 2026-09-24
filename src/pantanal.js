@@ -3550,6 +3550,7 @@ function panBuildWater(root) {
   g.setAttribute('color', new THREE.BufferAttribute(col, 4));
   g.computeVertexNormals();
   panWaterMat = panVCW(true);
+  panSkyFresnelHook(panWaterMat);
   const m = new THREE.Mesh(g, panWaterMat);
   m.frustumCulled = false;
   m.renderOrder = 2;
@@ -3583,6 +3584,89 @@ function panUpdateWater() {
   // the river stops being brown. This is a mirror picking up a colour, not a
   // filter over the frame — the grade in systems.js is already doing that half.
   panWaterMat.color.copy(panWaterDay).lerp(panWaterDusk, panSmooth(panDusk) * 0.42);
+  panUpdateSkyFresnel();
+}
+
+/**
+ * T4d — THE SKY IN THE WATER WHEN THE MIRROR IS PARKED (noPanSkyFresnel).
+ *
+ * The flood is a mirror because the planar pass (reflect k 1.0, panVCW) puts
+ * the sky and the gallery trees in it, and that pass parks at rung 1. On
+ * every laptop that steps down, the chapter's defining picture went to its
+ * vertex colours: flat khaki, lily pads floating on mud, the jacarés black
+ * wedges. grain()'s own Fresnel is there, but at 0.65 on a steep curve it is
+ * a rim at the horizon and nothing at the play angle.
+ *
+ * So, only while perfRung >= 1: the same weight the mirror uses (1 - V.y,
+ * k 0.78), toward a two-stop sky. Both stops start from the horizon colour
+ * grain() already tracks (uGrSkyC, which the weather moves, so an overcast
+ * campo gets an overcast flood): 30% toward a lightened panHaze at grazing,
+ * 35% toward panSkyTop and nearly half down looking down, because the
+ * mirror at rung 0 is dark there: it is the top of the sky it is showing. With a band of
+ * reflected tree line along the low angles,
+ * its top a sum of three sines in the view's bearing, which is what a
+ * wooded horizon looks like doubled in still water. On the LIT colour, like
+ * the mirror: it is light from somewhere else. Weighted by (1 - the mirror's
+ * live strength), so the hand-over while k damps is a cross-fade and at
+ * rung 0 it is zero whatever the uniform says; and zero from under the
+ * sheet. An atan, three sines and two mixes on one sheet, and a uniform
+ * branch when cut. The colours follow the sundown in
+ * panUpdateSkyFresnel.
+ *
+ * A chained hook, because the sheet is grainOwn's and grain's hook has to run
+ * first: it writes vGrainW, uReflK and uReflOn, and this reads all three.
+ */
+const panSKYF_K = 0.78;               // the mirror's own k is 1.0; the water keeps a little of itself
+const panSkyF = { value: 0 };
+const panSkyH = { value: new THREE.Color() };     // the horizon, in the water
+const panSkyZ = { value: new THREE.Color() };     // looking down: the zenith
+const panSkyT = { value: new THREE.Color() };     // the tree line, doubled
+const panSkyHDay = new THREE.Color(PALETTE.panHaze).lerp(new THREE.Color(PALETTE.panSkyLow), 0.45);
+const panSkyZDay = new THREE.Color(PALETTE.panSkyTop);
+const panSkyTDay = new THREE.Color(PALETTE.panForest).lerp(new THREE.Color(PALETTE.panHaze), 0.3);
+const panSkyTDusk = new THREE.Color(PALETTE.panForest);
+function panSkyFresnelHook(m) {
+  const prev = m.onBeforeCompile, prevKey = m.customProgramCacheKey;
+  m.onBeforeCompile = function (shader, renderer) {
+    prev.call(this, shader, renderer);
+    shader.uniforms.uPanSF = panSkyF;
+    shader.uniforms.uPanSkyH = panSkyH;
+    shader.uniforms.uPanSkyZ = panSkyZ;
+    shader.uniforms.uPanSkyT = panSkyT;
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>',
+      '#include <common>\nuniform float uPanSF;\nuniform vec3 uPanSkyH;\nuniform vec3 uPanSkyZ;\nuniform vec3 uPanSkyT;');
+    // before the LAST opaque_fragment: grain's mirror block keeps the anchor
+    // at its own tail, and this goes after the mirror, where it replaces it
+    const at = shader.fragmentShader.lastIndexOf('#include <opaque_fragment>');
+    if (at < 0) return;
+    shader.fragmentShader = shader.fragmentShader.slice(0, at) + [
+      'if (uPanSF > 0.001) {',
+      '  vec3 sfV = normalize(cameraPosition - vGrainW);',
+      '  float sfY = clamp(sfV.y, 0.0, 1.0);',
+      '  float sfW = (1.0 - sfY) * ' + panSKYF_K.toFixed(3) + ' * uPanSF * (1.0 - clamp(uReflK * uReflOn, 0.0, 1.0)) * step(0.0, sfV.y);',
+      '  vec3 sfC = mix(mix(uGrSkyC, uPanSkyH, 0.3), mix(uGrSkyC, uPanSkyZ, 0.35) * 0.55, smoothstep(0.03, 0.4, sfY));',
+      // the tree line's height in V.y, by bearing: about 6 to 20 degrees
+      '  float sfA = atan(sfV.x, sfV.z);',
+      '  float sfT = 0.22 + 0.06 * sin(sfA * 5.0 + 1.3) + 0.03 * sin(sfA * 13.0 + 0.4) + 0.018 * sin(sfA * 31.0 + 2.1);',
+      '  sfC = mix(sfC, uPanSkyT, (1.0 - smoothstep(sfT * 0.8, sfT, sfY)) * 0.85);',
+      '  outgoingLight = mix(outgoingLight, sfC, sfW);',
+      '  diffuseColor.a = mix(diffuseColor.a, 1.0, sfW * diffuseColor.a);',
+      '}',
+      '',
+    ].join('\n') + shader.fragmentShader.slice(at);
+  };
+  m.customProgramCacheKey = function () { return prevKey.call(this) + '|panSF'; };
+  m.needsUpdate = true;
+}
+/** Live only while the governor has parked the mirror, and never when cut. */
+function panUpdateSkyFresnel() {
+  const st = panGame && panGame.state;
+  panSkyF.value = (st && !st.noPanSkyFresnel && (st.perfRung || 0) >= 1) ? 1 : 0;
+  if (!panSkyF.value) return;
+  const k = panSmooth(panDusk);
+  panSkyH.value.copy(panSkyHDay).lerp(panWaterDusk, k * 0.6);
+  panSkyZ.value.copy(panSkyZDay).lerp(panWaterDusk, k * 0.35);
+  panSkyT.value.copy(panSkyTDay).lerp(panSkyTDusk, k * 0.5);
 }
 
 // =================================================================== UPDATE ==
@@ -3681,6 +3765,11 @@ function panUpdateHerd(game, dt) {
   if (p) panTrailPush(p.x, p.z);
 
   let following = 0;
+  // the back of the line, for anything trailing it (T4d)
+  let tailI = -1;
+  for (let i = 0; i < panHERD_N; i++) {
+    if (panHerd[i].st === 'follow' && (tailI < 0 || panHerd[i].order > panHerd[tailI].order)) tailI = i;
+  }
   for (let i = 0; i < panHERD_N; i++) {
     const r = panHerd[i];
     if (r.st === 'follow') {
@@ -3713,6 +3802,23 @@ function panUpdateHerd(game, dt) {
         r.tx += panFlow.x * panHERD_DRAG * age;
         r.tz += panFlow.z * panHERD_DRAG * age;
       }
+    } else if (r.trailT > 0) {
+      // ---- T4d: A GRAZER THAT HAS LOOKED UP walks after the tail ----------
+      // at a graze (the speed below is the grazer's) toward the last one in
+      // the line, and stops a gap short of it; and stops where it is when the
+      // time runs out, rather than turning for home, so the next wheek finds
+      // it inside the cascade's 5 m. At the last capybara itself, not at a
+      // trail point: the trail behind the tail is where the line has already
+      // been, which on a bank is as often as not the river. The grazer's
+      // water rule holds: it will not walk into a swim for it.
+      r.trailT -= dt;
+      if (tailI >= 0) {
+        const t = panHerd[tailI], ex = r.x - t.x, ez = r.z - t.z, el = Math.hypot(ex, ez);
+        const ax = el > panFOLLOW_GAP ? t.x + ex / el * panFOLLOW_GAP : r.x;
+        const az = el > panFOLLOW_GAP ? t.z + ez / el * panFOLLOW_GAP : r.z;
+        if (panTerrain(ax, az) >= panWATER - 0.45) { r.tx = ax; r.tz = az; }
+      }
+      if (r.trailT <= 0 || tailI < 0) { r.trailT = 0; r.tx = r.x; r.tz = r.z; r.restT = rand(5, 13); }
     } else {
       r.restT -= dt;
       if (r.restT <= 0) {
@@ -4054,10 +4160,21 @@ function panWheek(game) {
     const d = dx * dx + dz * dz;
     if (d < bestD) { bestD = d; best = i; }
   }
-  if (best < 0) return;
   let order = 0;
   for (let i = 0; i < panHERD_N; i++) if (panHerd[i].st === 'follow') order++;
-  panHerd[best].st = 'follow';
+  // ---- T4d: AND ONCE THERE IS A LINE, THE LINE DOES SOME OF THE ASKING --
+  // (noHerdCascade). One recruit per wheek was nine presses for nine animals,
+  // and measured on a herd put beside the animal the eighth was still grazing
+  // after a 14 s swim. From the fourth wheek on a call takes up to three: the
+  // nearest in reach, and any grazer standing within 5 m of one that has
+  // already joined, because a capybara follows its neighbour before it
+  // follows a stranger. Their answers climb the same scale, 0.12 s apart.
+  if (!(game.state && game.state.noHerdCascade) && order >= panCASCADE_AFTER) {
+    panCascade(game, p, rr, order);
+    return;
+  }
+  if (best < 0) return;
+  panHerd[best].st = 'follow'; panHerd[best].trailT = 0;
   panHerd[best].order = order;
   // ---- AND IT ANSWERS YOU -----------------------------------------------
   // The one new mechanic in the chapter, and the entire acknowledgement of a
@@ -4077,6 +4194,72 @@ function panWheek(game) {
   panSfx.volume = 0.45; panSfx.pitch = rand(1.1, 1.35);
   game.sfx('wheek', panSfx);
   if (order === 0) game.toast('it is coming with you.');
+}
+
+/**
+ * T4d — THE CASCADE (noHerdCascade). panWheek's recruit, from the fourth call
+ * on. `rr` is its reach (16 m, 26 over water), `order` how many already
+ * follow. Up to panCASCADE_N join per call: the nearest one to the animal of
+ * any grazer inside `rr` of it OR inside panCASCADE_R of a follower —
+ * including one that joined on this same call, so the line reaches along
+ * itself. Each answers panCASCADE_GAP after the last, a step further up the
+ * scale than the one before, which is the old figure played faster.
+ *
+ * AND WITH FIVE BEHIND IT THE REST LOOK UP. Every grazer inside
+ * panLOOKUP_R of the animal turns (the look the recruit already has) and walks
+ * after the tail of the line at a graze for panLOOKUP_T seconds. They are not
+ * followers — a line that recruits itself would make the wheek pointless —
+ * but they end up within the cascade's 5 m of one, so the next call has them.
+ */
+const panCASCADE_AFTER = 3;           // the fourth wheek is the first that cascades
+const panCASCADE_N = 3;               // the most one call brings in
+const panCASCADE_R = 5;               // m — a grazer this close to a follower hears it
+const panCASCADE_GAP = 0.12;          // s between answers
+const panLOOKUP_R = 16;               // m — with five behind, grazers this close trail
+const panLOOKUP_N = 5;                // followers it takes before they look up
+const panLOOKUP_T = 6;                // s of trailing, at graze speed
+let panCascadeLast = 0;               // how many the last call took (the probe reads it)
+function panCascade(game, p, rr, order) {
+  const rr2 = rr * rr, cr2 = panCASCADE_R * panCASCADE_R;
+  let took = 0;
+  for (let k = 0; k < panCASCADE_N; k++) {
+    let best = -1, bestD = 1e18;
+    for (let i = 0; i < panHERD_N; i++) {
+      const r = panHerd[i];
+      if (r.st === 'follow') continue;
+      const dx = r.x - p.x, dz = r.z - p.z;
+      const d = dx * dx + dz * dz;
+      if (d >= bestD) continue;
+      let hears = d < rr2;
+      for (let j = 0; !hears && j < panHERD_N; j++) {
+        const f = panHerd[j];
+        if (f.st !== 'follow') continue;
+        const fx = f.x - r.x, fz = f.z - r.z;
+        if (fx * fx + fz * fz < cr2) hears = true;
+      }
+      if (hears) { bestD = d; best = i; }
+    }
+    if (best < 0) break;
+    const r = panHerd[best];
+    r.st = 'follow'; r.order = order; r.trailT = 0;
+    r.reply = 0.28 + order * 0.04 + k * panCASCADE_GAP;
+    r.replyP = 1.12 + order * 0.055;
+    r.look = 1.6;
+    order++; took++;
+  }
+  panCascadeLast = took;
+  if (took) {
+    panSfx.volume = 0.45; panSfx.pitch = rand(1.1, 1.35);
+    game.sfx('wheek', panSfx);
+  }
+  if (order < panLOOKUP_N) return;
+  const tr2 = panLOOKUP_R * panLOOKUP_R;
+  for (let i = 0; i < panHERD_N; i++) {
+    const r = panHerd[i];
+    if (r.st === 'follow') continue;
+    const dx = r.x - p.x, dz = r.z - p.z;
+    if (dx * dx + dz * dz < tr2) { r.trailT = panLOOKUP_T; r.look = 1; }
+  }
 }
 
 /** The mats. Loaded ones sink; unloaded ones come back up, more slowly. */
@@ -5779,7 +5962,7 @@ export function createPantanal(game) {
       for (let i = 0; i < panHerd.length; i++) {
         const r = panHerd[i];
         r.st = 'graze'; r.order = -1; r.restT = rand(0, 6); r.wet = 0;
-        r.reply = 0; r.replyP = 1.2; r.look = 0;
+        r.reply = 0; r.replyP = 1.2; r.look = 0; r.trailT = 0;
       }
       panHerdChat = 4; panShakeT = 0;
       // ---- Tier 5: a fresh visit is a fresh onça ---------------------------
@@ -5913,7 +6096,7 @@ export function createPantanal(game) {
       for (let i = 0; i < panHERD_N; i++) {
         const r = panHerd[i];
         if (i < n) { r.st = 'follow'; r.order = i; r.x = p.x + (i % 2 ? 1.2 : -1.2); r.z = p.z + 2.6 * (i + 1); r.tx = r.x; r.tz = r.z; }
-        else { r.st = 'graze'; r.order = -1; }
+        else { r.st = 'graze'; r.order = -1; r.trailT = 0; }
       }
       return n;
     },
@@ -5922,7 +6105,7 @@ export function createPantanal(game) {
       for (let i = 0; i < panHERD_N; i++) {
         const r = panHerd[i];
         r.x = panCROSS.x + (i - 4) * 2.2; r.z = -86 + (i % 3) * 2.0;
-        r.tx = r.x; r.tz = r.z; r.st = 'graze'; r.restT = 30;
+        r.tx = r.x; r.tz = r.z; r.st = 'graze'; r.restT = 30; r.trailT = 0;
       }
       return panHERD_N;
     },
@@ -6067,6 +6250,37 @@ export function createPantanal(game) {
     },
 
     following() { return panFollowing; },
+    /**
+     * T4d, measured: `last` is how many the last cascading wheek took,
+     * `trailing` how many grazers are walking after the line right now.
+     */
+    cascade() {
+      let trailing = 0, following = 0;
+      for (let i = 0; i < panHERD_N; i++) {
+        if (panHerd[i].st === 'follow') following++;
+        else if (panHerd[i].trailT > 0) trailing++;
+      }
+      return { last: panCascadeLast, trailing: trailing, following: following };
+    },
+    /** T4d: the parked-mirror sky, as the sheet sees it this frame. */
+    skyFresnel() {
+      return { on: panSkyF.value, hooked: !!(panWaterMat && /\|panSF$/.test(panWaterMat.customProgramCacheKey())),
+               h: '#' + panSkyH.value.getHexString(), z: '#' + panSkyZ.value.getHexString() };
+    },
+    /** T4d test hook: put grazer `i` at (x, z) and keep it there a while. */
+    herdAt(i, x, z) {
+      const r = panHerd[i];
+      if (!r) return null;
+      r.x = x; r.z = z; r.tx = x; r.tz = z;
+      r.st = 'graze'; r.order = -1; r.restT = 30; r.trailT = 0;
+      return { x: r.x, z: r.z, st: r.st, order: r.order, trailT: r.trailT || 0 };
+    },
+    /** T4d: where one of them is, and what it is doing. Ask, never cache. */
+    herdOne(i) {
+      const r = panHerd[i];
+      return r ? { x: +r.x.toFixed(2), z: +r.z.toFixed(2), st: r.st, order: r.order,
+                   trailT: +(r.trailT || 0).toFixed(2) } : null;
+    },
     /** 0..1 — the sundown the crossing switches on. systems.js reads it. */
     dusk() { return panDusk; },
     crossing() { return panCrossT > 0; },

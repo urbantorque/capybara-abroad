@@ -1288,6 +1288,52 @@ visible (5921). Arrival p95 is under 1.5x steady. Sky Fresnel (`noPanSkyFresnel`
 perfRung ≥ 1): a sky-gradient mix plus a tree band as a function of view angle (602, 3584). Proof: a
 hide-and-diff on the water at rung 1.
 
+### T4d — shipped
+
+Two of the three terms are built. The warm was already there. Owner file: `src/pantanal.js`. No
+save field, no PALETTE entry, no new line in any pool.
+
+- **The cascade (`noHerdCascade`, no GPU term).** `panWheek` hands the call to `panCascade` once 3
+  or more follow. One call takes up to 3: the grazer nearest the animal among those inside the
+  reach (16 m, or 26 over water) or within 5 m of any follower, including one that joined on the
+  same call. Each answer lands 0.12 s after the last, on the rising pitch. Once 5 or more follow,
+  every grazer within 16 m gets `look = 1` and `trailT = 6`. For 6 s it walks at graze speed toward
+  a point one gap short of the last follower, keeping the grazer's water rule, and then stops where
+  it is. It is never made a follower. `qa/ten-t4d-herd.js` runs on the hand clock with the herd
+  beside the animal. Live: 4 wheeks to reach 4 followers and 5 to reach 9, over two runs. Flagged:
+  4 and 9. One real Q on the real clock with 3 following took the count to 6. Look-up test: 5
+  following and 4 grazers at 11–14 m. One wheek took 3, and the fourth trailed from 14.08 m to
+  9.59 m from the animal over 7 s, still a grazer. On the hand clock the answers came at 0.40 s,
+  0.55 s and 0.72 s. The code spaces them 0.12 s apart, and the extra gap on the hand clock was not
+  chased. The crossing still asks for 4 followers, so it opens on the 4th wheek either way when the
+  herd is in reach. The cascade matters for the other five.
+- **The sky in the flood (`noPanSkyFresnel`, live only while `perfRung >= 1`).** This is a chained
+  `onBeforeCompile` on the grainOwn sheet, with its own program key (`|panSF`). It runs after
+  grain's mirror, on `outgoingLight`. Weight: `(1 − V.y) × 0.78 × (1 − uReflK·uReflOn)`, and 0 from
+  under the sheet. At rung 0 it is therefore zero, and while k damps the switch is a cross-fade.
+  The sky has two stops from grain's `uGrSkyC`: 30% toward panHaze lightened with panSkyLow at
+  grazing, and ×0.55 of a 35% step toward panSkyTop looking down. A reflected tree band covers
+  about 6–20° of view elevation. Its top is three sines of bearing, and its colour is panForest
+  toward panHaze. Sundown tints all three from panSkyDusk. `qa/ten-t4d-sky.js` took three pinned
+  lenses and compared rung 1 live against flagged, masking with the sheet hidden. Water covered 32%,
+  48% and 66% of the frame. Inside the mask 96.7%, 98.0% and 97.7% of pixels changed, and outside
+  it 0.17%, 0.26% and 1.79% (herons and lilies between ticks). Mean water colour (river lens):
+  (109,114,90) for the rung-0 mirror, (133,133,113) for the rung-1 fallback, and (111,106,72)
+  flagged. The fallback reads lighter than the mirror, because it draws no dark tree doubles near
+  the eye. Pinned PNGs are `ten-t4d-sky-*`. On the real loop, `ten-t4d-look-r1` shows pale sky
+  water and `-r1cut` the khaki the reviewer saw. Console: 0 errors.
+- **The warm (`noPanWarm`): stale, not built.** `biomeWarm` (src/systems.js:43385) already compiles
+  every root of the chapter behind the white, hidden ones included (`biomeWarmShim.traverse`, 43359,
+  `scene.traverse`). `qa/ten-t4d-warm.js` ran on a fresh profile, crossing from Sydney. warmN was
+  131 and warmMs 7728. `renderer.info.programs` read 99 when the hold released, 99 at 3 s and 10 s,
+  and 99 after `forceJaguar()` (the onça stalking, dusk 0.56). Nothing links after the card. On
+  the contended laptop, frame p95 was 184 ms for the first 3 s and 282 ms steady (p50 94 and 51).
+  The reviewer's 900 ms sample was taken at t = 14.8 s, still under the white. The proof slot
+  should re-read it at rung 0.
+- **For the proof slot:** `noPanSkyFresnel` should be A/B'd at rung 1 (it is zero at rung 0).
+  `noHerdCascade` draws nothing.
+- **Hooks (test only):** `game.pantanal.cascade()`, `herdAt(i, x, z)`, `herdOne(i)`, `skyFresnel()`.
+
 **T4e · palawan.js · clear water.** The underwater far distance x2, with a lighter cyan tint in
 `palDeepClear` (`noPalClear`, 5290). Chroma above 20 at 10 m, and the manta readable from 15 m. The
 karst hatching: A/B with AO, shadow-lerp and form-shade toggled, then fix only the term that draws
