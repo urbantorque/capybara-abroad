@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, placeCue, makeMerger } from './shared.js';
+import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, placeCue, makeMerger, matRound } from './shared.js';
 import { farMover, farBundle } from './far.js';
 
 // ===========================================================================
@@ -152,6 +152,8 @@ const antPOD_RUN_AT = 8.0;
 const antPOD_RUN_V  = 11.0;
 const antPOD_LOSE   = 6.0;
 let antPodRunPX = 0, antPodRunPZ = 0, antPodGap = 0, antPodToldGap = false;
+// T2b: 'find the lead', once a visit (noPodLead)
+let antPodToldLead = false, antPodWaitT = 0, antPodWaiting = false;     // ...and the seconds a run has waited at the lead's edge
 
 // ------------------------------------------------------------------ scratch --
 const antV3 = new THREE.Vector3();
@@ -2339,6 +2341,104 @@ function antBuildBoat(game, root) {
 
 // -------------------------------------------------------------------- pod ---
 /**
+ * THE ROUND ORCA (T2b, noOrcaRound).
+ *
+ * Measured from the chase lens (qa/ten-review/b3m-antarctic-03-pod-with.png):
+ * the escort read as four or five black crates with square planks on top, and
+ * no white at all, because every white piece sat at -0.52 s under a camera
+ * 41 degrees down. The star of chapter 17 was the one animal the AAA pass did
+ * not round. So, the same merger, the same six meshes, a second set of
+ * geometry on each:
+ *
+ *   body    three stretched sph12 lobes (head, torso, tail stock), smooth
+ *           normals under matRound, because it breathes
+ *   white   the eye patch raised to +0.34 s and 0.34 tall, which is where the
+ *           lens can see it from 30 degrees of pitch; a belly crescent in
+ *           antOrcaBelly, wider than the torso where the waterline cuts it
+ *   dorsal  a three-sided cone 0.18 wide, swept back 0.35 rad (the bull's
+ *           straight and 2.1 m, the only fin that does not hook)
+ *   flukes  two swept flattened lobes on the old hinge
+ *
+ * Triangles only, no draw call: the three meshes per animal are the three
+ * they were. Parks at rung 2 with the rounded people, for the same reason
+ * (npc.js, noPersonRound): a busy frame should not turn the pod back into
+ * crates. Children stay in the old order, fin then fluke (qa/wow-movers.js).
+ */
+let antOrcaGeo = [], antOrcaRoundK = -1, antOrcaMatR = null, antOrcaBlowN = 0;
+function antOrcaMerger() {
+  if (!antG.sph12) antG.sph12 = new THREE.SphereGeometry(0.5, 12, 8);
+  if (!antG.cone3) antG.cone3 = new THREE.ConeGeometry(0.5, 1, 3);
+  return makeMerger(antG, {
+    xform: antXform, sphSegs: [8, 12], coneSegs: [3, 4], normals: 'recompute', jitter: 0.030,
+  });
+}
+function antOrcaRoundGeos(s, L, bull) {
+  const B = antOrcaMerger();
+  const K = PALETTE.antOrca, W = PALETTE.antOrcaBelly;
+  // the three lobes overlap by a third, so the back is one line from the
+  // melon to the tail stock, and the tail stock is taller than it is wide
+  B.sph(0, 0.02 * s, L * 0.30, 0.68 * s, 0.60 * s, L * 0.20, K, 12);
+  B.sph(0, 0, L * 0.04, 0.82 * s, 0.72 * s, L * 0.30, K, 12);
+  B.sph(0, 0.04 * s, -L * 0.29, 0.36 * s, 0.46 * s, L * 0.22, K, 12);
+  // the belly crescent: 0.74 wide against the torso's 0.66 at that height, so
+  // it shows as a white rim along both flanks when the back is up
+  B.sph(0, -0.40 * s, L * 0.12, 0.74 * s, 0.36 * s, L * 0.30, W, 12);
+  // the chin, which is what is pointed at you in a spy-hop
+  B.sph(0, -0.30 * s, L * 0.40, 0.50 * s, 0.28 * s, L * 0.09, W, 12);
+  for (let sd = -1; sd <= 1; sd += 2) {
+    // the eye patch, high on the head now, and leaning out so its face is
+    // turned up at the lens rather than at the sea
+    B.add(antG.sph12, antXform(sd * 0.47 * s, 0.34 * s, L * 0.36, 0, 0, sd * 0.55,
+                               0.24 * s, 0.34 * s, 0.84 * s), W);
+    // the flank flash, sweeping up behind the belly
+    B.add(antG.sph12, antXform(sd * 0.60 * s, -0.20 * s, -L * 0.13, 0.38, 0, sd * 0.30,
+                               0.26 * s, 0.46 * s, 1.60 * s), W);
+    // pectorals: paddles, down and back
+    B.add(antG.sph12, antXform(sd * 0.92 * s, -0.40 * s, L * 0.18, 0, sd * 0.40, -sd * 0.30,
+                               1.30 * s, 0.14 * s, 0.70 * s), K);
+  }
+  // the saddle, immediately behind the fin, and it is the read from above.
+  // 0.84 wide, not 1.08: any wider and from the chase lens it is a grey disc
+  // laid on the back rather than a mark on it (qa/ten-t2b-orca-round.png)
+  B.sph(0, 0.58 * s, -L * 0.11, 0.42 * s, 0.12 * s, 0.66 * s, PALETTE.antOrcaSaddle, 12);
+
+  // the dorsal, on the old pivot: its base is buried at 0.45 s, under a back
+  // that breaks at 0.72, so the fin comes out of the body and not off it
+  const D = antOrcaMerger();
+  const fh = bull ? 1.90 * s : 0.95 * s, fb = bull ? 1.10 * s : 0.95 * s;
+  const sweep = bull ? -0.06 : -0.35;
+  D.add(antG.cone3, antXform(0, 0.45 * s + fh * 0.5 * Math.cos(sweep), fh * 0.5 * Math.sin(sweep),
+                             sweep, 0, 0, 0.18 * s, fh, fb), K);
+  // the flukes: two lobes swept back from the hinge
+  const F = antOrcaMerger();
+  for (let sd = -1; sd <= 1; sd += 2) {
+    F.add(antG.sph12, antXform(sd * 0.56 * s, 0, -0.42 * s, 0, sd * 0.50, 0,
+                               1.30 * s, 0.13 * s, 0.56 * s), K);
+  }
+  return { body: B.build(), fin: D.build(), fluke: F.build() };
+}
+/** One writer for the pod's geometry and material: the flag, the rung. */
+function antOrcaRoundTick(game) {
+  if (!antPodParts || !antOrcaGeo.length) return;
+  const st = game.state || {};
+  const k = !st.noOrcaRound && (st.perfRung | 0) < 2 ? 1 : 0;
+  if (k === antOrcaRoundK) return;
+  antOrcaRoundK = k;
+  if (k && !antOrcaMatR) {
+    antOrcaMatR = grain(matRound(0xffffff, { vertexColors: true }), { scale: 0.30, amount: 0.10, warp: 0.5 });
+  }
+  const m = k ? antOrcaMatR : antPodParts[0].userData.flatMat || antPodParts[0].material;
+  for (let i = 0; i < antPodParts.length; i++) {
+    const body = antPodParts[i], g = antOrcaGeo[i];
+    if (!body.userData.flatMat) body.userData.flatMat = body.material;
+    body.geometry = g.body[k];
+    antPodFins[i].geometry = g.fin[k];
+    antPodFlukes[i].geometry = g.fluke[k];
+    const mm = k ? m : body.userData.flatMat;
+    body.material = mm; antPodFins[i].material = mm; antPodFlukes[i].material = mm;
+  }
+}
+/**
  * SIX ORCAS.
  *
  * SILHOUETTE FIRST, because this game is played from above: what reads from a
@@ -2352,6 +2452,7 @@ function antBuildPod(root) {
   antPodGroup = new THREE.Group();
   antPodParts = [];
   antPodFlukes = []; antPodFins = [];
+  antOrcaGeo = [];
   antPodGroup.name = 'antPod';         // findable from the harness (qa/wow-movers.js)
   antPodX = new Float32Array(antPOD_N);
   antPodZ = new Float32Array(antPOD_N);
@@ -2412,6 +2513,7 @@ function antBuildPod(root) {
     mesh.frustumCulled = false;
     antPodGroup.add(mesh);
     antPodParts.push(mesh);
+    const round = antOrcaRoundGeos(s, L, bull);
 
     // THE DORSAL, ON A HINGE (ROADMAP-WOW Part C). A bull's is 1.8 m and it
     // is straight; a female's is half that and it hooks. Its own mesh on a
@@ -2440,7 +2542,10 @@ function antBuildPod(root) {
     fl.castShadow = true; fl.frustumCulled = false;
     mesh.add(fl);
     antPodFlukes.push(fl);
+    antOrcaGeo.push({ body: [mesh.geometry, round.body], fin: [fin.geometry, round.fin],
+                      fluke: [fl.geometry, round.fluke] });
   }
+  antOrcaRoundK = -1;                  // the next antUpdatePod decides
   root.add(antPodGroup);
 
   // the blow: one puff of vapour, reused by whichever animal surfaced last
@@ -4374,12 +4479,24 @@ function antPodEndRide(game) {
 function antUpdatePod(game, dt) {
   if (!antPodGroup) return;
   antPodStateT += dt;
+  antOrcaRoundTick(game);
 
   let yaw = antPodYaw;
   if (antPodState === 'patrol') {
     antPodU += dt / 172;                       // ~604 m of loop at 3.5 m/s
     const a = antPodU * Math.PI * 2;
-    const px = 42 * Math.sin(a) + 8;
+    // ---- IN THE LEAD, NOT ACROSS IT (T2b, noPodLead) -------------------
+    // The ellipse was 42 m either side of x 8, and for z < -270 the east half
+    // of it (x 20..60) reads packAt 0.41-0.93: half the loop in heavy pack,
+    // where the tender tops out at 2.8-3.3 m/s and the run's 4.0 never comes.
+    // Measured (qa/ten-review/b3m-antarctic.js): escort formed at z -440 and
+    // sat at withPod 0.95+ for 45 s at full throttle without once breaking
+    // north. On the lead with ten metres of weave packAt peaks at 0.086 (mean
+    // 0.058, against the ellipse's 0.72 and 0.27, sampled at 360 points),
+    // so wherever a wheek finds them is water the boat can do 12.6 in.
+    const lead = !(game.state && game.state.noPodLead);
+    const px = lead ? antLeadX(-300 + 132 * Math.cos(a)) + 10 * Math.sin(a * 2)
+                    : 42 * Math.sin(a) + 8;
     const pz = -300 + 132 * Math.cos(a);
     yaw = Math.atan2(px - antPodCX, pz - antPodCZ);
     antPodCX = px; antPodCZ = pz;
@@ -4439,14 +4556,36 @@ function antUpdatePod(game, dt) {
     // rather less in brash, plus whatever the wake is worth — which is why
     // the wake gain and the ride clock now accrue ONLY inside antPOD_HOLD.
     // Falling out of that for antPOD_LOSE seconds and they are gone.
-    antPodCZ -= antPOD_RUN_V * dt;
+    // ---- THEY WAIT AT THE EDGE OF IT (T2b, noPodLead) --------------------
+    // The escort forms wherever the boat was, so a run can break with the
+    // hull still in the pack: measured (qa/ten-t2b-helm.js), a break at
+    // packAt 0.72 with the boat doing 2.4 and the pod doing 11 was 90 m
+    // behind in eight seconds and gone, and the second go lost it the same
+    // way. Above 0.12 of ice (where the tender's ceiling drops under the
+    // pod's 11) they sit in the lead eight metres north of the boat's line,
+    // never going back south, the lose clock and the ride clock both stop,
+    // and the run starts properly when the hull reaches open water. AND IS
+    // WITH THEM: ice under 0.12 is still twenty metres off the lead's middle,
+    // so a wait released on the ice alone let them go at 11 from 22 m off a
+    // boat still turning into the lead, and lost it in six seconds (measured,
+    // second helm run). The wait holds until the boat is inside 13 m.
+    const runWait = !(game.state && game.state.noPodLead) &&
+      (antBoatIce > 0.12 || (antPodWaiting && antPodGap > antPOD_HOLD * 0.8));
+    antPodWaiting = runWait;
+    if (runWait) { antPodCZ = Math.min(antPodCZ, damp(antPodCZ, antBoatZ - 8, 1.2, dt)); antPodWaitT += dt; }
+    else antPodCZ -= antPOD_RUN_V * dt;
     const wantX = antLeadX(antPodCZ);
     antPodCX = damp(antPodCX, wantX, 1.6, dt);
-    yaw = Math.atan2(antPodCX - antPodRunPX, antPodCZ - antPodRunPZ);
+    // a pod holding station has no heading to take from its own motion, and
+    // atan2(0, 0) is due south: keep the last one (T2b)
+    const mvx = antPodCX - antPodRunPX, mvz = antPodCZ - antPodRunPZ;
+    yaw = mvx * mvx + mvz * mvz > 1e-8 ? Math.atan2(mvx, mvz) : antPodYaw;
     antPodRunPX = antPodCX; antPodRunPZ = antPodCZ;
     const gap = Math.hypot(antBoatX - antPodCX, antBoatZ - antPodCZ);
     antPodGap = gap;
-    if (gap < antPOD_HOLD) {
+    if (runWait) {
+      antSlowT = 0;
+    } else if (gap < antPOD_HOLD) {
       antSlowT = 0;
       antPodRide += dt;
       if (antPodRide > antPodBest) antPodBest = antPodRide;
@@ -4526,12 +4665,24 @@ function antUpdatePod(game, dt) {
     // you settle into it, and then they leave and you find out whether you
     // meant it. Gated on the helm and on speed, so it cannot fire at a boat
     // sitting still with nobody driving it.
-    if (antPodStateT > antPOD_RUN_AT && antHelmOn && sp > 4.0 &&
+    // (T2b) ...and the 4.0 is a clear-water number. The escort forms wherever
+    // the boat was when they came, and a boat in 0.9 pack at full throttle
+    // does 2.8: so the gate comes down with the ice under the hull, to 1.6 in
+    // the worst of it, and the lead does the rest. Four seconds past the
+    // break with the gate still shut, the one line that says why.
+    const podLead = !(game.state && game.state.noPodLead);
+    const runGate = podLead ? 4.0 * (1 - 0.6 * antBoatIce) : 4.0;
+    if (podLead && !antPodToldLead && antHelmOn && sp < runGate &&
+        antPodStateT > antPOD_RUN_AT + 4) {
+      antPodToldLead = true;
+      antToast('they want open water. find the lead.');
+    }
+    if (antPodStateT > antPOD_RUN_AT && antHelmOn && sp > runGate &&
         !(game.state && game.state.noPodRun)) {
       antPodState = 'run';
       antPodStateT = 0;
       antSlowT = 0;
-      antPodToldGap = false;
+      antPodToldGap = false; antPodWaiting = false;
       // THE RUN IS THE RIDE (L5): the escort's seconds do not count toward the
       // tick — measured, eight seconds of escort plus one of the run ticked
       // the marquee before the pod had led anywhere
@@ -4739,6 +4890,17 @@ function antUpdatePod(game, dt) {
       }
       if (antPodTight() || Math.random() < 0.35) {
         antSfx('hiss', { volume: antPodTight() ? 0.20 : 0.10, pitch: rand(0.30, 0.42) });
+      }
+      // ...AND THE BLOW IS WET (T2b, noOrcaRound). Six white sparks off the
+      // blowhole, a fifth of a body length ahead of the fin, going up: the
+      // puff above is a shape, and this is the thing in it that catches the
+      // light. Rung 1 and up keeps the puff and drops these.
+      if (!(game.state && game.state.noOrcaRound) && ((game.state && game.state.perfRung) | 0) < 1 &&
+          typeof game.sparks === 'function') {
+        const bl = 7.2 * (i === 4 ? 1.28 : i === 5 ? 0.62 : 1.0) * 0.22;
+        game.sparks(antPodX[i] + Math.sin(antPodYaw) * bl, y + 0.7, antPodZ[i] + Math.cos(antPodYaw) * bl, 6,
+                    { spd: 1.2, up: 4.2, grav: 7, drag: 0.8, life: 0.9, size: 0.22, rgb: [1.15, 1.25, 1.35] });
+        antOrcaBlowN++;
       }
     }
   }
@@ -6141,6 +6303,7 @@ export function createAntarctic(game) {
       antSkuaLap = -1; antSkuaGot = false; antSkuaHeavy = 0; antSkuaT = 0;
       // D4.12: and the run does not survive travel either
       antPodToldGap = false; antPodGap = 0; antPodRunPX = 0; antPodRunPZ = 0;
+      antPodToldLead = false; antPodWaitT = 0; antPodWaiting = false;
       antCallR = -1;
       antCallR = -1;
       antCallT[0] = -1; antCallT[1] = -1; antCallT[2] = -1;
@@ -6216,7 +6379,10 @@ export function createAntarctic(game) {
                leadX: Math.round(antLeadX(antPodCZ) * 10) / 10,
                boatZ: Math.round(antBoatZ * 10) / 10,
                boatSp: Math.round(antBoatSpeed * 100) / 100,
-               slowT: Math.round(antSlowT * 10) / 10, helm: antHelmOn };
+               slowT: Math.round(antSlowT * 10) / 10, helm: antHelmOn,
+               // T2b: the rounded pod on (1) or crates (0), blow bursts thrown, the lead line said
+               round: antOrcaRoundK, blows: antOrcaBlowN, toldLead: antPodToldLead, waitT: Math.round(antPodWaitT * 10) / 10,
+               pack: Math.round(antIceAt(antPodCX, antPodCZ) * 1000) / 1000 };
     },
     /** Wind the skua's clock to just before a strike, so a probe need not wait. */
     skuaTo(u) {
