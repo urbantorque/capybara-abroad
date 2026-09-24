@@ -140,6 +140,9 @@ let palSub = 0;                      // 0..1 — how far under the camera should
 // number there and leaves it alone; and what it did, for the audit.
 let palClearHooked = false, palClearWrote = -1;
 const palClearLast = { k: 0, far: 0, wrote: 0 };
+// The island's own switch for the lens capsule (T4e): 0 = the wall stays
+// drawn. See palBuildIsland; update() writes it from `noPalKarstSolid`.
+const palKarstCapOn = { value: 0 };
 
 let palWaterMesh = null;
 let palFishMesh = null, palFishData = null;
@@ -978,7 +981,28 @@ function palBuildIsland(game, root) {
     tower(x, z, 18 + rnd() * 10, 18 + rnd() * 10, 26 + rnd() * 22, rnd(), true);
   }
 
-  const mesh = new THREE.Mesh(M.build(), palVC());
+  // ---- THE WALL IS NOT IN THE WAY, IT IS THE WAY (ROADMAP-TEN T4e) ---------
+  // The reviewer's two frames at the foot of the front wall read as stippled
+  // screen-door bands and hatching down every tapered block. Knocked out one
+  // term at a time through a frozen lens (qa/ten-t4e-karst.js): the capsule
+  // between the lens and the animal (shared.js, _lensCapA) is what draws it —
+  // ordered-dither holes 1.08 -> 0 and 0.58 -> 0.01 per thousand cliff pixels
+  // with it cut, and the edge energy 4.80 -> 3.23 and 3.48 -> 2.61. AO, the
+  // smooth shadow filter and form shade move neither, and the shadow's own
+  // edge energy is the lens's to keep. With this in, the same spots read 0 and
+  // 0.01 holes. The capsule exists to
+  // open a pole or an awning; the massif is the thing the lens collides with,
+  // and the boom already stops in front of its boxes. So the island's own
+  // material binds the capsule's switch to its own uniform, off unless
+  // `noPalKarstSolid` puts it back. Its own material (grainOwn) so nothing
+  // else in the chapter that shares palVC's loses the capsule; the program is
+  // the same one, so no compile and no draw call.
+  const mesh = new THREE.Mesh(M.build(), palVC(true));
+  const im = mesh.material, obc = im.onBeforeCompile;
+  im.onBeforeCompile = function (shader, r) {
+    if (obc) obc.call(this, shader, r);
+    if (shader.uniforms.uLensCapOn) shader.uniforms.uLensCapOn = palKarstCapOn;
+  };
   mesh.castShadow = true; mesh.receiveShadow = true;
   mesh.name = 'palIsland';
   root.add(mesh);
@@ -5399,6 +5423,8 @@ export function createPalawan(game) {
       palTime += dt;
       // The caustics' cut (Part B). One shared float; a probe's OFF arm.
       causticSet(!(game.state && game.state.noCaustic));
+      // ...and the karst's own capsule switch (T4e), the same kind of float
+      palKarstCapOn.value = game.state && game.state.noPalKarstSolid ? 1 : 0;
 
       palUpdateClock(game, dt);
       palUpdateBangka(game, dt);

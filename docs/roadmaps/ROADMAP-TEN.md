@@ -1149,6 +1149,40 @@ karst hatching: A/B with AO, shadow-lerp and form-shade toggled, then fix only t
 it (normalBias or excluding the fade) (688). Proof: a masked diff on the cliff. Publish "hold E to
 go down" through the manta row's clue hook when dh < −3 (2359, 5279).
 
+### T4e — shipped
+
+- **Clear water (`noPalClear`).** The look under Palawan is systems.js's sysSUB row, and
+  palawan.js runs before systems.js, so the override is laid over the row at the draw
+  (`palClearDraw`, chained on `scene.onBeforeRender`, Palawan only, the row never re-based): fog
+  far 62 → 124 at full lens depth; the row's palFogUnder share of the fog, the clear colour and
+  the composite tint (`uSub`) swapped for `palDeepClear`; the tint laid at 0.60 of the lens depth
+  (it also scales the ceiling veil). A second draw in one frame finds its own far and leaves it.
+  No draw call or program, so nothing parks at a rung. Audit: `game.palawan.clearAudit()`.
+- **Proof** (`qa/ten-t4e-clear.js`: one pinned lens, world clock frozen, row and clear back to
+  back, mask by hide-and-diff). Reef at 10 m: a\*b\* distance from the water behind 11.9 → 16.0,
+  dE 12.5 → 16.7. Manta at 15 m: dE 4.6 → 6.2, and the frame is 6 L lighter.
+  `qa/ten-t4e-terms.js` knocks terms out one at a time: pushing the fog to 2 km moves the far
+  band by 2 L, and turning the tint off moves frame chroma by 5. The murk is the tint, not the far.
+- **Miss:** median coral chroma at 10 m is 15.4 (p75 21.7), not above 20. Under a cyan multiply,
+  chroma counts the water's own cyan, so taking tint away lowers it on teal coral as it raises it
+  on pink. a\*b\* distance from the water is the number that moved. Getting past 20 needs the sub
+  hemi colour (systems.js, A's).
+- **Karst stipple (`noPalKarstSolid`).** Each term was knocked out through a frozen lens at the
+  reviewer's two spots (`qa/ten-t4e-karst.js`, cliff mask by hide-and-diff). The lens capsule
+  (`_lensCapA`) draws it: ordered-dither holes 1.08 → 0 and 0.58 → 0.01 per thousand cliff
+  pixels, and edge energy 4.80 → 3.23 and 3.48 → 2.61. AO, the smooth shadow filter and form shade
+  do not move it, and normalBias is not the term. The island now has its own material (grainOwn,
+  same program), and its `uLensCapOn` is bound to a Palawan uniform that stays 0 unless the flag
+  is set. The camera collision already stops in front of the boxes. After the fix the same spots
+  read 0 / 0.01 holes. **Caveat:** in the after-run the lens settled differently, and the flag's
+  own ON arm did not reproduce the holes either, so the proof slot should A/B `noPalKarstSolid`
+  headful at the lagoon wall.
+- **The manta clue was already shipped.** At the surface the manta row's clue reads "over the
+  lagoon, hold E to dive. at its front edge, press E" (systems.js ~33520). Since T3a the arrow
+  prints "↓ 6 m" and not "here" when |dh| > 6 (systems.js ~52875). No palawan.js hook feeds
+  either one. The dh < −3 band (the manta cruises at −6.0, so about −6.2 from the surface) would
+  need sysHINT_RISE, which is A's. Not live-verified in this wave.
+
 **T4f · drift.js · the cloud is soft** (`noCloudSoft`). Smooth normals on the lobe merger, 10x6
 segments, lit tops at 0.12 driCloudLit, 12 low wisps; at rung 1 or above keep the normals and drop
 the wisps (1154-1257). Proof: a landing PNG with no facet edges visible at 1280.
