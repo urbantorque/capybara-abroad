@@ -266,6 +266,36 @@ hide-and-diff on the capy group shows it solid, not dithered, in over 80% of hel
 dolphins surface only past Bradleys Head and within 20 m of the rhumb line (5829). Spray
 (`noQuaySpray`): sheets at 0.35x, 44 instances, tumbling, 0.6 s life, PALETTE.foam (2964).
 
+### T1d — shipped
+
+`3172815`, src/quay.js only. No new flag (geometry, collision, a gate), no draw call, no save field.
+
+- **The fort.** `quayFORT` x 6 → −20. The straight run from the berth (x 6.6) clears its hard ring by
+  12.5 m. The red buoys at z −40 (x 2) and z −150 (x 16) are still inboard of it.
+- **Head on.** In `quayShore`, past 0.85 of her way into a hard disc she yaws away at 0.25 rad/s. The
+  side is latched for the contact and released the frame she is clear. "S to go astern" shows once a
+  visit (a stick sentence on pad or touch, because sysSay never rewrites a lone S). While the marquee
+  is live, systems.js routes it to the paper's live line, not a pill. qa/ten-t1d-rock.js: square on,
+  W held, she turned 1.51 rad and was clear in 8.4 s. Before, she was pinned for good.
+- **The hero.** The roadmap's wing wheel (x +0.9 on the deck) was measured first. Visibility was
+  0.69, the same as the centreline, 0/10 frames solid. The 3.7 m house is under the lens ray whatever
+  side the wheel is on. So the wheel is on the roof's fore edge at x +0.9 (`quayHELM.up` 2.21), with
+  a teak grating. E from the foredeck takes it (the gate's floor drops by `up`). E again puts the
+  animal back on the foredeck. The house collider now tops out at the drawn roof (2.30 → 2.56).
+  qa/ten-t1d-helm.js hide-and-diff on the capy group, boat hidden for the mask: 10/10 helm frames
+  above 0.85, mean 0.912.
+- **The passage.** qa/ten-t1d-pass.js uses real keys: E from the foredeck, W held, an A/D loop on
+  the buoy-pair midpoints, and S for the last 50 m. It arrived 5/5 in 56.1–58.8 s, with 0 head-on
+  contacts and the fort never closer than 52 m. `node qa/ten-t1d-sum.mjs` prints the table.
+- **Dolphins.** They surface only past Bradleys Head and within 20 m (`quayDOLPHIN_LANE`) of the
+  berth→Manly rhumb line. The escort first formed at z −213 to −222 in all five runs. Before, it
+  ticked 11 s after taking the wheel.
+- **Miss: spray (`noQuaySpray`) not built.** The spray pool (`quaySPRAY_N`, 2982) is foam spheres,
+  already PALETTE.foam. Those are the "ice boulders". The cream "paper sheets" in the review shots are
+  not this pool, and their source was not found in the time. Left for T6a.
+- The harness hook `game.quay.passageAudit()` is new. The helm's world point (`game.quay.boat.helm`)
+  is now 2.2 m higher, so anything aiming at it (the hint arrow) follows it up onto the roof.
+
 **T1e · condor.js · the bird can be caught.** Clamp the low orbit to 3.5 m or more above
 `condorGroundTop + condorHANG`. Add a watchdog: after 3 s lowered but not ready, re-centre on the
 nearest open point (8 bearings x 8/14/20 m) and toast "it will not come down under the flags.

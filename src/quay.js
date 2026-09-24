@@ -82,7 +82,18 @@ const quayLAND_HX = 74;              // ...and the last x
 // whose verb is "steer" should not open with a manoeuvre nobody is told about.
 const quayBERTH     = { x: 6.6, z: 6.0, yaw: Math.PI };
 const quayBOAT_DECK = 0.55;                          // body origin above the waterline datum
-const quayHELM      = { x: 0, z: 3.1 };              // helm station in boat-local metres
+// THE WHEEL IS ON THE ROOF (T1d). It stood on the foredeck at (0, 3.1), and
+// the sailing lens sits dead astern and ten metres up — so the house and the
+// funnel stood between the eye and the animal for the whole passage, and the
+// rim's capsule drew it as a screen-door ghost. Measured by hide-and-diff:
+// 0.69 of the animal's own pixels survived, 0 of 10 helm frames solid. A
+// wing wheel at x +0.9 on the same deck measured the same 0.69: the house is
+// 3.7 m wide and the ray to a capybara standing in front of it comes down
+// through the roof whatever side it is on. So the wheel went up — an open
+// flying bridge on the roof's fore edge, still to starboard of the funnel and
+// the mast — and the ray now comes down onto the animal over nothing at all.
+// `up` is the lift from the deck (0.35) to the roof's top face (2.56).
+const quayHELM      = { x: 0.9, z: 1.3, up: 2.21 };  // helm station in boat-local metres
 
 // The Bridge is the gate: it stands ACROSS the fairway a little north of the
 // wharves, so leaving the Quay means going under it whether you meant to or not.
@@ -105,7 +116,13 @@ const quayDECK_HALF = 190;
 const quayABUT = { u: 190, r: 42, h: 25 };
 
 // Landmarks, in the order you meet them.
-const quayFORT   = { x: 6, z: -126, r: 13 };         // Fort Denison, fine on the port bow
+// Fort Denison, fine on the port bow — which it was not: at x 6 it sat dead
+// ahead of a berth at x 6.6 with her head to the north, so full ahead from the
+// wharf buried the bow in the sandstone at z -114 and she parked (T1d,
+// measured by the review: 13 s pinned with the clock running). At x -20 the
+// straight run clears its hard ring by 12.5 m, and it still lies outside the red
+// buoys at z -40 (x 2) and z -150 (x 16), so the channel is still a channel.
+const quayFORT   = { x: -20, z: -126, r: 13 };
 const quayBRAD   = { x: -76, z: -196, r: 40 };       // Bradleys Head
 const quaySHARK  = { x: -46, z: -268, r: 17 };       // Shark Island
 const quayMIDDLE = { x: -122, z: -404, r: 62 };      // Middle Head
@@ -141,6 +158,7 @@ const quayFLEET = [
 ];
 
 const quayDOLPHIN_N = 5;
+const quayDOLPHIN_LANE = 20;         // m either side of the rhumb line they will run in (T1d)
 
 // ---------------------------------------------------------------- headlands --
 /**
@@ -3256,9 +3274,11 @@ function quayBuildBoat(game, root) {
   B.cyl(0, 3.98, -2.6, 0.56, 0.28, PALETTE.hullRed, 0, 0, 0, 8);
   // mast + rigging stub
   B.cyl(0, 3.4, -0.2, 0.10, 2.2, PALETTE.wood, 0, 0, 0, 6);
-  // the binnacle the wheel stands on, at the fore end of the house
-  B.cyl(quayHELM.x, 0.75, quayHELM.z, 0.22, 0.80, PALETTE.woodDark, 0, 0, 0, 6);
-  B.box(quayHELM.x, 1.20, quayHELM.z, 0.9, 0.14, 0.5, PALETTE.deckTeakDark);
+  // the binnacle the wheel stands on, on the fore edge of the roof (T1d), and
+  // a teak grating under it so the animal stands on a bridge and not on paint
+  B.cyl(quayHELM.x, 0.75 + quayHELM.up, quayHELM.z, 0.22, 0.80, PALETTE.woodDark, 0, 0, 0, 6);
+  B.box(quayHELM.x, 1.20 + quayHELM.up, quayHELM.z, 0.9, 0.14, 0.5, PALETTE.deckTeakDark);
+  B.box(quayHELM.x, 2.575, quayHELM.z - 0.8, 1.3, 0.04, 2.4, PALETTE.deckTeak);
   // fenders
   for (let i = -2; i <= 2; i++) {
     for (let s = -1; s <= 1; s += 2) {
@@ -3281,7 +3301,7 @@ function quayBuildBoat(game, root) {
     W.sph(Math.cos(a) * 0.47, Math.sin(a) * 0.47, 0, 0.055, 0.055, 0.075, PALETTE.brassTrim);
   }
   quayWheelMesh = new THREE.Mesh(W.build(), quayVC());
-  quayWheelMesh.position.set(quayHELM.x, 1.52, quayHELM.z);
+  quayWheelMesh.position.set(quayHELM.x, 1.52 + quayHELM.up, quayHELM.z);
   quayWheelMesh.castShadow = true;
   g.add(quayWheelMesh);
 
@@ -3335,9 +3355,12 @@ function quayBuildBoat(game, root) {
     body.addShape(new CANNON.Box(new CANNON.Vec3(quayGANG_OUT * 0.5 + 0.05, 0.14, quayGANG_HZ)),
                   new CANNON.Vec3(s * (HX + quayGANG_OUT * 0.5), 0.30, 0));
   }
-  // and the house, so you can climb it but not walk through it
-  body.addShape(new CANNON.Box(new CANNON.Vec3(HX - 0.5, 0.95, 2.6)),
-                new CANNON.Vec3(0, 1.35, -1.2));
+  // and the house, so you can climb it but not walk through it. Its top is
+  // the ROOF's top face (2.56), not the cabin's (2.30): the wheel is up there
+  // now (T1d), and an animal that steps off it would stand sunk a quarter of
+  // a metre into the green.
+  body.addShape(new CANNON.Box(new CANNON.Vec3(HX - 0.5, 1.08, 2.6)),
+                new CANNON.Vec3(0, 1.48, -1.2));
   // A KINEMATIC BODY AT REST FALLS ASLEEP. She is berthed with her velocity
   // explicitly zeroed (see onEnter and the idle branch of quayUpdateBoat) —
   // which is precisely what cannon's sleep heuristic is waiting for — and once
@@ -4256,7 +4279,19 @@ function quayBuildDolphins(root) {
 
 function quayUpdateDolphins(dt) {
   if (!quayDolphins) return;
-  const fast = quayHelmOn && quayBoatSpeed > 6.5;
+  // ...AND ONLY ONCE SHE IS OUT IN THE HARBOUR, ON HER LINE (T1d). Speed was
+  // the whole rule, and full ahead is 10.4 m/s two seconds off the wall: the
+  // review had "Earn a dolphin escort" ticked 11 s after taking the wheel,
+  // with nothing done but W, and the best thing on the harbour spent in the
+  // first hundred metres. Now they come past Bradleys Head and within 20 m of
+  // the rhumb line from the berth to Manly, so they are the reward for
+  // steering the open stretch well and they land in the middle of it.
+  let fast = quayHelmOn && quayBoatSpeed > 6.5 && quayBoatZ < quayBRAD.z;
+  if (fast) {
+    const lx = quayMANLY.x - quayBERTH.x, lz = quayMANLY.z - quayBERTH.z;
+    const off = Math.abs((quayBoatX - quayBERTH.x) * lz - (quayBoatZ - quayBERTH.z) * lx) / Math.hypot(lx, lz);
+    fast = off < quayDOLPHIN_LANE;
+  }
   quayDolphinOn = damp(quayDolphinOn, fast ? 1 : 0, fast ? 0.7 : 1.4, dt);
   if (quayDolphinOn < 0.01) {
     if (quayDolphinT !== -1) {
@@ -5118,7 +5153,7 @@ function quayUpdateChips(game, dt) {
 function quayHelmWorld(out) {
   const cs = Math.cos(quayBoatYaw), sn = Math.sin(quayBoatYaw);
   out.set(quayBoatX + sn * quayHELM.z + cs * quayHELM.x,
-          quayWATER_Y + quayBOAT_DECK + 0.78,
+          quayWATER_Y + quayBOAT_DECK + 0.78 + quayHELM.up,
           quayBoatZ + cs * quayHELM.z - sn * quayHELM.x);
   return out;
 }
@@ -5166,6 +5201,21 @@ function quayLeaveHelm() {
   quayHelmCool = 0.35;
   g.state.sailing = false;
   if (g.capy) g.capy.atHelm = false;
+  // DOWN OFF THE BRIDGE (T1d). Stepping away from a wheel on the roof left
+  // the animal on the roof, two metres over a deck with the gangway and the
+  // wharf both at deck height. It is put down on the foredeck in front of the
+  // house, riding her way, where the old wheel stood.
+  const cb = g.capy && g.capy.body;
+  if (cb && quayBoatBody) {
+    const cs = Math.cos(quayBoatYaw), sn = Math.sin(quayBoatYaw);
+    const lz = 2.6;
+    cb.position.set(quayBoatX + sn * lz + cs * quayHELM.x,
+                    quayBoatBody.position.y + 0.72,
+                    quayBoatZ + cs * lz - sn * quayHELM.x);
+    cb.velocity.set(quayBoatBody.velocity.x, 0, quayBoatBody.velocity.z);
+    cb.previousPosition.copy(cb.position);
+    cb.interpolatedPosition.copy(cb.position);
+  }
 }
 
 /**
@@ -5187,7 +5237,10 @@ function quayStepBoat(game, dt) {
     const dy = capy.body.position.y - quayV3.y;
     if (quayHelmOn) {
       quayLeaveHelm();
-    } else if (dx * dx + dz * dz < quayHELM_R * quayHELM_R && dy > -2.2 && dy < 2.6) {
+    // ...and from the foredeck under it (T1d): the wheel is on the roof now,
+    // so the floor of the gate drops by the roof's height and E on the deck
+    // in front of the house still reaches up and takes it.
+    } else if (dx * dx + dz * dz < quayHELM_R * quayHELM_R && dy > -2.2 - quayHELM.up && dy < 2.6) {
       quayTakeHelm();
     }
   }
@@ -5387,6 +5440,28 @@ function quayStepBoat(game, dt) {
 const quayGROUND_LINE = ['aground. astern, and try that again.',
                          'you have found the bottom. it was always there.'];
 let quayBumpCool = 0;
+// ...and the head-on case (T1d). See quayShore.
+const quayHEADON_YAW = 0.25;           // rad/s away from a rock she is square to
+let quayHeadOnSide = 0, quayHeadOnN = 0, quayAsternSaid = false;
+/**
+ * The way off a rock, in the scheme the player is holding. sysSay's tables
+ * rewrite "W/S" and never a lone S — a lone capital is how a clue gets
+ * rewritten by accident — so the pad and the thumb get their own sentence
+ * here rather than "S" on a controller that has no S on it.
+ */
+function quayAsternLine(game) {
+  let other = false;
+  try {
+    other = !!(window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches);
+    if (!other && navigator.getGamepads) {
+      const pads = navigator.getGamepads();
+      for (let i = 0; pads && i < pads.length; i++) if (pads[i]) { other = true; break; }
+    }
+  } catch (e) { other = false; }
+  const line = other ? 'pull the stick back to go astern' : 'S to go astern';
+  if (typeof game.control === 'function') game.control(line);
+  else if (typeof game.toast === 'function') game.toast(line);
+}
 
 function quayBump(game, hard, aground) {
   if (quayBumpCool > 0) return;
@@ -5420,10 +5495,34 @@ function quayShore(game, dt) {
     const into = -(vx * dx + vz * dz);
     if (into > 0) {
       quayBump(game, clamp(into / quayBOAT_VMAX, 0, 1), false);
+      // ---- HEAD ON, SHE STEERS HERSELF OFF (T1d) --------------------------
+      // The slide above keeps the way that runs ALONG the rock, and head on
+      // there is none: the speed is cut every frame she is touching, rudder
+      // authority is bought with speed, so a bow square to a rock is a boat
+      // that can neither slide nor turn. Measured by the review at the old
+      // fort: 13 s parked with W held and the clock running. Past 0.85 of her
+      // way into it she is yawed away at 0.25 rad/s, and the side is held
+      // for the whole contact so a bow on the dead centre does not dither;
+      // it lets go the frame she is clear. Once a visit, the way out is said.
+      if (quayBoatSpeed > 0.05 && (quayHeadOnSide !== 0 || into > 0.85 * quayBoatSpeed)) {
+        if (quayHeadOnSide === 0) {
+          const s = dx * Math.cos(quayBoatYaw) - dz * Math.sin(quayBoatYaw);
+          const mx = quayMANLY.x - quayBoatX, mz = quayMANLY.z - quayBoatZ;
+          quayHeadOnN++;
+          quayHeadOnSide = Math.abs(s) > 0.02 ? Math.sign(s)
+                         : (mx * Math.cos(quayBoatYaw) - mz * Math.sin(quayBoatYaw) >= 0 ? 1 : -1);
+        }
+        quayBoatYaw += quayHeadOnSide * quayHEADON_YAW * dt;
+        if (!quayAsternSaid) {
+          quayAsternSaid = true;
+          quayAsternLine(game);
+        }
+      }
       quayBoatSpeed *= 0.42;
     }
     return;
   }
+  quayHeadOnSide = 0;
 
   // --- THE QUAY ITSELF, WHICH WAS AN INVISIBLE LINE -------------------------
   //
@@ -6392,6 +6491,7 @@ export function createQuay(game) {
       // would not come back. The CHECKLIST stays ticked (that is systems.js's
       // business); the STAGING has to replay or the return trip is scenery.
       quayVoyaged = false; quayCastOff = false; quayBridged = false; quayWalled = false;
+      quayAsternSaid = false; quayHeadOnSide = 0;
       quayRunT = -1;
 
       quayRaceT = 0; quayRaceMask = 0; quayEscortT = 0; quayEscorted = false; quayArrivalT = 0;
@@ -6562,6 +6662,8 @@ export function createQuay(game) {
     boatDebugTo(x, z) { quayBoatX = x; quayBoatZ = z; },
     /** THE HUMPBACK, for the harness (L5). */
     whaleAudit() { return { t: +quayWhaleT.toFixed(2), seen: quayWhaleSeen, y: quayWhaleGroup ? +quayWhaleGroup.position.y.toFixed(2) : null, visible: !!(quayWhaleGroup && quayWhaleGroup.visible), splashed: quayWhaleSplashed, helm: quayHelmOn, speed: +quayBoatSpeed.toFixed(2), heads: +quayHeadsK.toFixed(2) }; },
+    /** THE PASSAGE, for the harness (T1d): where she is, and how often a rock turned her. */
+    passageAudit() { return { x: +quayBoatX.toFixed(1), z: +quayBoatZ.toFixed(1), yaw: +quayBoatYaw.toFixed(3), speed: +quayBoatSpeed.toFixed(2), throttle: +quayThrottle.toFixed(2), helm: quayHelmOn, headOnN: quayHeadOnN, headOnSide: quayHeadOnSide, astern: quayAsternSaid, castOff: quayCastOff, arrived: quayVoyaged, runT: +quayRunT.toFixed(1), dolphin: +quayDolphinOn.toFixed(2) }; },
     /** ...and the helm, taken from outside (the harness). */
     helmDebug(on) { if (on && !quayHelmOn) quayTakeHelm(); else if (!on && quayHelmOn) quayLeaveHelm(); return quayHelmOn; },
 
