@@ -821,6 +821,51 @@ Act II behaviour always. Next appearance within 60 s of an act turn (38, 141, 15
 Proof: `qa/aaa-rival.mjs` stays at 7/7, and a new `qa/ten-rival.mjs` forces each act and asserts the
 behaviour state, with a PNG of the Act III chase.
 
+### T3b — shipped
+
+Commit 574dd79 on the T3b worktree branch. One file, src/rival.js, plus `qa/ten-t3b-*`. The item was
+not stale: rival.js read no act, no keepsake and no finale before this.
+
+- **`noRivalArc`.** The act is read per visit (`game.journeyAct()`; `game.state.qaRivalAct` forces it
+  for a probe). 0 (Free Roam, legacy) and 2 are A4's thief, unchanged. No save field, no new mesh:
+  the same eight meshes on two new pivots (`upper`, `neckG`) so it can hunch, sit and peck, and the
+  wings fold along the body whenever it stands still. CPU only; nothing to park.
+- **Act I, the watcher.** A scored ring 12-28 m from the animal: terrain, plus the lids of heavy
+  props by name (bin, esky, crate...; a sign's box stood the bird 0.2 m over its board, and a
+  deckchair was moved under it in two seconds). The middle of the lens scores highest. It ignores
+  the grace, because watching is not stealing, and it leaves at 10 m. Sydney, fresh story file: act
+  1, first visit at 22.5 s (not A4's 75-110), on a bin lid 20 m off and 2.4 m up, on screen at
+  (889, 151). It left 'near' when the animal was set down 8 m off. `qa/ten-t3b-watch.js`,
+  `-close.png`.
+- **Act III, the chase.** On `'story:memory'` (act 3, or the story in act 3), once per chapter, it
+  waits 7.5 s, or 7.5 s after an act card. It takes the keepsake from `physics.keepOut(place)` on
+  npc.js's errand pin (frozen, KINEMATIC, no collision response, not grabbable), and hands it back
+  through `physics.dropOwned` with the type restored on every path out. The run: a 1.4 s getaway at
+  7.0 with no catch, then 2.2 / 3.6 / 5.2 m/s by distance, a 6.9 burst inside 3 m, a look back every
+  2.4 s, a bend round the snatch point past 13 m, and one knee-height ray that rounds walls. At first
+  the bird went over the Gion fence and the animal stood at it for 26 s. Kyoto, a scripted sprint
+  after a 0.6 s reaction: caught at 4.4 s with 2 looks. Standing still, it tired at 28 s, 16.5 m from
+  the snatch point (the cap is 30). The keepsake was dynamic, unfrozen and grabbable both times. A
+  second memory in chapter 4 does not bring it back. `qa/ten-t3b-chase.js`, `-run/-look/-fall.png`.
+- **Act IV+, cold.** Iceland, the antarctic and the cave: it stands hunched 8 m off and steals
+  nothing (a fruit 12 m ahead stayed put). A yuzu 1.5 m from it (`dropGive`, the ask's door), or a
+  carried edible set down within 2.2 m (`capy:drop`), is walked to, pecked, eaten, and gets the line
+  (`'rival:fed'`). `qa/ten-t3b-cold.js`, `-hunch/-close.png`.
+- **The end.** On `'finale:staged'` it lands 0.45 rad off the mouth's centre line at 1.05 r, facing
+  the animal (error 0.00 rad), sits, and carries a yuzu if it was fed that session. It goes when
+  `finaleOn` drops. `qa/ten-t3b-finale.js`, `-sit.png`.
+- **Act turn.** `'story:act'` pulls the next visit to 20-50 s (measured 120 → 32.5 s). With no fruit
+  about, that visit is a watch.
+- **For the merger.** `qa/aaa-rival.mjs` fails "A states off" on ten-pass without this change: a
+  fresh Free Roam file is in the T2a grace (`graceOn` true), so `rivalOK` is false. The same seven
+  checks pass 7/7 with the grace cut after arrival (`qa/ten-t3b-aaa-rival.mjs`). The fix belongs in
+  aaa-rival.mjs or in T2a's grace, not in rival.js. New bus events: `rival:left {how}`,
+  `rival:fed {fed}`, `rival:seated {x,z,fed}`; `rival:stole`/`rival:dropped` carry `keep: true` for
+  the keepsake. `rivalAudit()` adds mode, act, keep, look, hunch, sit, fed, perch and seat.
+- **Missed.** The "yuzu given is remembered" is the session's (no save field was named). The chase
+  was proved by a scripted sprint on a hand clock, not by a human under real keys. The watcher can
+  still land behind a HUD card: the premise card covered it in one run.
+
 **T3c · npc.js · crowds make room.** Bubble cap (`noBubbleCap`): 2 live, nearest and
 addressed-to-the-animal first; 1 within 20 m of the marquee or while a subtitle is live; speakers
 beyond 25 m go to the heard pill; drop anchors in the top 18% of the screen (2020, 3261). Photo
