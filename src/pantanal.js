@@ -3550,6 +3550,7 @@ function panBuildWater(root) {
   g.setAttribute('color', new THREE.BufferAttribute(col, 4));
   g.computeVertexNormals();
   panWaterMat = panVCW(true);
+  panSkyFresnelHook(panWaterMat);
   const m = new THREE.Mesh(g, panWaterMat);
   m.frustumCulled = false;
   m.renderOrder = 2;
@@ -3583,6 +3584,89 @@ function panUpdateWater() {
   // the river stops being brown. This is a mirror picking up a colour, not a
   // filter over the frame — the grade in systems.js is already doing that half.
   panWaterMat.color.copy(panWaterDay).lerp(panWaterDusk, panSmooth(panDusk) * 0.42);
+  panUpdateSkyFresnel();
+}
+
+/**
+ * T4d — THE SKY IN THE WATER WHEN THE MIRROR IS PARKED (noPanSkyFresnel).
+ *
+ * The flood is a mirror because the planar pass (reflect k 1.0, panVCW) puts
+ * the sky and the gallery trees in it, and that pass parks at rung 1. On
+ * every laptop that steps down, the chapter's defining picture went to its
+ * vertex colours: flat khaki, lily pads floating on mud, the jacarés black
+ * wedges. grain()'s own Fresnel is there, but at 0.65 on a steep curve it is
+ * a rim at the horizon and nothing at the play angle.
+ *
+ * So, only while perfRung >= 1: the same weight the mirror uses (1 - V.y,
+ * k 0.78), toward a two-stop sky. Both stops start from the horizon colour
+ * grain() already tracks (uGrSkyC, which the weather moves, so an overcast
+ * campo gets an overcast flood): 30% toward a lightened panHaze at grazing,
+ * 35% toward panSkyTop and nearly half down looking down, because the
+ * mirror at rung 0 is dark there: it is the top of the sky it is showing. With a band of
+ * reflected tree line along the low angles,
+ * its top a sum of three sines in the view's bearing, which is what a
+ * wooded horizon looks like doubled in still water. On the LIT colour, like
+ * the mirror: it is light from somewhere else. Weighted by (1 - the mirror's
+ * live strength), so the hand-over while k damps is a cross-fade and at
+ * rung 0 it is zero whatever the uniform says; and zero from under the
+ * sheet. An atan, three sines and two mixes on one sheet, and a uniform
+ * branch when cut. The colours follow the sundown in
+ * panUpdateSkyFresnel.
+ *
+ * A chained hook, because the sheet is grainOwn's and grain's hook has to run
+ * first: it writes vGrainW, uReflK and uReflOn, and this reads all three.
+ */
+const panSKYF_K = 0.78;               // the mirror's own k is 1.0; the water keeps a little of itself
+const panSkyF = { value: 0 };
+const panSkyH = { value: new THREE.Color() };     // the horizon, in the water
+const panSkyZ = { value: new THREE.Color() };     // looking down: the zenith
+const panSkyT = { value: new THREE.Color() };     // the tree line, doubled
+const panSkyHDay = new THREE.Color(PALETTE.panHaze).lerp(new THREE.Color(PALETTE.panSkyLow), 0.45);
+const panSkyZDay = new THREE.Color(PALETTE.panSkyTop);
+const panSkyTDay = new THREE.Color(PALETTE.panForest).lerp(new THREE.Color(PALETTE.panHaze), 0.3);
+const panSkyTDusk = new THREE.Color(PALETTE.panForest);
+function panSkyFresnelHook(m) {
+  const prev = m.onBeforeCompile, prevKey = m.customProgramCacheKey;
+  m.onBeforeCompile = function (shader, renderer) {
+    prev.call(this, shader, renderer);
+    shader.uniforms.uPanSF = panSkyF;
+    shader.uniforms.uPanSkyH = panSkyH;
+    shader.uniforms.uPanSkyZ = panSkyZ;
+    shader.uniforms.uPanSkyT = panSkyT;
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>',
+      '#include <common>\nuniform float uPanSF;\nuniform vec3 uPanSkyH;\nuniform vec3 uPanSkyZ;\nuniform vec3 uPanSkyT;');
+    // before the LAST opaque_fragment: grain's mirror block keeps the anchor
+    // at its own tail, and this goes after the mirror, where it replaces it
+    const at = shader.fragmentShader.lastIndexOf('#include <opaque_fragment>');
+    if (at < 0) return;
+    shader.fragmentShader = shader.fragmentShader.slice(0, at) + [
+      'if (uPanSF > 0.001) {',
+      '  vec3 sfV = normalize(cameraPosition - vGrainW);',
+      '  float sfY = clamp(sfV.y, 0.0, 1.0);',
+      '  float sfW = (1.0 - sfY) * ' + panSKYF_K.toFixed(3) + ' * uPanSF * (1.0 - clamp(uReflK * uReflOn, 0.0, 1.0)) * step(0.0, sfV.y);',
+      '  vec3 sfC = mix(mix(uGrSkyC, uPanSkyH, 0.3), mix(uGrSkyC, uPanSkyZ, 0.35) * 0.55, smoothstep(0.03, 0.4, sfY));',
+      // the tree line's height in V.y, by bearing: about 6 to 20 degrees
+      '  float sfA = atan(sfV.x, sfV.z);',
+      '  float sfT = 0.22 + 0.06 * sin(sfA * 5.0 + 1.3) + 0.03 * sin(sfA * 13.0 + 0.4) + 0.018 * sin(sfA * 31.0 + 2.1);',
+      '  sfC = mix(sfC, uPanSkyT, (1.0 - smoothstep(sfT * 0.8, sfT, sfY)) * 0.85);',
+      '  outgoingLight = mix(outgoingLight, sfC, sfW);',
+      '  diffuseColor.a = mix(diffuseColor.a, 1.0, sfW * diffuseColor.a);',
+      '}',
+      '',
+    ].join('\n') + shader.fragmentShader.slice(at);
+  };
+  m.customProgramCacheKey = function () { return prevKey.call(this) + '|panSF'; };
+  m.needsUpdate = true;
+}
+/** Live only while the governor has parked the mirror, and never when cut. */
+function panUpdateSkyFresnel() {
+  const st = panGame && panGame.state;
+  panSkyF.value = (st && !st.noPanSkyFresnel && (st.perfRung || 0) >= 1) ? 1 : 0;
+  if (!panSkyF.value) return;
+  const k = panSmooth(panDusk);
+  panSkyH.value.copy(panSkyHDay).lerp(panWaterDusk, k * 0.6);
+  panSkyZ.value.copy(panSkyZDay).lerp(panWaterDusk, k * 0.35);
+  panSkyT.value.copy(panSkyTDay).lerp(panSkyTDusk, k * 0.5);
 }
 
 // =================================================================== UPDATE ==
@@ -6177,6 +6261,11 @@ export function createPantanal(game) {
         else if (panHerd[i].trailT > 0) trailing++;
       }
       return { last: panCascadeLast, trailing: trailing, following: following };
+    },
+    /** T4d: the parked-mirror sky, as the sheet sees it this frame. */
+    skyFresnel() {
+      return { on: panSkyF.value, hooked: !!(panWaterMat && /\|panSF$/.test(panWaterMat.customProgramCacheKey())),
+               h: '#' + panSkyH.value.getHexString(), z: '#' + panSkyZ.value.getHexString() };
     },
     /** T4d test hook: put grazer `i` at (x, z) and keep it there a while. */
     herdAt(i, x, z) {
