@@ -1122,6 +1122,7 @@ function monBuildGround(game, root) {
   m.receiveShadow = true;
   m.castShadow = false;
   m.frustumCulled = false;
+  m.name = 'monGround';   // the race lens probe counts it (qa/ten-t1b-lens.js)
   root.add(m);
 }
 
@@ -3365,6 +3366,41 @@ function monRaceLeave(game) {
     if (capy.position) capy.position.set(ox, monMeTY + 0.9, oz);
   }
   if (monRaceT < 0) monRaceT = -1;
+}
+// ---- THE RACE LENS (TEN T1b, flag noMonRaceLens) -----------------------------
+// The follow rig was 13 m at 0.30 rad over a 1.2 m raise: an eye about five
+// metres over the car, looking along its bonnet. On the climb out of the
+// harbour the road is cut into the hill, and a lens that low, aimed where the
+// car points rather than where the road goes, filled the frame with the bank
+// — the reviewers' 60 % hillside. Three moves, all through hooks systems.js
+// already reads (rig, rideYaw, camFloor):
+//   - the eye 1.5 m higher on a shorter boom, so it looks down the road;
+//   - the yaw aimed at the road monLENS_AHEAD metres on (at the car's own
+//     lateral offset), so a bend is framed before the car is in it;
+//   - a floor monLENS_FLOOR over the road under the lens, and never less than
+//     monLENS_BANK over the ground there, so a cut bank cannot swallow it.
+// A camera term, not a picture term: nothing is drawn, so it costs nothing
+// on the GPU and does not park with the rung.
+const monLENS_DIST  = 9.5;    // m of boom (was 13)
+const monLENS_PITCH = 0.50;   // rad — with the raise, the eye 6.5 m over the car (was 5.0)
+const monLENS_RAISE = 2.0;    // m the aim sits over the car (was 1.2)
+const monLENS_AHEAD = 12;     // m down the lap the yaw is aimed at
+const monLENS_FLOOR = 2.5;    // m over the tarmac the lens may not go under
+const monLENS_BANK  = 1.2;    // m over the ground beside it
+const monLensTmp = { x: 0, y: 0, z: 0, yaw: 0, i: 0, t: 0 };
+function monLensOn() {
+  return monRaceOn && !(monGame && monGame.state && monGame.state.noMonRaceLens);
+}
+function monLensYaw() {
+  monTrackAt(monMeS + monLENS_AHEAD, monLensTmp);
+  const c = Math.cos(monLensTmp.yaw), sn = Math.sin(monLensTmp.yaw);
+  const ax = monLensTmp.x + monMeLat * c, az = monLensTmp.z - monMeLat * sn;
+  const dx = ax - monMeTX, dz = az - monMeTZ;
+  return (dx * dx + dz * dz > 1) ? Math.atan2(dx, dz) : monMeYaw;
+}
+function monLensFloor(x, z) {
+  monRoad(x, z);
+  return Math.max(monRoadY + monLENS_FLOOR, monTerrain(x, z) + monLENS_BANK);
 }
 function monUpdateRace(game, dt) {
   if (!monMeG || dt <= 0) return;
@@ -5739,11 +5775,20 @@ export function createMonaco(game) {
     // the camera sits behind the car while you drive it, close and low: the
     // helm rig is a ship's (21 m, 27°) and on a street with walls it was
     // shoved up to a plan view. See rideYaw in systems.js and the rig chain.
-    rideYaw() { return monRaceOn ? monMeYaw : NaN; },
+    // ...and with the race lens live (TEN T1b) it points down the road
+    // monLENS_AHEAD metres on, not along the bonnet — see monLensYaw.
+    rideYaw() { return monRaceOn ? (monLensOn() ? monLensYaw() : monMeYaw) : NaN; },
     rig() {
       if (!monRaceOn) return null;
+      if (monLensOn()) return { w: 1, dist: monLENS_DIST, pitch: monLENS_PITCH, raise: monLENS_RAISE, lambda: 3.0 };
       return { w: 1, dist: 13, pitch: 0.30, raise: 1.2, lambda: 3.0 };
     },
+    // Published only while the lens is live: the property is undefined the
+    // rest of the time, so systems.js falls through to its own floor and to
+    // the dive floor exactly as it did before this chapter had an opinion.
+    get camFloor() { return monLensOn() ? monLensFloor : undefined; },
+    /** Metres from the tarmac's centreline. Harness only (qa/ten-t1b-lens.js). */
+    roadD(x, z) { return monRoad(x, z); },
     raceDebug(o) {
       // the harness: hold the pedals without a keyboard
       if (o && o.take && !monRaceOn) monRaceTake(monGame);

@@ -159,6 +159,32 @@ of the frame is under 25% and the car is in the middle third. Stretch: every thi
 three-tier motor yacht in the existing instanced batch (1303), and the promenade is pale limestone
 (`PALETTE.monStone`, seeded).
 
+### T1b — shipped
+
+- **The seat (no flag, a bug).** The cause is not interpolation but the shed: from rung 2,
+  world.step takes two 1/60 substeps under a 1/20 s clock, so a velocity-driven kinematic body
+  covers two thirds of each frame's travel and never gets the rest back. The car drove a
+  two-thirds copy of the lap about the grid. `monMePlace(dt>0)` now puts the body at the target
+  after setting the contact velocity, and `monMeDraw()` draws the car from monMeTX/TY/TZ/Yaw. The
+  pack gets the same treatment, and a roof rider is carried by the correction the solver did not
+  integrate (`monSEAT_CARRY2`, 3 m cap). RULE 5 is amended in the carrier's header comment.
+  Proof `qa/ten-t1b-seat.js` / `-r0.js`, W held, one full lap: at rung 3, capy−car was 33.9 m
+  mean and 59 m max before, 0.55 m after (the seat's own offset). At rung 0 it is 0.55 m. PNG
+  `ten-t1b-seat-r3-2.png` shows the animal in the red car. `qa/ten-t1b-roof.js`, fastest pack car,
+  no keys, about 11 s: the ride held 4.5/0.5/3.9/0.1 s before and 12.0/10.0/11.6/8.0 s after.
+- **The race lens (`noMonRaceLens`, a camera term, no GPU, not parked).** rig() is 9.5 m, 0.50
+  rad and a 2.0 m raise (it was 13/0.30/1.2). rideYaw aims 12 m down the lap at the car's own
+  lateral. A `camFloor` getter, published only while racing, sets the floor at road +2.5 and
+  ground +1.2, so the dive floor elsewhere is untouched. `api.roadD` is a harness helper. Proof
+  `qa/ten-t1b-lens-ab.js`, 13 stations, the same road cut vs live, rung 3: the car took ray hits
+  at 4/13 stations before and 12/13 after, and it sat in the middle third at 13/13 both times.
+  Mean eye height went from 4.8 m to 5.5 m. **Miss:** off-tarmac ground share was 0.33 before
+  and 0.36 after, and 7/13 stations are over 25% either way. The cut banks at s≈20-70, 170-270,
+  520 and 620 fill the frame from any eye behind the car, so reaching the target would take the
+  bank geometry, not the lens. The proof slot should re-measure at rung 0 headful.
+- **Stretch not done:** the three-tier motor yachts in the moored batch and the limestone
+  promenade (`monYachtNavy`, `monStone` stay unused). They are open for T6a.
+
 **T1c · goreme.js · the truck leaves the pad.** `gorUpdateTruck` holds at (20,10, yaw 0) until the
 balloon is more than 2 m airborne, and aims at least 7 m off the basket when chasing a landing
 (4603, 4415, 4742). Proof: from a fresh save, walk to `hintTarget('aboard')`, hop, and `gorAboard`
