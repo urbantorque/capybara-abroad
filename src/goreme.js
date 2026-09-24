@@ -1389,7 +1389,41 @@ function gorBuildScatter(game, root) {
       gorInstance(root, gorG.sph6, PALETTE.gorPot, pumpkin, false, true, 'gorScat:pumpkin:' + id));
   }
   gorScatMeshes = gorScatMeshes.filter(Boolean);
+  // ---- THE POPLARS WAIT FOR THE SUN (TEN T1c, noGorDawn) ----------------
+  // At five in the morning they were the brightest, most saturated thing in
+  // a blue-violet frame, brighter than the envelopes the frame is about. One
+  // material for every chunk's cones, cloned off the shared cache so nothing
+  // else painted gorPoplar moves, and the rim hook carried across by hand
+  // because Material.copy does not bring it. gorUpdatePoplars warms it.
+  gorPoplarMat = null; gorPoplarK = -1;
+  for (let i = 0; i < gorScatMeshes.length; i++) {
+    const m = gorScatMeshes[i];
+    if (m.name.indexOf('gorScat:poplar:') !== 0) continue;
+    if (!gorPoplarMat) {
+      gorPoplarMat = m.material.clone();
+      gorPoplarMat.onBeforeCompile = m.material.onBeforeCompile;
+      gorPoplarMat.customProgramCacheKey = m.material.customProgramCacheKey;
+    }
+    m.material = gorPoplarMat;
+  }
   if (solid) gorPoolDone(game, SB);
+}
+
+let gorPoplarMat = null, gorPoplarK = -1;
+const gorPoplarLit = new THREE.Color();
+/**
+ * Olive until the sun is on the horizon (gorSun 0.354), their own yellow by
+ * the time it has cleared the rim and a little over (0.60): the valley lights
+ * up with the marquee rather than before it. A colour uniform, written only
+ * when it changes, so there is nothing to park at any rung.
+ */
+function gorUpdatePoplars() {
+  if (!gorPoplarMat) return;
+  const k = (gorGame && gorGame.state && gorGame.state.noGorDawn) ? 1
+          : gorSmooth((gorSun - 0.354) / 0.25);
+  if (Math.abs(k - gorPoplarK) < 0.002) return;
+  gorPoplarK = k;
+  gorPoplarMat.color.setHex(PALETTE.gorPoplarOlive).lerp(gorPoplarLit.setHex(PALETTE.gorPoplar), k);
 }
 
 /**
@@ -3042,6 +3076,7 @@ function gorUpdateDecor(dt) {
   gorDecorMeshBask.instanceMatrix.needsUpdate = true;
   gorDecorMeshThroat.instanceMatrix.needsUpdate = true;
   gorUpdateDawnLine(dt);
+  gorUpdatePoplars();
 }
 
 /**
@@ -4462,7 +4497,12 @@ function gorTrailerRide(game, dt) {
   const p = capy.position;
   // Height plus a radius, the bangka's lesson: an axis-aligned rectangle reads
   // aboard on a fraction of the frames of a ride nobody ever falls off.
-  const aboard = Math.hypot(p.x - tx, p.z - tz) < 2.4 && p.y > ty && p.y < ty + 2.6;
+  // NOT WHILE IN THE BASKET (TEN T1c). A landing ON the trailer puts the
+  // basket inside this radius and its floor inside this height band, so the
+  // ride home fired on the touch itself: the toast said hold the ropes and
+  // the truck drove to the square with the animal still in the basket.
+  const aboard = !gorAboard &&
+                 Math.hypot(p.x - tx, p.z - tz) < 2.4 && p.y > ty && p.y < ty + 2.6;
   gorTrailerCarrying = aboard;
   if (aboard) {
     gorTrailerCarry.x = gorTrailerBody.velocity.x;
@@ -4601,6 +4641,9 @@ function gorUpdateDust(dt, moving) {
  */
 const gorCHASE_LAG = 0.30;           // lambda: about four seconds of being wrong
 const gorCHASE_TOP = 9.0;            // m/s flat out on the valley floor
+const gorCHASE_OFF = 7.0;            // m, basket to the aim once it is down: he
+                                     // stops 3 short of that, the trailer 2.4 on,
+                                     // so the bed is 6.4+ out and the basket 1.5 wide
 function gorUpdateTruck(dt) {
   if (!gorTruck) return;
   // where they THINK it is going: the wind it is in now, for as long as it
@@ -4612,8 +4655,35 @@ function gorUpdateTruck(dt) {
   gorChaseZ = damp(gorChaseZ, clamp(gorBalZ + w.z * fall, -104, 56), gorCHASE_LAG, dt);
   // ...unless somebody is in the back, in which case they stop chasing and
   // drive to the square. See gorTrailerRide.
-  const tx = gorRideHome ? gorPLAZA.x : gorChaseX;
-  const tz = gorRideHome ? gorPLAZA.z - 9 : gorChaseZ;
+  let tx = gorRideHome ? gorPLAZA.x : gorChaseX;
+  let tz = gorRideHome ? gorPLAZA.z - 9 : gorChaseZ;
+  // ---- AND A BALLOON ON THE GROUND IS NOT A CHASE (TEN T1c) --------------
+  // With nothing in the air `fall` is zero, so the prediction above is the
+  // basket itself: the truck left its spot at (20, 10) on arrival, stopped
+  // three metres short and swung the trailer 2.4 m on, onto the basket. Two
+  // reviewer runs stood 2.2 m from the basket for forty seconds and never got
+  // in. So, on the ground: before the first flight the crew stay parked, and
+  // after one they pull up at least gorCHASE_OFF from the basket on the side
+  // they came from. In the air, and all the way down to the touch, the chase
+  // is exactly what it was — 'on-the-trailer' is a landing ON the trailer.
+  // A bed nearer an EMPTY basket than that (gorCHASE_OFF - 0.6, bed centre to
+  // basket centre) pulls out further; with the animal in the basket it stays put
+  // rather than sweep a kinematic box through the passenger.
+  if (!gorRideHome && gorBalY - gy0 <= 2 && (!gorFlown || gorGroundedT > 0.5)) {
+    if (!gorFlown) { tx = 20; tz = 10; }
+    else {
+      const ox = gorTruckX - gorBalX, oz = gorTruckZ - gorBalZ;
+      const ol = Math.hypot(ox, oz);
+      // on the exact centre (nobody has seen it, but a divide by zero parks
+      // the truck at NaN for the rest of the chapter): back out along +x
+      const ux = ol > 0.01 ? ox / ol : 1, uz = ol > 0.01 ? oz / ol : 0;
+      const over = Math.hypot(gorTruckX + Math.sin(gorTruckYaw) * 2.4 - gorBalX,
+                              gorTruckZ + Math.cos(gorTruckYaw) * 2.4 - gorBalZ) < gorCHASE_OFF - 0.6;
+      const off = over ? gorCHASE_OFF + 5 : gorCHASE_OFF;
+      tx = over && gorAboard ? gorTruckX : gorBalX + ux * off;
+      tz = over && gorAboard ? gorTruckZ : gorBalZ + uz * off;
+    }
+  }
   const dx = tx - gorTruckX, dz = tz - gorTruckZ;
   const d = Math.hypot(dx, dz);
   if (d > 3) {
@@ -6163,6 +6233,13 @@ export function createGoreme(game) {
     onMare() { return !!(gorGame && gorGame.capy && gorOnMare(gorGame.capy.position)); },
     balloon() { gorV3b.set(gorBalX, gorBalY, gorBalZ); return gorV3b; },
     truck() { gorV3b.set(gorTruckX, gorTerrain(gorTruckX, gorTruckZ), gorTruckZ); return gorV3b; },
+    // the bed and the ride (TEN T1c). Nothing in src reads these; the harness
+    // does — the bed is 2.4 m off the truck along a yaw nothing else publishes.
+    trailer() {
+      const x = gorTruckX + Math.sin(gorTruckYaw) * 2.4, z = gorTruckZ + Math.cos(gorTruckYaw) * 2.4;
+      gorV3b.set(x, gorTerrain(x, z) + 0.97, z); return gorV3b;
+    },
+    riding() { return gorRideHome; },
 
     update(dt) {
       if (!gorBuilt) return;
