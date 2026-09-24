@@ -535,6 +535,57 @@ SphereGeometry(0.5,7,5) (2670-2733, 4574). Proof: in a pinned-camera PNG the cur
 no hard line (row luminance falls monotonically), and steam covers under 10% of the frame in the
 tick frame. Stretch: the lantern trail up the gap in the rows (1378).
 
+### T2c — shipped
+
+- **`noAuroraRamp`.** Each curtain is now one ribbon, `PlaneGeometry(330, 100, 40, 4)` from 46 m to
+  146 m, in place of the two flat bands. The vertex colours fall from the hem to the top: 1.0 at the
+  hem in `PALETTE.iceAuroraHem`, then 0.7, 0.4 and 0.16 in the curtain's own colour, then 0. The top
+  half leans toward `iceAuroraMag`. The last 18 % at each end tapers along x. The folds are two
+  sines along the length, one pair per curtain, and they scale whole columns, so every column still
+  falls. The material is `MeshBasicMaterial`: additive, vertex colours, no depth write, no fog. A
+  Lambert emissive ignores vertex colour. Peak opacity is 0.56, which is the lower band's 0.46
+  raised to cover the light the folds remove. It draws 6 times where the bands drew 12. At rung 2
+  and above it swaps to a pre-built 2-row copy (123 vertices a ribbon, not 205). The flag hides the
+  ribbons and draws the old bands untouched. The ripple is shared: a band's `ampUp` is 0, so it is
+  the old formula.
+- **`noAuroraFrame`.** The call that ticks `aurora` now fires `frameShot`, where before only every
+  fourth call in time did. The yaw is the bearing of the curtain nearest the lens plus PI,
+  clamped to the inner four curtains, because at an end curtain the frame held only two. It holds
+  for 5 s. **The review's pitch −14° and raise 0.8 could not be used.** The lens floor is 1.7 m and
+  the soaking animal is at −0.35 m, so the eye was clamped up and the lens looked *down* 10.3°
+  (first run). The shipped numbers are pitch −3°, dist 9, raise 2.5. Measured at the tick: eye
+  2.09 m, the lens looking up 0.8°, the animal at NDC y −0.48 (bottom third), the framed curtain's
+  hem at +0.18 and its top at +0.63. Before the call the lens was looking down 12°, and no curtain
+  vertex was in front of it.
+- **`noSteamSoft`.** Each puff shrinks by smoothstep over its last 0.8 s. Any puff within 4 m of the
+  eye is scaled to 0, at a cost of 54 distance checks. The geometry is `SphereGeometry(0.5,7,5)`
+  scaled 0.93, which gives the old pentagon's area. It parks back to the 5×4 geometry at rung 1.
+  The burst's 14 puffs go to a 6-9 m ring on the far side of the spring from the burst shot's eye.
+  **The pool was always full:** 54 of 54 live at every sample, so the old burst ring mostly never
+  spawned. The ring now takes the slot nearest its end, which the shrink has already made small.
+- **Proof** (`qa/ten-t2c-aurora.js`, rung pinned 0, fresh profile). Hide-and-diff uses one frozen
+  camera clone and raw renders in one task. The live run is compared with `noAuroraRamp` +
+  `noSteamSoft` set, with the frame live in both, so the tick frames share a view.
+  - The curtain's centre column, from the hem up to 20 % past the top: ribbon 0 rises, largest
+    single fall 6.2 levels. Bands: plateaus of 72.5 and 32.1, largest single fall 46.4.
+  - Steam's share of the tick frame: 9.86 % live against 10.3 %. Across three runs the live
+    figure was 8.6-10.4 %, so the "under 10 %" target is only just met.
+  - Steam at the resting lens in the pool, same pose: 6.2 % against 24.4 %.
+  - Burst frame: 4.4 % against 1.4 %. That is more steam, because the ring now rises on the far
+    rim and frames the animal.
+  - `aurora` ticked in both runs, no errors. PNGs: `qa/ten-t2c-aurora-{live,off}-{before,tick,burst}.png`.
+- **Second increment: the light back.** On the steeper ramp at 0.56, the ribbon carried less than
+  half the bands' light, and the tick frame read as an empty sky at the low point of a breath. The
+  ramp is now 1.0, 0.85, 0.6, 0.3, 0. The folds use 0.6 + 0.4 across and 0.8 + 0.2 along, and the
+  peak is 0.66. Re-measured in the same run as the flag:
+  - Ribbon column: hem at 134 levels, falling to 44 levels at 20 % past the top, where the
+    column reaches the next curtain. There is one 23-level dip where it crosses that curtain.
+  - Bands: a 100-level plateau, then a single 66.7-level fall, then a 59-level plateau.
+  - Steam in the tick frame: 10.0 % against 15.7 %. At the resting lens: 5.7 % against 11.9 %.
+- **Missed:** the stretch, the lantern trail up the gap in the rows. The review's other ask, keeping
+  bubbles and the paper off the frame, belongs to A (`noHeldWow` / T2a). Rung-0 GPU cost is owed to
+  the proof slot.
+
 **T2d · rio.js · the rock is solid.** Seeded `rioRnd` boulders, and a rioStaticBox for every sphere
 with s > 1.4, pooled into one body (1660-1680). Proof: `qa/audit-solid2.js` at each stone gives 0
 walk-through. Add an `inZone('posto6')` box for A's T3 door guard. Bounce (`noRioBounce`):
