@@ -614,6 +614,12 @@ export const PALETTE = {
   heronLeg:     0xb08a5c,
   kyotoHaze:    0xdfe7e4,
   kyotoSky:     0xa8cfda,
+  // The bowl the valley sits in. farTone lerps it a third of the way to
+  // kyotoHaze, so this is the colour BEFORE the air: bluer than sugi and a
+  // step lighter, so the hills stay behind the torii wood and never in it.
+  kyoRidge:     0x587a68,
+  kyoGravelShade: 0xd4ccbc,    // the furrow of a raked line: 8% under gravelZen, warm, not road paint
+  kyoUnder:     0x2e4033,      // the floor under the Inari cedars: below sugiDeep, so only the vermilion is lit
 
   // ---- Sydney Harbour & Manly (chapter 3) ----
   // The harbour read from a boat is a different place from the harbour read
@@ -1437,6 +1443,7 @@ export const PALETTE = {
   hanLeaf:       0x5f8451,
   hanLeafDk:     0x466439,
   hanTrunk:      0x7a6247,
+  hanWillow:     0x8fa65f,      // the willows round Hoan Kiem: paler and yellower than hanLeaf, or they sink into the lake
 
   // ---- the bia hoi corner, the market and the rest -------------------------
   hanStoolA:     0xd94f3d,      // and there are ninety-six of them
