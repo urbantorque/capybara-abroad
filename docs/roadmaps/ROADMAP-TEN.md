@@ -355,6 +355,34 @@ the paper (4775, 4812). Flag `noChivaHold`. Proof: roofPlace(0), no input, still
 s=177, at rung 0 and at rung 3. Stretch (`noWireFade`): wires at half radius in dark metal, faded
 within 5 m of the lens (2079).
 
+### T1f — shipped
+
+- **The cause was the clock, not friction.** From rung 2, main.js clamps the frame at 1/20 s and
+  runs two 1/60 substeps of it. The world moved the passenger for 1/30 s while cali.js drove the bus
+  for 1/20. The drift was linear in s: lz −5.1 m at s 28, off the tail at s 49, on the paving at
+  s 177 (`qa/ten-t1f-hold-r3.js` on the old code, and again with the flag set).
+- **`noChivaHold`** (`caliHoldRoof`). No move key held, the roof test true within 0.3 s, inside the
+  roof plus 0.4 m, and no cable latch: each frame the animal is put back at its roof-local point,
+  with its history shifted, and its horizontal velocity set to v + ω × r. y stays with the solver,
+  so a hop without a direction goes straight up and lands on the same spot. This is behaviour, not
+  a picture, so it has no GPU term and does not park. With roofPlace(0) and no input: at **rung 3**
+  it was on the roof at s 178.0, with max |lx|,|lz| 0.06 m through four cable hits. At **rung 0** it
+  was on the roof at s 178.8, max 0.06 m. The flag set restores the old fall (off at s 50.7).
+- **The missed-her beat.** One second off the roof while she is on the road, no cable in the last
+  2.5 s, said once per ride: "she does not stop for anybody. she goes round again." A new
+  `nextIn('chiva-mirador')` gives the seconds until she is parked at the kerb again. It is an
+  estimate built from the drive's own speed law, plus the stops, the turn and the deadhead. It
+  returns −1 while she is parked, so the wheek's ladder line is unchanged, and −1 while the animal
+  is on her. `qa/ten-t1f-missed.js` walked off with a real S key at s 21. The line came once, the
+  paper read "next in 165 s", and t + nextIn drifted 2.4 s over 113 s of climb.
+- **Stretch, `noWireFade`.** The catenaries are now one InstancedMesh with 126 segments, at half
+  section (0.0375 m) in `PALETTE.caliWire`. Each segment takes the crowd's dither through
+  `aLensFade`, from 5 m of the lens down to fully gone at 3.5 m. The pennants and washing stay put.
+  The fade parks at rung 1 and above, and the thin line stays. The flag brings back the old merged
+  cables. On the frozen-camera spawn frame (`qa/ten-t1f-wires-ab.js`, rung 0), 7 segments faded and
+  the top-left bars were gone. On the ride under the first cable, up to 14 faded as the lens passed.
+  Rung-0 GPU cost is owed to the proof slot.
+
 T1 seed (A): `PALETTE.monStone`, `monYachtNavy`, `gorTuffLo/Hi`, `gorPoplarOlive`, `caliWire`.
 
 ## T2 — the story shows itself (hours 2–4)

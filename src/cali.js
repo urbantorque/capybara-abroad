@@ -239,12 +239,34 @@ let caliWires = null;               // [{ s, x0, z0, x1, z1, y, hit, side }]
 // How many cables this ride has been got under cleanly. Scored at the mirador.
 let caliWireClear = 0;
 let caliWireMesh = null;
+// T1f (noWireFade): the cable as a thin instanced line, and the old one kept for the flag
+let caliWireThin = null, caliWireOld = null, caliWireFadeA = null, caliWireMid = null;
+let caliWireFadeN = 0;              // segments with any fade on them last frame
+const caliWIRE_THIN = 0.0375;       // m — half the 0.075 section the review called a bar
+const caliWIRE_FADE_R = 5.0;        // m from the lens a segment starts to go
+const caliWIRE_FADE_W = 1.5;        // ...and gone entirely by 3.5
 let caliBandGroup = null, caliBandDuck = 0, caliBandMembers = null;
 let caliCityLights = null, caliCityMat = null;
 let caliMiradorGlow = null, caliMiradorPool = null;
 let caliRoadMesh = null;
 let caliHornT = 0;
 let caliSweptT = 0;                 // s left of "a cable has just had you"
+// ---- T1f: THE CHIVA HOLDS ON (noChivaHold) --------------------------------
+// Where on the roof the passenger is, in her frame, as of the end of the last
+// frame; and whether that number is worth holding it to. See caliHoldRoof.
+let caliHoldLx = 0, caliHoldLz = 0, caliHoldHave = false;
+let caliHoldT = 0;                  // s since the roof test last said yes, counting down from caliHOLD_MEM
+let caliHoldN = 0;                  // frames held this ride — the harness reads it
+const caliHOLD_MEM = 0.3;           // s of "was on the roof" a flicker in the roof test may not cost
+const caliHOLD_PAD = 0.4;           // m past the roof's own footprint that still counts as on it
+const caliHOLD_KEY = 0.15;          // stick magnitude under which no move key is held
+// ...and the ride you fell off. Said once a ride, and only if nothing threw you.
+let caliRideOn = false, caliOffT = 0, caliMissSaid = false, caliMissN = 0;
+let caliHitSeen = 0, caliHitT = 0;  // the cable count last frame, and s since one last had you
+const caliMISS_OFF = 1.0;           // s off the roof, not a hop, before she has gone without you
+const caliMISS_HIT = 2.5;           // s after a cable during which a fall is the cable's, not yours
+let caliUpLeft = null;              // s from each caliUP_DS of route to the top, at her own pace
+const caliUP_DS = 2;
 const caliMusOut = { x: 0, y: 0, z: 0 };
 const caliChivaOut = { x: 0, y: 0, z: 0, yaw: 0, v: 0 };
 
@@ -2079,6 +2101,8 @@ const caliWIRE_LINES = [
 function caliBuildWires(game, root) {
   caliWires = [];
   const M = caliMerger();
+  const Mold = caliMerger();   // T1f: the cables as they were, drawn only under noWireFade
+  const thin = [];             // ...and as they are: caliPush9 rows, one per catenary segment
   for (let i = 0; i < caliWIRE_AT.length; i++) {
     const s = caliWIRE_AT[i] * caliRouteLen;
     const a = caliRouteAt(s);
@@ -2110,8 +2134,10 @@ function caliBuildWires(game, root) {
         const qy = top - sag * (1 - Math.pow(2 * u - 1, 2));
         const flat = Math.hypot(qx - px, qz - pz);
         const len = Math.hypot(flat, qy - py);
-        M.box((px + qx) * 0.5, (py + qy) * 0.5, (pz + qz) * 0.5, 0.075, 0.075, len,
-              PALETTE.caliCable, -Math.atan2(qy - py, flat), a.yaw + Math.PI / 2, 0);
+        Mold.box((px + qx) * 0.5, (py + qy) * 0.5, (pz + qz) * 0.5, 0.075, 0.075, len,
+                 PALETTE.caliCable, -Math.atan2(qy - py, flat), a.yaw + Math.PI / 2, 0);
+        caliPush9(thin, (px + qx) * 0.5, (py + qy) * 0.5, (pz + qz) * 0.5,
+                  -Math.atan2(qy - py, flat), a.yaw + Math.PI / 2, 0, caliWIRE_THIN, caliWIRE_THIN, len);
         px = qx; pz = qz; py = qy;
       }
     }
@@ -2181,6 +2207,71 @@ function caliBuildWires(game, root) {
   m.frustumCulled = false;
   root.add(m);
   caliWireMesh = m;
+  // ---- T1f: THE LINE ITSELF (noWireFade) ---------------------------------
+  // The review, at the spawn: five or six cables across the upper-left third
+  // of the first frame as heavy bars, thicker than the palm trunks, running
+  // into the lens — caliWIRE_Y + 1.42 is the walking camera's own eye height
+  // for most of the town. Half the section, in dark metal a shade off the
+  // poles (PALETTE.caliWire), and one instance per segment so that each can
+  // take the crowd's own dither (vLensFade, per instance through aLensFade)
+  // as the lens comes within caliWIRE_FADE_R of it. The pennants, the washing
+  // and the shoes are the telegraph and stay in the merged mesh, undimmed.
+  const old = new THREE.Mesh(Mold.build(), caliVC());
+  old.castShadow = true;
+  old.frustumCulled = false;
+  old.visible = false;
+  root.add(old);
+  caliWireOld = old;
+  const im = caliInstance(root, new THREE.BoxGeometry(1, 1, 1), PALETTE.caliWire, thin, true, false);
+  if (im) {
+    const n = thin.length / 9;
+    caliWireFadeA = new THREE.InstancedBufferAttribute(new Float32Array(n), 1);
+    caliWireFadeA.setUsage(THREE.DynamicDrawUsage);
+    im.geometry.setAttribute('aLensFade', caliWireFadeA);
+    caliWireMid = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      caliWireMid[i * 3] = thin[i * 9]; caliWireMid[i * 3 + 1] = thin[i * 9 + 1]; caliWireMid[i * 3 + 2] = thin[i * 9 + 2];
+    }
+    caliWireThin = im;
+  }
+}
+
+/**
+ * THE LINE GOES WHEN THE LENS IS ON IT (T1f, `noWireFade`).
+ *
+ * Per segment, the distance from the rendered eye to the segment's middle: a
+ * segment is two metres at most, so the middle is within a metre of its
+ * nearest point, and the ramp is wider than that. Written only when a value
+ * changes; 126 multiply-adds a frame. Parks at rung 1 and up — every k back
+ * to zero, the thin line drawn whole, and the loop not run. The flag puts the
+ * old cables back and hides these.
+ */
+function caliUpdateWireFade(game) {
+  if (!caliWireThin || !caliWireFadeA) return;
+  const off = !!game.state.noWireFade;
+  if (caliWireThin.visible === off) {
+    caliWireThin.visible = !off;
+    if (caliWireOld) caliWireOld.visible = off;
+  }
+  const cam = game.camera;
+  const park = off || !cam || (game.state.perfRung | 0) >= 1;
+  if (park && caliWireFadeN === 0) return;
+  const arr = caliWireFadeA.array, mid = caliWireMid;
+  const cx = park ? 0 : cam.position.x, cy = park ? 0 : cam.position.y, cz = park ? 0 : cam.position.z;
+  const R2 = caliWIRE_FADE_R * caliWIRE_FADE_R;
+  let dirty = false, lit = 0;
+  for (let i = 0; i < arr.length; i++) {
+    let k = 0;
+    if (!park) {
+      const dx = mid[i * 3] - cx, dy = mid[i * 3 + 1] - cy, dz = mid[i * 3 + 2] - cz;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 < R2) k = clamp((caliWIRE_FADE_R - Math.sqrt(d2)) / caliWIRE_FADE_W, 0, 1);
+    }
+    if (k > 0) lit++;
+    if (arr[i] !== k) { arr[i] = k; dirty = true; }
+  }
+  caliWireFadeN = lit;
+  if (dirty) caliWireFadeA.needsUpdate = true;
 }
 
 /**
@@ -2529,6 +2620,147 @@ function caliRoofCheck(game) {
 }
 
 /**
+ * THE CHIVA HOLDS ON (T1f, `noChivaHold`).
+ *
+ * An idle passenger slid off the back of the roof about thirty metres in and
+ * she drove on without it (ROADMAP-TEN review, rung 3). Not friction — the
+ * roof has none to lose; see the ferry contract on caliStepChiva. It is the
+ * CLOCK. From rung 2 main.js clamps the frame at 1/20 s and lets the solver
+ * take two 1/60 substeps of it, and drops the rest: the world is simulated for
+ * a thirtieth of a second while this file drives the bus along the road for a
+ * twentieth. The passenger, carried by the solver, goes two thirds as far as
+ * the floor under it. MEASURED with no hand on anything (qa/ten-t1f-hold-r3.js):
+ * lz −5.1 m at s 28, off the tail at s 49, on the paving at 177. The drift is
+ * linear in s, which is the tell — a friction slide would bunch in the bends.
+ *
+ * So: with no move key held, whatever the solver did this frame, the animal is
+ * put back where it was IN HER FRAME, and its horizontal velocity is her frame
+ * velocity at that point (v + ω × r, the same sum capybara.js does for a deck
+ * that turns). Only a walk or a cable takes it off. A hop with no direction is
+ * held too, which is the one the cables ask for: straight up, and down onto the
+ * same bit of roof. y is the solver's, always — the roof pitches on the grades
+ * and the hop is a height.
+ *
+ * A CORRECTION, NEVER A TELEPORT: at rung 3 the error is v/60 a frame, 12 cm at
+ * her top speed, and anything over two metres is not this and is left alone.
+ */
+function caliHoldRoof(game, dt) {
+  const capy = game.capy;
+  const body = capy && capy.body;
+  if (!body) { caliHoldHave = false; return; }
+  if (caliOnRoof) caliHoldT = caliHOLD_MEM;
+  else if (caliHoldT > 0) caliHoldT -= dt;
+  const c = Math.cos(caliChivaYaw), s = Math.sin(caliChivaYaw);
+  const moving = caliChivaState === 'rolling' || caliChivaState === 'stopped';
+  const inp = game.input;
+  const key = inp ? Math.hypot(inp.x || 0, inp.z || 0) : 0;
+  const dy = body.position.y - (caliChivaY + caliROOF_TOP);
+  if (!game.state.noChivaHold && moving && caliHoldHave && caliHoldT > 0 && caliSweptT <= 0 &&
+      key < caliHOLD_KEY && !capy.carriedBy && dy > -0.6 &&
+      Math.abs(caliHoldLx) < caliCHIVA_W * 0.5 + caliHOLD_PAD &&
+      Math.abs(caliHoldLz) < caliCHIVA_L * 0.5 + caliHOLD_PAD) {
+    const nx = caliChivaX + caliHoldLx * c + caliHoldLz * s;
+    const nz = caliChivaZ - caliHoldLx * s + caliHoldLz * c;
+    const ddx = nx - body.position.x, ddz = nz - body.position.z;
+    if (ddx * ddx + ddz * ddz < 4) {
+      body.position.x = nx; body.position.z = nz;
+      // the history moves with it, or capybara.js reads the shift as a
+      // teleport and rebuilds the interpolation (capyDESYNC2)
+      body.previousPosition.x += ddx; body.previousPosition.z += ddz;
+      body.interpolatedPosition.x += ddx; body.interpolatedPosition.z += ddz;
+      const w = caliChivaV > 0.05 ? caliChivaYawRate : 0;
+      const rx = nx - caliChivaX, rz = nz - caliChivaZ;
+      body.velocity.x = s * caliChivaV + w * rz;
+      body.velocity.z = c * caliChivaV - w * rx;
+      caliHoldN++;
+    }
+  }
+  // ...and where it is now, in her frame, for the next one. Written every
+  // frame, held or not: a walk moves the number, and letting go of the keys
+  // holds it wherever the walk left it.
+  const dx = body.position.x - caliChivaX, dz = body.position.z - caliChivaZ;
+  caliHoldLx = dx * c - dz * s;
+  caliHoldLz = dx * s + dz * c;
+  caliHoldHave = true;
+}
+
+/**
+ * SHE DOES NOT STOP FOR ANYBODY (T1f). The ride you fell off, said once.
+ *
+ * The review: the paper went quietly back to "Ride the party bus roof up… 60 m"
+ * and nothing said she had gone. A second off the roof while she is on the
+ * road — longer than any hop, which tops out under a second — and no cable in
+ * the last caliMISS_HIT, because a cable has its own line and says it first.
+ * The when is on the paper: nextIn, below.
+ */
+function caliMissedHer(game, dt) {
+  if (caliWireHits !== caliHitSeen) { caliHitSeen = caliWireHits; caliHitT = 0; }
+  else caliHitT += dt;
+  const moving = caliChivaState === 'rolling' || caliChivaState === 'stopped';
+  if (!moving) { caliRideOn = false; caliOffT = 0; return; }
+  if (caliOnRoof) { caliRideOn = true; caliOffT = 0; return; }
+  if (!caliRideOn) return;
+  caliOffT += dt;
+  if (caliOffT < caliMISS_OFF) return;
+  caliRideOn = false;
+  if (caliMissSaid || caliHitT < caliMISS_HIT || caliSweptT > 0) return;
+  caliMissSaid = true;
+  caliMissN++;
+  if (typeof game.toast === 'function') game.toast('she does not stop for anybody. she goes round again.');
+}
+
+/**
+ * HOW LONG THE CLIMB TAKES FROM HERE, at her own pace (T1f).
+ *
+ * The drive's own speed law — grade, bend, the last 22 m — read once over the
+ * route at caliUP_DS, summed from the top down. The ramps in and out of the two
+ * stops are not in it; caliBackIn adds a flat three seconds a stop for them.
+ * Built at the first pull-away, inside the step, because caliRouteAt answers
+ * into one shared object and the drive is holding it.
+ */
+function caliUpTable() {
+  if (caliUpLeft || !caliRX || caliRouteLen <= 0) return caliUpLeft;
+  const n = Math.ceil(caliRouteLen / caliUP_DS) + 1;
+  const t = new Float32Array(n);
+  let acc = 0;
+  for (let i = n - 2; i >= 0; i--) {
+    const s0 = i * caliUP_DS;
+    const r = caliRouteAt(Math.min(caliRouteLen, s0 + caliUP_DS * 0.5));
+    let v = lerp(caliCHIVA_V_FLAT, caliCHIVA_V_HILL, clamp(r.grade / 0.10, 0, 1));
+    v *= lerp(1, 0.60, clamp(Math.abs(r.curve) * 26, 0, 1));
+    const left = caliRouteLen - s0;
+    if (left < 22) v = Math.min(v, 1.0 + left * 0.30);
+    acc += Math.max(0, Math.min(caliUP_DS, caliRouteLen - s0)) / Math.max(0.5, v);
+    t[i] = acc;
+  }
+  caliUpLeft = t;
+  return t;
+}
+
+/**
+ * SECONDS UNTIL SHE IS PARKED AT THE KERB AGAIN, or −1 (T1f).
+ *
+ * −1 while she is parked — the window is open, and the wheek's why-line for
+ * this chapter is about the ladder, which a 0 here would silence — and −1
+ * while the animal is on her, because then there is nothing to wait for.
+ * Otherwise the rest of the climb, the stops still to come, the turn-round at
+ * the top and the deadhead back down: an ESTIMATE, on pasto's carroza rule.
+ */
+function caliBackIn() {
+  const down = caliCHIVA_V0 * caliCHIVA_DOWN_K;
+  const st = caliChivaState;
+  if (st === 'returning') return Math.max(0, caliChivaS) / down;
+  if (st === 'parked' || caliOnRoof) return -1;
+  const back = caliRouteLen / down;
+  if (st === 'arrived') return Math.max(0, caliCHIVA_TURN - caliTurnT) + back;
+  const tab = caliUpLeft;
+  if (!tab) return -1;
+  const i = clamp(Math.floor(caliChivaS / caliUP_DS), 0, tab.length - 1);
+  const stops = Math.max(0, caliSTOPS.length - caliStopIdx) * (caliCHIVA_STOP_T + 3);
+  return tab[i] + stops + (st === 'stopped' ? Math.max(0, caliChivaHold) : 0) + caliCHIVA_TURN + back;
+}
+
+/**
  * ONE FRAME OF THE BUS.
  *
  * The whole set piece lives in here: parked, rolling, two stops, and the
@@ -2606,6 +2838,8 @@ function caliStepChiva(game, dt) {
         caliHornT = 1.6;
         caliStopIdx = 0;
         caliWireHits = 0;
+        caliHitSeen = 0; caliHitT = 99; caliMissSaid = false; caliHoldN = 0;   // T1f: a fresh ride
+        caliUpTable();
         if (typeof game.sfx === 'function') { game.sfx('horn', { pitch: 1.15 }); game.sfx('strum'); }
         if (typeof game.toast === 'function') game.toast('hold on to something');
       }
@@ -2751,6 +2985,8 @@ function caliStepChiva(game, dt) {
   b.interpolatedPosition.copy(b.position);
   b.previousQuaternion.copy(b.quaternion);
   b.interpolatedQuaternion.copy(b.quaternion);
+  caliHoldRoof(game, dt);
+  caliMissedHer(game, dt);
 
   // ---- the band -----------------------------------------------------------
   if (caliBandMembers) {
@@ -4723,6 +4959,7 @@ export function createCali(game) {
       // in from another country. Three lines, same rule as the latches below.
       caliLastYaw = 0; caliOffFloorT = 0; caliStepCool = 0; caliFlash = 0;
       caliRoofT = 0; caliOnRoof = false; caliBandDuck = 0; caliWireClear = 0;
+      caliHoldHave = false; caliHoldT = 0; caliRideOn = false; caliOffT = 0;   // T1f
       // SAYING SHE HAS ARRIVED IS NOT THE SAME AS PUTTING HER THERE.
       // This set the state and left `caliChivaS` alone, and caliStepChiva
       // places her from the arclength — so a player who ticked the mirador on
@@ -4762,6 +4999,7 @@ export function createCali(game) {
       caliOrtizIn = false;
       caliCombo = 0;
       caliOnRoof = false; caliRoofT = 0; caliWireClear = 0;
+      caliHoldHave = false; caliHoldT = 0; caliRideOn = false; caliOffT = 0;   // T1f
       caliCaneIn = false; caliCaneT = 0;
       caliCartBack = 0;
       caliDanceCheer = 0;
@@ -4794,7 +5032,10 @@ export function createCali(game) {
                wiresTouched: clear, wiresArmed: armed,
                clearScore: caliWireClear, hits: caliWireHits, lean: +caliBandLean.toFixed(2), duck: +caliBandDuck.toFixed(2),
                night: +caliNightT.toFixed(2), bulbs: caliChivaBulbs ? +caliChivaBulbs.material.color.r.toFixed(2) : null,
-               perfectT: +caliPerfectT.toFixed(2), yaw: +caliChivaYaw.toFixed(3), yawRate: +caliChivaYawRate.toFixed(3) };
+               perfectT: +caliPerfectT.toFixed(2), yaw: +caliChivaYaw.toFixed(3), yawRate: +caliChivaYawRate.toFixed(3),
+               held: caliHoldN, missed: caliMissN, backIn: +caliBackIn().toFixed(1),
+               wireSegs: caliWireFadeA ? caliWireFadeA.count : 0, wireFaded: caliWireFadeN,
+               wireThin: !!(caliWireThin && caliWireThin.visible), wireOld: !!(caliWireOld && caliWireOld.visible) };
     },
     /** For the harness (L5): the hazards, in route order. */
     wireList() {
@@ -4819,6 +5060,14 @@ export function createCali(game) {
       b.previousPosition.copy(b.position); b.interpolatedPosition.copy(b.position);
       if (capy.position) capy.position.set(x, y, z);
       return [+x.toFixed(2), +y.toFixed(2), +z.toFixed(2)];
+    },
+    /**
+     * WHEN SHE IS BACK AT THE KERB (T1f). The paper's `next in` and the
+     * wheek's "not yet" read this — see caliBackIn for why parked is −1.
+     */
+    nextIn(id) {
+      if (id !== 'chiva-mirador') return -1;
+      return caliBackIn();
     },
     built() { return caliBuilt; },
     terrainHeight: caliTerrain,
@@ -4990,6 +5239,7 @@ export function createCali(game) {
       caliStepChiva(game, dt);
       caliUpdateCart(game, dt);
       caliCheckWires(game, dt);
+      caliUpdateWireFade(game);
       caliUpdateKites(dt);
       caliUpdateLoros(game, dt);
       caliUpdateNight();
