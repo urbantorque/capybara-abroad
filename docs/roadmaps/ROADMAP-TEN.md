@@ -647,6 +647,38 @@ T5 seed (A): `PALETTE.bagKhaki`, `gardenWood`, `lanternWarm`, `pastoField1-3`.
 **T6a · A · spill.** Whatever T1-T5 left open, in pass order, bugs first. The cave items, if they
 have not started: `noEchoPing` wall glints and the first-echo toast (cave.js:4100-4137), `noFern`.
 
+### T2f — shipped
+
+Pulled forward from T6a into T2, owner cave.js only.
+
+- **The ping (`noEchoPing`, parked at rung 1 and up).** At the wheek, a fan of 24 rays is marched
+  against the floor law, the drawn side-wall face (cavBuildWalls' own wobble, now `cavWallFace`),
+  the Great Wall and the far end. Each ray leaves 3 marks on the floor and 3 up the face it meets,
+  and up to 12 go on the roof where it is in reach. One instanced draw of 156 octahedra in
+  `PALETTE.caveGlint`, fog off. Each mark lights on the frame the ring reaches it (the ring's
+  smoothstep, inverted), so the reveal travels out with the ring. It pops, then falls away over
+  0.62 s. Rock with daylight over 0.45 is skipped. Proof `qa/ten-t2f-ping-clock.js`, clock driven by
+  hand (dt 1/60) at (32, −14), daylight 0: 73 marks cast, 20 on a face, first lit at 0.5 s, 48 lit
+  at the peak (1.0 s), last lit at 2.2 s, nothing lit after 2.3 s. With the flag or at rung 1, 0 are
+  cast and the mesh is hidden. `qa/ten-t2f-ping-shot.js` has pinned-lens PNGs, live against flagged
+  at the same tick (`-rig-live-09` / `-rig-off-09`, `-wall-*`). `game.cave.ping()` is the harness
+  read.
+- **The first-echo lesson (no flag, a line and a landmark).** `game.cave.mouth` has one reader, the
+  'first-echo' hint arrow (systems.js). It moves from z 46, where daylight is 0.9 and the tick
+  (under 0.25) can never fire, to (2, 28), where daylight is 0. A wheek in daylight before the tick
+  now says, once, "too much daylight here for it to come back. further in." Proof
+  `qa/ten-t2f-ping.js`, fresh profile, real Q keys: two presses at the spawn gave no tick and the
+  line once. One press on the arrow's spot ticked first-echo.
+- **The ferns (`noFern`, parked at rung 1 and up).** The 130 lime cones on the doline floor move
+  to their own merged mesh, which is the flag's picture and the rung-1 fallback. In their place, on
+  the same spots and at the same lean, is one instanced fern: nine fronds (six spreading, three
+  standing), `cavJungleDk` at the heart and `PALETTE.caveFern` at the tips. Instance colour is
+  0.5 to 1.0 by `cavDaylightAt`, so the green is brightest under the hole. There is no shadow and
+  one draw. Proof `qa/ten-t2f-fern.js`, pinned lens from the rim and the glade: 130 ferns drawn and
+  the cones hidden when live, and the reverse flagged and at rung 1. PNGs `-glade-live` /
+  `-glade-off`.
+- Rung-0 GPU cost for both flags is owed to the proof slot.
+
 **T6b · the stranger's hour.** Two fresh profiles with real keys, one per mode, for 30 minutes each:
 premise to the first act turn (story), and the picker to three places (free). Every card, bubble and
 pill is logged through the /shot sink. Check the numbers: first earned reward after the first input;
