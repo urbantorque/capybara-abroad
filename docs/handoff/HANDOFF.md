@@ -1,25 +1,28 @@
 # HANDOFF — state of play, 25 Sep 2026
 
-## ROADMAP-TEN (25 Sep), state after T1
+## ROADMAP-TEN (25 Sep), state after T2
 
 The pass is docs/roadmaps/ROADMAP-TEN.md, worked on branch `ten-pass`
 (master is still the published AAA build, d78cd7e). Eight reviewers scored
 the game; their evidence is ROADMAP-TEN-findings.json. Six waves, one agent
 per file set (the ownership table at the foot of the roadmap).
 
-T1 is merged (`dd592d7`) and pushed: Free Roam has the flat 19-tile picker
-and its own departures board, the story has its atlas and a way back, and
-the Monte Carlo car, the Göreme truck, the Quay ferry, the Pasto condor and
-the Cali chiva no longer break. Three of those five were one bug: from rung
-2 the solver steps less time than the frame, so anything driven by velocity
-or force drifts. Check any other track carrier for it. The CONTRACT entry
-"TEN T1" has the numbers and the misses; npm test 78/0.
+T1 and T2 are merged and pushed (T2 `1131dd0`, npm test 79/0). T2 gave
+the story its beats: ranked cards, one A MEMORY card with a keepsake, ACT
+II once, a grace before the ibis, and held toasts that expire
+(`game.journeyAct()`, `game.graceOn()`, bus `story:act` / `story:memory`).
+The orca ride ticks (3 of 3) and the orcas are round; the aurora is a
+ribbon with a framed tick; Arpoador is solid; the Sahara has a zenith and
+ring beams (`sahara.wowTarget()`); the cave pings, has ferns and crescent
+swifts. The CONTRACT entry "TEN T2" has the numbers and the misses.
 
-Owed from T1: the rung-0 headful A/B for `noWireFade`, `noGorDawn` and the
-`noSummonShot` framing; the travel-door guard on `flierWhistleT` (T3); the
-Quay spray and Monte Carlo's bank share (T6a spill). Instruments for a
-fresh story file set `state.journeyMode = 'free'` before `hud.cross`.
-Next: T2, the story's beats.
+Owed: the rung-0 headful A/B for the ten GPU flags of T2 and for T1's
+`noWireFade`, `noGorDawn` and `noSummonShot`; `noKelvin`; the lantern
+trail. For T3 in systems.js: the calving timer on the orca ride's paper
+subline, the hint arrow preferring `wowTarget()`, `atRio` to posto6 if the
+door moves, the `flierWhistleT` travel-door guard. Instruments for a fresh
+story file set `state.journeyMode = 'free'` before `hud.cross`. Next: T3,
+Free Roam's own game and the ibis's arc.
 
 ## Homecoming published for playtest (23 Sep, newest)
 

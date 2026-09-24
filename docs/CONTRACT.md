@@ -1,3 +1,102 @@
+## TEN T2 — THE STORY SHOWS ITSELF (25 Sep 2026)
+
+Six builders on six disjoint files, merged into `ten-pass` with no
+conflicts (`3e9b930`..`1131dd0`). The roadmap was the only shared file;
+the T2f block, which had landed inside T6, was moved beside T2e. The item
+blocks with every number are the "### T2x — shipped" sections of
+docs/roadmaps/ROADMAP-TEN.md.
+
+**The story's beats (T2a, systems.js).** Cards have four ranks (incidental,
+system, story, memory). A rank-0 card under a higher one is dropped, the
+rest wait, and a card holds for 0.9 + 0.045 s a character, clamped 2.6-6 s
+(`noMomentPriority`). A memory is one A MEMORY card and a keepsake dropped
+0.9 m from the animal (`noMemBeat`); the paper footer, the atlas tiles and
+the page-two stat count memories. ACT II fires once after the Quay memory
+and not again on reload (`noActTurn`). Until the first memory (story) or
+first repertoire name (free) the ibis stays off and the heat ladder stops
+at AN INCIDENT; THE FIRST LOOK pays on the chapter's first wheek
+(`noFirstGrace`). A held toast is dropped after 12 s or on leaving, and
+waits while a marquee or framed shot is live (`noHeldWow`). The atlas no
+longer scrolls (731 -> 720 px in a 720 window). ten-t2a-story 22/22 twice;
+ten-t2a-static (26 checks) is registered. New for T3: `game.journeyAct()`,
+`game.graceOn()`, bus `story:act` and `story:memory`.
+
+**Antarctica (T2b).** The pod patrols the lead, not an ellipse through the
+pack (pack under the loop peaks 0.086, was 0.72); the run gate eases in
+pack; a pod whose run starts in pack waits 8 m up the lead and stops both
+clocks until the boat is within 13 m (`noPodLead`, no GPU; the wait was not
+in the roadmap). Orca ride under real keys at rung 3: 3 of 3, 43-52 s wall;
+flagged, no tick in 150 s. The orcas are three smooth lobes with a raised
+eye patch and an `antOrcaBelly` crescent (`noOrcaRound`, parks at rung 2,
+2016 triangles a body against 248, same draw calls), and six blow sparks
+at each surfacing (parks at rung 1).
+
+**Iceland (T2c).** One additive ribbon per curtain, brightest at the hem
+in `iceAuroraHem`, gone at the top: the centre column falls from 134
+levels with no step, where the bands dropped 66.7 in one step at their top
+edge; 6 draws where the bands drew 12 (`noAuroraRamp`, 2-row copy at rung
+2). The aurora tick frames the nearest curtain: lens up 0.8° (was down
+12°), animal in the bottom third (`noAuroraFrame`). The steam shrinks out,
+is culled within 4 m of the eye and bursts on the far rim: 9.9-10.0 % of
+the tick frame against 10.3-15.7 % (`noSteamSoft`, parks lighter at rung 1).
+
+**Rio (T2d).** The 22 Arpoador stones are seeded, share one static body of
+convex colliders in the drawn shape, and keep the way up open: 0 of 176
+walk-through rays, was 176 of 176; the shove test never put the animal
+inside a waist. `inZone('posto6')` exists; nothing reads it yet. The
+frontage's seaward faces take a baked `rioBounce`, one window in six lit:
++16.3 to +18.3 % sRGB in the mask at three lenses (`noRioBounce`, no GPU,
+does not park).
+
+**The Sahara (T2e).** A zenith cap in `sahZenith` with a clear hole round
+the sun, fading with storm and dusk: sky-to-sand RGB distance 51 -> 90
+(`noSahZenith`, parks at rung 1). A `sahFire` beam over each ring, one draw,
+pulsing on the next ring in a run (`noSahRingBeam`, parks at rung 1).
+`game.sahara.wowTarget()` gives the next ring, then the minaret, while the
+pack is on. The square's joints at a third of the colour: rendered contrast
+0.426 -> 0.194 (`noSahStallSmoke`, the roadmap's name; one draw, no
+per-frame cost).
+
+**The cave (T2f, pulled forward from T6a).** A wheek glints the rock the
+ring reaches, one instanced draw of up to 156 in `caveGlint`: 73 cast, 48
+lit at the peak, none after 2.3 s (`noEchoPing`). The first-echo arrow
+points at the first dark spot (2, 28) instead of daylight at z 46 where the
+task could never tick, and a daylight wheek says so once: one press on the
+spot ticked it. The 130 doline cones are instanced ferns lit by the hole
+(`noFern`); the swifts that read as bars are crescents flickering in two
+poses, 3.8 of 16 mid-flick a frame (`noSwiftShape`). All three park at
+rung 1.
+
+npm test: 79 checks, 0 failed (T2a registers ten-t2a-static). node --check
+on every changed file; build 7194.8 KB, no collisions.
+
+**Honest misses.**
+- No rung-0 headful GPU cost yet for `noOrcaRound`, `noAuroraRamp`,
+  `noAuroraFrame`, `noSteamSoft`, `noSahZenith`, `noSahRingBeam`,
+  `noSahStallSmoke`, `noEchoPing`, `noFern`, `noSwiftShape`, nor the headful
+  composite for `noRioBounce`; the proof slot owes them.
+- `noKelvin` (the V wake) did not fit; the ring wake stands. T2b's helm
+  harness steers up the lead during escort, not at the pod.
+- The aurora frame uses pitch −3°, raise 2.5, not the review's −14° / 0.8
+  (the 1.7 m lens floor clamped it). Steam under 10 % is only just met
+  (8.6-10.4 % across runs); the burst ring now shows more than before. Two
+  NPC bubbles still land on the aurora frame. The lantern trail was not
+  built.
+- The zenith band is full from about 20°, not over the top 35 % (the
+  resting lens reaches sin 0.28). Joints −55 %, not −70 %.
+- Rio: no live-camera frame of the frontage; 3 of 87 nav samples on the
+  way up block on a sunk stone's nav box; no real-key walk up the rock.
+- Cave: the thicker ring and the lamp-glow cap were not done; the cones
+  outside the mouth are still cones.
+- T2a: the concert was ticked through `completeTask`, not played with
+  keys. The paper heading still shows the part, the journal still says
+  NOTICED in chapter one, a reload before the first wheek loses THE FIRST
+  LOOK (no save field was named), and web-design-guidelines was not run.
+- Left for T3 (systems.js): the orca ride's paper subline shows the
+  calving timer; the hint arrow should prefer `sahara.wowTarget()`;
+  `atRio` and the CHAPTERS way line point at posto6 if the door moves off
+  the rock; the `flierWhistleT` travel-door guard from T1.
+
 ## TEN T1 — THE SPLIT, AND THE BROKEN MARQUEES (25 Sep 2026)
 
 Six builders on six disjoint files, merged into `ten-pass` with no
