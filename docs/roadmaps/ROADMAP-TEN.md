@@ -784,6 +784,57 @@ a third as wide, in `kyoGravelShade`, with a highlight strip (747). Proof: pinne
 20 and 35 gives a lawn-green share between the posts under 10%, and a PNG down the Gion lane shows
 the ridge line.
 
+### T3d — shipped
+
+Owner kyoto.js only. Audit first: kyoto.js never imported far.js, the sugi placer still cut its
+corridor at `kyoTORII_CAM_R + 2.4` (7.0 m, not the finding's 8.6), and the rake lines were 0.30 m of
+`granite` every 0.9 m. None of it had shipped.
+
+- **The bowl (`noKyoFar`; `noFar` still cuts it too).** `kyoBuildFar`, called from `kyoBuild` (the
+  builder createKyoto registers): seven rounded ridges, 24-40 m high with a nine-point cosine
+  crest and no peaks. Arashiyama is west, Kitayama north, Higashiyama east, and the Uji hills south.
+  The south-east (x > 60, z > 115) is left open where the river leaves. There is also one Yasaka
+  pagoda, 38.5 m, on the Gion lane's axis at (194, 52), in front of the east ridge. **Not at
+  300-420 m.** Kyoto's fog is 46-330 (`sysKYO_FOG`, never re-based), so a wedge at 300 m from the lane
+  is 90% fog. The ridges stand 200-260 m from play instead. **Fog off:** the fog colour
+  (kyotoHaze) is lighter than the composited dome. Measured through `game.post` on the west lens
+  (`qa/ten-t3d-far-tone.js`), a fogged ridge read luminance 0.60 under a 0.54 sky, which looks like
+  snow. Unfogged it read 0.45 under 0.52, a hill in haze, and the composite's air still applies.
+  The pagoda is merged into the ridge mesh by vertex colour, so it is **one draw**, 440 triangles
+  (216 of them the pagoda). The static silhouette stays at every rung, as far.js keeps every
+  chapter's. Proof `qa/ten-t3d-far.js`, rung 0, pinned lenses through the composite, live against
+  cut. The layer changes 3.2% of the frame down the Gion lane, 15.9% west, 7.1% north-east and 2.1%
+  south. From the Uji bridge looking downstream, the changed pixels (2.4%) are all the south ridge
+  at frame-left, and the river's way out is open. The arrival resting lens now ends the lane on the
+  pagoda and a ridge line (PNGs `-gion-live` / `-cut`, `-rest-live`).
+- **The torii wood (`noToriiWood`; the rows and understory park at rung 1 and up).**
+  `kyoBuildToriiWood` works from gate 0. It plants a first row of cedars at CAM_R + 1.2 (5.8 m,
+  about one between every pair of posts), a second row at 8.5-11 m, and 190-205 low dark mounds
+  in `kyoUnder` at 3-6 m from the centreline (height 0.55 m by the legs up to 1.25 m). Three
+  instanced cedar draws and one mound draw, no shadow. Across loads that is 50-54 trees, because
+  `rand` is unseeded here like the rest of the chapter. The ground inside 13 m of the path takes a
+  second colour buffer toward sugiFloor, then kyoUnder, swapped the machiya way. That swap follows
+  the flag only, at zero cost. The rows' trunks are solid (kyoTrunkSolid's box). They leave the
+  world when the rows hide, and `onEnter` re-settles them because `biome.attach` re-adds every body
+  filed under Kyoto. The main sugi placer is untouched. Proof `qa/ten-t3d-torii.js`, lens 6 m back
+  and 2.6 m up the path, rung 0. Lawn share between gate k+2's posts at gate 5: 13.7% cut, 0.0%
+  live; whole frame 9.7% to 0.3%. Gates 20 and 35 were already under 0.5% cut (the flank's litter
+  tint) and stay there. `qa/ten-t3d-return.js`: 54 of 54 trunks in the world live, 0 away, 54 after
+  a return, 0 and hidden when flagged across a return, 54 when unflagged.
+- **The gravel (no flag; a width and a seeded shade).** The rake lines are 0.10 m in
+  `kyoGravelShade`. The paw prints stay granite, so the mischief now reads harder than the bed.
+  `qa/ten-t3d-zen.js` reads a bare strip seen through the gap: the stripe share (under 92% of the
+  median) went from 47.2% to 27.5%, and the bed's median luminance from 0.594 to 0.785. By eye it
+  is furrows, not a zebra crossing (`ten-t3d-zen-before.png` / `ten-t3d-zen.png`). The highlight
+  strip was not built (Not doing).
+- **Exports for other waves.** `game.kyoto.toriiPath()`, `toriiWood()` and `farAudit()` are
+  harness reads. No bus events. No save field.
+- **Misses.** There is no far mover (the brief did not ask for one). Rung-0 GPU cost for
+  `noKyoFar` and `noToriiWood` is owed to the proof slot. The tunnel lawn number is taken on a plain
+  pinned lens, not the live run rig. `qa/reimagine-chute-contour.mjs` counts `new THREE.Mesh(` across
+  the whole of kyoto.js against f3252dd, and that is why the pagoda went into the ridge draw: a
+  second mesh failed it.
+
 **T3e · hanoi.js · the lake is a place to sit** (`noHanWillow`). 28-36 instanced willows round
 hanLAKE, wind-sway hooked; 6-10 lotus clusters and one paddle boat on a mover loop. Hanoi's world
 pass is already 13 ms, so the willows are instanced, with no grain() material. Spawn stays; the
