@@ -1153,6 +1153,52 @@ go down" through the manta row's clue hook when dh < −3 (2359, 5279).
 segments, lit tops at 0.12 driCloudLit, 12 low wisps; at rung 1 or above keep the normals and drop
 the wisps (1154-1257). Proof: a landing PNG with no facet edges visible at 1280.
 
+### T4f — shipped
+
+One flag, `noCloudSoft` (falsy = live), all in `src/drift.js`. The audit found the finding current:
+the lobes were `driG.sph6` (6x4) through `driMerger`/`driVC()`, flat Lambert.
+
+- **Lobes.** The same 228 lobes in the same places are now built twice in one loop, so the second
+  build draws no extra `rand()`. The second copy is `driG.sph10` (10x6) through `driSoftMerger()`
+  (`normals: 'keep'`, so the ellipsoid normal goes through the normal matrix and there is no seam),
+  on `driSoftVC()`, which is driVC's grain on `flatShading: false`. The top lobe of each mass is its
+  own mesh with `driCloudLit` emissive at 0.12. The flat mesh is kept for the flag's other arm, and
+  one of the two is drawn. Cost: +1 draw call, and 22.8k triangles where the flat lobes had 8.2k.
+- **12 low wisps** (`driLOW_N`) sit at y 2–6, held within 40 m of the animal. They ride the wind at
+  0.5–0.9 of its speed, with a 0.35 m/s floor, and respawn upwind at the rim, growing in and
+  shrinking out over the last 8 m. They draw BackSide through `driVapour()`: alpha is multiplied
+  by the facing term squared, so they have no rim and the lens can pass through one. +1 draw call,
+  and they are parked at rung ≥ 1. The lobes stay soft at every rung.
+- **Beyond the item, found in the landing PNG.** Two more things drew the paving. The 46 cumulus
+  banks (`driBuildBanks`, sph6, flat) fill the landing lens. They get the same twin built at 10x6,
+  and `driSyncSoft` swaps the one mesh's geometry and material, so no draw call is added (29.7k
+  triangles where the flat banks had 10.7k). The bloom (26 `sph6` puffs at 0.7 opacity) was the
+  row of hexagons around the animal after every fall. It now swaps to sph10 on a driVapour
+  material at 0.85.
+- `driSyncSoft(game)` makes the visibility and swap writes only on the frame the answer changes.
+  `game.drift.cloudSoft()` reports the state for instruments.
+
+Proof. `qa/ten-t4f-cloud.js` covers a fresh free file, pf 'pretty' (rung 0), and a real clock,
+drops the animal into open cloud from 14 m, and then pins the body and yaw for an A/B on the same
+frame. With the flag live, the soft lobes and banks are drawn and the low wisps are on. With it
+set, the flat meshes are back and the wisps are gone (live toggle both ways). At rung 1 the
+wisps are off and the lobes and banks stay soft. The edge energy over the lower 45% of the pinned
+frame, outside the animal, is mean |dL| 1.02 live against 1.20 flagged, and pixels with
+|dL| > 8 are 1.08% against 1.67%. That is a 35% cut in hard edges on a frame that is mostly
+grain. In a second run the body was pinned in the cloud at y −0.56, with the bloom up and the
+lens at y 2.7. There, hard pixels were 0.06% live against 0.14% flagged. The flagged PNG is the
+hexagon-plate bloom and the live one is a soft column. The metric is noisy, because the arrival
+card was still up in that run under heavy load, so the PNGs read by eye are the proof. `qa/ten-t4f-landdiag.js` shoots the landing at +0.45 s and +1.9 s in both arms. Read by
+eye: flagged, the landing shows hexagon plates (the bloom) and ridged banks. Live, it shows
+rounded masses and a soft puff column, with no facet edges on the cloud. lastError was null in
+every run. The GPU cost is left to the proof slot's rung-0 A/B.
+
+Misses and notes. The silhouette of a 54 m lobe is still a ten-sided outline at grazing angles,
+which is what the spec asks for. The concentric hexagonal ripple rings round the swimming
+animal are the shared swim ring, not drift.js, and are out of this item's files. Six glowing rings
+sat at the same screen places in two landings on the first task tick. A scene projection found
+no mesh behind them, only the `.capyui-moment*` overlay, so they are HUD and not the cloud.
+
 T4 seed (A): `PALETTE.palDeepClear`, `finPlinth` (if stone reads cold).
 
 ## T5 — home, the first frame, the far places (hours 8–10)

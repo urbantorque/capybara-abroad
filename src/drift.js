@@ -251,6 +251,12 @@ const driFlyData = new Float32Array(driFLY_N * 11);
 //              8 slot (its place in the tail), 9 bob rate, 10 the time it woke
 let driWispMesh = null;
 const driWispData = new Float32Array(driWISP_N * 5);   // x,y,z,scale,rate
+// T4f (noCloudSoft): the flat lobes as they were, the soft ones over them,
+// the soft tops on their own, and the low wisps that pass the lens.
+let driLobeFlat = null, driLobeSoft = null, driLobeTop = null;
+let driLowMesh = null, driSoftWas = -1;
+const driLOW_N = 12;
+const driLowData = new Float32Array(driLOW_N * 5);     // x,y,z,scale,rate
 
 let driLanternGroup = null, driLanternPaper = null, driLanternMat = null;
 let driLanternHalo = null, driLanternPool = null;
@@ -286,7 +292,7 @@ let driInCloud = 0;                  // s continuously in the cloud
 let driWhoopT = -1, driWhoopX = 0, driWhoopZ = 0, driWhoopSaid = false;
 const driWHOOP_LIFE = 4.2;
 let driBloomOn = false, driBloomT = 0, driBloomX = 0, driBloomZ = 0;
-let driBloomMesh = null;
+let driBloomMesh = null, driBloomPair = null;   // T4f: [flat material, soft material]
 const driBloomData = new Float32Array(driBLOOM_N * 4);   // ang, radius, yOff, scale
 let driRideT = 0, driRideId = '';
 let driColPeak = 0, driColIdx = -1, driColFoot = 0;
@@ -317,7 +323,7 @@ function driXform(px, py, pz, rx, ry, rz, sx, sy, sz) {
   return driM;
 }
 
-const driG = { box: null, cyl16: null, cyl6: null, cyl8: null, cyl4: null, cone6: null, cone4: null, sph6: null, tet: null, oct: null, quad: null };
+const driG = { box: null, cyl16: null, cyl6: null, cyl8: null, cyl4: null, cone6: null, cone4: null, sph6: null, sph10: null, tet: null, oct: null, quad: null };
 function driInitGeos() {
   if (driG.box) return;
   driG.box = new THREE.BoxGeometry(1, 1, 1);
@@ -331,6 +337,9 @@ function driInitGeos() {
   driG.cone6 = new THREE.ConeGeometry(0.5, 1, 6);
   driG.cone4 = new THREE.ConeGeometry(0.5, 1, 4);
   driG.sph6 = new THREE.SphereGeometry(0.5, 6, 4);
+  // T4f: the cloud's lobes and the low wisps (noCloudSoft). Ten by six, and
+  // drawn smooth: a squashed six-by-four is a hexagon lying on the floor.
+  driG.sph10 = new THREE.SphereGeometry(0.5, 10, 6);
   driG.tet = new THREE.TetrahedronGeometry(0.5);
   driG.oct = new THREE.OctahedronGeometry(0.5);
   // A FLAT QUAD LYING IN XZ. Ground detail seen from above and below and never
@@ -390,6 +399,32 @@ function driRoundOn(m, twin) {
 function driVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
                { scale: 0.3, amount: 0.07, warp: 0.5, near: 0.30, nearScale: 9, contact: 1, broad: 0.08, broadM: 15 });
+}
+// T4f (noCloudSoft): driVC's grain on a material that is not flat, for the
+// cloud and nothing else, with an optional glow for the tops; and the merger
+// that feeds it, whose spheres are ten by six and keep their own normals (the
+// ellipsoid's, through the normal matrix) so a lobe has no seam.
+function driSoftVC(glow) {
+  const o = { vertexColors: true, flatShading: false };
+  if (glow) { o.emissive = PALETTE.driCloudLit; o.emissiveIntensity = glow; }
+  return grain(mat(0xffffff, o),
+               { scale: 0.3, amount: 0.07, warp: 0.5, near: 0.30, nearScale: 9, contact: 1, broad: 0.08, broadM: 15 });
+}
+function driSoftMerger() {
+  return makeMerger(driG, { xform: driXform, sphSegs: [10], normals: 'keep', jitter: 0.040 });
+}
+// And a transparent puff with no edge: alpha times the square of the facing
+// term, so it is densest looking through its middle and nothing at its rim.
+// On a private material (the hook does not survive a clone or a cache), one
+// program for every caller.
+function driVapour(m) {
+  m.onBeforeCompile = function (sh) {
+    sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>',
+      'float driFace = abs(dot(normalize(normal), normalize(vViewPosition)));\n' +
+      'diffuseColor.a *= driFace * driFace;\n#include <opaque_fragment>');
+  };
+  m.customProgramCacheKey = function () { return 'driVapour'; };
+  return m;
 }
 function driPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function driInstance(root, geo, material, list, cast, recv) {
@@ -1201,7 +1236,21 @@ function driBuildCloud(root) {
   // that the eye stops resolving individuals, or every one of them is an
   // object), and each mass built of three offset lobes so it has no silhouette
   // of its own. 76 masses, 228 lobes, and no stones.
+  //
+  // ---- T4f: AND STILL PAVING (noCloudSoft) -------------------------------
+  // A reviewer landing in it: "a field of flat-shaded lavender hexagons with
+  // dark facet edges, like cobbles". A six-by-four sphere squashed to a fifth
+  // of its width is a hexagon, and flat Lambert draws every one of its facets
+  // as its own value. A cloud is a volume, which is the one thing the law lets
+  // be smooth: the same 228 lobes in the same places, drawn a second time at
+  // ten by six with their own ellipsoid normals kept (not recomputed, so there
+  // is no seam), and the top lobe of every mass in a mesh of its own with
+  // driCloudLit at 0.12 in it, so a top is lighter than the sheet even where
+  // the moon is behind it. The flat mesh stays built for the flag's other arm;
+  // one of the two is drawn. +1 draw call, and 22.8k triangles where the flat
+  // set drew 8.2k.
   const L = driMerger();
+  const S = driSoftMerger(), T = driSoftMerger();
   for (let i = 0; i < 76; i++) {
     const a = rand(0, 6.283), rr = Math.sqrt(rand(0.02, 1)) * 250;
     const x = Math.cos(a) * rr, z = Math.sin(a) * rr - 60;
@@ -1209,9 +1258,10 @@ function driBuildCloud(root) {
     const pale = i % 4 ? PALETTE.driCloudLit : PALETTE.driCloud;
     for (let k = 0; k < 3; k++) {
       const ka = a * 1.7 + k * 2.1;
-      L.sph(x + Math.cos(ka) * s * 0.34, driCLOUD_Y + 0.3 + k * 0.55,
-            z + Math.sin(ka) * s * 0.30,
-            s * (0.62 - k * 0.13), s * (0.11 - k * 0.02), s * (0.50 - k * 0.10), pale);
+      const lx = x + Math.cos(ka) * s * 0.34, ly = driCLOUD_Y + 0.3 + k * 0.55, lz = z + Math.sin(ka) * s * 0.30;
+      const ex = s * (0.62 - k * 0.13), ey = s * (0.11 - k * 0.02), ez = s * (0.50 - k * 0.10);
+      L.sph(lx, ly, lz, ex, ey, ez, pale);
+      (k === 2 ? T : S).sph(lx, ly, lz, ex, ey, ez, pale, 10);
     }
   }
   const lm = new THREE.Mesh(L.build(), driVC());
@@ -1220,6 +1270,19 @@ function driBuildCloud(root) {
   lm.userData.noShadow = true;
   lm.frustumCulled = false;
   root.add(lm);
+  driLobeFlat = lm;
+  const sm = new THREE.Mesh(S.build(), driSoftVC());
+  const tm = new THREE.Mesh(T.build(), driSoftVC(0.12));
+  for (const m of [sm, tm]) {
+    m.receiveShadow = true;
+    m.castShadow = false;
+    m.userData.noShadow = true;
+    m.frustumCulled = false;
+    m.visible = false;              // driSyncSoft decides, on the first frame
+    root.add(m);
+  }
+  driLobeSoft = sm;
+  driLobeTop = tm;
 }
 
 /**
@@ -1244,6 +1307,33 @@ function driBuildWisps(root) {
   im.renderOrder = 1;
   driWispMesh = im;
   root.add(im);
+
+  // ---- T4f: AND TWELVE LOW ONES (noCloudSoft, parked at rung 1) ----------
+  // Every wisp above is at six metres or more and seventy-eight or more from
+  // the route, so a landing in the cloud had nothing between the lens and the
+  // sheet: the frame the chapter promises as "a soft landing" was a flat
+  // purple floor. Twelve smaller sheets two to six metres over the sea, kept
+  // within forty metres of the animal and riding the wind at half its speed
+  // or more, so something is always going past. Drawn from the inside
+  // (BackSide), so the lens entering one is a veil and not a pop; grown in
+  // and shrunk out over the last eight metres of the ring. Seeded on the
+  // first frame they are drawn, around wherever the animal is.
+  //
+  // First cut was a plain transparent ellipsoid, and at four metres from the
+  // lens it is a pane of frosted glass with a ten-sided outline. Vapour has
+  // no edge: the alpha goes as the square of the facing term, so a sheet is
+  // densest where the eye looks through its thickness and nothing at its
+  // rim. Private and uncached — it carries its own hook.
+  const lm = driVapour(new THREE.MeshLambertMaterial({ color: PALETTE.driCloudLit, transparent: true, opacity: 0.34,
+                                                       depthWrite: false, side: THREE.BackSide }));
+  const lw = new THREE.InstancedMesh(driG.sph10, lm, driLOW_N);
+  lw.frustumCulled = false;
+  lw.renderOrder = 1;
+  lw.visible = false;
+  lw.castShadow = false;
+  lw.userData.noShadow = true;
+  driLowMesh = lw;
+  root.add(lw);
 }
 
 /**
@@ -1270,6 +1360,12 @@ function driBuildBloom(root) {
   im.visible = false;
   driBloomMesh = im;
   root.add(im);
+  // T4f (noCloudSoft): and the bloom is the first thing in the landing frame,
+  // two dozen pale hexagons round the animal at the moment the chapter calls
+  // soft. The same puffs at ten by six with no rim (driVapour); a little more
+  // opacity, because the rim no longer carries any. driSyncSoft swaps them.
+  driBloomPair = [m, driVapour(new THREE.MeshLambertMaterial({ color: 0x000000, emissive: PALETTE.driCloudLit,
+    emissiveIntensity: 0.55, transparent: true, opacity: 0.85, depthWrite: false }))];
 }
 
 function driSyncBloom(game) {
@@ -2210,9 +2306,11 @@ function driBuildFlora(game, root) {
  */
 const driBANK_N = 46;
 let driBankMesh = null, driBankMat = null;
+let driBankGeo = null, driBankSoft = null;      // T4f: [flat, soft], the soft material
 
 function driBuildBanks(root) {
   const M = driMerger();
+  const S = driSoftMerger();          // T4f: the same banks, soft (noCloudSoft)
   for (let i = 0; i < driBANK_N; i++) {
     // A ring, thickening outward, with the middle sixty metres left empty: the
     // route runs up the spine of the map and a cumulus standing in it would be
@@ -2238,10 +2336,11 @@ function driBuildBanks(root) {
       const u = k / n;
       const ka = a * 1.7 + k * 2.2;
       const sc = 1 - u * 0.55;
-      M.sph(bx + Math.cos(ka) * w * 0.34, driCLOUD_Y + 0.4 + u * h,
-            bz + Math.sin(ka) * w * 0.30,
-            w * 0.46 * sc, h * 0.42 * sc + 1.6, w * 0.42 * sc,
-            k === 0 ? PALETTE.driCloudDeep : (k % 2 ? PALETTE.driCloud : PALETTE.driCloudLit));
+      const px = bx + Math.cos(ka) * w * 0.34, py = driCLOUD_Y + 0.4 + u * h, pz = bz + Math.sin(ka) * w * 0.30;
+      const ex = w * 0.46 * sc, ey = h * 0.42 * sc + 1.6, ez = w * 0.42 * sc;
+      const cc = k === 0 ? PALETTE.driCloudDeep : (k % 2 ? PALETTE.driCloud : PALETTE.driCloudLit);
+      M.sph(px, py, pz, ex, ey, ez, cc);
+      S.sph(px, py, pz, ex, ey, ez, cc, 10);
     }
   }
   // ---- AND A CLOUD IS NOT A WINDOW ---------------------------------------
@@ -2258,8 +2357,17 @@ function driBuildBanks(root) {
   // and opaque it sorts itself for free, it reads as folded paper the way
   // everything else in this game does, and falling INTO one is then a thing
   // that happens rather than a thing you can see through.
+  //
+  // ---- T4f: AND FOLDED PAPER, AT THE LENS, IS A ROCK ---------------------
+  // Folded paper reads from the Crown. From the cloud, where every fall ends,
+  // the lens sits a few metres off a bank's flank and the paper is a cliff of
+  // hard plates: the landing PNG was more bank than sheet. Under noCloudSoft
+  // the one mesh swaps geometry and material (driSyncSoft) for the same banks
+  // at ten by six, smooth. Still opaque, still sorted for free; no draw call.
   driBankMat = driVC();
-  const m = new THREE.Mesh(M.build(), driBankMat);
+  driBankGeo = [M.build(), S.build()];
+  driBankSoft = driSoftVC();
+  const m = new THREE.Mesh(driBankGeo[0], driBankMat);   // driSyncSoft picks, on the first frame
   m.name = 'dri:banks';
   m.castShadow = false;
   m.receiveShadow = false;
@@ -5506,6 +5614,70 @@ function driUpdateWisps(dt) {
   driWispMesh.instanceMatrix.needsUpdate = true;
 }
 
+/**
+ * T4f — WHICH CLOUD IS DRAWN (noCloudSoft). Three visibility writes, and only
+ * on the frame the answer changes. The soft lobes are the lobes, so they stay
+ * at every rung; the low wisps are the part that costs fill, and they park at
+ * rung 1. Returns whether the low wisps are live.
+ */
+function driSyncSoft(game) {
+  const st = game && game.state;
+  const soft = !(st && st.noCloudSoft);
+  const low = soft && !(st && (st.perfRung | 0) >= 1);
+  const k = (soft ? 1 : 0) + (low ? 2 : 0);
+  if (k !== driSoftWas) {
+    driSoftWas = k;
+    if (driLobeFlat) driLobeFlat.visible = !soft;
+    if (driLobeSoft) driLobeSoft.visible = soft;
+    if (driLobeTop) driLobeTop.visible = soft;
+    if (driLowMesh) driLowMesh.visible = low;
+    if (driBankMesh && driBankGeo) {
+      driBankMesh.geometry = driBankGeo[soft ? 1 : 0];
+      driBankMesh.material = soft ? driBankSoft : driBankMat;
+    }
+    if (driBloomMesh && driBloomPair) {
+      driBloomMesh.geometry = soft ? driG.sph10 : driG.sph6;
+      driBloomMesh.material = driBloomPair[soft ? 1 : 0];
+    }
+  }
+  return low;
+}
+const driLOW_R = 40;                // m: the ring the low wisps are kept in
+function driLowSeed(o, cx, cz, rim) {
+  // the rim one comes in from upwind, so it crosses the ring rather than
+  // leaving it again on the next frame
+  const a = rim ? driWindAng + Math.PI + rand(-1.2, 1.2) : rand(0, 6.283);
+  const r = rim ? driLOW_R - 0.5 : Math.sqrt(rand(0.04, 1)) * (driLOW_R - 6);
+  driLowData[o] = cx + Math.cos(a) * r;
+  driLowData[o + 1] = rand(2, 6);
+  driLowData[o + 2] = cz + Math.sin(a) * r;
+  driLowData[o + 3] = rand(6, 15);
+  driLowData[o + 4] = rand(0.5, 0.9);
+}
+function driUpdateLow(game, dt) {
+  if (!driSyncSoft(game) || !driLowMesh) return;
+  const p = game.capy && game.capy.position;
+  if (!p) return;
+  // the air moves them; a floor of 0.35 m/s on the wind's own bearing, so the
+  // lull between two breaths is slow and never still
+  const fx = Math.cos(driWindAng) * 0.35, fz = Math.sin(driWindAng) * 0.35;
+  for (let i = 0; i < driLOW_N; i++) {
+    const o = i * 5;
+    if (driLowData[o + 3] === 0) driLowSeed(o, p.x, p.z, false);
+    const rt = driLowData[o + 4];
+    driLowData[o] += (driWindX * rt + fx) * dt;
+    driLowData[o + 2] += (driWindZ * rt + fz) * dt;
+    let dx = driLowData[o] - p.x, dz = driLowData[o + 2] - p.z;
+    let d = Math.sqrt(dx * dx + dz * dz);
+    if (d > driLOW_R) { driLowSeed(o, p.x, p.z, true); dx = driLowData[o] - p.x; dz = driLowData[o + 2] - p.z; d = Math.sqrt(dx * dx + dz * dz); }
+    const e = clamp((driLOW_R - d) / 8, 0, 1);
+    const s = driLowData[o + 3] * e * e * (3 - 2 * e);
+    driLowMesh.setMatrixAt(i, driXform(driLowData[o], driLowData[o + 1], driLowData[o + 2],
+                                       0, i * 0.9 + driTime * 0.012, 0, s, s * 0.18, s * 0.62));
+  }
+  driLowMesh.instanceMatrix.needsUpdate = true;
+}
+
 function driUpdateRibbons(dt) {
   const lvl = 0.12 + driGlow * 0.88;
   for (let i = 0; i < driRibbons.length; i++) {
@@ -5815,6 +5987,17 @@ export function createDrift(game) {
      * nothing outside this file could read them.
      */
     islandKind(x, z) { const s2 = driIslandAt(x, z); return s2 ? ((s2.def || s2).kind || null) : null; },
+    /** T4f, for the instrument: which cloud is drawn and where the low wisps are. */
+    cloudSoft() {
+      const low = [];
+      for (let i = 0; i < driLOW_N; i++) low.push([+driLowData[i * 5].toFixed(1), +driLowData[i * 5 + 1].toFixed(1), +driLowData[i * 5 + 2].toFixed(1)]);
+      return { flat: !!(driLobeFlat && driLobeFlat.visible), soft: !!(driLobeSoft && driLobeSoft.visible),
+               top: !!(driLobeTop && driLobeTop.visible), lowOn: !!(driLowMesh && driLowMesh.visible),
+               tris: driLobeSoft ? (driLobeSoft.geometry.index.count + driLobeTop.geometry.index.count) / 3 : 0,
+               trisFlat: driLobeFlat ? driLobeFlat.geometry.index.count / 3 : 0,
+               bankSoft: !!(driBankMesh && driBankGeo && driBankMesh.geometry === driBankGeo[1]),
+               bankTris: driBankGeo ? [driBankGeo[0].index.count / 3, driBankGeo[1].index.count / 3] : null, low };
+    },
     slopeAt: driSlope,
     waterLevel: driCLOUD_Y,
     isOverWater: driIsOverWater,
@@ -5986,6 +6169,7 @@ export function createDrift(game) {
       driUpdateTravellers(dt);
       driUpdateColumnMotes(dt);
       driUpdateWisps(dt);
+      driUpdateLow(game, dt);
       driUpdatePennants();
       driUpdateRoost(game, dt);
       driUpdateBeacons(dt);
