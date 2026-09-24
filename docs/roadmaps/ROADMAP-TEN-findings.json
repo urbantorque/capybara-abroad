@@ -1,0 +1,1494 @@
+[
+ {
+  "area": "Story Mode vs Free Roam (title, picker, in-play divergence)",
+  "score_now": 4,
+  "summary": "Today the two modes are almost the same game. The whole in-play difference comes down to three gates. The premise card only shows in story (systems.js:39017). jrOpen gating (31794) and the board's gate copy (31959) differ. The pause card's one-way \"free roam\" switch (26151/26686) is hidden once the file is free. Everything else is identical in both modes: the paper with THE BIG ONE HERE, the memory counter, \"the way on\", the gardener tutorial, the ibis, the act-ordered journal and the homecoming finale. I measured this on a fresh Free Roam run in Sydney: the paper read \"0 OF 19 MEMORIES · SYDNEY · A MEMORY: THE STAR, OR ITS QUIET WAY\" and the guided walk still ran. The Free Roam picker is the story's act-folded atlas with the gates removed. At 1280x720 it shows 3 of 19 tiles and 4 closed folds, and the tiles still say \"AFTER SYDNEY\" and \"CHAPTER ONE · START HERE\". Story Mode has little narrative beyond one premise card, and acts open silently. Three bugs also came up: pressing a digit on page one of a fresh file silently starts Free Roam, the story atlas shows the wrong gate reason on Quay and Manly, and Free Roam is a one-way door on the shared save. The systems that could make Free Roam great already exist but are buried: the repertoire of 45 mischief names, the notoriety ladder, per-place secrets, the rival and the departures board.",
+  "findings": [
+   {
+    "title": "Free Roam picker: go back to the flat 19-tile grid (owner request) and branch it from the story atlas",
+    "category": "ui",
+    "impact": 5,
+    "evidence": "qa/ten-review/m-fresh-p2.png (fresh profile, Free roam, 1280x720): hero plus one open fold. Only 3 of 19 tiles are on screen (measured visibleTiles=3). Four closed <details> folds sit behind a '2 MORE BELOW' pill. Every tile carries an 'AFTER SYDNEY' eyebrow and the hero says 'CHAPTER ONE · START HERE' / '20 things to do'. Key badges read 3, ] and then out of order because the folds follow act order, not chapter order. Arrow keys walk the fold summaries: 8 ArrowDowns visited only SUMMARY rows. qa/F1-title-p2.png (the old version) shows hero plus 6x3 grid, all 19 on one screen. The flat grid was replaced in commit 4cc6e5e (ROADMAP-HOMECOMING M3a), so 4cc6e5e^ has the exact loop, pickCols() and the grid-arithmetic pickMove.",
+    "proposal": "Build the shelf twice: .capyui-picks.flat (19 tiles in CHAPTERS order, the loop 'for (let i = 1; i < pickDefs.length; i++) picksEl.appendChild(buildPick(pickDefs[i], i, false))' restored from 4cc6e5e^, with --cols from sysPickCols(18)=6) and the act atlas, which is built only when jrHasFile && journeyMode==='story'. The Free roam button (goEl click, 25217) and ArrowRight on page one show .flat. The pause 'choose a place' path (pickWanted, 25964) on a story file shows the atlas. Give pickList/pickMove/picksFade a 'which shelf is live' switch: the flat shelf uses 4cc6e5e^'s pickCols() grid nav (read gridTemplateColumns) and the atlas keeps the rect walk. In buildPick, pass a mode arg. In free mode, drop the 'after Sydney' eyebrow (25467), change the hero eyebrow to 'free roam' (25459) and change the pickfirst line (25474) to 'nobody watching'. Add a compact hero in free mode (.capyui-p2.free .capyui-pick.hero{height ~ one tile row}) so all 19 fit at 1280x720 without the 'more below' pill. Heading (25332): 'Where to?' in free, 'Where next?' on a story atlas. No save field, no flag needed (UI only).",
+    "files": [
+     "src/systems.js:25611-25641",
+     "src/systems.js:25742-25785",
+     "src/systems.js:25709-25737",
+     "src/systems.js:25459",
+     "src/systems.js:25467",
+     "src/systems.js:25474",
+     "src/systems.js:25332",
+     "src/systems.js:25217-25228",
+     "src/systems.js:9518-9562",
+     "git show 4cc6e5e^:src/systems.js (flat loop, pickCols)"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "Free Roam paper: swap the task list for a per-place 'sketchbook' of mischief names and secrets",
+    "category": "fun",
+    "impact": 5,
+    "evidence": "Fresh Free Roam in Sydney (m-free-syd-pause.png, trm-free.json): the paper was word-for-word the story paper. It showed 'THE BIG ONE HERE / THE OPERA HOUSE CONCERT', 'part 1 of 3 THE GARDENS' with three checkboxes, 'the way on: the ferry wharf at the Quay', 'somebody keeps turning up' and '0 OF 19 MEMORIES · SYDNEY · A MEMORY: THE STAR...'. Meanwhile the game already has a 45-name mischief repertoire (sysREP 49076, sysREP_MOVE 49002) with silhouettes drawn per word (repPage 49347). The player never sees it: it sits in a journal <details> fold that stays hidden until the first name is earned (jrRepDet 31371, 'jrRepDet.hidden = !found'). The notoriety ladder (a rumour → a natural disaster, sysNOTO_TIERS 37562) and per-place secrets (todoFindsLine 33995, 'two secrets hidden here') are also only side lines.",
+    "proposal": "In todoRefresh (34266), branch early: if (game.state.journeyMode==='free') { freePaperRefresh(n); return; }. The free paper has three short blocks. (1) The place line: chapter name plus this place's notoriety word (per-chapter jrChapInc/jrChapScene/jrChapPho/jrChapFed are already kept), e.g. 'Sydney · they call it a nuisance here'. (2) Three unfound repertoire silhouettes, reusing repPage's bar markup. Choose the biome-locked rows first, then the generic rows whose `t` prop exists in this chapter. Under each, one hint word drawn from its want (a hat, a spill, water, a throw), shown in the house voice without saying why. (3) Secrets 'n of m noticed' (todoFindsLine). The marquee stays as a single soft invitation line ('if it wants: the opera house concert'), never a checklist. Tasks still tick silently through completeTask, so nothing is lost if the player returns to the story. Flag noFreePaper (falsy = live). No new save field: jrRep, inc, scn and finds are already saved.",
+    "files": [
+     "src/systems.js:34266-34330",
+     "src/systems.js:34514-34521",
+     "src/systems.js:49347-49376",
+     "src/systems.js:49076",
+     "src/systems.js:31371",
+     "src/systems.js:37562-37600",
+     "src/systems.js:33995"
+    ],
+    "effort": "L"
+   },
+   {
+    "title": "Bug: pressing a digit on page one of a fresh title silently starts Free Roam, not the story",
+    "category": "bug",
+    "impact": 4,
+    "evidence": "Measured (qa/ten-review/tr-modes-story.js, trm-story.json): fresh profile, page one, press Digit1 → state.journeyMode='free'. Begin → 'story'. The title keydown handler calls startGame(CHAPTERS[pick-1].biome, jrHasFile, 'free') on ANY page (39686). With no file, startGame's mode arg then sets journeyMode='free' (39231). A player who presses the '1' printed on the Sydney hero, or any digit, gets no premise card, no act gating and no ibis framing, and is locked into free for good (see the one-way finding). Side effect: instruments like qa/wow-still.js press Digit1 and have been measuring Free Roam, not the story.",
+    "proposal": "At 39686, make digits act only when titlePageN===2, since that is where the key badges are printed. On page one with no file, Digit1 should do what Begin does: startResume(). Pass the mode from the shelf that is showing (the flat shelf → 'free', the story atlas → restore) instead of hard-coding 'free'. Add one qa check: fresh profile, Digit1 on page one → journeyMode==='story'.",
+    "files": [
+     "src/systems.js:39686",
+     "src/systems.js:39226-39233",
+     "qa/wow-still.js:15"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "Free Roam travel: in free mode, the journal is a departures board you can use anywhere",
+    "category": "cosy",
+    "impact": 4,
+    "evidence": "In both modes, travel needs the animal to walk to the chapter's physical board (jrShow(true) only from the board and clack paths, 33852-33905). The Tab/J journal is read-only: jrToggle → jrShow(false) (32062). The only other way to change place is pause 'choose a place', which runs location.reload() (26144-26149), i.e. a full reboot of about 6 s back through the title. For an exploration mode that is the wrong cost: every new place is a trek to one exit plus a reload.",
+    "proposal": "jrToggle: if (game.state.journeyMode==='free') jrShow(true) so the journey page offers all 19 rows as departures (jrOpen already returns true for free, 31794), using the existing jrTravel ceremony. In free mode, point the pause 'choose a place' button at the same jrShow(true) instead of the reload. Keep the board as the story's only door. Add a free-only line on the journal head in the house voice, e.g. 'anywhere. it is not in a hurry.' No save field; flag noFreeDepart.",
+    "files": [
+     "src/systems.js:32062",
+     "src/systems.js:32006",
+     "src/systems.js:26144-26149",
+     "src/systems.js:31790-31795"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "Free Roam is a one-way door on the shared save, with no confirm and no way back to the story",
+    "category": "bug",
+    "impact": 4,
+    "evidence": "Pause 'free roam: open every place' (26151) sets journeyMode='free' at once. So does picking any tile after 'Free roam' on a story file (titleFreeCommit 25141). Nothing anywhere sets journeyMode back to 'story' (grep: no assignment exists). After that, pauseFree is hidden (26686), and the title shows 'Go somewhere else' in place of the Free roam door (25197). The premise, act gates and board gate copy are gone for good for a player who only wanted to peek at Rio. There is also a latent trap: startGame's story restore returns SILENTLY when the saved biome is not open (39228), so any future path back to story would make Carry on do nothing.",
+    "proposal": "Make the mode a toggle on the save field that already exists (journeyMode). No new field is needed. On an arcV1 file in free mode, the pause card shows 'back to the story' (sysHOME_UI.storySwitch). The title's page one on a free file shows 'Carry on the story' as a second door. When switching to story while the current chapter is outside homecomingProgress().open, restore into the frontier's first open place rather than returning silently (39228). The first story→free switch from pause asks once ('every place opens. the story waits.'), reusing the pauseAsk pattern at 26160.",
+    "files": [
+     "src/systems.js:26151-26154",
+     "src/systems.js:26686",
+     "src/systems.js:25137-25147",
+     "src/systems.js:25196-25200",
+     "src/systems.js:39226-39233",
+     "src/systems.js:6564-6575"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "Title page one does not say what either mode is",
+    "category": "clarity",
+    "impact": 4,
+    "evidence": "qa/ten-review/m-fresh-p1.png and m-file-p1.png: the card shows two plain words, 'Begin' and 'Free roam' (or 'Carry on' and 'Free roam'). The only description is a title= tooltip (sysHOME_UI.freeHint / freeKeep, set at 25200), which only a mouse hover shows and a touch player never sees. Nothing on page one says that Begin is a story with acts and a rival and that Free roam has no list.",
+    "proposal": "Add one italic subline under each door, in the house voice and third person, using the same <b>/<i> markup the carry-on row already uses (25170). Begin: 'the bag, the shelf at home, and an ibis'. Free roam: 'every place open. no list. only trouble.' On a file, Carry on keeps 'you were last in X' and adds the act name. Strings go in sysHOME_UI (6564) so qa/lines.mjs sees them. Remove the title= tooltip.",
+    "files": [
+     "src/systems.js:25196-25200",
+     "src/systems.js:25242-25257",
+     "src/systems.js:25165-25172",
+     "src/systems.js:6564-6575"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "Story Mode: an act opens silently; give each act its own card and an ibis beat",
+    "category": "narrative",
+    "impact": 4,
+    "evidence": "HOMECOMING_ACTS (shared.js:4332) splits the journey into five named acts: 'A little further', 'In good company', 'Other people's rhythms', 'Beyond the familiar' and 'What comes home'. actIndex is read in only two places, the journal count line (31885) and the home-visit offer (31820). Nothing shows a moment when an act opens (grep: no showMoment tied to actIndex or to sysHOME_UI.ready). The story's whole spoken narrative is the one premise card (39017), which is never shown again. The acts are the only chapters the story has, and it never marks them.",
+    "proposal": "Seed lastAct from journeyProgress().actIndex on start, the way notoSeenTier is seeded (incTick 49377), so a restore does not replay. In the existing slow tick, when actIndex rises, showMoment(act.title.toUpperCase(), places joined by ' · ', one line per act from a new sysACT_LINES pool, e.g. 'the bag has a new tag on it.'), then open the board rows. Do the same when p.ready flips: 'THE WAY HOME' / 'the shelf has room for all of it.'. Add a rival hook: rival.js receives a 'story:act' bus event and makes its next appearance within 60 s. Story only; flag noActCard. No save field, because actIndex derives from tasks.",
+    "files": [
+     "src/systems.js:31796-31803",
+     "src/systems.js:31885",
+     "src/systems.js:39017",
+     "src/shared.js:4332-4338",
+     "src/rival.js:158"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "Bug: story atlas shows the wrong lock reason on Circular Quay and Manly",
+    "category": "bug",
+    "impact": 3,
+    "evidence": "qa/ten-review/m-story-atlas.png (Begin, then pause → choose a place, 0 tasks done): Circular Quay and Manly are in act one with Sydney, yet both tiles say 'two memories open the next act'. homecomingProgress (shared.js:4383-4386) opens them with ONE Sydney memory ('first'). The in-game board chooses correctly: keepHeld(1) ? actGate : firstGate (31960). The title always prints actGate (25553). The same screen's header says '0 OF 256 DONE', counting tasks in a mode whose only unit is 19 memories.",
+    "proposal": "At 25553, pick firstGate when the file has no Sydney memory (homecomingMemory(1, done).enough) and actGate otherwise. For a story file, change the p2stat (25340-25346) to '<n> of 19 memories · <act title>' instead of tasks done. Add per-act progress on each fold's summary ('1 of 2 memories').",
+    "files": [
+     "src/systems.js:25548-25554",
+     "src/systems.js:25340-25346",
+     "src/systems.js:31958-31961",
+     "src/shared.js:4379-4389"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "Free Roam in play: take out the story scaffolding (tutorial 'way on' beat, memory counter, journal act line)",
+    "category": "clarity",
+    "impact": 3,
+    "evidence": "Fresh Free Roam run: the gardener's guided walk ran ('the lawn is yours. W, A, S, D.', 'hold Shift - she has legs.'), because tutArm (39432) has no mode check. Its beat 8 aims at wayPoint(), which is the story's exit. The paper's count line switches to '0 of 19 memories · ... a memory: the star, or its quiet way' whenever homecomingArc is set (34514). Free files keep homecomingArc=1. The journal head (31881-31886) prints the act title and 'n of 2 memories' in free as well.",
+    "proposal": "Gate these three on journeyMode==='story'. In free mode: the count line (34514) becomes the free paper's place line (see the sketchbook finding). The journal head shows notoriety word, names found and secrets noticed instead of act and memories. The tutorial keeps beats 1-7 and ends at beat 8 in free (tutBeatStart: if n===8 && free → tutEnd('walked')). The homecoming finale stays reachable in free, since memories still count silently, but it is never advertised.",
+    "files": [
+     "src/systems.js:39432-39434",
+     "src/systems.js:38827-38835",
+     "src/systems.js:34514-34521",
+     "src/systems.js:31877-31890"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "Free Roam picker tiles should show what free play is about: notoriety, names, secrets",
+    "category": "reward",
+    "impact": 3,
+    "evidence": "The picker tile shows only task-derived facts: tally '0/20' (25493), progress bar (25480), souvenir when complete (25504) and a record line. In free mode those are the story's metrics on the free menu. The per-chapter counts that fit free play (jrChapInc/jrChapScene/jrChapPho/jrChapFed, finds, rep) are saved on the file (keys inc, scn, pho, fed, finds, rep in the save dump), but no screen compares them across places.",
+    "proposal": "In buildPick's free branch, swap the tally for a small line on the picture showing the place's notoriety word from that chapter's inc/scn vs pho/fed (game.notoWarm logic at 37597 gives 'warm' vs 'wary'), plus '2 secrets · 1 noticed' from FINDS filtered by biome. The p2stat in free: '<tier name> · <n> of 45 names'. The picker then shows the places as the player left them: a wall of reputations, not a checklist. Read only from jrFile and CHAPTERS/FINDS, like the souvenir. No save field.",
+    "files": [
+     "src/systems.js:25478-25500",
+     "src/systems.js:25340-25352",
+     "src/systems.js:37150-37160",
+     "src/systems.js:37597-37602"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "Free-roam-only 'the place remembers' on every revisit, not just three chapters",
+    "category": "cosy",
+    "impact": 3,
+    "evidence": "The world-level return reaction (X1b) is limited to three biomes: sysWORLD_CHAPS = { quay: 1, kyoto: 1, venice: 1 } (37372). Free Roam's loop is going back to places. In the other 16 chapters a return after trouble looks the same as a first visit. The only difference is a regular's line when one exists (N3).",
+    "proposal": "In free mode, give every chapter's arrival a cheap reaction driven by that chapter's own counts: if jrChapInc[n] >= 5, arrival toast from a pool ('somebody has moved the bins.' / 'the hats are held a little tighter.'); if notoWarm(n), a local offers a gift on sight (reuse the jrChapFed give path). Reuse sysWorldAwayCheck's biome:enter hook and its 20-minute threshold. Session-only, no save field. Flag noFreeRemember. Lines go through the pools and qa/lines.mjs.",
+    "files": [
+     "src/systems.js:37353-37400",
+     "src/systems.js:37150-37160",
+     "src/systems.js:37597-37602"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "The '2 MORE BELOW' pill counts fold headers, not places",
+    "category": "ui",
+    "impact": 2,
+    "evidence": "Fresh Free Roam picker: '2 MORE BELOW', with 16 of 19 places off screen behind 4 folds. Story atlas: '3 MORE BELOW'. picksFade counts summaries plus open-fold tiles under the fold (25723), so the number is neither places nor acts.",
+    "proposal": "This is fixed once the flat grid is in (tiles only). For the story atlas, count hidden places, i.e. the sum of act.places for folds whose summary is below the fold or closed, and word it as places ('14 more places below').",
+    "files": [
+     "src/systems.js:25709-25737"
+    ],
+    "effort": "S"
+   }
+  ]
+ },
+ {
+  "area": "Progression loop and central narrative (story acts, memories, keepsakes, yuzu economy, journal, ibis rival, premise, finale)",
+  "score_now": 5.5,
+  "summary": "I played this on a fresh profile under playwright (session tr-arc). I earned the Sydney and Quay memories with completeTask, which turned the page to Act II. Then I silently completed two memories in each later act, went home, sat in the horseshoe and watched it all the way to the ledger. The pieces of a story are all built: five acts, a premise card, a keepsake per place, a traveller who keeps turning up, an ibis rival, a horseshoe finale with a coda. Almost none of them reach the player at the moment they matter. Earning a memory, the unit of story progress, shows only the words \"A MEMORY KEPT\" on the paper. No keepsake card appears, nothing drops, there is no swell. A new act opens with no signal in the world at all, and only the journal's count line ever reads actIndex. The numbers contradict each other: the premise says \"one memory from each\" of nineteen places, the paper counts \"N of 19\", and the ending fires at 10. The ibis does the same thing in Sydney as in Hanoi and never appears in the ending. In the finale, the 24 cm keepsakes read as litter behind bystanders, and each coda caption (a place and its keepsake) is a small grey line at the top of the screen. Yuzu buys stat changes of about 4% that nobody can see. A player can't retell a story here: the arc is written in the code but hardly shown on screen, and it has no rising stakes and no antagonist payoff.",
+  "findings": [
+   {
+    "title": "Earning a memory (the story's unit of progress) is silent in Story Mode: the keepsake card, the drop at its feet and the score's lift only happen at 100%",
+    "category": "reward",
+    "impact": 5,
+    "evidence": "qa/ten-review/arc-05-mem-0..4.png, arc-3-01-act-0..4.png. After steal-hat plus opera-stage (the Sydney memory), the only memory signal was the paper's footer changing to 'SYDNEY · A MEMORY KEPT'. The OPERA HOUSE banner that played was the wow task's own. No showKeep card, nothing dropped, no musStatement. Quay (take-helm plus under-bridge) got nothing but the footer. In code, keepHeld() goes true on memory.enough under homecomingArc (systems.js:30875), but completeTask only calls chapterCeremony when chapComplete(cn) is true (systems.js:37088-37093). showKeep and sysDropKeep are only called from inside chapterCeremony (systems.js:38599). sysKeepsRestore also re-spawns keepsakes only for chapComplete chapters (systems.js:37953+), so on a story file the bag of keepsakes that is meant to follow the animal stays empty for most of the game.",
+    "proposal": "Under homecomingArc, move the keepsake beat onto the memory edge. completeTask already finds that edge at systems.js:37084 (jrKeptAt[cn] === undefined && keepHeld(cn)). On that edge, schedule a new memoryCeremony(cn) after 1.1 s. It should run showDone with the kicker 'A MEMORY' and the keepsake line, musSwell(1), musStatement('full','done',2.4), frameShot with the sysDONE_* pull-back, then showKeep(cn) and sysDropKeep(cn) after sysKEEP_WAIT. chapterCeremony stays as the 100% 'full plate' beat, and it skips showKeep/sysDropKeep if the memory beat already played this session. Change sysKeepsRestore to loop over keepHeld(k) instead of chapComplete(k). Flag noMemBeat. It adds no save field, because jrKeptAt is already saved.",
+    "files": [
+     "src/systems.js:37084",
+     "src/systems.js:37088",
+     "src/systems.js:38494",
+     "src/systems.js:38599",
+     "src/systems.js:37953",
+     "src/systems.js:30874"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "Act turns are invisible: HOMECOMING_ACTS has five titled folds, but opening Act II..V has no beat, image or sound",
+    "category": "narrative",
+    "impact": 5,
+    "evidence": "Grep: actIndex is read in only three places, all in systems.js: 31820 (journeyNext), and 31885 and 31886 (the journal count string). After the Quay memory opened Act II, the only change was the journal header, which moved from 'A LITTLE FURTHER · 1 OF 2' to 'IN GOOD COMPANY · 0 OF 2 MEMORIES' (arc3a.json). Screenshots arc-3-01-act-0..4 show no card, no toast and no change in the world. The act titles in shared.js:4332 ('A little further', 'In good company', 'Other people's rhythms', 'Beyond the familiar', 'What comes home') are the best story writing in the game, and they are only ever printed in 10 px caps inside a paused modal.",
+    "proposal": "Add an act-turn beat. In completeTask, compare journeyProgress().actIndex before and after the tick (the cache is keyed on doneCount, so the check is cheap). When it goes up, queue the turn after the memory beat (about 6 s later). The turn: showMoment('ACT ' + roman, act.title.toUpperCase(), one image line per act) through the four-word pool; a key change in the score (musStatement('full') in the next palette's key); and the traveller's figure seen leaving by the chapter's `way` door with the bag (npc.js already has travWhere and hintTarget('traveller') to place them). Save no field for it. It is a projection, so on reload the page does not replay. Also print the current act title as the paper's kicker ('part 1 of 3' becomes 'ACT II · IN GOOD COMPANY'). Flag noActTurn, and park it at rung 1 like every other new beat.",
+    "files": [
+     "src/shared.js:4332",
+     "src/systems.js:31796",
+     "src/systems.js:31885",
+     "src/systems.js:37084",
+     "src/systems.js:30288"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "The ibis rival has no arc: the same 85-140 s yuzu snatch from Sydney to Hanoi, and it is missing from the ending",
+    "category": "narrative",
+    "impact": 5,
+    "evidence": "src/rival.js:38-49. Fixed timers (rivFIRST 75-110 s, rivGAP 85-140 s), fixed speeds, and one steal-yuzu behaviour for every chapter. rival.js never reads the act, the finale or keepsakes; grep for finale/act/keep in rival.js returns nothing. The premise card says 'an ibis is coming too' (systems.js:39019), which is the game's only antagonist setup, and it is never paid off. In the horseshoe finale (arc-3-12-close-0..3.png) the ibis doesn't appear.",
+    "proposal": "Scale the rival by the act and give it an ending. The rival can read game.journeyAct(), a one-line export of journeyProgress().actIndex. Act I: it only watches, landing on a high point near the arrival and flying off when the animal comes within 10 m, which sets it up. Act II: yuzu thefts as now. Act III: once per chapter, it snatches the keepsake from the new memory beat's sysDropKeep, using the existing dropSteal path with a keepsake prop, and it must be run down or wheeked. That is the stakes beat, it can never cost the memory itself, and the keepsake always falls back within 30 m. Act IV: in the cold and dark chapters (iceland, antarctic, cave) it stands hunched and does not steal, and a yuzu dropped within 2 m of it (dropGive) earns a new one-line reaction. Act V / finale: on 'finale:staged' it lands inside the horseshoe mouth, facing the animal, and sits the coda out. Flag noRivalArc. There is no save field; if a count of fruit it took is wanted later, a roadmap must name `rivalN` first.",
+    "files": [
+     "src/rival.js:38",
+     "src/rival.js:141",
+     "src/systems.js:39019",
+     "src/systems.js:38244"
+    ],
+    "effort": "L"
+   },
+   {
+    "title": "The story's numbers contradict each other: the premise says nineteen, the paper counts to nineteen, the ending fires at ten",
+    "category": "clarity",
+    "impact": 4,
+    "evidence": "arc-02-premise.png: 'NINETEEN PLACES / one memory from each, for the shelf at home'. The paper reads '0 OF 19 MEMORIES · SYDNEY · A MEMORY: THE STAR, OR ITS QUIET WAY, AND ONE SMALL THING' (systems.js:34519), and the journal reads 'collection: 1 of 19 memories'. But homecomingProgress.ready needs only two memories in each of the five acts (shared.js:4385-4388), and the ending I reached said 'BACK WHERE IT BEGAN · 10 PLACES REMEMBERED · HOME AGAIN' (arc-3-12-close-4.png). A player aiming for 19 gets an ending at 10 that looks premature. A player who believes the premise sees a 1-of-19 treadmill.",
+    "proposal": "Make one number the story's number. Premise text (systems.js:39019): 'FIVE FOLDS OF A MAP' / 'two memories from each, then home. an ibis is coming too.' On the paper, the story count becomes per act: 'ACT II · 1 of 2 memories · then the next fold'. The 'N of 19' collection count moves to the journal shelf only, as the completionist's number. In the last act the paper says 'one more, then home'. All of these are text changes through sysHOME_UI and the pools, and each needs to pass qa/lines.mjs.",
+    "files": [
+     "src/systems.js:39019",
+     "src/systems.js:34514",
+     "src/systems.js:31883",
+     "src/shared.js:4378",
+     "src/systems.js:6564"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "Free Roam carries the whole Story framing: memory counts, 'the star or its quiet way', and an act-gated ending",
+    "category": "narrative",
+    "impact": 4,
+    "evidence": "homecomingArc is true for every new file in either mode (systems.js:39230: !restore || ...), so the countEl override at systems.js:34514 prints '<n> of 19 memories · <place> · a memory: the star, or its quiet way, and one small thing' in Free Roam too. sysFinaleAll (systems.js:38177) waits on journeyProgress().ready in both modes. The owner asked for Free Roam to be exploration and mischief with fewer defined tasks and less narrative.",
+    "proposal": "Gate the story surfaces on journeyMode === 'story', not homecomingArc. In Free Roam, the paper footer shows mischief instead: '<place> · <found> noticed · <notoriety tier>', reusing notoChip() and findCount(), which the journal already uses at systems.js:31891. The signature and support rows fall back to the plain list. The homecoming lawn becomes available whenever you are in Sydney holding three or more keepsakes (sysFinaleCheck on a free file), with no acts. The premise card is already story-only (39017). Add no new state.",
+    "files": [
+     "src/systems.js:34514",
+     "src/systems.js:38177",
+     "src/systems.js:39230",
+     "src/systems.js:31891"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "The finale's picture does not read: the keepsakes look like litter, a bystander blocks the lens, and the coda captions are small grey text at the top",
+    "category": "beauty",
+    "impact": 4,
+    "evidence": "arc-3-12-close-1..3.png. Ten keepsakes on the 2.6 m horseshoe (sysFIN_R, systems.js:38165) are 24 cm boxes. From the coda lens I could make out a red box, a book stack and a basket among the lawn clutter. A pink-shirted gatherer stands between the camera and the ring in close-2, and two NPCs carry glowing yuzu that outshine every keepsake. The coda caption ('PALAWAN / a pearl out of the giant clam') is .capyui-coda at top:13% with font-size tSm in ink colour over sky (systems.js:9939-9944), and it overlaps the tree canopy and is barely legible. The ledger took over about 13 s after the animal sat down, so the ending lasts roughly one breath.",
+    "proposal": "(a) While staged, scale each keepsake mesh 2.2x (mesh only, not the body) in physStageKeep, and put each on a low PALETTE.stone plinth, one box per keepsake, instanced, flag noFinPlinth. (b) npc.js's 'finale:staged' answer keeps gatherers outside r=5.5 m and outside a 50-degree cone behind the lens yaw (sysFinOpen). (c) Move .capyui-coda to bottom:18%, give it the pill style of toastNow, raise the <i> line to tLg+2, and fade it on each note. (d) While the coda plays, light each keepsake's column with the existing ph.flash(p, 10) doubled to flash(p, 24). (e) Hold the lens for sysFIN_HUSH plus 3 s before ledShow. Flag noFinPolish.",
+    "files": [
+     "src/systems.js:38165",
+     "src/systems.js:9939",
+     "src/props.js:2694",
+     "src/systems.js:38300",
+     "src/npc.js:5841"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "The traveller is the only story a player could retell, and it is hidden in a journal fold and 4-second bubbles",
+    "category": "narrative",
+    "impact": 4,
+    "evidence": "CHAPTERS[].nb (for example Hanoi, shared.js:4299-4306: 'I fly home on Thursday. I would put money on where it is going.') and npcTRAV_FIN_LINES (npc.js:5841-5878: 'You will not know me. I have been three steps behind you since Sydney.') make a real arc: a stranger following the animal across the world. In play I only saw it at the finale, as one bubble (arc-3-11-ring.png). The premise card is titled 'A TRAVELLER'S BAG' but never shows the traveller. The notebook pages sit behind Tab, then a fold, then a button, and nothing pushes them at the player.",
+    "proposal": "Tie the traveller to the new act-turn beat. At each act turn, one notebook page (the nb line for the chapter just remembered) is shown as the moment's note in the traveller's italic voice. It is not a modal and passes the pools. At each memory beat, the traveller's cameo is placed 20-30 m away and turns to look (npc.js already has travWhere). At the finale, the traveller walks into the horseshoe mouth and sets the rucksack (sysBagGroup, systems.js:38911) down beside the animal before the coda. That links the opening image (the animal asleep by a bag) to the last one without saying why. Flag noTravArc.",
+    "files": [
+     "src/shared.js:4299",
+     "src/npc.js:5841",
+     "src/systems.js:38911",
+     "src/systems.js:31567"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "Yuzu buys invisible multipliers; the economy has nothing to do with the cosy home the story is about",
+    "category": "reward",
+    "impact": 4,
+    "evidence": "sysUPGRADES (systems.js:35863-35889). LONG LEGS is 7.4 to 7.7 m/s (4%) for 35 yuzu, MORE PUFF is 0.88x drain, and the capstones cost 300-380. Income is wow 20, mini 8, plain 3, first arrival 8 and keepsake 15 (systems.js:47071-47076), roughly 400-600 yuzu by a 10-memory ending, which covers about half the everyday rungs. None of these purchases shows up in the world or at the ending. The only visible purchases are six costumes (35812-35826). The finale's 'home' is the unchanged picnic lawn.",
+    "proposal": "Give yuzu a home to spend on. Add a 'GARDEN' tab to the bag with 6-8 items for the homecoming lawn: a hammock between the two jacarandas, strings of lanterns, a stepping-stone path, a birdbath (which the ibis uses in Act V), a bench for the traveller, a small pond. Each is built from existing box, cone and PALETTE parts and appears on the lawn at sysFIN_X/Z whenever the animal is in Sydney. The finale frames them. Prices 40-150. The two F3 capstones stay as the high-end sink. This needs a save field, so first name `garden` (an array of ids) in a roadmap entry and in sysSAVE_SHAPE (systems.js ~4341). Flag noGarden.",
+    "files": [
+     "src/systems.js:35863",
+     "src/systems.js:35806",
+     "src/systems.js:47071",
+     "src/systems.js:4364",
+     "src/systems.js:38158"
+    ],
+    "effort": "L"
+   },
+   {
+    "title": "The journal board hides the act structure: chapter-number order, and every locked row gives the same wrong unlock line",
+    "category": "clarity",
+    "impact": 3,
+    "evidence": "arc-06-journal.png / arc2.json. In Act I, Palawan (an Act I place, shared.js:4333) sits at row 12, among 16 dimmed rows in chapter order. Every locked row reads 'two memories open the next act', including Act IV-V places that are two or three acts away (systems.js:31959-31961). The act a row belongs to is never shown.",
+    "proposal": "In story mode, jrRefresh groups the rows by HOMECOMING_ACTS order under a small act-title header (the same row DOM, reordered with appendChild in act order). Opened acts are listed in full. The next act shows its title and its place names dimmed. Acts beyond that fold into one line: 'two more folds of the map'. A locked row's gate line reads 'after <previous act title>'. In Free Roam, keep the flat 19 in chapter order, which is what the owner asked for.",
+    "files": [
+     "src/systems.js:31940",
+     "src/systems.js:31959",
+     "src/shared.js:4332"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "The story ends at 10 of 19 and then gives no reason to go on",
+    "category": "reward",
+    "impact": 3,
+    "evidence": "arc-3-12-close-4.png: 'BACK WHERE IT BEGAN · 10 PLACES REMEMBERED · HOME AGAIN' and a hint to 'tap or press Enter to cause it all again' (systems.js:31099-31106). Nine places, including Rio, Venice, Hong Kong, the Drift and the Pantanal, were never visited, and nothing on the ledger or the lawn afterwards points to them. The 'MISCHIEF COMPLETE' title exists only for 100% (sysFinaleFull).",
+    "proposal": "Add an epilogue hook after the ledger. The ledger lists the unvisited places as greyed postcards under the remembered ones ('still out there'). The next time the animal enters Sydney after `fin`, the traveller has left a keepsake-shaped parcel on the shelf; it is a sysDrops drop, and opening it with E shows the name of a random unvisited place and pins that place on the board as 'a postcard came from here'. The ledger title steps up at 13 and at 19 remembered ('FURTHER THAN IT MEANT', then 'MISCHIEF COMPLETE'). There is no new save field: `fin` and keepHeld already project all of it.",
+    "files": [
+     "src/systems.js:31047",
+     "src/systems.js:31099",
+     "src/systems.js:38182"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "The memory rule reads like a design doc on the paper",
+    "category": "clarity",
+    "impact": 3,
+    "evidence": "arc-02-premise.png: the paper's footer says '0 OF 19 MEMORIES · SYDNEY · A MEMORY: THE STAR, OR ITS QUIET WAY, AND ONE SMALL THING' in 10 px caps (systems.js:34519-34521). The heading 'THE BIG ONE HERE' sits above the Opera House row, but nothing marks which rows count as the 'quiet way' or the 'small thing', so a player can't tell which two ticks will make the memory.",
+    "proposal": "Mark the rows, not the footer. Rows in HOMECOMING_EXPERIENCES[n] get a small keepsake-glyph bullet (the chapter's own shelf icon, the same one the journal shelf draws). Once one signature or alternative row and one support row are ticked, both bullets fill. The footer shrinks to 'ACT I · a memory here: ◆ + one ◇'. The data already exists in homecomingMemory(); this is presentation only.",
+    "files": [
+     "src/systems.js:34514",
+     "src/shared.js:4341",
+     "src/shared.js:4364"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "Tab opens the journal but does not close it, because the next Tab is taken by the focus trap",
+    "category": "bug",
+    "impact": 2,
+    "evidence": "My first scripted run pressed Tab to close the journal and stayed stuck in a paused journal for the whole next script (arc-2-05-close-7.png shows the board still up after 60 s of cross and teleport calls). systems.js:39817 opens on Tab when !jrShown, and 39833 routes Tab to sysFocusWrap while it is shown. Only Esc closes it. The controls legend (systems.js:6447) says 'Tab: the journal', which implies a toggle.",
+    "proposal": "When jrShown and the Tab press has no shift and focus is on the journal root or body (not on a row button), call jrHide(). Keep Tab and Shift+Tab focus-cycling once focus is inside a control, so keyboard access is unchanged. Alternatively, change the legend to 'Tab opens · Esc closes'.",
+    "files": [
+     "src/systems.js:39817",
+     "src/systems.js:39833",
+     "src/systems.js:6447"
+    ],
+    "effort": "S"
+   }
+  ]
+ },
+ {
+  "area": "The first fifteen minutes (fresh profile: title, Begin, premise, Sydney with real keys)",
+  "score_now": 7,
+  "summary": "I played a fresh profile in session tr-first with real keys: both title pages, Begin, then Sydney through the hat, the bin, the Opera House concert, the swim, the shop, the journal, pause and the three-wheek board at the wharf. The place is charming. The chatter is funny (\"It's the size of a labrador.\"), the concert crowd cheering from the steps is a real moment, and the wheek → crowd → encore loop works. Time to first reward is under 5 s, but that reward is unearned: +8 yuzu for \"THE FIRST LOOK\", before any input. The first earned tick is instant (Q). The first memory came after about 2.5 minutes of active play, and nothing marks it: a toast saying \"the light is going.\" and a count line that changes to \"A MEMORY KEPT\". Three things stop this from being a 10. The central progression beat (a memory for the shelf) has no ceremony. The moment-card channel has no priority, so the premise gets 2.6 s and mischief cards trample the concert. And the first minute is noisy rather than cosy: the heat ladder goes 1→5 in 20 s, the ibis steals yuzu 10 s after the first tick, and there are 18-word rule toasts. An experienced player finishes the chapter's \"big one\" with three Q presses in six seconds, and after about 5 minutes has 70 yuzu, enough for any single upgrade on the first shelf. The travel board is the journal list with a different footer, so leaving Sydney feels like a menu, not a departure.",
+  "findings": [
+   {
+    "title": "The first memory is earned in silence",
+    "category": "reward",
+    "impact": 5,
+    "evidence": "Opera concert completed at t=642.6 s. The only signals were the paper count line changing to 'SYDNEY · A MEMORY KEPT' and a toast 'the light is going.' (eveTick). No card names the memory or the keepsake ('a tourist's hat'), nothing flies to the shelf and no chime plays. The journal shelf icon lit up without the player being told. Log: qa/trf-fm4.json.png; screenshot qa/ten-review/fm-12-concert2.png shows 'WORD HAS SOFTENED' in the slot where a memory beat belongs.",
+    "proposal": "Add a keepMoment(n) edge, fired once when chapEnough(n) flips false→true. The eveTick check at systems.js:27714 already detects this edge; call it there, before the dusk toast. Wait until wowLiveOn is false, then show a held card (4.5 s): kicker 'A MEMORY', text = the chapter's marquee name, note = 'for the shelf: ' + cdef.keep. Animate a flat PALETTE glyph of the keepsake (reuse the journal shelf icon DOM) from centre to the Tab/journal corner. Add one synthesized two-note chime on the sfx bus. Flag noKeepMoment; costs nothing when idle. Suppress every other showMoment for the hold time (see the next finding). No save field: jrEve already records the edge.",
+    "files": [
+     "src/systems.js:27714",
+     "src/systems.js:34084",
+     "src/systems.js:34510",
+     "src/shared.js:3845"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "Moment cards have no priority, so the premise gets 2.6 s and the concert is overwritten",
+    "category": "clarity",
+    "impact": 5,
+    "evidence": "showMomentNow clears the previous timer and replaces the text immediately, and every card holds sysMOMENT_CARD = 2600 ms. The premise card ('A TRAVELLER'S BAG / NINETEEN PLACES / one memory from each, for the shelf at home. an ibis is coming too.') is the one line that explains the game, and fm7 sampled it at 'show' for about 2.5 s only (17.0–19.5 s). Stealing the hat produced three cards in 7 s: 'AN INCIDENT / THE HAT TRICK' (458.8), 'YOU ARE NOW / A RUMOUR' (463.3), 'A SCENE' (466.0). Right after the concert, 'WORD HAS SOFTENED / NOBODY IN PARTICULAR — they fed you. the place has stopped counting.' took the centre of the screen during the crowd's cheer. Screenshots: fm-04-premise-6000.png, fm-12-concert2.png.",
+    "proposal": "Give showMoment a priority argument: 0 incidental, 1 system, 2 story, 3 memory. A lower-priority card never replaces a higher one that is still up; queue it, or drop it if it is incidental. Hold = max(2600, 900 + 45 ms per character of note), capped at 6 s. Make the premise priority 2, held 5 s, dismissable on any key only after 1.5 s. Send heat-ladder cards (systems.js:49386) at priority 0 and collapse repeats within 10 s into the pips label that already shows '5 OF 5 · A SCENE'. Pure HUD logic; flag noMomentPriority.",
+    "files": [
+     "src/systems.js:30292",
+     "src/systems.js:4677",
+     "src/systems.js:39017",
+     "src/systems.js:49386"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "Minute one is not cosy: heat ladder 1→5 in 20 s, the ibis robs you 10 s after your first tick, rules explained mid-chase",
+    "category": "cosy",
+    "impact": 4,
+    "evidence": "First task on the paper is the hat. Taking it triggered the 18-word toast 'somebody saw that. three things in front of people is AN INCIDENT, five is A SCENE — unless one of them reaches you first.' The pips went 1 OF 5 → 5 OF 5 · A SCENE in 20 s (446→466). Ten seconds after the first yuzu tick the ibis arrived ('it has seen your yuzu'), yanked the camera round with frameShot and 'got away with a yuzu' (491–511). Tourists shouted 'You little ratbag!' and 'Get out of it!'. It is funny, but for a casual player's first 90 seconds it reads as punishment and noise. Screenshots fm-07-hat.png, fm-09-bin.png.",
+    "proposal": "Add a fresh-file grace that lasts until the first memory, computed as keepCount() === 0 so no save field is needed. (1) rivalOK() returns false during the grace, so the ibis debuts after the concert as a new beat. (2) The heat ladder caps at 3 (AN INCIDENT) during the grace and never pays out 'A SCENE'. (3) Cut the rule toast at systems.js:48737 to 'somebody saw that.' and move the rule text into Learn to Play §2. Flag noFirstGrace. An experienced player who goes straight for the concert loses nothing.",
+    "files": [
+     "src/systems.js:47943",
+     "src/systems.js:48737",
+     "src/rival.js:172",
+     "src/systems.js:49386"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "The game throws away its best frame: the resting lens puts a jacaranda over 40% of the first minute",
+    "category": "beauty",
+    "impact": 4,
+    "evidence": "The opening shot (fm-04-premise-800.png, fm-04-premise-3000.png) is the best composition in the session: sails, bridge arch, steps and the animal on the lawn. By 6 s the lens has swung to frame the hat tourist, and for the whole first minute the right 40% of the screen is a purple low-poly canopy and a dark trunk: the jacaranda at envJAC_SPOTS [6, 22.5]. This held on two separate fresh runs (fm-04-premise-6000.png, fm-05-arrive.png, fm-op-8000.png, fm-op-16000.png, fm-06-wheek.png). The Opera House is out of frame until the player turns the camera.",
+    "proposal": "On the first-ever Sydney arrival only (sysOpenArm path), release the opening frameShot into a resting yaw that keeps the sails in frame. Reuse yaw 0.35 from systems.js:38971 as the arrival yaw instead of the bearing to the first hint target, and let the paper arrow do the pointing. This does not re-base the camera; it is one frameShot with a longer hold (6 s) after the nap ends. If the canopy still enters, drop the jacCan instance scale for the [6, 22.5] spot to 0.8 (environment.js:3616); that is a prop, not a spawn. Check with a pinned-camera before/after PNG.",
+    "files": [
+     "src/systems.js:38971",
+     "src/environment.js:279",
+     "src/environment.js:3611"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "The story hook is a brown box: the opening 'traveller's bag' reads as a crate",
+    "category": "narrative",
+    "impact": 3,
+    "evidence": "The ten-second opening shows the capybara asleep beside sysBagGroup, which is two BoxGeometry pieces (0.34×0.42×0.20 body plus a flap). At the establishing distance of 8.6 m it reads as a small cardboard box stuck in the animal's flank (fm-04-premise-800.png, fm-04-premise-3000.png). The premise card then says 'A TRAVELLER'S BAG', but the player never saw a bag, a traveller or a departure. The bag also never appears again: the traveller at the wharf stall has no bag (fm-17-shop-near.png).",
+    "proposal": "Make the bag read as luggage: a rounded 8-segment cylinder body lying on its side (a duffel), two thin torus handles, a strap in PALETTE.khaki and a luggage tag as a flat card in PALETTE.cream. Build it once, under 200 triangles. Clone the same group beside the traveller's stall at every chapter wharf so the object the animal is following is physically there when it reaches 'the way on'. Flag noBagProp; static and shadow-registered, well under 0.1 ms.",
+    "files": [
+     "src/systems.js:38911",
+     "src/systems.js:39017"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "The chapter's 'big one' is solved in six seconds with three Q presses",
+    "category": "fun",
+    "impact": 4,
+    "evidence": "Steering straight to the podium took 8.4 s. Q×3 at about 3.5 s intervals gave 'drew a house of 8 people' against par 6 ('a good one is 6 people'), which ticked THE OPERA HOUSE CONCERT and kept the first memory. The encore fired by itself. No timing, position or crowd management mattered, so an experienced player gets nothing to master in the marquee (log qa/trf-fm4.json.png 629.8→642.6).",
+    "proposal": "Make the house depend on rhythm. environment.js stageNote already counts notes and calls game.concert.call(0, 2.5, n). Scale the reach by how close each wheek lands to the score's beat, which is already running for the sidechain: within ±120 ms gives full reach, otherwise 40%. Show the beat as a pulsing PALETTE ring decal on the red carpet, driven by the stageGlow pulse that already exists. Raise par to 10 so casual players still tick at 6 or more, while 'a good one' needs on-beat wheeks. Flag noConcertBeat. No new save field: recs already stores the best house.",
+    "files": [
+     "src/environment.js:4110",
+     "src/environment.js:4130",
+     "src/shared.js:4928"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "Leaving Sydney is a menu: the three-wheek 'board' is the journal list, with a locked chapter above the next one",
+    "category": "narrative",
+    "impact": 4,
+    "evidence": "Three wheeks at the wharf opened 'The journey so far', the same sheet as Tab (fm-19-board.png vs fm-14-journal.png), with the footer 'PICK A PLACE, OR PRESS THE KEY BESIDE IT'. The in-world black departures board under the wharf shelter (fm-17-shop-near.png) plays no part. The rows are in chapter-number order, so '2 Pasto, Nariño — two memories open the next act' sits greyed out above '3 Circular Quay — next on the journey'. The first departure of the journey has no ceremony.",
+    "proposal": "In board mode (the jrfoot branch at systems.js:31997), add a class that restyles the sheet as a departures board. Header 'FROM ' + cdef.way. List open destinations first, with a PALETTE flip-row per destination: name, and 'departs now' or 'after N more memories'. Collapse locked chapters into one line: 'and fifteen more, further along'. Point the camera at the in-world board with frameShot({hold: 3}) while the sheet fades in. HUD/CSS only; flag noDepartures.",
+    "files": [
+     "src/systems.js:31997",
+     "src/systems.js:39860",
+     "src/systems.js:25992"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "The paper's progress line is jargon, with two denominators",
+    "category": "clarity",
+    "impact": 3,
+    "evidence": "The paper footer reads '0 OF 19 MEMORIES · SYDNEY · A MEMORY: THE STAR, OR ITS QUIET WAY, AND ONE SMALL THING' (fm-04-premise-6000.png). A new player cannot tell that 'the star' is the Opera House concert, and 'its quiet way' is never defined anywhere they have seen. The journal header says 'A LITTLE FURTHER · 1 OF 2 MEMORIES · 14:35 · 3 NOTICED', a second count (act-level) beside the paper's 1 of 19, with a ticking clock and an unexplained 'NOTICED'. The marquee block at the top of the paper already names the star as 'THE BIG ONE HERE'.",
+    "proposal": "At systems.js:34521, replace the rule text with a concrete sentence that uses the marquee's own name: 'a memory here: ' + wow.name.toLowerCase() + (supportMissing ? ', and one more thing off this list' : ''). The result reads 'a memory here: the opera house concert, and one more thing off this list'. In the journal header, drop the running clock and '3 NOTICED' on the first chapter, and write the act count as 'Act I · 1 memory of 2'. Copy only; goes through qa/lines.mjs.",
+    "files": [
+     "src/systems.js:34519",
+     "src/systems.js:34521",
+     "src/systems.js:25992"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "The Free roam picker shows 3 of 19 places (owner's own note confirmed)",
+    "category": "ui",
+    "impact": 4,
+    "evidence": "Page two of the title ('Where would you like to start?', fm-02-title-p2.png) shows one hero Sydney tile and two small tiles (Circular Quay, Manly) under 'A little further'. Four collapsed accordions follow ('In good company', 'Other people's rhythms', …) and a '2 MORE BELOW' pill. Sixteen of the nineteen places need clicks to see, and the groups (shared.js:4333) mean nothing to a new player. On page one, 'Begin' and 'Free roam' are plain serif words with no button shape (fm-01-title.png).",
+    "proposal": "When the picker is reached from Free roam, render a flat 5×4 grid of all nineteen tiles: the existing per-place picture, the name, and the key glyph already printed on each tile. No accordions, no hero. Keep the grouped shelf for the story file's 'Go somewhere else'. On page one, give .capyui-p1 .capyui-go a 1px rule border and hover fill so both doors read as buttons (systems.js:11522). CSS/DOM only.",
+    "files": [
+     "src/systems.js:25088",
+     "src/systems.js:25190",
+     "src/systems.js:11522",
+     "src/shared.js:4333"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "The expanded paper covers the marquee title banner",
+    "category": "bug",
+    "impact": 3,
+    "evidence": "At the concert payoff the paper auto-expanded (on the tick) to about 330 px tall. It sits over the left end of the centred 'THE OPERA HOUSE CONCERT' banner, and the word 'THE' is hidden behind the paper (fm-11-concert.png). .capyui-place is top:31%, z-index 58. The paper sits at left 14px/top 12px and reaches y≈330, which overlaps the banner band at y≈240–380.",
+    "proposal": "While .capyui-place is showing, force the paper into its one-line tab state (the same fold class L/P already toggle) and restore it afterwards. Alternatively, give .capyui-place a left inset of the paper's rendered width + 24 px, measured like yuzuWalletReposition does. CSS plus a two-line class toggle.",
+    "files": [
+     "src/systems.js:11053",
+     "src/systems.js:10097"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "The first reward is paid for nothing, and the wallet inflates past the whole first shelf",
+    "category": "reward",
+    "impact": 3,
+    "evidence": "'+8 · THE FIRST LOOK' fired 0.3 s after the HUD appeared, before any input (sysYUZU_ARRIVAL). After about 5 minutes of active play the wallet held 70 yuzu (hat +6, bin +4, concert +38, swim +8, meeting the traveller +5, …). That already covers the most expensive first-row upgrade (SURE FEET 70) and most rows below it, so there is never a 'saving up' feeling. The shop sheet leads with six stat rows ('7.4 m/s toward 8.0'), and the cosmetics that change how the animal looks are buried below the fold with stat copy ('SECOND WIND runs a little stronger') (fm-18-shop-open.png).",
+    "proposal": "Pay THE FIRST LOOK on the first wheek of the chapter instead of on arrival, so the first reward answers a player action. Change the gate at systems.js:47271 to fire from the wheek handler when !jrSeen[n]; no new field. In the bag sheet (systems.js:29713), put 'wear' first, with a small PALETTE preview of the animal wearing each item, and move stat lines to a second line in inkSoft. Separately flag a tuning pass: sysYUZU_TIER.wow 20 → 12 so the first shelf takes about two chapters.",
+    "files": [
+     "src/systems.js:47071",
+     "src/systems.js:47271",
+     "src/systems.js:47076",
+     "src/systems.js:29713",
+     "src/systems.js:35863"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "Near depth of field smears the fallen blossom into mauve blotches at the bottom of every frame",
+    "category": "beauty",
+    "impact": 3,
+    "evidence": "In every Sydney lawn frame, the bottom 120 px carries large soft mauve blobs, which are the envBLOSSOM decals under near DOF blur. The stone bench at the left edge is also blurred into a smear (fm-05-arrive.png, fm-06-wheek.png, fm-op-16000.png). With the capybara at mid-frame, it reads as a dirty lens rather than shallow focus, and it draws the eye away from the animal.",
+    "proposal": "For Sydney's composite row, reduce the near-blur ramp (p.dofNear0/1 used at main.js:2117) so blur starts at under 2.5 m from the camera rather than across the whole lower foreground. Or halve the Sydney dof weight when the ground occupies the lower third. Verify with a hide-and-diff in the bottom-third mask and a pinned-camera before/after. This re-tunes an existing term, not the grade.",
+    "files": [
+     "src/main.js:2117",
+     "src/environment.js:298"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "A herd lesson fires when you knock over a bin",
+    "category": "clarity",
+    "impact": 2,
+    "evidence": "Ticking 'Knock over a bin (for the ibis)' raised a big centre card 'THE HERD — wheek at anything small. keep wheeking, or they wander off.' (fm-09-bin.png). Nothing small was following the capybara, and the text has nothing to do with what the player just did, because bin-chicken is the 'alt' trigger for the chapter-15 skill.",
+    "proposal": "For skill rows fired through `alt`, prefix the line with a bridge sentence written by the task: 'the ibis came for the bin. so will anything small, if you wheek.' Or delay the alt skill card until a small animal is within 8 m of the animal (npc query already exists for the herd). Add the bridge as an `altLine` field in the skill table at systems.js:35773.",
+    "files": [
+     "src/systems.js:35773"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "Main-thread stall after Begin; attract-mode toast leaks into play",
+    "category": "bug",
+    "impact": 2,
+    "evidence": "A 250 ms setInterval sampler installed before clicking Begin logged nothing for about 4.3 s (fm2: entries at 0.3 s then 4.6 s). On a second run with the machine loaded by other reviewers it went quiet for about 10 s (fm7: first sample 5.6 s, next 10.3 s). The title fade and opening play through this freeze. The machine was shared, so the absolute numbers are inflated, but the gap is a synchronous build on click. Separately, npc.js's 'man overboard.' toast fired while the title card was still up (0.3 s) and was still on screen after the HUD appeared. The perf governor also printed 'DRAWING A LITTLE LESS TO KEEP UP' on the minimap 56 s in; that is engineer text in a cosy game.",
+    "proposal": "Profile the Begin click with a Performance trace. If it is shader compile for HUD/opening materials, warm them during the title idle with renderer.compile on the bag group and the moment-card composite. Gate game.toast in npc.js:11380 on game.state.started. Replace the governor badge text with nothing, or with a tiny glyph (systems.js:54495).",
+    "files": [
+     "src/npc.js:11380",
+     "src/systems.js:54495",
+     "src/systems.js:38964"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "The pause menu is a developer's list",
+    "category": "ui",
+    "impact": 2,
+    "evidence": "Pause shows nine equal-weight buttons: RESUME, SETTINGS, THE JOURNEY SO FAR, LEARN TO PLAY, REPLAY THE GUIDED WALK, REPLAY THE OPENING, CHOOSE A PLACE, QUIT TO THE TITLE, FREE ROAM: OPEN EVERY PLACE (fm-16-pause.png). Three of them are one-time utilities, and 'FREE ROAM: OPEN EVERY PLACE' on a story file two minutes in invites the player to skip the whole progression loop.",
+    "proposal": "Keep Resume, The journey so far, Settings and Quit to the title as the primary stack. Fold Learn to Play, Replay the guided walk, Replay the opening and Choose a place under a single 'more' disclosure. Show 'Free roam: open every place' only after the first border crossing, or inside 'more' with a one-line consequence note. DOM only, around systems.js:26130.",
+    "files": [
+     "src/systems.js:26130"
+    ],
+    "effort": "S"
+   }
+  ]
+ },
+ {
+  "area": "biome group 2: kyoto, kowloon, hanoi, palawan",
+  "score_now": 7,
+  "summary": "I played all four places with real keys, entering each through hud.cross with journeyMode set to 'free' on a fresh save. Each has one strong moment. In Kyoto it is the vermilion torii tunnel and the rock-garden rake, which ticks, pays 3 yuzu and gets a good line from someone watching. Hong Kong's climb works and is taught clearly (\"hold E on the bamboo and push up\"). Hanoi's pho scooter ride through 18 riders feels right, and Palawan's first dive ticks straight away. What holds the group at about 7 is shared rather than per place. The one-line paper points past the district you arrive in: Kyoto opens on an Uji row 151 m away and Hanoi on a pho row 117 m away, and both are on the far side of something. During a live marquee the paper goes back to a support row. On the surface above the manta the arrow says \"here\" when she is 6 m down. The pictures fall short in the same places each time: Kyoto has no far layer, so every view out ends in a flat green horizon. The torii tunnel stands on open lawn. The street-level shop arcade in Hong Kong and the Palawan karst walls both trap the camera in dithered geometry. Several key moments stack four to six text elements on top of each other. Frame timing could not be judged, because the laptop was shared: the governor sat at rung 3 and the median frame was 35–100 ms in every run. I hit no console errors and state.lastError stayed null.",
+  "findings": [
+   {
+    "title": "[kyoto][hanoi] On arrival the paper points 117-151 m past the district you are standing in",
+    "category": "clarity",
+    "impact": 5,
+    "evidence": "Fresh save, arrival. In Kyoto the paper's only row is 'Get into the matcha at Uji ▸ 99+ m' (minimap 151 m); the lantern, zen and torii rows are all within 60 m of the spawn and none is shown (qa/ten-review/kyoto-02-list.png). While the torii run clock was running, the paper still pointed at Uji, 253 m away (kyoto-d2-torii-mid.png). In Hanoi the first row is 'Get your whole face in a bowl of pho 99+ m' (117 m), and the steering line runs straight across Hoan Kiem, so the animal ends up swimming (hanoi-02-list.png, hanoi-03-marquee.png). Cause: with homecomingArc set, the paper shows experience.supportOpen.slice(0,1), which is simply the first entry in the table order. HOMECOMING_EXPERIENCES[4].supports starts with 'matcha-raid' (act 2, in Uji) and [19] starts with 'pho-raid'.",
+    "proposal": "Where the homecomingArc branch builds winIds (systems.js ~34326-34331), sort supportOpen by live distance from the animal to each row's hint target before slicing. Hint targets are already computed for the arrow, so this is one sort over at most 5 rows, four times a second, with no new state. If a row has no target, fall back to preferring rows whose act equals sysActNow(n). Second part: reorder HOMECOMING_EXPERIENCES[4].supports so it opens with an act-1 Kyoto row, and add 'torii-run' to it. The tunnel is the chapter's defining image and it is not on the homecoming route at all. Verify with a fresh-save arrival in each of the four chapters: the top row should be under 60 m away.",
+    "files": [
+     "src/systems.js:34326",
+     "src/shared.js:4346",
+     "src/shared.js:4361",
+     "src/systems.js:34205"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[kyoto] No far layer: every view out of Kyoto and Uji ends in a flat green horizon",
+    "category": "beauty",
+    "impact": 5,
+    "evidence": "kyoto.js never imports far.js (grep for farLayer/farBundle finds it only in kowloon.js, hanoi.js and palawan.js). Down the Gion lane the vanishing point is an empty green strip under a bleached sky (kyoto-02-list.png). Down the Uji rapids the river runs to a bare flat horizon (kyoto-05-wander.png). Kyoto sits in a bowl of forested hills, Higashiyama, Kitayama and Arashiyama, and Uji lies between hills too. That enclosure is what makes the place read as Kyoto.",
+    "proposal": "Add a kyoBuildFar(root) modelled on palBuildFar (palawan.js:996): farTone(PALETTE.<new kyoRidge>, PALETTE.kyotoHaze, 0.35), with 6-8 low rounded wedges (profile heights 18-40 m, no peaks) on a 300-420 m ring on three sides. Leave the Uji river's downstream end open. Add one far mover, for example a Yasaka-style five-storey pagoda silhouette as a static wedge stack, or a heron drifting across the ridge on a 90 s farMover loop. Call it from createKyoto (kyoto.js:4781) and gate it on a noKyoFar flag. far.js layers are already costed, and this adds one PALETTE entry.",
+    "files": [
+     "src/kyoto.js:4781",
+     "src/palawan.js:996",
+     "src/far.js:80",
+     "src/shared.js:611"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[hanoi] While the pho run is live, the paper drops the run and points at a different row",
+    "category": "clarity",
+    "impact": 4,
+    "evidence": "I took the scooter with E at the stall. The paper showed 'THE BIG ONE · NOW / THE PHO RUN / the bia hoi corner · 54 m · 0 km/h · pho hot' (hanoi-d2-scooter.png). Six seconds into the ride, still mounted at y 2.6 and with the run's subtitle 'the bowls jumped. one more kerb like that and one comes off.' on screen, the tucked paper read 'Get your whole face in a bowl ... 34 m' and then '76 m'. The arrow and minimap line were pointing at pho-raid, not at the drop lantern (hanoi-d3-riding.png, hanoi-d4-riding2.png).",
+    "proposal": "While a chapter's wow row is running (the same condition that puts 'NOW' in the marquee eyebrow), make todoTuckTick (systems.js:26786) keep the marquee block as the tucked line, and set `top` to the wow id so hintX/hintZ follow the live target: the next drop lantern, which hanoi.js already knows. This is a single guard in the top-row selection and needs no new state. Check it with a real-key ride in hanoi (the paper should read the delivery distance for the whole ride) and in kowloon's helicopter (the next ring).",
+    "files": [
+     "src/systems.js:26786",
+     "src/systems.js:34326",
+     "src/systems.js:34420"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[palawan] The arrow says 'here' at the surface while the manta is 6 m below and out of sight",
+    "category": "clarity",
+    "impact": 4,
+    "evidence": "After the first dive (which ticked), I swam to (-6, 0.2, -24). The paper read 'Grab the manta ray and ride it ▸ here' with 'deepest 0.8 m down' under it. The frame showed only the surface and a karst wall, with no manta (palawan-d4-ride.png). palMANTA_Y is -6.0 (palawan.js:2359), and marqueeAt() does return y. But systems.js:51649 prints 'here' whenever the horizontal distance is under sysHINT_NEAR (4.5 m), and that overrides the ↑/↓ indicator.",
+    "proposal": "At systems.js:51649, when the target is horizontally near but |dh| > sysHINT_RISE, print '↓ 6 m' (or '↑ 12 m') instead of 'here', and only say 'here' when the 3D distance is under sysHINT_NEAR. In Palawan specifically, add 'hold E to go down' to the manta row's clue whenever the animal is at the surface and dh < -3. The same fix helps Hong Kong: on the street under the helicopter the arrow showed '26 m ↓', but next to the scaffold it will say 'here' while the pad is 34 m up.",
+    "files": [
+     "src/systems.js:51649",
+     "src/systems.js:4286",
+     "src/palawan.js:2359",
+     "src/palawan.js:5279"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[kowloon] The street-level shopfront under the scaffold traps the camera in dithered stalls",
+    "category": "bug",
+    "impact": 4,
+    "evidence": "I steered at the helicopter from the Mong Kok arrival. The animal ran under the bamboo scaffold along the west shopfronts and stopped at (-9.2, 0.3, 1.3). The lens showed the animal through the bamboo grid (kowloon-03-marquee.png). A few hops later the camera was inside a stall: the capybara filled 40% of the frame, a stippled half-faded stall covered the rest, and the shop interior was blown to white (kowloon-05-wander.png). This is the route every player takes, because the marquee arrow points straight at that face.",
+    "proposal": "Apply the torii-rail approach from kyoto.js:4337 ('SOLVE the sight line') to the scaffold footprint. When the animal is inside x ∈ [hkSCAF.x-1, hkSCAF.x+hkSCAF.out+1], z ∈ [z0, z1] and below 3 m, publish a camera hint from kowloon.js (the chapter api already publishes marqueeAt and climbHold) that pulls the lens out over the carriageway (+x) and lifts it about 1.5 m, facing back toward the face. Seeing the whole scaffold is also the best advert for the climb. Gate it on noHkArcadeCam. Check that 20 s of wandering along the shopfront keeps the animal under 15% of the frame and has no dither in the middle third.",
+    "files": [
+     "src/kowloon.js:73",
+     "src/kowloon.js:859",
+     "src/kowloon.js:1535",
+     "src/kyoto.js:4337"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[kyoto] The torii tunnel stands on open lawn, not in a sugi wood",
+    "category": "beauty",
+    "impact": 4,
+    "evidence": "Running the lower tunnel (the clock read 'the tunnel in 10.9 s'), both sides between the posts are bright open grass all the way to the vanishing point. The only tree in frame is one conifer at the far right edge (kyoto-d2-torii-mid.png). The INARI-YAMA note (kyoto.js:2490) describes 'a mountain of very old sugi… shoulder to shoulder', but on the lower half of the run the corridor cut-out (kyoTORII_CAM_R + 4 = 8.6 m) leaves an open lawn band on each side. The tunnel reads as the owner's own worry from that note: gates put up as scaffolding on a golf course.",
+    "proposal": "In the Inari-yama placement, cut the exclusion to kyoTORII_CAM_R + 1.2 for trunks only; the canopy cones already sit above the camera rail. Then add a second instanced ring of low dark understory (the existing bamboo or hedge shape, darkened in PALETTE) at 3-6 m from the path centreline, starting from gate 0. Everything outside the gates should be dark wood, so the vermilion carries the frame. Check with a pinned camera at gates 5, 20 and 35: the 'lawn green' pixel share between the posts should drop below 10%. Flag it noToriiWood.",
+    "files": [
+     "src/kyoto.js:2490",
+     "src/kyoto.js:67",
+     "src/kyoto.js:607"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[hanoi] Arrival puts the animal on the far side of Hoan Kiem, and the lake is a bare green plate",
+    "category": "cosy",
+    "impact": 3,
+    "evidence": "hanSPAWN is (-60, 2.4, -78) (hanoi.js:4639). The marquee stall is at (6, 15.5), 117 m away across hanLAKE (rx 58, rz 38). My first steered walk ended mid-lake. Beauty: the Turtle Tower and the red Huc bridge read well, but the lake is an opaque flat green with sparse white flecks and nothing on it. The bank is bare concrete with 2-3 trees (hanoi-03-marquee.png, hanoi-05-wander.png). The real Hoan Kiem is ringed with big willows and flame trees, and those are what make it a place to sit.",
+    "proposal": "(1) Add an instanced willow ring around hanLAKE: 28-36 trees at r ≈ 1.04 × the ellipse, with drooping cone-strip canopies, wind-sway hooked, and in PALETTE greens. That gives the chapter its cosy middle and softens the lake edge in every Old Quarter shot. (2) Put 6-10 lily or lotus pad clusters and one small paddle boat on a farMover-style loop on the lake surface. (3) Move hanSPAWN about 40 m round the lake to the Old Quarter corner so the first road crossing and the pho stall are both in the arrival frame. Flag noHanWillow. There are no new save fields.",
+    "files": [
+     "src/hanoi.js:59",
+     "src/hanoi.js:4639",
+     "src/hanoi.js:4798"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[kyoto] Four speech bubbles, a subtitle band and the paper pile up on the Uji bridge where the marquee starts",
+    "category": "ui",
+    "impact": 3,
+    "evidence": "Arriving under the Uji bridge (the River Run start), the frame had four NPC bubbles ('The bridge at Uji. I have crossed a lot of bridges…', 'The moss will not mind. I mind.', 'The maple is early…', 'Every one of those has to be swept.'). It also had the centre subtitle 'the boats off this bridge go down to the sea, and then anywhere.', the paper's 'the river in 3.3 s', and the wheek-home pill (kyoto-03-marquee.png, kyoto-04-wheek.png). The top third of the screen was unreadable at the chapter's biggest moment.",
+    "proposal": "In npc.js's speech capacity path (npcSpeechAudit 'capacity', npc.js:2020), lower the bubble cap to 1 while the animal is within about 20 m of the chapter's marquee point (CHAPTERS[n].marquee), or whenever a centre subtitle is live. Also drop ambient lines whose anchor projects into the top 18% of the screen, where they collide with the paper. This covers all nineteen chapters.",
+    "files": [
+     "src/npc.js:2020",
+     "src/npc.js:3261",
+     "src/shared.js:3954"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[kyoto] The wheek at the Uji marquee start also starts the three-wheek 'go home' prompt",
+    "category": "clarity",
+    "impact": 3,
+    "evidence": "One Q at the shrine bay under the Uji bridge (the River Run start) lit the 'wheek three times to go home ●○○' pill (kyoto-04-wheek.png). CHAPTERS[4].way is 'the bridge at Uji', which is the same spot as marquee {x:4, z:128}. Wheeking is the verb this game teaches everywhere, so a player who wheeks for joy at the rapids is one-third of the way to leaving the chapter they have just reached.",
+    "proposal": "Either move Kyoto's way point to the Uji tea town end (kyoUJI, kyoto.js:14) so leaving comes after the tea rows, or have the travel whistle count only while no wow row is armed within 15 m. The first is a one-line data change that fits the act order: Kyoto, then Uji, then out.",
+    "files": [
+     "src/shared.js:3951",
+     "src/shared.js:3954",
+     "src/kyoto.js:14"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[palawan] Hatched stripes and screen-door dither on the karst faces near the water",
+    "category": "bug",
+    "impact": 3,
+    "evidence": "At the base of the karst wall at the lagoon (-6, 0.2, -24), the near cliff faces show regular diagonal hatch stripes and stippled dither bands across whole faces. Another frame at (-21, 0.4, -30) shows stippled edges down every tapered block (palawan-d4-ride.png, palawan-05-wander.png). These are the frames where the player hunts for the manta and the crack, and the rock reads as noisy rather than as limestone.",
+    "proposal": "Hide-and-diff the karst meshes with the AO, smooth-shadow and form-shade flags toggled (qa/aaa-ab.mjs) to find which term draws the hatching. Likely suspects: shadow acne on near-vertical faces, which needs normalBias raised for Palawan's karst material only, or the occluder fade switching the whole massif into dither. If it is the occluder fade, exclude the karst's static group from the fade (it is the colliding wall itself) and let the camera collision pull in instead. Verify with a per-pixel diff inside a mask on the cliff.",
+    "files": [
+     "src/palawan.js:688",
+     "src/palawan.js:5290"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[kowloon] The climb's 'THE REACH' card covers the scaffold above the animal mid-climb",
+    "category": "ui",
+    "impact": 3,
+    "evidence": "At about 22 m up the scaffold, bamboo-climb ticked. Three things appeared at once: a 520 × 110 px centre card ('THE REACH — get your chin over it and the rest of you follows.'), a tip bubble ('top left is the paper…'), and a 'TICKED' toast, while the paper grew to its full nine-row card. Together they covered the next 12 m of lattice the player was climbing toward (kowloon-d3-climb-top.png).",
+    "proposal": "Queue skill cards (the sysSKILL rows around systems.js:35766) and all tips while the animal is climbing, riding or flying, and show them on the next grounded frame. Keep the paper tucked while climbing (todoTuckTick). This uses the existing card and tuck code, with no new state.",
+    "files": [
+     "src/systems.js:35766",
+     "src/systems.js:26786"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[kyoto] The raked gravel reads as a zebra crossing",
+    "category": "beauty",
+    "impact": 2,
+    "evidence": "The zen garden's rake lines are thick mid-grey stripes about as wide as the white gravel between them, at high contrast (kyoto-d5-zen-after.png). The garden's whole appeal is subtlety, and the most photographed place in the chapter looks like road paint. The mechanic itself is lovely: zen-ruin ticked, +3 yuzu, and '…a bold reinterpretation. Yes.' — somebody on the path.",
+    "proposal": "In the gravel-bed builder (kyoto.js:747), make the ridges a third as wide and colour them from a new PALETTE.kyoGravelShade about 7-9% darker than the gravel, not grey. Add a thin lighter highlight strip on the sun side of each ridge so the lines read as relief rather than paint. The raked-disturbance decal the player leaves can stay dark, so the mischief now shows up better against the calmer bed.",
+    "files": [
+     "src/kyoto.js:742",
+     "src/kyoto.js:747"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[kowloon] A blank blown-out magenta panel sits in the middle of the arrival frame",
+    "category": "beauty",
+    "impact": 2,
+    "evidence": "The Mong Kok arrival frame has a large square magenta sign with no glyph on it. It sits dead centre above the dai pai dong, bloomed to near-white at the edges, and is the brightest thing on screen. The other signs carry glyph blocks. It reads as a missing texture or placeholder (kowloon-02-list.png).",
+    "proposal": "In the neon builder (kowloon.js:2172), give that sign (the largest panel over the dai pai dong) the same inset glyph blocks the others use, in a darker PALETTE neon tone. Alternatively, cap its emissive so the bloom threshold only catches the glyph strokes. Check with a pinned arrival camera: the panel's peak luminance should be at or below the other signs'.",
+    "files": [
+     "src/kowloon.js:2172",
+     "src/kowloon.js:2494"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[palawan] Underwater reads as murky teal fog, not Palawan's clear water",
+    "category": "beauty",
+    "impact": 3,
+    "evidence": "After the dive, the coral garden 3-8 m away is already washed into flat teal, and the karst above the waterline is desaturated to grey-teal (palawan-d2-dive.png, palawan-03-marquee.png). The paper promises 'the interesting half is underneath', and the reef is the chapter's second look, but everything beyond 8 m looks the same. Palawan lagoons are known for 20-30 m visibility.",
+    "proposal": "Add a Palawan-only override to the underwater fog/tint that the lens applies when it goes under (the canDive path, palawan.js:5290 onward). Push the underwater fog far distance out about 2× and make the tint lighter and more cyan (a new PALETTE.palDeepClear). Keep the density curve, so the manta at 6 m depth reads as a silhouette from 15 m instead of from 5 m. Flag it noPalClear. Check the rendered PNG: the coral colour should still show chroma above 20 at 10 m.",
+    "files": [
+     "src/palawan.js:5290",
+     "src/palawan.js:2359"
+    ],
+    "effort": "S"
+   }
+  ]
+ },
+ {
+  "area": "sydney-quay-manly (ch1, ch3, ch14)",
+  "score_now": 6.5,
+  "summary": "Sydney is the best-written of the three. The Opera House concert works (3 wheeks on the red, 8 people come, +20 yuzu, a title card), but the screen is crowded: the paper, 3-4 speech bubbles, two pills and a tutorial pill that won't go away. The payoff looks small, too: a handful of blocky figures at the foot of the stairs, and the fireworks only fire on a hidden encore. The Quay marquee breaks for a casual player: hold W from the wharf and the ferry drives straight into Fort Denison and gets stuck there, and the capybara is a see-through dithered ghost behind the funnel for the whole passage. Manly has the most ambitious systems (the swell, the rip, the heat that ends with people wading out after you), but the first step forward from the spawn hits a bin. The frame reads khaki-grey instead of surf-blue, and the marquee clue never tells you how to get out past the break. Caveat: the shared laptop held the performance governor at rung 3 (39 ms frames, 1024 shadow map, near-clear air and AO switched off), so the jagged shadows and dithering in my shots are partly harness artefacts. The colour measurements below should be re-checked at rung 0 on the reference GPU. The geometry, collision and design findings do not depend on the rung.",
+  "findings": [
+   {
+    "title": "[quay] Fort Denison sits dead ahead of the berth: full ahead from the wharf pins the ferry head-on",
+    "category": "bug",
+    "impact": 5,
+    "evidence": "Real keys: E at the helm, W 3 s, then W 2 s. The boat went from z 4 to z -89 in 11 s, then stopped at (7.1, -114) and was still at (7.5, -114.1) 13 s later, with a D press in between. Timer still counting ('the passage in 46.5 s'). Screenshots qa/ten-review/b0-quay-05-run.png, -07-run2.png, -08-run3.png show the bow buried in the fort's sandstone skirt. quayFORT = {x: 6, z: -126, r: 13} and the berth helm is at x 6.6, so the default heading hits the fort's centre. quayShore keeps only the tangential part of the velocity, and on a head-on hit that is about 0, so she parks. The comment even says 'fine on the port bow'.",
+    "proposal": "Move quayFORT to x -20 (keep z and r) so it really is fine on the port bow of the rhumb line, and check the fairway buoy pairs (quayBUOYS) still bracket the channel. Second, in quayShore: when the into-component is more than 0.85 of the speed, add a 0.25 rad/s yaw nudge away from the obstacle centre plus a one-time toast 'S to go astern', so a head-on contact slides off instead of pinning. No save change, no new visual term.",
+    "files": [
+     "src/quay.js:108",
+     "src/quay.js:5395-5420",
+     "src/quay.js:120"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[quay] The hero is invisible for the whole ferry marquee: funnel and wheelhouse sit between the lens and the helm",
+    "category": "beauty",
+    "impact": 5,
+    "evidence": "Every helm frame (qa/ten-review/b0-quay-03-took.png through -08-run3.png) draws the capybara as a stippled occlusion ghost behind the cream funnel and green roof. The helm is at boat-local (0, 3.1) on the centreline. The funnel (0, 3.15, -2.6) and house are also at x = 0. The sailing lens targets heading + PI, dead astern, so the line of sight always passes through the funnel.",
+    "proposal": "In the sailing branch, target capy.group.rotation.y + PI - 0.38 rad (a starboard-quarter lens) whenever quayHelmOn, so the ray clears the funnel and the animal at the wheel is in profile with the bow water ahead. Alternatively, move quayHELM to x +0.9 (a wing wheel) with the binnacle boxes. Check with a hide-and-diff mask on the capy group that coverage goes from dithered to solid.",
+    "files": [
+     "src/systems.js:50309",
+     "src/quay.js:85",
+     "src/quay.js:3251-3261"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[manly] A solid bin stands on the spawn centreline, 2.8 m in front of the arrival",
+    "category": "bug",
+    "impact": 4,
+    "evidence": "Spawn (0, 2.9, 46). After 5 s of real W the animal was at z 42.9 and had moved 3 m. It is pressed against a green bin in qa/ten-review/b0-pretty-manly.png, and the same bin fills the middle of the arrival frame in b0-manly-01-arrive.png. The bins are at x = -50 + i*25 (i 0..4), so one is at x = 0, z = manPROM_Z + 2.2 = 43.2, with a manPoolBox collider. The pine row two blocks above was moved off x = 0 for exactly this reason (comment at 1549); the bins were missed.",
+    "proposal": "Offset the bin row by half a spacing: x = -37.5 + i*25. The centre stays clear by 12.5 m and the bins stay evenly spread. Re-run the spawn-ring / arrival instruments.",
+    "files": [
+     "src/manly.js:1609-1614",
+     "src/manly.js:1549-1553"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[manly] The Pacific reads as khaki-grey concrete, not surf",
+    "category": "beauty",
+    "impact": 4,
+    "evidence": "Mean RGB and saturation measured from the rendered PNGs. Water at the break (b0-manly-05-outback.png, box 700-1060 x 450-700): (161,168,148), saturation 0.12. Shallow water (b0-manly-06-wait.png): (169,191,174), saturation 0.14. Upper frame (b0-manly-01-arrive.png): (166,166,146), saturation 0.17. The authored colours are manSeaShal 0x51b0ad (81,176,173, saturation 0.54) and manSea 0x1f6272. For comparison, Quay water measured saturation 0.24. The wave faces render as pale grey wedges (b0-manly-05) and the beach shows through them. Mood row 'Late Westerly', lock 'golden', spray motes 1.0. Measured at rung 3, so re-check at rung 0.",
+    "proposal": "Don't re-base anything; lay a new term over it, flagged noManlyGlass and parked at rung 1 or above. In manUpdateSurface, widen the existing lip term (manLipC, the sun through the back of a crest) from the crest band to the whole wave face in the bank zone (manSeaShal band): lerp 35% toward manLipC on faces with slope > 0.2 facing the lens. The swell then reads as backlit aquamarine glass, the one read every Manly photo has. Vertex colours only, zero draw calls, well under 0.1 ms. If rung 0 still measures below 0.3 saturation, A/B the golden lock's air and wash terms on this chapter with qa/aaa-ab.mjs.",
+    "files": [
+     "src/manly.js:3566-3580",
+     "src/shared.js:945-949",
+     "src/weather.js:428-436"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[manly] The marquee clue never says how to get out the back (HOLD E to duck-dive)",
+    "category": "clarity",
+    "impact": 4,
+    "evidence": "Steering straight at the marquee point (0, -23.8) for 30 s got from z 30.6 to z 13.4, then back to 22.9. The shore break never let the animal through, and 'THAT ONE' fired while it was still in the whitewater. The paper showed the all-the-way clue 'out past the break; face the beach in front of the big one'. The only place HOLD E is taught is the duck-dive row's clue, and that row is not on the paper in act one.",
+    "proposal": "In the 'all-the-way' and 'take-off' clue functions, add a branch before the others: if game.capy.swimming and the animal is on the beach side of manly.bank(), return 'HOLD E as each white one reaches you — under, not over'. Also, the first time whitewater pushes a swimming animal back more than 3 m, toast it once in the lifeguard's voice. No save change.",
+    "files": [
+     "src/systems.js:32998-33020"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[sydney] Tutorial beats ignore actions the player already did, so pills nag over the marquee",
+    "category": "clarity",
+    "impact": 4,
+    "evidence": "The run to the podium used Shift from the start. 'hold Shift — she has legs.' then stayed on screen through the whole Opera House concert, including its title card (b0-syd-21-q.png, -22-q.png, -23-after.png, -24-after2.png). In the first run, 'Space, at the bench.' sat at bottom centre from about t 20 to t 35+ (b0-syd-04, -05, -06, -15, -16) and never says which bench. Beat 2 only adds to tutRunT during beat 2, and beat 3 needs one particular tutBench. Beats 4 and 5 already accept a done task (taskRec.wheek / steal-hat), so the rule is inconsistent.",
+    "proposal": "Keep session counters tutRunEverT and tutHopEver, running from beat 0. On opening beat 2 or 3, close it at once (tutBeatClose(true)) if the player has already done it: run time ≥ sysTUT_RUN_T, or any grounded landing with p.y > 0.9. While beat 3 is open, point the paper arrow at tutBench, the way beat 5 aims at the hat. Also hide any tutorial pill while game.wowLive() is true, so a marquee is never subtitled with 'hold Shift'.",
+    "files": [
+     "src/systems.js:52680-52714",
+     "src/systems.js:6525-6534",
+     "src/systems.js:6619"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[sydney] Photo flash renders as a 1 m grey card over the crowd, drawn through bodies",
+    "category": "bug",
+    "impact": 3,
+    "evidence": "The frame where the concert ticked (qa/ten-review/b0-syd-22-q.png) has a flat grey translucent square, about 180x185 px at (155-335, 470-655), drawn over the audience on the stairs and through a tourist's body. It is the npc.js fireFlash quad: BoxGeometry(1,1,0.02) in PALETTE.sail, depthTest false, renderOrder 21, placed 0.45 m toward the camera from a photographer who is about 6 m from the lens.",
+    "proposal": "Make the flash a small star rather than a 1 m slab. Scale the quad to 0.18 m times distance/6 (clamped 0.12-0.35), orient it to the camera each frame it is visible (f.q.quaternion.copy(camera.quaternion)), use PALETTE.foam with emissive at 1.6 so the composite blooms it, and set a 90 ms life. Keep depthTest off so it still reads through the crowd.",
+    "files": [
+     "src/npc.js:9266-9292"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[sydney] The concert payoff is small: 5-8 figures, invisible sail glow, fireworks hidden behind the encore",
+    "category": "reward",
+    "impact": 4,
+    "evidence": "After three notes (b0-syd-23-after.png, -24-after2.png), the house is 5 blocky figures queued at the bottom-left of the stairs. The sails look the same before and after the notes (b0-syd-10 vs -21 vs -23). The carpet still has two green wheelie bins and two cones on it, so the stage reads as a bin area. The fireworks, half-speed world and ten seconds of lit sails exist (envFireworkStep, envENCORE_*), but only on a fourth Q inside an 8 s window. That prompt shares the bottom pills with the gardener's tutorial pill.",
+    "proposal": "(1) Fire 3 of the 7 shells on the tick itself, and keep the full 7-shell, half-speed show for the encore, so every player sees the harbour answer once. (2) Raise stageGlow per note from 0.7 to 1.0 and hold it (envStagePulse decay 1.6 to 0.6/s) so the sails visibly brighten note by note. (3) While envConcertOn, have the bins and cones on the carpet be the props that scatter on the first note: an impulse from the capy, the 'mischief beat' already built. (4) Put 'Q — the encore' on the big-one card line (systems.js wow card) rather than a toast, and raise envENCORE_WIN to 12 s.",
+    "files": [
+     "src/environment.js:86-126",
+     "src/environment.js:3834-3890",
+     "src/environment.js:4107"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[sydney] The opening sky renders slate teal, not harbour blue, including behind the title card",
+    "category": "beauty",
+    "impact": 4,
+    "evidence": "Upper-frame sky mean across three sessions: title card (b0-syd-00-title.png) (107,130,131); arrival (108,139,138); concert (109,140,138), saturation about 0.2. PALETTE.skyTop is 0x8fd3ea = (143,211,234). The very first image a player sees (the title card) is under a sky that reads as a storm coming in, while the mood row says 'Harbour Midday', rain odds 0.16. Measured at governor rung 3, so the cause may be partly a parked term.",
+    "proposal": "Measure at rung 0 on the reference GPU with the qa/aaa-ab.mjs per-flag A/B, using the sky region only (the dome is renderOrder -10, depthWrite false). Find which composite or air term takes about 35% off the dome's luminance, and exempt the dome from that term the way depthWrite false already exempts it from the v45 air (environment.js ~2556-2575), rather than re-basing skyTop. If it survives at rung 0, the governor should not park near-clear air before shadows on the title/Sydney frame, because it is the first impression.",
+    "files": [
+     "src/environment.js:2544-2579",
+     "src/shared.js:710-711",
+     "src/main.js:2112"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[sydney] The lens buries itself in the colonnade awning and inside the Opera House sails",
+    "category": "beauty",
+    "impact": 3,
+    "evidence": "b0-syd-06-walk2.png at (-45.2, 0.3, 10.9): about 70% of the frame is the dithered underside of the colonnade awning and pier shafts, and the animal is a small shape between them. b0-syd-16-harbour.png at (13.5, 0.3, -8.8), harbour side of the House: the lens is inside a sail vault, and the vault's underside shows as ragged hanging strips on the left third.",
+    "proposal": "Give the colonnade's awning and entablature an envStaticBox with userData { camSolid: true }, as the podium plinth already has at environment.js:2935, so the boom stops in front of them. Extend the three sail shell camSolid colliders so they also cover the harbour-side (north) openings of the vaults, not just the forecourt side.",
+    "files": [
+     "src/environment.js:1037-1060",
+     "src/environment.js:2930-2936"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[sydney] Speech bubbles pile up and draw under the paper and the yuzu pill",
+    "category": "ui",
+    "impact": 3,
+    "evidence": "b0-syd-04-walk.png: four NPC bubbles, two pills, the paper, the puff bar and the minimap are on screen at once. Two bubbles are cut off by the paper card ('…on over there?', '…thing's happening' with the yuzu pill on top). The same thing happens in b0-syd-24-after2.png ('Table with a view, you said.' under the paper edge).",
+    "proposal": "Cap live NPC bubbles at 2, nearest to the animal first, and let the rest queue. Clamp each bubble's screen x so its box never enters the paper's getBoundingClientRect (and the yuzu pill's); nudge it right, or drop it if it can't fit. Put it behind a noBubbleCap flag.",
+    "files": [
+     "src/npc.js",
+     "src/systems.js:27318"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[quay] Bow spray reads as floating paper and ice boulders",
+    "category": "beauty",
+    "impact": 3,
+    "evidence": "b0-quay-04-under.png, at speed: the bow throws big flat cream triangles about 2-3 m across that lie on the water like sheets of paper, plus white faceted spheres the size of the wheelhouse either side of the bow. Neither reads as spray.",
+    "proposal": "In quaySprayEmit/quayBuildSpray, cut the sheet size to about 0.35 times current, double the count within the same InstancedMesh (quaySPRAY_N 22 to 44), give each one a tumble (random axis spin) and a 0.6 s life with scale going to 0 in the last 40%. Change the colour to PALETTE.foam from the cream sail tone. Shrink the bow puff spheres to 0.5 times and lift them 0.4 m so they leave the hull as a plume. Draw calls stay the same.",
+    "files": [
+     "src/quay.js:2964-2990"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[quay] 'Earn a dolphin escort' is free: it ticks 11 s after taking the wheel",
+    "category": "reward",
+    "impact": 3,
+    "evidence": "Took the helm at t 40.8, and 'dolphin-escort' was done at t 52.4 with nothing but W held. The rule is 'hold better than 6.5 m/s for six seconds', which full throttle does by default. A task named 'earn' should be earned, and here it also uses up the harbour's best moment in the first 100 m.",
+    "proposal": "Only let the dolphins surface (quayDolphinOn) once the boat is past Bradleys Head (quayBoatZ < quayBRAD.z) and within 20 m of the rhumb line between the next buoy pair. The escort then becomes the reward for steering the open-harbour stretch well, it lands mid-passage, and the rest of the rule stays as it is.",
+    "files": [
+     "src/quay.js:5829-5850",
+     "src/quay.js:109"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[manly] The arrival frame is the back of a blank billboard, a bin and zebra planks",
+    "category": "beauty",
+    "impact": 3,
+    "evidence": "b0-manly-01-arrive.png, the first frame of 'the sea has a shape here': about 35% of the frame is dithered crossing planks, then the bin, then the blank cream back of a noticeboard. The ocean is a thin grey band on the horizon, and the break, the flags and the swell are not in shot.",
+    "proposal": "After fixing the bin, set the chapter's arrival lens to look down the beach over the break: the resting lens already described at (11.6, 6.7, 48.4). Alternatively, spawn at the top of the centre beach steps (x -12, z 38) facing -z, so the first thing on screen is a set breaking across the whole frame. Turn the noticeboard 180 degrees so its painted face (not the blank back) faces the promenade.",
+    "files": [
+     "src/shared.js:4183-4186",
+     "src/manly.js:1614-1620"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[free-roam] The Free Roam picker shows the story grouping, not the 19 tiles the owner asked for",
+    "category": "ui",
+    "impact": 4,
+    "evidence": "b0-free-00.png: 'Free roam' opens 'Where would you like to start?' with a big Sydney hero card, a 'A little further' fold holding 2 tiles, and collapsed folds 'In good company' and 'Other people's rhythms', plus '2 MORE BELOW'. Only 3 of 19 places are visible. The owner explicitly asked for the 19 tiles in one clean grid for Free Roam.",
+    "proposal": "When the picker is opened from Free Roam, skip the hero and fold layout and render one 5x4 grid of all 19 painted tiles (the same tile art and key corners). Keep the story layout for Story Mode. No save change.",
+    "files": [
+     "src/systems.js:25332"
+    ],
+    "effort": "M"
+   }
+  ]
+ },
+ {
+  "area": "South America (pasto, cali, rio, pantanal)",
+  "score_now": 6.5,
+  "summary": "I played all four chapters with real keys in session tr-biome1. The laptop was shared with other reviewers, so the governor sat at perfRung 3 the whole time (median frame 62-82 ms). That means reflections, far planes and full shadows were parked, and my beauty calls take that into account. What each place is works well. Pasto's plaza, with its bunting, a llama and a vendor chasing the animal, is lively. Cali's party bus is noisy and colourful, with a band on the roof. Copacabana's wave pavement, the kiosk and the Globo man read as Rio at a glance. In the Pantanal, the herd answers each call on a rising pitch and the cowbird rides the animal's back. What keeps the group from a 10 is that three of the four headline moments failed or got in each other's way when I played them for real. In Pasto the condor ended up on the paving next to the animal and was never grabbable (0 of 100 samples in reach). In Rio the fragata is called with the same Q, in the same 13 m circle, as the three-wheek travel door. In Cali an idle passenger fell off the party bus about 30 m into the ride and the bus drove on without it. The places also lose their sense of where they are at the edges: Pasto's horizon is grey pyramids rather than the Andean patchwork, and the Pantanal's mirror water turns to olive mud as soon as the governor steps down.",
+  "findings": [
+   {
+    "title": "[pasto] After the second whistle the condor settles on the plaza paving and can never be grabbed",
+    "category": "bug",
+    "impact": 5,
+    "evidence": "qa/ten-review/tb3-pasto.js on a fresh file, standing at the plaza spawn (0,26): Q, wait 5 s, Q, then 10 s of sampling. condor.state was 'circling' for 100/100 samples, talonInReach() was true in 0/100, and the talon-to-animal distance got as low as 1.45 m. In other words the bird was standing on the ground beside the capybara. Screenshot qa/ten-review/tb3-pasto-02-plaza-low.png shows the black condor lying flat on the paving next to the animal, with the paper still saying 'Q again to bring it lower, then hold E under it'. In the earlier run (tb2-pasto-03-grab.png) E was held for 3 s and nothing happened (mounted:false). condorPickupReady() requires p.y - terrain > 4 and a launch path clear of scenery for 1.4 s, so a bird parked on the plaza can never pass. This was at rung 3, but weaker laptops sit there too, and this is the chapter's headline moment.",
+    "proposal": "In the low-orbit branch of the condor update, clamp the bird's target height to max(condorORBIT_LOW_Y + capy.y, condorGroundTop(x,z) + condorHANG + 3.5), so it can never reach the paving. Then add a watchdog: if condorLowered && !condorPickupReady() for 3 s in a row, move the orbit centre to the nearest open point (a ring search on condorGroundTop, 8 bearings x 8/14/20 m) and say 'it will not come down under the flags. somewhere with more sky.' through game.toast. Point the paper's where() for condor-ride at that point too. Add a harness row condorAudit().stuckT so the soak catches it. Gate the reposition behind game.state.noCondorOpen.",
+    "files": [
+     "src/condor.js:192",
+     "src/condor.js:2423",
+     "src/condor.js:2461",
+     "src/condor.js:976",
+     "src/pasto.js:1408"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[rio] The three-wheek travel door sits on the fragata summon spot, so calling the bird opens the travel board",
+    "category": "bug",
+    "impact": 4,
+    "evidence": "CHAPTERS puts Rio's marquee at Arpoador (-62,-26), and the fragata is called there with Q. atRio in systems.js:52799 is game.rio.inZone('arpoador'), which is rioARPOADOR r=13 (rio.js:53). The home counter at systems.js:52943 counts every input.whistlePressed inside that zone and calls boardOpen() on the third, and it only excludes the player while mounted. In tb2-rio-03-grab.png, after the call and the lower (two Qs), the pill 'wheek three times to go home ○○○' is sitting in the middle of the marquee frame. A player who presses Q a third time because the bird is slow to come down gets the travel board in the middle of the chapter's star moment.",
+    "proposal": "In homeOk, add && !(game.condor && game.condor.active) && !(game.state.flierWhistleT > 0), and have condorSummon() set game.state.flierWhistleT = 6 whenever it consumes a whistle (in the circling and inbound branches). Better still, move Rio's door off the rock to the Posto 6 fishermen's end or the kiosk line: add an inZone('posto6') box in rio.js and change the CHAPTERS 'way' line to match. The rock then belongs only to the bird and the applause. Pasto's crater door has the same shape (condor-ride and thermal-peak also use Q near the crater), so apply the same guard there.",
+    "files": [
+     "src/systems.js:52799",
+     "src/systems.js:52905",
+     "src/systems.js:52943",
+     "src/rio.js:53",
+     "src/condor.js:976",
+     "src/shared.js:3990"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[cali] An idle passenger slides off the party bus about 30 m in, and the bus carries on without it",
+    "category": "bug",
+    "impact": 4,
+    "evidence": "qa/ten-review/tb2-cali.js called game.cali.roofPlace(0) with the chiva parked and then gave no input. At 3 s chivaDebug() reported st:'rolling', onRoof:true, s=2.9, and the paper card showed 'THE BIG ONE · NOW, on the roof · 0 of 10 cables'. By 15 s the animal was at (-0.4, 0.7, 40.5) on the pavement with onRoof:false, wiresTouched 0 and hits 0. The chiva went on to s=177 with nobody on board (tb2-cali-03-ride.png, 05-ride3.png). No line told the player they had missed her. The paper just switched back to 'Ride the party bus roof up… 60 m'. This was at rung 3, where the world steps under a 1/20 s clock, which is exactly where a moving floor loses friction.",
+    "proposal": "Hold a passenger to the roof whenever there is no input. When caliOnRoof has been true within the last 0.3 s, the animal is inside the roof's local box plus 0.4 m, and no move key is held, snap its horizontal velocity to the chiva's frame velocity each substep (the same carry-frame write rio's bonde uses), so only a deliberate walk or a cable takes it off. Add a missed-her beat: if the animal leaves the roof while st is 'rolling' and no cable hit caused it, say 'she does not stop for anybody. she goes round again.' and show caliChivaNextIn on the paper, the same way nextIn works for Pasto's carroza. Flag: noChivaHold.",
+    "files": [
+     "src/cali.js:143",
+     "src/cali.js:2601",
+     "src/cali.js:2615",
+     "src/cali.js:4812",
+     "src/cali.js:4775"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[pasto] Whistling for the condor gives no camera beat, so the bird arrives out of shot",
+    "category": "clarity",
+    "impact": 4,
+    "evidence": "condorSummon (condor.js:965-1063) spawns the bird 46 m out at a random bearing and 56 m up, then toasts 'something enormous turns overhead'. Nothing moves the camera. In tb2-pasto-02-called.png the locals are saying 'Look at the size of that thing.' while the frame shows level plaza, stalls and a bench, and no condor anywhere (it was at (-1.8,14.1,26.1), behind the lens). Rio's fragata uses the same module, so it has the same gap. The only framed shot in this file, condorShot, runs at the launch, after the player has already found the bird.",
+    "proposal": "On the first summon of each chapter visit, call game.frameShot({ yaw: atan2(bird.x - capy.x, bird.z - capy.z) + PI, dist: 11, pitch: -22*PI/180 (looking up), raise: 1.5, hold: 2.6 }) as soon as the bird crosses 30 m from the animal while inbound. That keeps the animal in the bottom third with the wings turning above it. Play the whistle's echo as a second, lower wheek 0.6 s later through game.sfx('whistle',{pitch:0.8,volume:0.5}) so the call sounds answered. Flag game.state.noSummonShot, which costs nothing when cut. It fixes Pasto and Rio in one place.",
+    "files": [
+     "src/condor.js:965",
+     "src/condor.js:1060",
+     "src/pasto.js:3320",
+     "src/rio.js:4902"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[pasto] The horizon is 21 grey pyramids, not the Andean patchwork Nariño is known for",
+    "category": "beauty",
+    "impact": 4,
+    "evidence": "Every Pasto frame I took (tb1-pasto-02-list, tb2-pasto-03-grab, tb1-pasto-06-wander) closes on sharp 4- and 5-sided grey cones 60-110 m tall. They come from pastoPEAK_RINGS (pasto.js:563-566) using ConeGeometry(1,1,4|5). Behind the plaza they read as generic low-poly mountains that could be any chapter's. The real view from Pasto, and Nariño's signature, is the colcha de retazos: rounded green ridges quilted with fields in greens and ochres, with hedgerows between them.",
+    "proposal": "Keep the far ring (r 184, pale andesFog) as the one silhouette of volcanoes. Replace the near ring with a closed ridge strip: one BufferGeometry annulus from r 140 to 175, 96 x 6 quads, with a smooth sum-of-sines profile rising 18-45 m. Give each quad a vertex colour picked from 5 existing PALETTE field tones (grass greens, andesSun ochre, a ploughed brown) on a 2 x 3 quad patch grid, and darken the quad edges along the patch borders as hedgerows (PALETTE.peakFar). Flat Lambert, one draw call, about 1.2k tris, no shadows. The patchwork must show from the plaza (y about 4) and from condor altitude. The ring is static, so it needs no flag. It lays over the existing layout and re-bases nothing.",
+    "files": [
+     "src/pasto.js:552",
+     "src/pasto.js:563",
+     "src/pasto.js:568"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[rio] Arpoador's boulders are drawn but not solid, right where the marquee happens",
+    "category": "bug",
+    "impact": 3,
+    "evidence": "rioBuildArpoador (rio.js:1660-1680) scatters 22 boulders at random with up to 3 m radius (M.sph) across the rock and never adds a collider (no rioStaticBox). When I placed the animal on the rock (tb2-rio-01b/03-grab.png) it stood inside a boulder. The rock showed a dithered hole with the animal's colour showing through, and it then sank to y -0.9 in the surf. The call, the applause crowd and the marquee framing all happen on this rock, so a player walks through its stones while trying to get under the bird.",
+    "proposal": "For each sphere with s > 1.4, add a rioStaticBox that fits the drawn half-extents (s, s*0.55, s) at the same x/z and yaw 0, pooled into one body the way pastoBody pools the bunting posts. Also swap rand() for a seeded rioRnd so the rock is the same on every visit, which the collider needs anyway. A differential with qa/audit-solid2.js (walk at each stone) proves it.",
+    "files": [
+     "src/rio.js:1660",
+     "src/rio.js:1663",
+     "src/rio.js:53"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[pantanal] Arrival hitches for about a second, and it is the only chapter in my group that does",
+    "category": "perf",
+    "impact": 3,
+    "evidence": "The same 3 s rAF sample right after the arrival fade, on the same loaded machine: Pasto p95 120 ms, Cali 67.8, Rio 69.0, Pantanal p95 900 ms with a max of 1199 ms, only 22 frames in 3 s (qa/tb1-pantanal.json.png). The first frame (tb1-pantanal-01-arrival.png) is still under the white wash at t=14.8 s. A spike this size on top of a steady 66 ms median points to first-use shader compiles, most likely the flood's grainOwn water with the reflection, the dusk-tinted sheet and the lily and firefly materials, landing in the first visible frames. HANDOFF records the same shape for Palawan's manta (fixed by warming during the fade).",
+    "proposal": "In the Pantanal onEnter, while the white card is still up, call renderer.compile(scene, camera) once with the chapter root and the dormant dusk, firefly and jaguar groups set visible for that single call, then restore their visibility. This is the Palawan manta pattern. Measure it with qa/aaa-ab.mjs-style GPU timers on a fresh profile: arrival p95 over the first 3 s should drop to within about 1.5x the chapter's steady frame time. Flag: noPanWarm.",
+    "files": [
+     "src/pantanal.js:5921",
+     "src/pantanal.js:602",
+     "src/pantanal.js:3584"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[pantanal] At any governor rung above 0 the mirror flood turns to olive mud",
+    "category": "beauty",
+    "impact": 3,
+    "evidence": "The water is meant to be 'a MIRROR: what you see is not the water, it is the sky in the water' (pantanal.js:3568). The planar reflection (reflect k 1.0, pantanal.js:611) parks at rung >= 1. In every play shot (tb1-pantanal-03-midway, tb2-pantanal-03-midriver) the flood is flat opaque khaki, the lily pads float on what looks like mud, and the caimans read as flat black wedges. Players on laptops that step down lose the chapter's defining picture.",
+    "proposal": "Add a cheap fallback inside grain() for this material, used only when the reflection is parked. Take the view-space Fresnel you already compute (fresnel 0.65) and mix toward a two-stop vertical sky gradient (PALETTE panSky, a lightened panHaze) instead of toward the sheet colour, so grazing angles show pale sky. Then subtract a soft dark band where the gallery-forest silhouette would reflect, as a function of view direction only (a sin band on atan2(view.x, view.z) scaled by the tree line), for the look of reflected trees. That is roughly 0.03 ms. Flag noPanSkyFresnel, active only while perfRung >= 1. Check it with a hide-and-diff mask on the water at rung 1.",
+    "files": [
+     "src/pantanal.js:602",
+     "src/pantanal.js:611",
+     "src/pantanal.js:3584",
+     "src/shared.js"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[cali] The lens fade clears only a 0.7 m band of a lamp post, so the pole still splits the frame",
+    "category": "ui",
+    "impact": 3,
+    "evidence": "In tb1-cali-04-marquee.png a black utility pole stands between the camera and the animal. Only a band of it at chest height is dithered (sysLENS_CAP_R = 0.7 m capsule, systems.js:643). The rest of the pole stays a solid black bar through the middle of the screen. The Pantanal version is worse: in tb1-pantanal-06-wander.png the capsule fade on a bush shows as a hard-edged rectangular screen-door slab across a third of the frame, with the animal cut off at the bottom edge.",
+    "proposal": "When the capsule test hits a mesh flagged userData.thin (poles, lamp posts, trunks; set in caliBuildWires and panBuild*), fade the whole mesh through the existing vLensFade per-draw uniform instead of the capsule, and bias the boom by sysLENS_OUT for as long as the hit lasts. For foliage clumps, taper the capsule's fade edge over 0.5 m (smoothstep on distance to the capsule axis) so the fade has a soft radial edge rather than a rectangle. This is the existing noLensCap A/B, with one new flag noLensThin.",
+    "files": [
+     "src/systems.js:640",
+     "src/systems.js:643",
+     "src/cali.js:2079",
+     "src/pantanal.js:602"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[pasto] The arrival lens looks up into the drizzle, so the first frame is mostly brown sticks",
+    "category": "beauty",
+    "impact": 3,
+    "evidence": "tb1-pasto-01-arrival.png is the chapter's first picture. The arrival lens pitches up at Galeras from under the bunting, and the frame is full of long dark diagonal streaks and grey chips. That is the 'Andean Drizzle' rain field (weather.js:282, rain odds 0.46) drawn as BoxGeometry streaks inside a 10 m box around the camera (weather.js:936, wxRAIN_BOX_R 588), plus the motes. Seen from below against the sky, the streaks read as twigs falling around the volcano, not rain, and they bury the plume and the cone.",
+    "proposal": "Two changes, both laid over the existing rows with nothing re-based. (1) A rain start delay: in wxPrime(to), when the arrival lens is up (game.state.arriveLens or the first 20 s after a cross), hold rainWant at 0 so the first frame of every chapter is dry and the shower rolls in later. The weather row stays the same. (2) A streak term that depends on pitch: scale each streak's length by (1 - 0.7*max(0, camPitchUp)) and lerp its colour toward the sky fog colour as the camera pitches up, so rain seen against the sky reads pale and short. Flag noRainPitch, which costs nothing when cut.",
+    "files": [
+     "src/weather.js:282",
+     "src/weather.js:588",
+     "src/weather.js:936",
+     "src/weather.js:1176",
+     "src/weather.js:1183"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[pantanal] Gathering the herd takes nine separate wheeks, one recruit each",
+    "category": "fun",
+    "impact": 3,
+    "evidence": "herdToCrossing() placed the nine capybaras beside the animal. One Q recruited exactly one (herdAudit: 1 row 'follow', 8 'graze'). After a 14 s swim toward the river the other eight were still grazing at the start (tb2-pantanal-03-midriver). The recruit loop (pantanal.js:4047-4061) takes the single nearest non-follower per wheek. The rising answer figure is lovely, but it has to be pressed out nine times, and the crossing clue asks for 4 before you can start. The chapter is about 'the world falls in behind you', and in play it feels like clicking.",
+    "proposal": "Make the herd cascade: after the third recruit, each further wheek recruits the nearest one plus any grazer within 5 m of a follower, capped at 3 per wheek. Their answers keep the rising scale, each 0.12 s after the last. Wheeking with 5+ followers makes the remaining grazers within 16 m look up (the look=1 path) and trail after the line at graze speed for 6 s. The chorus arrives sooner and the crossing starts after 3-4 wheeks instead of 9. No save field is involved, since following is live state. Flag noHerdCascade.",
+    "files": [
+     "src/pantanal.js:4040",
+     "src/pantanal.js:4047",
+     "src/pantanal.js:4059",
+     "src/systems.js:33049",
+     "src/systems.js:33073"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[rio] The Copacabana frontage sits in deep shade, so half the beach frame is grey slabs",
+    "category": "beauty",
+    "impact": 3,
+    "evidence": "In tb1-rio-06-wander.png, looking along the beach, the left half of the frame is apartment blocks in heavy shade: dark grey, near-black windows, palms against a dark wall. The right half is bright sand and sea. The Avenida Atlântica is famously a bright wall of white and pastel buildings, and here it reads as a gloomy concrete canyon. The blocks use rioWall1/2/3/5 (rio.js:2320-2400). The seaward faces are shaded because of where the sun sits, and that sun must not be re-based.",
+    "proposal": "Leave the sun alone and lay a bounce term over it. The frontage faces a 100 m-wide bright beach, so add a sand-bounce vertex colour to the seaward faces in rioBuildFrontage: lerp each face's colour 25% toward PALETTE.rioPavePale, weighted by the face's normal dot the -z (sea) direction and fading with height (strongest on the bottom two floors). Scatter lit window rows (PALETTE warm window colour) on 1 in 6 windows so the wall has life when it goes to dusk. It is baked, so it costs nothing per frame. Flag noRioBounce, checked by a hide-and-diff mask on the frontage band.",
+    "files": [
+     "src/rio.js:2320",
+     "src/shared.js:321"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[cali] Chiva cables are drawn as thick black bars across the spawn street",
+    "category": "beauty",
+    "impact": 2,
+    "evidence": "In tb1-cali-02-list.png, taken at the spawn, five or six black cables cross the upper-left third of the frame as heavy bars, thicker than the palm trunks, running into the camera. caliBuildWires (cali.js:2079-2110) builds them as catenaries at caliWIRE_Y 4.2 m plus 1.42 m, which puts them at the follow camera's eye height for most of the town, and they are what frames the first impression of Cali. They are a real hazard on the chiva route, but at the spawn they only add clutter.",
+    "proposal": "Draw the cables at about half their current radius, in a mid-grey from PALETTE (a dark metal, not black), and fade any cable segment within 5 m of the camera through the existing vLensFade uniform. That keeps the wires readable from the roof, where they are the challenge, and clears them from the walking camera. Flag noWireFade.",
+    "files": [
+     "src/cali.js:167",
+     "src/cali.js:2079",
+     "src/cali.js:2100"
+    ],
+    "effort": "S"
+   }
+  ]
+ },
+ {
+  "area": "biome group 4: sahara (ch8 Marrakech), venice (ch10), goreme (ch13 Cappadocia), monaco (ch18)",
+  "score_now": 6.8,
+  "summary": "I played each chapter with real keys at a fresh save, 2 to 3 runs each, and went back for the Sahara jetpack, the Cappadocia balloon and the Monaco car. The best frames are really good: the dune crest looking back at the Koutoubia and the palmeraie, the St Mark's facade and clock tower, pre-dawn Cappadocia under the balloons, and the Monaco grid at night in front of the stand. Two of the four marquees are broken right now. In Monaco the animal is not in the red car it is driving (measured 8.7 m apart while atHelm is true). In Cappadocia the chase truck parks its trailer collider on the launch basket, and in two runs the animal could not board. Beyond the bugs, three camera problems keep it off a 10. Venice has no camera ceiling under the Procuratie arcades. The Monaco race camera gets buried behind terrain. The jetpack paper keeps showing an unrelated task while the jetpack run is on, so the player flies off the course into a void. On beauty, the Sahara day sky blends into the sand as one khaki colour, Monaco's harbour boats look like pontoons, and the Marrakech arrival is a tiled floor plus a 275 m walk over an empty plain. The small mischief (orange cart, snake basket, spritz, pigeons) ticks within 15 to 20 s of arrival and feels good. Headless timing was about 15 fps at perfRung 3 in every chapter.",
+  "findings": [
+   {
+    "title": "[monaco] BUG: the capybara is not in the red car it is driving",
+    "category": "bug",
+    "impact": 5,
+    "evidence": "qa/ten-review/tr4m-monaco.js: I pressed E at the car and held W. The car drove the circuit at 20-30 m/s. qa/ten-review/tr4-car.js measured capy.atHelm=true with the capy at (153.9,10.2,0.9) and the monMeCar mesh at (150.2,8.5,-7), 8.7 m apart. In tr4-car-now.png the animal is standing on the road behind the red car under the bridge. In tr4m-monaco-04-drive.png it is on the hillside about 5 m to one side of the car. Likely cause: the seat is written from the analytic target (monMeTX/TY/TZ) but the car mesh is copied from monMeBody.interpolatedPosition. monMePlace(dt) only sets a velocity on that body, and main.js caps the physics at 2 substeps once perfRung >= MAIN_SHED_RUNG. At low frame rates the body only covers part of each frame's travel, so the car falls further behind the target (and the seat) every frame.",
+    "proposal": "Use one pose for both. In monMePlace(dt>0), also do b.position.set(tx,ty,tz) (keep the velocity for contacts), and in the race update draw monMeG at (monMeTX, monMeTY, monMeTZ) with the yaw from monMeYaw instead of from interpolatedPosition/Quaternion. Do the same to the pack cars if they use the same pattern. Test: probe |capy - monMeCar| < 1 m over a whole lap at perfRung 0 and 3, and take a picture of the capy on the roof or in the seat.",
+    "files": [
+     "src/monaco.js:3050",
+     "src/monaco.js:3493",
+     "src/monaco.js:3507",
+     "src/main.js:1687",
+     "src/main.js:2875"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[goreme] BUG: the chase truck parks its trailer on the launch basket and blocks boarding",
+    "category": "bug",
+    "impact": 5,
+    "evidence": "In two separate runs (tr4-goreme.js, then tr4m-goreme.js with 40 s of steering plus hops) the animal stopped 2.19-2.26 m from the basket at (-0.66,4.54,0.17) and never got aboard, so 'aboard' and 'sunrise' could not start. tr4-near.js listed the physics bodies there: basket body 250 at (0,4.32,-2) and the trailer bed KINEMATIC body 248 at (0.5,5.05,-1.7) with 1.3x0.12x2.1 half-extents and side rails, i.e. the bed overlaps the basket. tr4m-goreme-03-aboard.png shows the capy wedged between the green truck and a poplar trunk, with the basket behind. gorUpdateTruck chases gorBalX/Z + wind*fall even while the balloon is on the ground (fall = 0), so the truck drives from (20,10) onto the pad and stops at d<3, which puts the trailer 2.4 m behind it, right on the basket.",
+    "proposal": "In gorUpdateTruck, hold the truck at its parking spot (20,10, yaw 0) until the balloon is airborne (gorBalY - ground > 2) or a flight has started. When it chases a balloon that is landing, clamp its aim point to at least 7 m from (gorBalX,gorBalZ) so the trailer can never land on the basket collider. Test: from a fresh save, walk to hintTarget('aboard'), hop, and assert gorAboard within 10 s.",
+    "files": [
+     "src/goreme.js:4603",
+     "src/goreme.js:4415",
+     "src/goreme.js:4742"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[venice] The camera goes into the Procuratie arcades: dark wall frames and a dithered animal",
+    "category": "beauty",
+    "impact": 4,
+    "evidence": "2 of the 6 play shots were unusable. tr4-venice-03-spritz-theft.png (the spritz cafe under the arcade): the lens is inside the colonnade, the frame is 80% dark brown ceiling and pillar, the capy is a dithered close-up. tr4-venice-07-wander.png at (-17.9,1.3,-35.2): the camera is wedged between arcade piers with large yellow bokeh discs. Venice has no camCeil hook. Sahara solved the same problem for the souk with sahCamCeil (sahara.js:694), which it passes to the rig as camCeil and systems.js:50976 reads.",
+    "proposal": "Add venCamCeil(x,z) that returns the arcade soffit height (about 4.2 m) inside the footprints of both Procuratie colonnades and the cafe portico (the rectangles already built in venBuildSquares), and null elsewhere. Pass it as camCeil in the rig api, as Sahara does. Test: stand at (-17.4,0.9,-18.4) and (-17.9,1.3,-35.2), confirm the camera y stays below the soffit, and check by eye that the capy is not dithered.",
+    "files": [
+     "src/venice.js:1056",
+     "src/sahara.js:694",
+     "src/sahara.js:6221",
+     "src/systems.js:50976"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[sahara] The jetpack run: the paper shows the orange cart, so a free flight ends in a khaki void",
+    "category": "clarity",
+    "impact": 4,
+    "evidence": "tr4m-sahara.js: strapped on at the crest (275,37,55), then held W+Space in 2.5 s bursts. The animal flew 130 m north to (263,14,173) and then west to (32,1,165), never passing a ring. In tr4m-sahara-05-flying.png the paper tab title reads 'Rob the orange juice cart 99+ m' with only a small subline 'to the minaret in 10.7 s'. No ring is on screen, and the sand and sky are the same khaki with no horizon. The wowLive line is shown, but the tab's head and arrow still point at the next unticked paper row.",
+    "proposal": "While wowLive is fresh (sysWOW_LIVE_STALE), switch the paper tab's title and arrow to the live marquee. Point the arrow at the next ring, from a new sahara hook game.wowTarget() -> {x,y,z} of sahJET_RINGS[sahJetNext] (or the minaret), and do the same for the Monaco lap and the Venice flood. Also give each ring a thin vertical PALETTE beam to the sand (flag noSahRingBeam, parked at rung >= 1) so it can be seen from 150 m.",
+    "files": [
+     "src/systems.js:26962",
+     "src/sahara.js:5768",
+     "src/sahara.js:169"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[sahara] The day sky is khaki, so sky and sand merge (the chapter looks smoggy)",
+    "category": "beauty",
+    "impact": 4,
+    "evidence": "Every Sahara day shot (tr4-sahara-01, -03, -06, tr4m-sahara-05) has an olive-khaki sky close in value to the plaster and dune. From the air (tr4m-sahara-05-flying.png) there is no horizon at all. Cause: the sky colour is sahSkyDay lerped 0.62 toward sahSkyHot 0xd9d4bc ('nearly white'), and the haze sahHaze 0xe4cfa8 sits on top. The sky reads overcast in a chapter whose line is 'Forty-one degrees in the shade'.",
+    "proposal": "Leave the grade and fog as they are and add a zenith band over the dome: the top 35% of the sky lerps toward a new PALETTE.sahZenith (a saturated blue near 0x4f8fc4) by elevation, and the horizon stays hot and pale. That gives the 'white horizon, blue overhead' look and puts a value break behind the minaret and dune crests. Gate it with game.state.noSahZenith, park it at rung >= 1, fade it with the storm/dusk scalar the chapter already exports (sahara.js:6260) so the sandstorm still eats it, and check with the qa/aaa-ab.mjs A/B.",
+    "files": [
+     "src/systems.js:2823",
+     "src/shared.js:499",
+     "src/shared.js:500",
+     "src/sahara.js:6260"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[monaco] The race camera is buried behind terrain and the car barely shows",
+    "category": "beauty",
+    "impact": 4,
+    "evidence": "tr4m-monaco-04-drive.png on the climb out of the harbour: 60% of the frame is a dark hillside and the red car is a small shape in the upper middle. tr4m-monaco-05-drive2.png: the lens is off the road among barriers and billboard slabs. At the start line (tr4-monaco-07-wander.png) the grid-and-stand composition is excellent, so the problem is the follow camera on the climbing, cut road.",
+    "proposal": "While monRaceOn, give the rig a race frame: a higher eye (+1.5 m), a shorter follow distance, and a look-ahead aim 12 m down the track from monTrackAt(monMeS+12), plus a camFloor that returns monRoad height + 2.5 on the circuit so the lens cannot sink into the cut banks. Use the same optional-hook shape as camFloor/camCeil (systems.js:30139).",
+    "files": [
+     "src/monaco.js:3329",
+     "src/monaco.js:753",
+     "src/systems.js:30139"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[sahara] The walk to the marquee is 275 m of empty flat plain",
+    "category": "fun",
+    "impact": 3,
+    "evidence": "The marquee is at (275,55) and the spawn at (0,8). The bot covered 40 m in 35 s. tr4-sahara-06-jetpack.png and -07-wander.png outside the walls: a uniform orange plane, sparse clusters of brown stakes, and a checker-stippled wall shadow. The camel ride exists ('Leave town on somebody's camel', caravan at 107,22), but nothing in the frame at the gate says so, and a walker gets nothing along the way.",
+    "proposal": "Dress the stretch from the gate to the palmeraie as a route people use, not a plane. Put a line of 8-10 telegraph poles along the staked track, fresh tyre ruts (the ground decal pass), and a donkey cart heading out on the same polyline as the caravan. At the gate, have a camel boy whose bubble says the caravan leaves 'when it leaves' and who kneels his camel when the animal comes within 6 m. That makes the ride the obvious answer, and the walk becomes optional. All of it uses existing instanced props and the caravan code.",
+    "files": [
+     "src/sahara.js:4730",
+     "src/sahara.js:3032",
+     "src/sahara.js:3818"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[monaco] The harbour boats read as pontoons, not the superyachts the place is famous for",
+    "category": "beauty",
+    "impact": 3,
+    "evidence": "tr4-monaco-04-palace-guard.png (swimming in the port) and -03: the moored boats are flat white slabs with brown decks and one cube cabin plus a mast, the same height as the pontoons. From the water nothing says 'Monaco harbour'. The one real yacht (monBuildYacht) is the task boat; the rows at the quay are what fill the frame.",
+    "proposal": "Change the moored boats in monBuildHarbour so every third one is a 3-tier motor yacht: a stepped superstructure (3 boxes, each 70% of the one below), a dark window band in a PALETTE navy, a raked bow wedge and a thin pale hull stripe, merged into the existing instanced batch so it adds no draw calls. Add a lit window row on the top tier using the existing EMIT_OVER emitter pattern (monaco.js:2783) so they glow at night.",
+    "files": [
+     "src/monaco.js:1303",
+     "src/monaco.js:1327",
+     "src/monaco.js:2783",
+     "src/monaco.js:3692"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[sahara] Four speech bubbles at once cover the best view in the chapter",
+    "category": "ui",
+    "impact": 3,
+    "evidence": "tr4m-sahara-03-crest.png: from the dune crest, the view back to the Koutoubia and the palmeraie (the chapter's best composition) is covered by four bubbles at once: 'The storytellers start at dusk...', 'Dust off the Atlas...', 'Chergui. Shut the shutters.', 'Walk up on the hard track...'. The Jemaa arrival (tr4-sahara-04) had two more on top of the ticked toast. The bubble pool is eight elements and nothing caps how many show at once (systems.js ~30772 only removes duplicate text).",
+    "proposal": "Cap visible NPC bubbles at 2. Priority goes to the nearest speaker and to any line addressed to the animal. Other bubbles queue for 2.5 s or fall back to the one-line heard pill. Also, bubbles from speakers more than 25 m away should use the heard pill, not a floating bubble.",
+    "files": [
+     "src/systems.js:30772",
+     "src/systems.js:30794"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[sahara] The Jemaa el-Fnaa floor reads as a tiled kitchen floor, and the square has no evening smoke",
+    "category": "beauty",
+    "impact": 3,
+    "evidence": "tr4-sahara-01-arrival.png and -02: the square is a terracotta grid of 6 m tiles with thick dark-red joints running to the horizon. That is the loudest pattern in the frame, and the real square is open, dusty, trodden plaster. There are no smoke columns over the food stalls, which are the square's signature from any distance.",
+    "proposal": "Cut the joint colour contrast by about 70% and break the lattice with 3-4 worn diagonal footpaths (a lighter PALETTE value) between the stalls, cart and snake basket, in sahBuildSquare. Add a slow grey-white smoke plume above each food stall from the existing weather mote pool (flag noSahStallSmoke, parked at rung >= 1). That puts a landmark over the stall rows you can see from the dune crest.",
+    "files": [
+     "src/sahara.js:1173",
+     "src/sahara.js:1338"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[venice] The arrival frame is half blocked by a grey plinth and a traffic cone",
+    "category": "beauty",
+    "impact": 3,
+    "evidence": "tr4-venice-01-arrival.png at the spawn (-4,13): St Mark's gilded domes are framed between the two Molo columns, which is good, but a large grey block (a plinth or utility box) fills the lower-left third right in front of the animal, and an orange traffic cone sits beside the right column. The first image of Venice is mostly slab.",
+    "proposal": "Nudge the spawn about 2.5 m east or yaw the arrival lens about 12 degrees right so the plinth moves out of the lower-left third, and move the cone to the passerelle stack where it tells the story. Pin the camera and check the before/after with the resting-lens probe (the resting lens is not deterministic between arrivals).",
+    "files": [
+     "src/venice.js:90",
+     "src/venice.js:4023"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[goreme] The dovecote approach is plain white boxes on flat grey ground",
+    "category": "beauty",
+    "impact": 3,
+    "evidence": "tr4-goreme-05-dovecote.png at (-46,-2.6,-36.7): a zig-zag of five untinted white boxes (steps or blocks) crosses a flat, even grey slope dotted with dark holes. It looks like blockout, next to the carefully finished balloon field. The line that fires there ('eight hundred years of pigeons, and you are what happened to them.') is lovely, but nothing in the picture looks like tuff.",
+    "proposal": "Tint the treads with the valley's tuff PALETTE ramp (warm cream to rose), round their top edges with the existing round-on twin helper, and stagger their widths. Give the slope 2-3 painted dovecote bands (the white-ringed holes Cappadocia is known for) as flat decals on the cliff face over the dark holes, in gorBuildCliff's merger, so no draw calls are added.",
+    "files": [
+     "src/goreme.js:1995",
+     "src/goreme.js:2026",
+     "src/goreme.js:371"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[goreme] The poplars glow chartreuse at pre-dawn and pull the eye off the balloons",
+    "category": "beauty",
+    "impact": 2,
+    "evidence": "tr4-goreme-07-wander.png and -05: the conical poplars are the most saturated, brightest object in a blue-violet pre-dawn frame, brighter than the balloon envelopes that are supposed to be the subject. Next to the pale mare herd they read as neon.",
+    "proposal": "Tie the poplar instance colour to the dawn line (gorUpdateDawnLine already has the 0..1 of the sunrise). Start them at a desaturated olive and let them warm to their current yellow-green only as the sun clears the rim, so the valley 'lights up' with the marquee. Two PALETTE entries and one lerp, with a flag.",
+    "files": [
+     "src/goreme.js:3097",
+     "src/goreme.js:1215"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[monaco] The promenade reads as dirt with red confetti, not pale Monaco stone",
+    "category": "beauty",
+    "impact": 2,
+    "evidence": "tr4-monaco-03-pass-the-door.png on the harbour promenade: the ground is an even brown-grey with scattered small red squares, like litter. The lit facades and palms above it are strong, but the floor makes the richest town in the game look like a car park.",
+    "proposal": "Give the quay-side promenade a pale limestone PALETTE value with a 2 m paving lattice (the same joint trick as the Venice paving, at low contrast), and replace the red squares with a line of planters and bollards along the quay edge. That puts a clean pale band between the dark water and the lit facades.",
+    "files": [
+     "src/monaco.js:1062",
+     "src/monaco.js:1303"
+    ],
+    "effort": "S"
+   }
+  ]
+ },
+ {
+  "area": "biome group 3: iceland (ch7), antarctic (ch17), cave (ch16 Son Doong), drift (ch9)",
+  "score_now": 6.8,
+  "summary": "I played all four chapters in playwright session tr-biome3 on a fresh profile. I walked routes with real keys, used teleport-assisted runs for each marquee, took about 40 screenshots and got no console errors or lastError. The ideas are the best in the game: sitting in a hot pool until the sky answers, a cave you light with your own voice, a floating archipelago you jump through, and an orange tender running with orcas. Each place also has at least one screen that looks lovely: lit Reykjavik windows, the drift updraft shaft, the doline forest from above. What holds the group back is the same pattern in every chapter. The payoff moment is drawn with the cheapest primitives or gets covered up. The aurora is hard-edged green rectangles. Iceland's steam is grey octagon cards that fill the lens at the pool. The orcas are black crates. The drift cloud sea you land on after every fall reads as paving stones. On top of that, toasts, the expanded paper and NPC bubbles land on the marquee frame. There are also two real clarity bugs: the cave's first hint arrow sends you to a spot where the taught move does nothing, and the orca pod patrols through pack ice where the run cannot start.",
+  "findings": [
+   {
+    "title": "[antarctic] Orca marquee can stall for good: the pod patrols through 0.4-0.9 pack, where the boat can't reach the 4 m/s the run needs",
+    "category": "bug",
+    "impact": 5,
+    "evidence": "qa/ten-review/b3m-antarctic.js: a closed-loop helm run with W held for 150 s, calling Q whenever the pod was within 180 m. Second escort formed near z=-440. withPod() then read 0.95-0.997 for over 45 s while boat speed sank to 2.8-3.3 m/s with the throttle full. The pod never broke into 'run', and orca-ride never ticked (log in qa/tr-biome3-mq-antarctic.json.png). Probe of packAt(): for z<-270 the east half of the patrol loop (x=20..60) reads 0.41-0.93. Patrol is px=8+42 sin(a), pz=-300+132 cos(a), so it spends about half its loop in heavy pack. The escort-to-run gate needs sp>4.0 (antarctic.js:4527), and nothing tells the player why the pod just sits there. The earlier 'run' had also dropped the pod back to patrol at (8,-432): the pod was 48 m away at t=20 s and 313 m away at t=25 s.",
+    "proposal": "Make the patrol follow the clear lead instead of an ellipse through the pack: in antUpdatePod patrol, set px = antLeadX(pz) + 10*sin(a*2), keeping pz = -300+132*cos(a). The pod then only ever forms up in water where 12.6 m/s is possible. As a belt-and-braces fix, scale the run gate by antBoatIce, e.g. sp > 4.0*(1-0.6*antBoatIce). Also add a one-shot toast when escort has lasted more than RUN_AT+4 s with sp<4, e.g. 'they want open water. find the lead.' No new save field; gate it behind a noPodLead flag for A/B.",
+    "files": [
+     "src/antarctic.js:4379-4386",
+     "src/antarctic.js:4518-4531",
+     "src/antarctic.js:141-153",
+     "src/systems.js:33187-33193"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[iceland] The aurora is six hard-edged flat rectangles with no fall-off; the chapter's wow reads as green glass panes",
+    "category": "beauty",
+    "impact": 5,
+    "evidence": "qa/ten-review/b3m-iceland-03-aurora-rise.png and -05-aurora-look.png: at ignition the sky shows solid mint-green quads with a straight top and bottom edge and even brightness across the whole face, crossing behind the church. iceBuildAurora uses PlaneGeometry(len,h,40,1) with a single emissive colour per band. There is no vertical gradient and no alpha ramp, and a Lambert emissive ignores vertex colour, so there is no bright lower hem fading to nothing at the top like the real thing.",
+    "proposal": "Rebuild each band as PlaneGeometry(len, h, 40, 4) with a per-vertex colour attribute: row 0 (the hem) at 1.0 of PALETTE.iceAurora*, row 1 at 0.7, row 2 at 0.3, row 4 at 0. Pair it with MeshBasicMaterial({vertexColors:true, blending:Additive, depthWrite:false, fog:false}); under additive blending black is transparent, so the top dissolves and the hem glows. Tint the upper rows of band 1 toward iceAuroraMag for the violet crown, and taper both ends along x with the same ramp so no curtain has a vertical cut edge. Keep the per-vertex wave in iceUpdateAurora; it already moves x/y. Gate it as noAuroraRamp, parked at rung >= 2 by using 2 rows. Cost is the same draw count.",
+    "files": [
+     "src/iceland.js:2835-2925",
+     "src/iceland.js:2926-3036"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[iceland] The aurora tick has no shot: the camera stays at pool level, the paper expands and NPC bubbles cover the sky",
+    "category": "clarity",
+    "impact": 5,
+    "evidence": "qa/ten-review/b3m-iceland-04-aurora-call.png, 3 s after the first successful call (aurora ticked). The camera is at the water looking horizontally at the pool rim. The curtains are only a glow at the top edge of the frame. The left third is covered by the expanded paper (part 1 of 3, four unticked Reykjavik tasks), and a local's bubble 'You are in a hot spring. What could you possibly need?' sits across the middle of the sky. iceAuroraCall only calls game.frameShot on iceAurRun % iceBURST_N === 0, the fourth in-time call (iceland.js:4566). The call that ticks the marquee gets no framing.",
+    "proposal": "On the first call that ticks 'aurora' (and on ignition, if the player is soaking), fire game.frameShot({ yaw: <bearing to the nearest curtain>+PI, pitch: -14deg (looking up), dist: 9, raise: 0.8, hold: 5 }). This puts the animal in the bottom third and the curtains in the top two thirds. For those 5 s, suppress the paper's tick expansion and NPC 'say' bubbles (wowLiveOn is already set; route barks through the existing sysPlaceLine path). Flag it noAuroraFrame.",
+    "files": [
+     "src/iceland.js:4545-4570",
+     "src/iceland.js:2848-2860",
+     "src/systems.js:30581"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[iceland] Steam puffs are flat grey octagon cards that fill the frame at the pool and Strokkur, and the aurora burst spawns 14 of them in front of the lens",
+    "category": "beauty",
+    "impact": 4,
+    "evidence": "qa/ten-review/b3m-iceland-05-aurora-look.png and -07-geysir.png: a dozen large pale octagons with hard silhouettes cover the capybara and half the screen. iceBuildSteam uses SphereGeometry(0.5,5,4) at a constant opacity of 0.26 for the puff's whole life. iceSteamSync only grows the scale, so a puff reaches maximum size and then vanishes in one frame. iceAuroraCall's burst spawns 14 puffs within 3 m of the spring centre (iceland.js:4574-4577), which is exactly where the soaking animal and the camera are.",
+    "proposal": "(1) In iceSteamSync, shrink over the last 0.8 s of life, s *= smoothstep(0, 0.8, life), so puffs dissolve instead of popping. (2) Cull any puff within 4 m of game.camera.position by setting its scale to 0 in iceSteamSync. This costs one distance check per instance, 54 per frame. (3) Move the burst ring out to r=6-9 m on the far side of the spring from the camera, so it frames the animal rather than covering it. (4) Raise geometry detail to SphereGeometry(0.5,7,5) so the silhouette is not an octagon at close range. Flag it noSteamSoft.",
+    "files": [
+     "src/iceland.js:2670-2733",
+     "src/iceland.js:4574-4577"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[cave] The first hint arrow sends the player into daylight, where the taught Q does nothing",
+    "category": "clarity",
+    "impact": 4,
+    "evidence": "b3-cave run: I walked to the 'first-echo' hint target (0,46), whose paper line reads 'Q. in the dark. that is it.' and whose arrow shows 'here'. I pressed Q about 20 times over 15 s at 2.3 m from it and first-echo never ticked (qa/ten-review/b3-cave-03-first-echo.png shows the echo ring firing over green-lit grass). A later run pressed Q once at (-2,30) and it ticked immediately (b3m-cave-04-echo-05.png). cavWheek only ticks when cavDaylightAt < 0.25, which is smooth((z-30)/22), so z must be below about 34. The hint points at game.cave.mouth, about 12 m too far out, and the failure gives no feedback. It is the chapter's first lesson.",
+    "proposal": "Point the 'first-echo' where() at {x:0, z:cavMOUTH_Z-22} (z=28), the first spot that is actually dark. In cavWheek, when cavDaylightAt >= 0.25 and !cavToldEcho, show a one-shot toast: 'too much daylight here for it to come back. further in.' This is 3 lines plus 1 line of copy through the pools. No new save field.",
+    "files": [
+     "src/systems.js:33104-33105",
+     "src/cave.js:4121-4137",
+     "src/cave.js:511-521"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[all] Held toasts drain into the marquee: a stale cave lesson sits over the Drop into the Light",
+    "category": "bug",
+    "impact": 4,
+    "evidence": "qa/ten-review/b3m-cave-07-col-fall.png: mid-fall off the column, with the signpost reading 'THE BIG ONE · NOW / FALLING · 5 m · 0 of 3 hoops'. The centre band of the screen shows the first-echo toast 'it comes back. that is how you see in here.', fired about 8 s earlier in the passage, right across the capybara. toast() only routes 'say' lines to the placed line when wowLiveOn at enqueue time (systems.js:30581). Lines parked in sysToastHeld by the freshness budget (30582-30588) are released later without re-checking wowLiveOn, so a stale line lands on the one frame the chapter is built around. The same clutter shows up in Iceland (bubble plus toast over the aurora) and in the drift (the puff tutorial toast at the first mid-air wheek).",
+    "proposal": "Where sysToastHeld is drained (the release path after sysFRESH_GAP), skip or keep holding any entry while wowLiveOn is true or a frameShot hold is active, and drop entries whose bio no longer matches the current biome or that are more than 12 s old. It is a single guard in the drain loop. Flag it noHeldWow.",
+    "files": [
+     "src/systems.js:30573-30592"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[antarctic] The orcas are box stacks and read as floating black crates from the chase camera",
+    "category": "beauty",
+    "impact": 4,
+    "evidence": "qa/ten-review/b3m-antarctic-03-pod-with.png and -04-end.png: the escort is four or five black rectangular clumps around the boat with square dorsal planks. No white flank or eye patch reads, because the white boxes sit low on the body (-0.52*s) and the camera is above and behind. antBuildPod makes the body from five M.box slabs plus a sphere head, the dorsal from one M.box, and the flukes from a flat box. The AAA pass rounded the other animals; this one was missed, and it is the star of chapter 17.",
+    "proposal": "Body: replace the five boxes with three overlapping stretched M.sph lobes (head, torso, tail stock) with smooth normals, per the 'what breathes' law, in PALETTE.antOrca. Dorsal: a 3-sided M.cone flattened to 0.18 wide, swept back 0.35 rad (bull straight, 2.1 m). Raise the eye patch to y=+0.34*s and scale it to 0.34 so it reads from 30 degrees of pitch. Add a thin antOrcaW belly crescent visible at the waterline. On each surfacing (the porpoise phase peak), spawn 6 white game.sparks at the blowhole. It is the same merger, so there is no draw-call change.",
+    "files": [
+     "src/antarctic.js:2351-2440"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[drift] The cloud sea you land on after every fall looks like hexagonal paving",
+    "category": "beauty",
+    "impact": 4,
+    "evidence": "qa/ten-review/b3-drift-06-updraft.png and -07-wander.png, and the landing in b3-drift-04-cloud-dive.png: the cloud floor is a field of flat-shaded lavender hexagons with dark facet edges, like cobbles or stones. The chapter header promises a 'slow lovely twelve seconds through the dark and a soft landing in cloud'. driBuildCloud's lobes are 228 squashed spheres through driMerger/driVC(), which is flat Lambert, at a low segment count, so each squashed sphere shows its 6-8 facets as a hard polygon. The landing view is a flat purple sheet with no depth (04-cloud-dive).",
+    "proposal": "Build the lobe merger with smooth normals (computeVertexNormals on the built geometry, flatShading false). A cloud is a volume, so it qualifies under the 'what breathes' exception. Raise each lobe to 10x6 segments. Give the top lobe of each mass a faint emissive of PALETTE.driCloudLit at 0.12 so tops go lighter than the sheet, as the comment intends. Add 12 low wisp sheets from driBuildWisps at y=2-6 over the sea, so a landing has something passing the lens. Flag it noCloudSoft; at rung >= 1 keep the smooth normals and drop the wisps.",
+    "files": [
+     "src/drift.js:1154-1224",
+     "src/drift.js:390-393",
+     "src/drift.js:1231-1257"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[cave] The echo, the chapter's torch, is a thin cyan arc and barely lights the cave",
+    "category": "fun",
+    "impact": 4,
+    "evidence": "qa/ten-review/b3m-cave-05-echo-14.png, 1.4 s after a wheek in the dark passage: the only visible sign is a thin pale-blue arc about 3 px thick in the middle distance. The walls and roof stay near-black, and a blown-out yellow NPC lamp glow in the lower-left foreground is the brightest thing on screen. cavBuildEcho uses one PointLight (reach 46, decay 1.35) and a RingGeometry(0.86,1.0) floor ring. The chapter's premise is 'THE NOISE IS THE TORCH', but the noise shows the player very little.",
+    "proposal": "Keep the one light and add a wall answer. On each wheek, cast 24 rays in a horizontal fan against the cave walls using the existing collider/terrain query (cavTerrain or the wall list). For each ray, spawn a brief PALETTE.cavEcho glint (game.sparks with 3 particles, life 0.6) at the hit point, delayed by distance/20 s so the reveal travels outward and arrives back like a sonar ping. Thicken the ring to RingGeometry(0.7,1.0) and fade its opacity by radius. Cap the NPC lamp glow sprite's screen size near the camera. Flag it noEchoPing, costing about 24 sparks per wheek with a 1.05 s cooldown.",
+    "files": [
+     "src/cave.js:4100-4116",
+     "src/cave.js:4121-4131",
+     "src/cave.js:87-89"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[antarctic] The wake is stacked grey octagon rings like a line of tyres behind the boat",
+    "category": "beauty",
+    "impact": 3,
+    "evidence": "qa/ten-review/b3m-antarctic-03-pod-with.png and -04-end.png: behind the tender at speed there is a column of 8-10 identical grey octagonal rings, fully opaque at the stern, reading as washers or tyres rather than foam. The sea itself is one flat dark slab with no sheen, so the rings are the brightest thing in the lower half of the frame, during the chapter's marquee.",
+    "proposal": "In antBuildWake, replace the ring stack with two diverging V arms, a Kelvin wake: thin quads at +/-19.5 degrees from the stern, vertex-coloured white-to-transparent along their length, additive-free with Lambert opacity 0.35 fading to 0. Keep a short stern patch of white foam, three soft discs from the existing splash sprite. The arms' length scales with antBoatSpeed. Flag it noKelvin.",
+    "files": [
+     "src/antarctic.js:1464-1520"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[antarctic] The orca title and the calving countdown share the paper tab",
+    "category": "clarity",
+    "impact": 3,
+    "evidence": "qa/ten-review/b3m-antarctic-03-pod-with.png: while the pod is formed up on the boat, the one-line tab reads 'Drive the boat into the orca p... ▲13 m' with the subline 'the face goes in 45 s'. That subline is the 'the-calving' clue (systems.js:33195-33200), not the orca instruction ('W/S · A/D. find the blows, press Q, keep above 5.5 m/s', 33187-33191). In the marquee's own moment, the one line of instruction is about a different task 40 m to 400 m away.",
+    "proposal": "In the tab renderer, take the subline from the same task id as the title. If a live timer from another task wants the line, show it only when no wowLive is active. While the pod is escorting, prefer the orca clue's second form ('keep above 5.5 m/s with them'). Check that the recordLive/clue resolution for the tab uses the pinned task id.",
+    "files": [
+     "src/systems.js:33187-33200"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[drift] The live lantern count is worded as already done: 'lit it with 5 lampflies' shows before the lantern is lit",
+    "category": "clarity",
+    "impact": 2,
+    "evidence": "qa/ten-review/b3m-drift-04-plinth.png: standing at the unlit plinth with 5 of 6 flies, the tab subline reads 'lit it with 5 lampflies'. The E press refuses ('it wants light to start with. 5 of 6.'), and the lantern task is not done. drift.js:5005-5008 calls game.recordLive('lantern', driFliesAwake) while !driLit. The record row's label in shared.js:4962 is past tense ('lit it with'), so the live count tells the player the marquee has already happened.",
+    "proposal": "Add an optional liveLabel column to the record table ('lantern': liveLabel 'carrying'). Record rows are a static table, not save data, so no save field is added. Have the tab renderer use liveLabel when the value comes from recordLive, so it reads 'carrying 5 lampflies'. Audit the other rows (e.g. 'the-column', 'orca-ride') for the same tense problem.",
+    "files": [
+     "src/shared.js:4962",
+     "src/drift.js:5005-5008"
+    ],
+    "effort": "S"
+   },
+   {
+    "title": "[cave] Lime-green cone ground cover and black-bar swiftlets break the Son Doong palette",
+    "category": "beauty",
+    "impact": 3,
+    "evidence": "qa/ten-review/b3-cave-06-the-column.png and -07-wander.png, and b3m-cave-01-arr-a.png: the doline floor and the mouth are covered in saturated lime-green 6-sided pyramids that read as plastic spikes, the most saturated value in a chapter otherwise in mossy browns. b3m-cave-07-col-fall.png: the swiftlets that fly 'with you' in the drop are straight black bars like thrown sticks. The real doline is ferns and moss under a shaft of light.",
+    "proposal": "Swap the pyramid shoots for 2-3 crossed leaf blades (thin tilted boxes, the fern pattern the drift flora already uses), in a darker moss PALETTE entry, and lift the lightness only in the daylight pool using cavDaylightAt so green is brightest where the light falls. For swiftlets, use two swept-back wing triangles plus a body (crescent silhouette) and flap scale on the existing phase. Flag them noFern / noSwiftShape.",
+    "files": [
+     "src/cave.js:280-281",
+     "src/cave.js:3990-4040"
+    ],
+    "effort": "M"
+   },
+   {
+    "title": "[iceland] Reykjavik's streets are dim and empty, and the town does not lead to the hot pool",
+    "category": "cosy",
+    "impact": 3,
+    "evidence": "b3-iceland run with real keys, following the minimap arrow from the pier toward the hot spring (-40,-10). The animal ended up against the side of a purple house at (17,115), 138 m out (qa/ten-review/b3-iceland-06-hot-spring.png). The minimap line goes straight through the house row, and nothing in the street (lamps, signs, people) points uphill. qa/ten-review/b3-iceland-02-list.png and -04-organ.png: the street is a wide grey-blue asphalt lane with parked box cars. The only warm light is window rectangles, and the church hill is a dark empty slope.",
+    "proposal": "Put a warm lantern trail up the one gap between iceROWS toward the geothermal field: 8 lamp posts (the existing street-lamp prefab with its road pool) spaced 12 m apart from the square to the spring. Add two locals walking that way with towels (existing crowd rig, a 'towel' prop box in PALETTE.iceSnow). Route the hot-spring hint through a waypoint at the gap, so the arrow follows the trail instead of the crow-fly line. The payoff is a visible warm path from town to the marquee.",
+    "files": [
+     "src/iceland.js:1378-1632",
+     "src/iceland.js:74-84"
+    ],
+    "effort": "M"
+   }
+  ]
+ }
+]
