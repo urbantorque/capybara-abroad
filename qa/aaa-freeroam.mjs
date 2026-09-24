@@ -10,16 +10,23 @@ import { openHarness } from './reimagine-harness.mjs';
 
 const tag = process.argv[2] || 'fr';
 process.env.CAPY_QA_MUTE_AUDIO = '1'; process.env.CAPY_QA_NO_THROTTLE = '1';
-const h = await openHarness({ width: 1280, height: 720 });
+const h = await openHarness({ url: process.env.CAPY_QA_URL || 'http://localhost:5188/', width: 1280, height: 720 });
+// A shared desk loads slower than the harness's 20 s (T1a, 25 Sep 2026).
+h.page.setDefaultNavigationTimeout(150000); h.page.setDefaultTimeout(90000);
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 const title = () => h.page.waitForFunction(() => window.__capy && document.querySelector('.capyui-go, .capyui-carry'), null, { timeout: 60000 });
 const read = () => h.page.evaluate(() => {
   const go = document.querySelector('.capyui-go.alt');
-  const picks = [...document.querySelectorAll('.capyui-pick')];
+  // ROADMAP-TEN T1a: a story file builds two shelves (the flat wall and the
+  // act atlas) and shows one, so 'picks' and 'locked' count the LIVE shelf
+  // and 'gated' counts every locked tile on the card (the atlas's). The
+  // door's word is its <b>: each door carries an italic subline now.
+  const all = [...document.querySelectorAll('.capyui-pick')];
+  const picks = all.filter(p => p.offsetParent !== null);
   return { started: !!window.__capy.state.started, mode: window.__capy.state.journeyMode, biome: window.__capy.biome.current,
-    second: go ? go.textContent.trim() : null, carry: !!document.querySelector('.capyui-carry'),
-    picks: picks.length, locked: picks.filter(p => p.disabled).length,
+    second: go ? go.querySelector('b').textContent.trim() : null, carry: !!document.querySelector('.capyui-carry'),
+    picks: picks.length, locked: picks.filter(p => p.disabled).length, gated: all.filter(p => p.disabled).length,
     file: (() => { try { return JSON.parse(localStorage.getItem('capy3.journey.v1')).journeyMode; } catch (e) { return null; } })() };
 });
 const click = sel => h.page.evaluate(sel => { const b = document.querySelector(sel); b.click(); return !!b; }, sel);
@@ -33,7 +40,7 @@ try {
   await h.page.reload(); await title(); await h.page.waitForTimeout(800);
   s = await read(); console.log('story title', JSON.stringify(s));
   ok(s.carry && s.second === 'Free roam', 'story file: the second door is Free roam');
-  ok(s.locked === 18, 'story shelf is gated before the door is used');
+  ok(s.gated === 18, 'story shelf is gated before the door is used');
   await click('.capyui-go.alt'); await h.page.waitForTimeout(700);
   s = await read(); console.log('after Free roam', JSON.stringify(s));
   ok(s.picks === 19 && s.locked === 0, 'Free roam opens all nineteen tiles');
@@ -81,7 +88,7 @@ try {
   await h.page.waitForTimeout(2500);
   await h.page.reload(); await title(); await h.page.waitForTimeout(800);
   s = await read(); console.log('free title', JSON.stringify(s));
-  ok(s.file === 'free' && s.second === 'Go somewhere else' && s.locked === 0, 'the file stays free and nothing is locked');
+  ok(s.file === 'free' && s.second === 'Go somewhere else' && s.gated === 0, 'the file stays free and nothing is locked');
   ok(h.metadata.errors.length === 0, 'no page errors: ' + JSON.stringify(h.metadata.errors.slice(0, 2)));
   console.log('Free roam: ' + checks + ' checks pass.');
 } finally { await h.close(); }

@@ -46,6 +46,7 @@ const ASSERTS = [
   ['qa/homecoming-board-ownership.mjs', 'rebuilt board ornaments avoid permanent biome capture'],
   ['qa/homecoming-story.mjs', 'alternative memories, earned act thresholds and no full-clear requirement'],
   ['qa/homecoming-atlas.mjs', 'five atlas folds and nineteen preserved chapter identities'],
+  ['qa/ten-t1a-modes-static.mjs', 'two shelves, two doors, the mode toggle both ways and the free gates'],
   ['qa/homecoming-biome-parking.mjs', 'sleeping scene traversal, returning rigs and owner rollback'],
   ['qa/homecoming-space.mjs', 'phrase-rest boundaries, alternating local colour and protected cues'],
   ['qa/homecoming-learning-contract.mjs', 'five reference lessons, live input wording and keyboard isolation'],
