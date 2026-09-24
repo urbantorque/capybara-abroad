@@ -631,6 +631,44 @@ and fades with the storm scalar (6260), with the grade left alone. Proof: the aa
 region, and a sky/sand luminance-contrast number before and after. Stretch (`noSahStallSmoke`):
 square joints at −70% contrast, three worn paths, and stall smoke (1173, 1338).
 
+### T2e — shipped
+
+Everything is in `src/sahara.js`. The proofs ran headless at rung 0, pinned by the prefs file
+(`pf: 1`). They measure behaviour and hide-and-diff numbers. GPU cost is left for the proof slot.
+
+- **Audit.** `jetTarget()` was already there, and the jetpack row's hint arrow already follows it
+  (systems.js 32879). The reviewer's arrow pointed at the cart because the paper's head row was the
+  cart, which T3 fixes. Two of the three stretch terms had already shipped: the worn paths (the two
+  wear bands in `sahBuildGround`, plus the L6 wear path) and the stall smoke (`sahBuildSmoke`).
+- **`game.sahara.wowTarget()`** returns `{x, y, z, kind: 'ring'|'minaret', i, of}` while a run is on
+  the animal's back, and `null` otherwise. In a `jetDebug` run it returned null before the take, then
+  rings 0 to 3 in order, then `minaret`.
+- **`noSahRingBeam`** (parks at rung 1 or above) puts a 36 m column of `sahFire` over each hoop,
+  fading to nothing at the top, and a sheath on the pole beneath. The hoop itself is left clear. It is
+  one merged mesh and one draw call, with alpha per vertex: 0.78 pulsing on the next ring, 0.26 idle
+  and 0.08 once flown. From a lens pinned 150 m from ring 2, 263 px change in the ring's 25 px column.
+- **`noSahZenith`** (parks at rung 1 or above) is a cap over the shared dome, at render order −19.5
+  (after the dome, before the clouds). It ramps from sin 0.03 to 0.85 × `sahZenith` at sin 0.35.
+  There is a hole from 7° to 24° round the sun, so the dome's disc stays clear. It fades by
+  (1 − storm)(1 − dusk). The grade and `sysSKY_TOP` are untouched. **This departs from the spec:**
+  the band is full from sin 0.35, not over the top 35%. The resting lens only reaches sin 0.28, and
+  the first cut at 0.65 moved sky luminance only from 0.553 to 0.546. Measured on the resting lens,
+  live against cut in one task:
+
+  | measure | cut | live |
+  |---|---|---|
+  | sky mean RGB | 155,141,108 | 130,138,143 |
+  | sky/sand luminance (Michelson) | 0.036 | 0.054 |
+  | sky-to-sand RGB distance | 51 | 90 |
+
+- **`noSahStallSmoke`** (the roadmap's name for the stretch) now softens the square's joints. They
+  are their own mesh, taken 70% of the way to the worn ground, and the colours are swapped only on
+  the frame the flag changes. That is one extra draw call, and the term does not park. Rendered joint
+  contrast went from 0.426 to 0.194, **−55%, short of −70%**. The 5 cm sides of the strips still
+  shade dark.
+- **Instruments:** `qa/ten-t2e-sky.js` and `qa/ten-t2e-joints.js`.
+- **Still owed:** the aaa-ab A/B on the sky region, in the proof slot.
+
 T2 seed (A): `PALETTE.sahZenith`, `antOrcaBelly`, `iceAuroraHem`, `rioBounce`.
 
 ## T3 — Free Roam gets its own game; the ibis gets an arc (hours 4–6)

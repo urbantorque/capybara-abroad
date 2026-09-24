@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, swayMesh, makeMerger, mergeWearBand, makeMover, roundBoxGeo } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, swayMesh, makeMerger, mergeWearBand, makeMover, roundBoxGeo, sky2Info } from './shared.js';
 import { npcPERSON, npcRoundParts } from './npc.js';
 
 // ===========================================================================
@@ -182,6 +182,19 @@ let sahJetToldFuel = false, sahJetRingT = 0, sahJetOnMinaret = false, sahJetBest
 // time every run, the record keeps the best.
 const sahJET_RING_FUEL = 1.6;   // s of burn a ring gives back
 let sahJetRun = false;          // a run is on: rings count, the minaret files
+// ---- THE BEAMS (T2e, noSahRingBeam) -----------------------------------------
+// A pilot strapped on at the crest flew 130 m north and then 230 m west and
+// never passed a ring: a brass hoop 9 m off the sand is three pixels at 150 m
+// against a sky the same colour as it. So a thin column of the ring's own fire
+// over each one, and a sheath on the pole under it. One merged mesh, one draw
+// call, the alpha written per vertex. NOT through the hoop: the flight line
+// goes through the middle and a lens inside a transparent column is a frame of
+// orange. The next ring is loud, the rest are there, the flown ones fade.
+const sahBEAM_R    = 0.45;   // m: 5 px at 150 m on the 48-degree lens
+const sahBEAM_UP   = 36;     // m of column over the hoop, fading to nothing
+const sahBEAM_GAP  = 4.6;    // m either side of the ring's centre left clear (outer radius 4.5)
+const sahBEAM_NEXT = 0.78, sahBEAM_IDLE = 0.26, sahBEAM_DONE = 0.08;   // alpha at the foot
+let sahJetBeam = null, sahJetBeamA = null, sahJetBeamK = null, sahJetBeamW = null;
 const sahDUST_N = 260;   // was 150; the avalanche (W1) wants a wall of it behind the run
 const sahSTAR_N = 200;
 const sahPALM_N = 90;
@@ -254,6 +267,9 @@ let sahSeguia = null;
 // x, y, z of every brazier on the square, filled in by sahBuildSquare.
 const sahBRAZIER = [];
 let sahSmokeMesh = null, sahSmokeMat = null;
+// the square's joints (T2e, noSahStallSmoke): 70% of the way to the ground
+const sahSQ_JOINT_SOFT = 0.7;
+let sahSqJoints = null, sahSqJointCut = null, sahSqJointLive = null, sahSqJointOn = -1;
 const sahSMOKE_PER = 5;            // puffs in the air over each brazier at once
 const sahSMOKE_RISE = 5.4;         // m a puff climbs before it is gone
 // The three halqa rings: x, z, radius. sahHalqaBeat is where each one is in
@@ -1377,8 +1393,42 @@ function sahBuildSquare(game, root) {
     // the joints darker, the flags no paler than the worn ground already is:
     // the first cut used sahPlaster and the square read as a checkerboard
     const joint = PALETTE.sahOchreDk, flag = PALETTE.sahOchrePale;
-    for (let k = 0; k <= 13; k++) M.box(sahSQ_X0 + k * 4, 0.02, 4, 0.14, 0.05, 36, joint);
-    for (let k = 0; k <= 9; k++) M.box(0, 0.02, sahSQ_Z0 + k * 4, 52, 0.05, 0.14, joint);
+    // ...AND AT A THIRD OF THE CONTRAST (T2e, noSahStallSmoke). The reviewer's
+    // arrival shot: "a terracotta grid of 6 m tiles with thick dark-red joints
+    // running to the horizon", the loudest pattern in the frame, on a square
+    // that is trodden plaster. The joints are their own small mesh now so the
+    // flag can swap them back: the live colour is 70% of the way from the
+    // joint to the worn ground it lies on. The name is the roadmap's for the
+    // whole stretch; the worn paths (sahBuildGround's two bands and the L6
+    // wear path) and the stall smoke (sahBuildSmoke) were already built, and
+    // this is the one term of it that was not.
+    const J = sahMerger();
+    for (let k = 0; k <= 13; k++) J.box(sahSQ_X0 + k * 4, 0.02, 4, 0.14, 0.05, 36, joint);
+    for (let k = 0; k <= 9; k++) J.box(0, 0.02, sahSQ_Z0 + k * 4, 52, 0.05, 0.14, joint);
+    const jm = new THREE.Mesh(J.build(), sahVC());
+    jm.receiveShadow = true;
+    root.add(jm);
+    sahSqJoints = jm;
+    const ca = jm.geometry.attributes.color;
+    if (ca) {
+      sahSqJointCut = ca.array.slice();
+      sahSqJointLive = ca.array.slice();
+      // the ground they lie on is the WORN ground (sahBuildGround: ochrePale,
+      // and plaster where it is most walked), not the dust at the square's edge
+      // — measured against dust-to-pale, the joints only lost a third of their
+      // contrast in the rendered frame (0.42 -> 0.29)
+      const gnd = new THREE.Color(PALETTE.sahOchrePale).lerp(new THREE.Color(PALETTE.sahPlaster), 0.4);
+      // per channel, as a ratio on what the merger wrote: every vertex keeps
+      // its own jitter (the merger's 0.058) and only the mean moves
+      const jc = new THREE.Color(joint);
+      const mr = lerp(jc.r, gnd.r, sahSQ_JOINT_SOFT) / Math.max(jc.r, 1e-4);
+      const mg = lerp(jc.g, gnd.g, sahSQ_JOINT_SOFT) / Math.max(jc.g, 1e-4);
+      const mb = lerp(jc.b, gnd.b, sahSQ_JOINT_SOFT) / Math.max(jc.b, 1e-4);
+      for (let v = 0; v < sahSqJointLive.length; v += 3) {
+        sahSqJointLive[v] *= mr; sahSqJointLive[v + 1] *= mg; sahSqJointLive[v + 2] *= mb;
+      }
+      sahSqJointOn = -1;   // written on the first update
+    }
     for (let ix = 0; ix < 5; ix++) {
       for (let iz = 0; iz < 4; iz++) {
         if ((ix + iz) % 2) continue;
@@ -5012,6 +5062,18 @@ function sahBuildSmoke(root) {
   sahSmokeMesh = im;
 }
 
+/** The joints' colour, written only on the frame the flag changes. It costs
+ *  nothing on either side of the flag, so it does not park on the rung. */
+function sahUpdateSqJoints(game) {
+  if (!sahSqJoints || !sahSqJointLive) return;
+  const on = (game.state && game.state.noSahStallSmoke) ? 0 : 1;
+  if (on === sahSqJointOn) return;
+  sahSqJointOn = on;
+  const ca = sahSqJoints.geometry.attributes.color;
+  ca.array.set(on ? sahSqJointLive : sahSqJointCut);
+  ca.needsUpdate = true;
+}
+
 function sahUpdateSmoke() {
   if (!sahSmokeMesh) return;
   const nb = sahBRAZIER.length / 3;
@@ -5157,6 +5219,107 @@ function sahBuildStars(root) {
   sahStarMat = mesh.material;
   sahStars = mesh;
   root.add(mesh);
+}
+
+// ============================================================ THE ZENITH ====
+// T2e (noSahZenith). Every day shot of this chapter had an olive-khaki sky a
+// step off the plaster and the dune, and from the air no horizon at all: the
+// dome's top is sahSkyDay pulled 0.62 of the way to near-white (systems.js,
+// sysSKY_TOP), which is right for the horizon and wrong for straight up. The
+// row is law, so this is LAID OVER it: a cap on the inside of the dome that
+// ramps in from the hot band at the horizon, which is left exactly as it was,
+// to sahZenith overhead. White low, blue high.
+//
+// FULL FROM SIN 0.35, NOT OVER "THE TOP 35%" as the roadmap drew it. The top
+// 35% of the dome starts at 40 degrees, and the resting lens on the square
+// (48-degree fov, pitched 8 down) tops out at sin 0.28 — 16 degrees. Measured
+// on the first cut: 23% of the frame changed and the sky there moved 0.55 to
+// 0.546 in luminance, which is a filter nobody sees. From 0.35 the top of the
+// walking frame is most of the way to blue and 5 degrees up is still white.
+//
+// DRAWN THE WAY THE CLOUD LAYER IS: custom alpha blending on an opaque-listed
+// material, depth off, renderOrder between the dome (−20) and the clouds (−19),
+// so it goes down after the gradient and before the world, and the clouds
+// still sit on top of it. The sun's disc does not: it is in the dome's own
+// shader, under the cap, so the cap has a hole round the sun (sahZEN_HOLE).
+// The sky next to a sun is white anyway, and the 61-degree disc and its dust
+// aureole stay the colour systems.js drew them.
+//
+// The storm eats it and the evening takes it back: alpha × (1 − storm) ×
+// (1 − dusk), and at zero the mesh is off. The grade is not touched.
+const sahZEN_R    = 190;           // m: inside the dome's 200, which also rides the lens
+const sahZEN_LO   = 0.03;          // sin of elevation where the ramp starts; below, the hot band
+const sahZEN_HI   = 0.35;          // ...and where it is full: 20 degrees up (see above)
+const sahZEN_K    = 0.85;          // how far to sahZenith at the top; the dust is still up there
+const sahZEN_HOLE = [7, 24];       // degrees from the sun: clear inside, full outside
+let sahZen = null, sahZenK = 0, sahZenSunT = 0;
+const sahZenSun = new THREE.Vector3(0, 1, 0);
+function sahBuildZenith(root) {
+  // a sphere cut at the ramp's foot; 40 round, 12 down, smooth — the dome is
+  // smooth for the same reason (sysBuildSky: flat shading on a gradient is quads)
+  const g = new THREE.SphereGeometry(sahZEN_R, 40, 12, 0, Math.PI * 2, 0, Math.acos(sahZEN_LO));
+  const n = g.attributes.position.count;
+  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 4), 4));
+  const m = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide });
+  m.fog = false;
+  m.depthWrite = false;
+  m.depthTest = false;
+  m.blending = THREE.CustomBlending;
+  m.blendSrc = THREE.SrcAlphaFactor;
+  m.blendDst = THREE.OneMinusSrcAlphaFactor;
+  m.blendEquation = THREE.AddEquation;
+  const mesh = new THREE.Mesh(g, m);
+  mesh.frustumCulled = false;
+  mesh.renderOrder = -19.5;
+  mesh.castShadow = false; mesh.receiveShadow = false;
+  mesh.userData.noShadow = true;
+  mesh.visible = false;
+  // it rides the lens that is drawing it — the main one, and the mirror's
+  mesh.onBeforeRender = function (r, s, cam) {
+    this.position.copy(cam.position);
+    this.updateMatrixWorld();
+  };
+  root.add(mesh);
+  sahZen = mesh;
+  sahZenPaint();
+}
+/** The cap's RGBA: sahZenith, alpha by elevation and by the angle to the sun. */
+function sahZenPaint() {
+  const g = sahZen.geometry, p = g.attributes.position, ca = g.attributes.color, c = ca.array;
+  const zc = new THREE.Color(PALETTE.sahZenith);
+  const h0 = Math.cos(sahZEN_HOLE[0] * Math.PI / 180), h1 = Math.cos(sahZEN_HOLE[1] * Math.PI / 180);
+  for (let v = 0; v < p.count; v++) {
+    const x = p.getX(v) / sahZEN_R, y = p.getY(v) / sahZEN_R, z = p.getZ(v) / sahZEN_R;
+    let t = clamp((y - sahZEN_LO) / (sahZEN_HI - sahZEN_LO), 0, 1);
+    t = t * t * (3 - 2 * t);
+    const cs = x * sahZenSun.x + y * sahZenSun.y + z * sahZenSun.z;
+    let hole = clamp((h0 - cs) / (h0 - h1), 0, 1);
+    hole = hole * hole * (3 - 2 * hole);
+    c[v * 4] = zc.r; c[v * 4 + 1] = zc.g; c[v * 4 + 2] = zc.b;
+    c[v * 4 + 3] = t * sahZEN_K * hole;
+  }
+  ca.needsUpdate = true;
+}
+function sahUpdateZenith(game, dt) {
+  if (!sahZen) return;
+  const st = game.state || {};
+  const want = (st.noSahZenith || (st.perfRung | 0) >= 1) ? 0 : (1 - sahStorm) * (1 - sahDusk);
+  // the flag is a cut, not a fade; the storm and the evening are weather
+  sahZenK = (want === 0 && (st.noSahZenith || (st.perfRung | 0) >= 1)) ? 0 : damp(sahZenK, want, 3, dt);
+  sahZen.visible = sahZenK > 0.004;
+  if (!sahZen.visible) return;
+  sahZen.material.opacity = sahZenK;
+  // the sun axis the dome's disc is drawn at; a second is often enough
+  sahZenSunT -= dt;
+  if (sahZenSunT <= 0) {
+    sahZenSunT = 1;
+    const d = sky2Info().sun.dir;
+    if (d[0] * d[0] + d[1] * d[1] + d[2] * d[2] > 0.5 &&
+        Math.abs(d[0] - sahZenSun.x) + Math.abs(d[1] - sahZenSun.y) + Math.abs(d[2] - sahZenSun.z) > 0.01) {
+      sahZenSun.set(d[0], d[1], d[2]).normalize();
+      sahZenPaint();
+    }
+  }
 }
 
 // ============================================================== GAMEPLAY ====
@@ -5564,6 +5727,97 @@ function sahBuildJet(game, root) {
     const pm = new THREE.Mesh(P.build(), sahVC());
     root.add(pm);
   }
+  sahBuildJetBeams(root);
+}
+/**
+ * THE BEAMS (T2e). Two open cylinders per ring — the sand to the hoop's foot,
+ * the hoop's head to 36 m over it — merged, with an RGBA vertex colour: the
+ * colour is PALETTE.sahFire, the alpha is the ring's level (written each frame)
+ * times a shape (fixed): 1 on the lower sheath, 1 down to 0 up the column, so
+ * the top never ends on a line. MeshBasic, no fog — at 150 m the Sahara's haze
+ * is 60% of the way to the sky and a marker that fades with it is not one.
+ */
+function sahBuildJetBeams(root) {
+  const segs = [];
+  for (let i = 0; i < sahJET_RINGS.length; i++) {
+    const r = sahJET_RINGS[i];
+    const gy = sahTerrain(r[0], r[1]), cy = gy + r[2];
+    segs.push([i, r[0], r[1], gy - 0.2, cy - sahBEAM_GAP, 0]);
+    segs.push([i, r[0], r[1], cy + sahBEAM_GAP, cy + sahBEAM_GAP + sahBEAM_UP, 1]);
+  }
+  const parts = [], ring = [], shape = [];
+  for (let s = 0; s < segs.length; s++) {
+    const g = segs[s], h = g[4] - g[3];
+    const cg = new THREE.CylinderGeometry(sahBEAM_R, sahBEAM_R, h, 6, g[5] ? 6 : 1, true);
+    cg.translate(g[1], g[3] + h * 0.5, g[2]);
+    const p = cg.attributes.position;
+    for (let v = 0; v < p.count; v++) {
+      ring.push(g[0]);
+      // the column: the square of what is left, so most of it has gone by half way
+      const u = g[5] ? clamp((p.getY(v) - g[3]) / h, 0, 1) : 0;
+      shape.push((1 - u) * (1 - u));
+    }
+    parts.push(cg);
+  }
+  // one buffer: positions only, then the colour this owns
+  let n = 0;
+  for (let i = 0; i < parts.length; i++) n += parts[i].index.count;
+  const pos = new Float32Array(n * 3);
+  sahJetBeamK = new Uint8Array(n); sahJetBeamW = new Float32Array(n);
+  let o = 0, base = 0;
+  for (let i = 0; i < parts.length; i++) {
+    const pa = parts[i].attributes.position, ix = parts[i].index;
+    for (let k = 0; k < ix.count; k++) {
+      const v = ix.getX(k);
+      pos[o * 3] = pa.getX(v); pos[o * 3 + 1] = pa.getY(v); pos[o * 3 + 2] = pa.getZ(v);
+      sahJetBeamK[o] = ring[base + v]; sahJetBeamW[o] = shape[base + v];
+      o++;
+    }
+    base += pa.count;
+    parts[i].dispose();
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const col = new Float32Array(n * 4);
+  const fc = new THREE.Color(PALETTE.sahFire);
+  for (let v = 0; v < n; v++) { col[v * 4] = fc.r; col[v * 4 + 1] = fc.g; col[v * 4 + 2] = fc.b; col[v * 4 + 3] = 0; }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
+  geo.computeBoundingSphere();
+  const m = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true,
+    depthWrite: false, fog: false, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(geo, m);
+  mesh.userData.noShadow = true;
+  mesh.castShadow = false; mesh.receiveShadow = false;
+  mesh.renderOrder = 2;
+  root.add(mesh);
+  sahJetBeam = mesh;
+  sahJetBeamA = new Float32Array(sahJET_RINGS.length);
+}
+/** The beams' levels, off the same next/done the hoops breathe on. */
+function sahUpdateJetBeams(game, dt) {
+  if (!sahJetBeam) return;
+  const st = game.state || {};
+  const on = !st.noSahRingBeam && (st.perfRung | 0) < 1;
+  sahJetBeam.visible = on;
+  if (!on) return;
+  let moved = false;
+  for (let i = 0; i < sahJetBeamA.length; i++) {
+    // out of a run the four are one line of equals, and quieter once flown;
+    // in it the next one is loud and pulses with its hoop
+    let want = sahJetDone ? sahBEAM_IDLE * 0.55 : sahBEAM_IDLE;
+    if (sahJetRun) {
+      want = i === sahJetNext ? sahBEAM_NEXT * (0.82 + Math.sin(sahJetRingT * 5) * 0.18)
+           : i < sahJetNext ? sahBEAM_DONE : sahBEAM_IDLE;
+    }
+    const a = damp(sahJetBeamA[i], want, 5, dt);
+    if (Math.abs(a - sahJetBeamA[i]) > 0.002) moved = true;
+    sahJetBeamA[i] = a;
+  }
+  if (!moved && sahJetBeam.userData.written) return;
+  sahJetBeam.userData.written = true;
+  const ca = sahJetBeam.geometry.attributes.color, c = ca.array;
+  for (let v = 0; v < sahJetBeamK.length; v++) c[v * 4 + 3] = sahJetBeamA[sahJetBeamK[v]] * sahJetBeamW[v];
+  ca.needsUpdate = true;
 }
 function sahJetTake(game) {
   const capy = game.capy;
@@ -5622,6 +5876,7 @@ function sahUpdateJet(game, dt) {
       sahJetRingMats[i].emissiveIntensity = damp(sahJetRingMats[i].emissiveIntensity, want, 6, dt);
     }
   }
+  sahUpdateJetBeams(game, dt);   // T2e
   if (!sahJetOn) {
     sahJetG.position.set(sahJetX, sahJetY, sahJetZ);
     sahJetG.rotation.set(0, sahJetYaw, 0);
@@ -6242,6 +6497,26 @@ export function createSahara(game) {
       if (sahJetNext < sahJET_RINGS.length && sahJetRings) { const p = sahJetRings[sahJetNext].position; return { x: p.x, y: p.y, z: p.z }; }
       return { x: sahKOUTOUBIA.x, y: sahKOUTOUBIA.h + 6, z: sahKOUTOUBIA.z };
     },
+    /**
+     * T2e: where the live marquee wants the animal next, for the paper's arrow
+     * while game.wowLive is fresh — the next ring, then the top of the minaret.
+     * null when there is no run on the animal's back (the pack off, or no run),
+     * which is when the paper's own head row is the right thing to point at.
+     * { x, y, z, kind: 'ring' | 'minaret', i, of }; a fresh object each call.
+     */
+    wowTarget() {
+      if (!sahJetOn || !sahJetRun || !sahJetRings) return null;
+      if (sahJetNext < sahJET_RINGS.length) {
+        const p = sahJetRings[sahJetNext].position;
+        return { x: p.x, y: p.y, z: p.z, kind: 'ring', i: sahJetNext, of: sahJET_RINGS.length };
+      }
+      return { x: sahKOUTOUBIA.x, y: sahKOUTOUBIA.h + 6, z: sahKOUTOUBIA.z, kind: 'minaret', i: sahJET_RINGS.length, of: sahJET_RINGS.length };
+    },
+    /** T2e test hook: the two new terms as they stand this frame. */
+    t2eAudit() {
+      return { zen: { vis: !!(sahZen && sahZen.visible), k: +sahZenK.toFixed(3), sun: [+sahZenSun.x.toFixed(3), +sahZenSun.y.toFixed(3), +sahZenSun.z.toFixed(3)] },
+               beam: { vis: !!(sahJetBeam && sahJetBeam.visible), a: sahJetBeamA ? Array.from(sahJetBeamA, function (v) { return +v.toFixed(3); }) : null } };
+    },
     jetDebug(o) {
       if (o && o.take && !sahJetOn) sahJetTake(game);
       if (o && typeof o.x === 'number') { sahJetX = o.x; sahJetY = o.y; sahJetZ = o.z; sahJetVX = sahJetVY = sahJetVZ = 0; }
@@ -6312,11 +6587,13 @@ export function createSahara(game) {
       sahUpdatePeople(dt);
       sahUpdateStorm(game, dt);
       sahSyncStormWall(game);
+      sahUpdateZenith(game, dt);   // T2e: after the storm, which it fades with
       sahUpdateAcrobats(game, dt);
       sahUpdateSurf(game, dt);
       sahUpdateJet(game, dt);   // X3
       sahUpdateDust(game, dt);
       sahUpdateSmoke();
+      sahUpdateSqJoints(game);   // T2e
       sahUpdateStorks(game, dt);
       sahUpdateGoats(dt);
       sahUpdateDates(game, dt);
@@ -6374,6 +6651,7 @@ function sahBuild(game) {
   sahBuildSmoke(sahRoot);
   sahBuildStormWall(sahRoot);
   sahBuildStars(sahRoot);
+  sahBuildZenith(sahRoot);   // T2e
   sahBuildHandcart(game, sahRoot);
   // LAST, because sahAddPerson is called from a dozen builders above and the
   // roster is not complete until every one of them has run.
