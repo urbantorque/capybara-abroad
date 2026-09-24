@@ -776,6 +776,54 @@ gatherers stay outside r 5.5 and out of a 50-degree cone behind the lens yaw, an
 walks to the horseshoe mouth to hand over the bag, which T4a places. Proof: the most bubbles on
 screen in 60 s on the Sydney lawn, the Sahara crest and the Uji bridge is 2 or fewer; a flash PNG.
 
+### T3c — shipped
+
+- **The cap** (`noBubbleCap`, every rung: it takes DOM away and costs no GPU). `npcBubCap`
+  decides what is drawn once a frame, before the draw loop. Two up; one within 20 m of
+  `CHAPTERS[].marquee`, while `wowLiveAt()` is live, or while a say/why toast is `.in` (read on
+  the panel tick). Rank: the traveller, then a line to the animal (speech null), then idle
+  talk, nearest first, and a line already up keeps its place against one 8 m nearer. Past 25 m
+  a line to the animal goes to `hud.heard` on the off-frame fence; idle talk goes. Idle anchors
+  in the top 18% go. A line over the cap waits hidden on its own clock. One that loses its place
+  fades on the 0.35 s tail and holds the place while it fades.
+  `game.bubbleCapAudit()` / `bubbleCapReset()`.
+- **The flash** (`noFlashStar`). The same two flash meshes are re-shaped into a four-point foam
+  star with emissive 1.6. It is 0.18 m across at 6 m (0.12-0.35 m), faces the lens, and lasts
+  90 ms. Its clock runs in every chapter; the card's clock ran only in Sydney. At rung 1 and up
+  it is parked and nothing is drawn. No new mesh or material (`qa/reimagine-person-contour.mjs`
+  locks that).
+- **'man overboard.'** is gated on `state.started`.
+- **The cameo** (`noTravArc`, parks at rung 1). On `'story:memory'`, one silent figure built
+  through `addLocal` (`near` 0, `cd` 1e9) stands 20-30 m off. Its bearing from the lens is
+  20-37 degrees, which keeps it out from under the memory card. It stands on a static floor
+  within 3 m of the animal's, is not in water, and nothing solid is between it and the lens. It
+  faces the animal for 10 s, then walks off for 3.5 s. It also leaves on `'story:act'`, when
+  the animal comes within 6 m, and on a crossing. If the chapter's own traveller is within 35 m,
+  that traveller turns instead (`chatYaw`), and the glimpse's stand turns too.
+- **The walk-in** (`noTravArc`, every rung: the figure is already drawn). On `'finale:staged'`
+  the lawn traveller's stall is re-parented to the scene where it stands. With the animal within
+  9 m of the ring, the traveller walks the arc outside the ring (their own 7.7 m) to the mouth
+  and in to r + 0.9. They bend for 2.6 s and emit `'npc:travBag'` (wrapped `{npc: {x, y, z, yaw,
+  bx, bz, biome}}`, with `bx/bz` a suggested bag spot beside the middle). Then they walk out and
+  round to home, at least 35 degrees off the mouth. This happens once a session.
+  `game.travFinAt()` → `{st, x, z, yaw, bag, mouth, cx, cz, visible}`, for T4a's `sysBagGroup`.
+  Gatherer slots are at 6.0 m or more (the arrival tolerance is 0.45) and outside the 50-degree
+  cone. `game.gatherAudit()`.
+- **Proof** (`qa/ten-t3c-*.js`, headful at rung 3 with the machine shared; the arc tests pin rung
+  0). Peak bubbles drawn over 60 s, counted from the DOM, with the cut figure in brackets:
+  Sydney spawn 1 (4), gardens lawn 1 (0), Sahara crest 0 (2), Uji bridge 1 (3). The Sydney spawn
+  is 19.5 m from the steps, so its cap is 1. The flash is 0.179 m at 6 m, gone by 100 ms, with
+  nothing fired at rung 1 (`ten-t3c-finale-flash.png`). The cameo on the Sydney memory was placed
+  22 m off, faceErr 0, and gone after its hold. At the Quay the chapter's traveller turned
+  (10 m). One act turn. The walk-in went round → in → hand → out → home → done, set down at 3.5
+  m in the mouth with one `npc:travBag`, and ended 97 degrees off the mouth. Gatherers were at
+  6.0-6.25 m (`ten-t3c-finale-hand.png`). npm test 79/0.
+- **Misses.** The cameo's line-of-sight test sees colliders only, so canopies still hide it.
+  Both Sydney runs stood the traveller behind a tree crown (a jacaranda, then a fig). The memory
+  is fired through `completeTask`, not played. The finale event is emitted by the instrument
+  (the real staging needs all ten keepsakes). T4a still has to place the bag. Rung-0 GPU numbers
+  for the two drawn flags are left to the proof slot.
+
 **T3d · kyoto.js · Kyoto sits in its hills.** `kyoBuildFar` modelled on palBuildFar
 (palawan.js:996): 6-8 rounded ridges at 300-420 m, the Uji downstream end left open, and one pagoda
 silhouette. Called from createKyoto (4781). Flag `noKyoFar`. Torii wood (`noToriiWood`): trunk

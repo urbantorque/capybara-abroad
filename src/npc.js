@@ -15456,7 +15456,8 @@ export function createNPCs(game) {
           npcHeardT = npcSAY_HEAR_GAP;
           try { game.hud.heard(b.txt.textContent, o); } catch (e) { /* never fatal */ }
         }
-        b.capOk = false;
+        b.capOk = !!b.shown;           // one already up fades out; one never drawn just goes
+        if (b.shown) fading++;         // fading from this frame: it holds its place too
         npcBubCapEnd(b);
         npcBubCapAud.far++;
         continue;
@@ -15469,7 +15470,8 @@ export function createNPCs(game) {
         npcBubCapV.y += 0.64;
         npcBubCapV.project(game.camera);
         if (npcBubCapV.z < 1 && npcBubCapV.y > npcBUBCAP_TOP) {
-          b.capOk = false; npcBubCapEnd(b); npcBubCapAud.top++;
+          if (b.shown) fading++;       // fading from this frame: it holds its place too
+          b.capOk = !!b.shown; npcBubCapEnd(b); npcBubCapAud.top++;
           continue;
         }
       }
@@ -15488,7 +15490,7 @@ export function createNPCs(game) {
     for (let i = n; i < npcBubCapRank.length; i++) {
       const b = npcBubCapRank[i];
       b.capOk = false;
-      if (b.capOn) { npcBubCapEnd(b); npcBubCapAud.lost++; up++; }   // it held a place: fade, do not blink
+      if (b.capOn) { b.capOk = !!b.shown; npcBubCapEnd(b); npcBubCapAud.lost++; up++; }   // it held a place: fade, do not blink
       else if (!b.capHeld) { b.capHeld = true; npcBubCapAud.held++; }
     }
     for (let i = 0; i < n && i < npcBubCapRank.length; i++) if (npcBubCapRank[i].capOn) up++;
