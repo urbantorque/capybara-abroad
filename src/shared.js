@@ -357,6 +357,7 @@ export const PALETTE = {
   rioSky:       0x7fc4e8,
   rioHaze:      0xdce9ee,      // sea haze — this one IS blue, unlike Cali's
   rioSun:       0xfff2da,
+  rioBounce:    0xf5dfb8,      // the beach thrown back up the Avenida's seaward faces (T2d)
 
   // ---- Iceland (chapter 7) ----
   // The only NIGHT in the game, and the only palette built to be read under a
@@ -428,6 +429,7 @@ export const PALETTE = {
   iceAurora3:   0xa8f2d8,
   iceAurora4:   0x5fc4e0,
   iceAuroraMag: 0xc48fd8,
+  iceAuroraHem: 0x7cffc4,      // the lower hem, where the curtain is brightest and the top dissolves (T2c)
   iceStar:      0xf4f6ff,
   iceSun:       0xf2e0c8,      // a very low sun, and a very warm one
 
@@ -498,6 +500,7 @@ export const PALETTE = {
   sahStorm:     0xc49a6a,
   sahStormDeep: 0x9a7248,
   sahSkyDay:    0x8fc4dc,
+  sahZenith:    0x4c8cc4,      // straight up, above the dust, where the sky is still blue (T2e)
   sahSkyHot:    0xd9d4bc,      // the sky at noon here is nearly white
   sahSkyNight:  0x2f3a58,
   sahStarSky:   0xf4f2e8,
@@ -1114,6 +1117,7 @@ export const PALETTE = {
   cavFoam:      0xc8dcdc,
   cavEcho:      0x9fe8ff,      // THE VOICE. Everything it touches goes this way
   cavEchoDim:   0x4a90a8,
+  caveGlint:    0xd8f6ff,      // what a ping leaves on wet rock for a moment: the voice, gone pale (T2)
   cavGlow:      0x7ef0c4,      // the worms, and they are the only nav aid
   cavGlowDim:   0x2e8a70,
   cavShaft:     0xfff4d0,      // the hole in the roof, two hundred metres up
@@ -1122,6 +1126,7 @@ export const PALETTE = {
   cavJungleLt:  0x76b84e,
   cavJungleDk:  0x2f5c2a,
   cavFern:      0x89c45c,
+  caveFern:     0xa2d066,      // ...and the fern standing in the shaft's own patch of floor (T2)
   cavPhyto:     0x6fa84a,      // phytokarst: the algae leans toward the light
   cavSwiftlet:  0x3a3630,
   cavFish:      0xe8e4d8,      // and it has no eyes, which you can see
@@ -1186,6 +1191,7 @@ export const PALETTE = {
   antOrca:      0x121517,      // and the pod, which is the reason to come
   antOrcaW:     0xf5f7f5,
   antOrcaSaddle: 0x93a3a4,
+  antOrcaBelly: 0xeaf3f7,      // the belly crescent and the eye patch: the white the chase lens has to find (T2b)
   antSkyTop:    0x8ab2ca,
   antSkyLow:    0xe2ecf0,
   antSun:       0xfff2dc,
