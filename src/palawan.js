@@ -135,6 +135,11 @@ let palBloomT = -1;                  // s into it, -1 when it is not on
 let palSeenBloom = false;
 let palWarned = false;
 let palSub = 0;                      // 0..1 — how far under the camera should feel
+// CLEAR WATER (ROADMAP-TEN T4e). See palClearDraw. The far it last wrote, so
+// the second draw of a frame (the mirror, then the picture) finds its own
+// number there and leaves it alone; and what it did, for the audit.
+let palClearHooked = false, palClearWrote = -1;
+const palClearLast = { k: 0, far: 0, wrote: 0 };
 
 let palWaterMesh = null;
 let palFishMesh = null, palFishData = null;
@@ -5329,6 +5334,8 @@ export function createPalawan(game) {
     /** 0..1 — how far under the surface the camera should FEEL. systems.js
      *  reads this for the fog, the light and the muffle. */
     submerged() { return palSub; },
+    /** T4e: what the clear water wrote on the last draw. See palClearDraw. */
+    clearAudit() { return { k: palClearLast.k, far: palClearLast.far, wrote: palClearLast.wrote }; },
     bloom() { return palBloom; },
     blooming() { return palBloomT >= 0; },
     seenBloom() { return palSeenBloom; },
@@ -5444,10 +5451,111 @@ export function createPalawan(game) {
   return api;
 }
 
+// ============================================================ CLEAR WATER ==
+/**
+ * FIFTEEN METRES OF WATER IS STILL WATER (ROADMAP-TEN T4e, `noPalClear`).
+ *
+ * Dived with real keys, the coral garden three to eight metres off went flat
+ * teal and the karst over the surface went grey — in a lagoon known for twenty
+ * to thirty metres of visibility, in the one chapter whose paper says the
+ * interesting half is underneath. The look under here is systems.js's sysSUB
+ * row, and Palawan's row is its four shipped constants: 4 near, 62 far, the
+ * fog in palFogUnder. That row is not re-based. This is laid OVER it, for the
+ * draw, in this chapter only:
+ *
+ *   THE FAR, TWICE. 62 becomes 124 at full depth of the lens. The near and the
+ *   curve stay, so the reef still goes away — it goes away at the distance a
+ *   clear sea lets it.
+ *
+ *   THE COLOUR, A STEP LIGHTER AND BLUER. palDeepClear in place of palFogUnder
+ *   in the fog, the clear colour and the composite's water tint (uSub). The
+ *   tint is the big one: it multiplies the whole picture by the water's colour,
+ *   and palFogUnder's red is 0.02 linear, which is what made every coral the
+ *   same teal. palDeepClear keeps three times the red — and the tint is laid
+ *   at 0.60 of the lens's depth rather than all of it (palCLEAR_TINT).
+ *
+ * Measured through one pinned, frozen lens, row against clear (qa/ten-t4e-
+ * clear.js): the coral at ten metres stands 11.9 -> 16.0 away from the water
+ * behind it in a*b*, the manta at fifteen 4.6 -> 6.2 dE, and the frame is
+ * seven L lighter. Knocking the terms out one at a time (qa/ten-t4e-terms.js)
+ * is why the tint and not the far carries it: the fog pushed to two kilometres
+ * moved the far band 2 L; the tint off moved the frame chroma 5.
+ *
+ * WHY IT IS WRITTEN AT THE DRAW. palawan.js runs before systems.js in the
+ * module order, so anything written in update() is overwritten by the sub
+ * block the same frame. scene.onBeforeRender runs after every module and
+ * before the lights and the fog are read; the composite reads its tint after
+ * the scene draw. Every value written here is the row's own contribution
+ * swapped for the clear one — `row + k*(clear - row)` on the exact weights the
+ * sub block used — so the abyss past the drop-off, the bloom and every other
+ * block's work stay where they were. Atmosphere is rebuilt from scratch every
+ * frame (atmosApply copies), so nothing here accumulates; the one thing that
+ * could double it is a second draw in the same frame, and palClearWrote is
+ * what that draw finds.
+ *
+ * No draw call, no program, no triangle: numbers that were going to be written
+ * anyway, so nothing to park at a rung — the cut is the flag alone.
+ */
+const palCLEAR_ROW_FAR = 62;         // m — systems.js sysSUB.palawan.far, the row
+const palCLEAR_FAR = 124;            // ...twice, which is what the reviewer asked
+// How much of the composite's water tint a metre of this water lays on the
+// near field, against the row's 1.0. The tint is path-free — it takes the same
+// colour out of a coral at two metres as at twenty — and CLEAR water is the
+// water that takes less of it. It also scales the ceiling's veil (uSubCeilK
+// is the same number), which was the milk over the top half of every dive.
+const palCLEAR_TINT = 0.60;
+const palClearC = new THREE.Color(PALETTE.palDeepClear);
+const palClearRow = new THREE.Color(PALETTE.palFogUnder);
+const palClearD = new THREE.Color();
+function palClearDraw() {
+  const g = palGame;
+  palClearLast.wrote = 0;
+  if (!g || !g.biome || !g.biome.isActive('palawan')) return;
+  const st = g.state;
+  const k = clamp(palSub, 0, 1);
+  palClearLast.k = k;
+  if ((st && st.noPalClear) || k < 0.002) return;
+  const scene = g.scene, fog = scene && scene.fog;
+  if (!fog || fog.far === palClearWrote) return;
+  // the same depth the sub block darkens by: the abyss keeps its share
+  const capy = g.capy;
+  const dp = capy ? clamp(((capy.depth || 0) - 4) / 8, 0, 1) : 0;
+  palClearD.copy(palClearC).sub(palClearRow);
+  fog.far += (palCLEAR_FAR - palCLEAR_ROW_FAR) * k;
+  const wf = 0.95 * k * (1 - dp * k * 0.6);
+  fog.color.r += palClearD.r * wf; fog.color.g += palClearD.g * wf; fog.color.b += palClearD.b * wf;
+  const bg = scene.background;
+  if (bg && bg.isColor) {
+    const wb = 0.9 * k * (1 - dp * k * 0.7);
+    bg.r += palClearD.r * wb; bg.g += palClearD.g * wb; bg.b += palClearD.b * wb;
+  }
+  // the composite's tint is a straight copy of the row's colour while sub > 0,
+  // and its strength is the lens's depth, k — so clear water takes less of it
+  const pp = g.post && g.post.params;
+  if (pp && pp.sub > 0) {
+    pp.subR = palClearC.r; pp.subG = palClearC.g; pp.subB = palClearC.b;
+    pp.sub = k * palCLEAR_TINT;
+  }
+  palClearWrote = fog.far;
+  palClearLast.far = fog.far;
+  palClearLast.wrote = 1;
+}
+function palClearInstall(game) {
+  if (palClearHooked || !game.scene) return;
+  palClearHooked = true;
+  // chained, never replaced: the scene is every chapter's
+  const prev = game.scene.onBeforeRender;
+  game.scene.onBeforeRender = function (r, s, c, t) {
+    if (prev) prev.call(this, r, s, c, t);
+    palClearDraw();
+  };
+}
+
 function palBuild(game) {
   if (palBuilt) return;
   palBuilt = true;
   palInitGeos();
+  palClearInstall(game);
 
   palRoot = new THREE.Group();
   palRoot.name = 'palawan';
