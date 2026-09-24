@@ -6601,6 +6601,72 @@ const sysACT_LINES = [
    'one fold left, and the way back is on it.'],
 ];
 const sysROMAN = ['I', 'II', 'III', 'IV', 'V'];
+// ---- THE SKETCHBOOK (ROADMAP-TEN T3a, noFreePaper) ----------------------
+// Free Roam's paper is not the story's list with the rows hidden. It is a
+// place, what the place calls the animal, three names it has not earned yet
+// drawn as bars, and what each one wants in a single word. The want is the
+// only clue: a noun or a verb, never an instruction, and never the why.
+// Keyed by repertoire id; a row with no word here falls back to 'trouble'.
+const sysREP_WANT = {
+  'hat-trick': 'hats', 'bin-day': 'bins', 'cone-zone': 'cones', 'roadworks': 'signs',
+  'same-again': 'again', 'clearance': 'everything', 'double-spill': 'spills',
+  'butterfingers': 'breakables', 'magpie': 'pockets', 'burial': 'water',
+  'direct-hit': 'aim', 'the-volley': 'throwing', 'triple-spill': 'spills',
+  'demolition': 'breakables', 'kleptomania': 'pockets', 'deep-six': 'water',
+  'bombardment': 'throwing', 'smash-grab': 'haste', 'pied-piper': 'followers',
+  'hit-and-run': 'nerve', 'wet-work': 'splashes', 'clumsy-thief': 'fumbles',
+  'mopping-up': 'puddles', 'housekeeping': 'housework', 'flat-white': 'coffee',
+  'paparazzo': 'cameras', 'camera-shy': 'cameras', 'shades-off': 'sunglasses',
+  'high-tea': 'mugs', 'the-service': 'bowls', 'last-orders': 'wine', 'chip-shop': 'chips',
+  'handbags': 'handbags', 'bin-shot': 'bins', 'beach-day': 'towels', 'day-off': 'deckchairs',
+  'the-picnic': 'baskets', 'lunch-hour': 'sandwiches', 'gondoliers-farewell': 'gondolas',
+  'the-checkout': 'shops', 'the-tea-house': 'teacups', 'rush-hour': 'traffic',
+  'clean-sweep': 'variety', 'full-set': 'variety', 'the-lot': 'everything',
+  'slide-off': 'slopes', 'the-kick': 'walls', 'the-mount': 'rides',
+  'long-shot': 'distance', 'the-chain': 'ledges',
+};
+// What ONE place calls it. The journey's ladder (sysNOTO_TIERS) is scored
+// across nineteen places; a single place reaches its words sooner, so the
+// rungs are its own. `bad` is incidents and scenes caused here, `good` the
+// gifts and half the photographs; a place that likes it more than it minds
+// it says so, and a place that has not noticed it yet says that.
+const sysPLACE_RUNGS = [
+  { at: 1,  word: 'a rumour',           line: 'there is a rumour about it here' },
+  { at: 3,  word: 'a nuisance',         line: 'they call it a nuisance here' },
+  { at: 6,  word: 'a menace',           line: 'they call it a menace here' },
+  { at: 10, word: 'a legend',           line: 'it is a legend here' },
+  { at: 16, word: 'a natural disaster', line: 'here it is a natural disaster' },
+];
+function sysPlaceWord(bad, good) {
+  const b = bad || 0, g = good || 0;
+  if (g >= 2 && g >= b) return { word: 'a favourite', line: 'they are fond of it here', warm: true };
+  let r = null;
+  for (let i = 0; i < sysPLACE_RUNGS.length; i++) if (b - g * 0.5 >= sysPLACE_RUNGS[i].at) r = sysPLACE_RUNGS[i];
+  return r ? { word: r.word, line: r.line, warm: false }
+           : { word: '', line: 'nobody here has noticed it yet', warm: false };
+}
+const sysFREE_UI = {
+  kick: 'the sketchbook', want: 'if it wants: ', names: ' names',
+  stampKick: 'into the sketchbook',
+};
+// At fifteen, thirty and forty-five names the sketchbook says what it has
+// become. Two per rung, so a second file does not hear the first's.
+const sysFREE_MILE = {
+  15: ['fifteen pages, and people have started to recognise the handwriting.',
+       'the sketchbook is getting heavy. nobody has asked for it back.'],
+  30: ['thirty. there are places that lock things away when it arrives.',
+       'the sketchbook needs a second strap now.'],
+  45: ['forty-five. the book is nearly full, and nobody in it has forgiven it.',
+       'there are not many names left that it does not have.'],
+};
+// Coming back to a place it made trouble in (noFreeRemember): somebody here
+// remembers, and says so once on arrival.
+const sysFREE_BACK = [
+  'somebody here puts a hand over their coffee.',
+  'a few people here have not forgotten.',
+  'the bins here have been moved since last time.',
+  'someone points. someone else nods.',
+];
 const sysLEARN_SHOP = {
   open: 'Try a practice purchase', wallet: 'Practice wallet: {n} yuzu',
   collect: 'Collect 5 practice yuzu', buy: 'Try buying {name} · {n} yuzu',
@@ -10892,6 +10958,45 @@ function sysBuildCSS() {
    Six a side on a short desktop window, the atlas only. */
 '@media (min-width:640px) and (max-height:760px){.capyui-title:has(.capyui-p2:not(.flatlive)){padding-top:12px;padding-bottom:12px;}}',
 /* TEN T2a story beats end. */
+/* TEN T3a sketchbook: FREE ROAM'S PAPER IS A PAGE OF A SKETCHBOOK (ROADMAP-TEN T3a).
+   The place is the headline, in the ink, a step larger than any row; what it
+   calls the animal is the italic under it. The three unearned names are the
+   repertoire's own silhouettes (repPage's bars) in dashed boxes, each with
+   its want in the accent ink at the right, so the eye reads shape then word.
+   The tally is the count's caps; the marquee is a soft italic at the foot.
+   No tick boxes: `.free` hides the list, the count and the finds, and the
+   marquee block only shows while the paper is in its `.marq` state. */
+'.capyui-sketch{display:none;}',
+'.capyui-todo.free .capyui-sketch{display:block;}',
+'.capyui-todo.free:not(.marq) .capyui-marq,.capyui-todo.free .capyui-count,.capyui-todo.free .capyui-finds{display:none;}',
+'.capyui-skplace b{display:block;font-size:clamp(15px,2.3vw,18px);font-weight:700;letter-spacing:.02em;line-height:1.12;color:' + ink + ';}',
+'.capyui-skplace i{display:block;margin-top:2px;font-size:' + tSm + ';line-height:1.3;color:' + inkSoft + ';}',
+'.capyui-sketch.warm .capyui-skplace i{color:' + sysHex(PALETTE.leafC) + ';}',
+'.capyui-skrows{list-style:none;margin:9px 0 0;padding:0;display:grid;gap:5px;}',
+'.capyui-skrow{display:flex;align-items:center;gap:8px;min-height:24px;padding:4px 8px;',
+  'border:1px dashed ' + inkFaint + ';border-radius:' + rSm + ';}',
+'.capyui-skrow:nth-child(2){transform:rotate(.5deg);}',
+'.capyui-skrow:nth-child(3){transform:rotate(-.4deg);}',
+'.capyui-skrow[hidden]{display:none;}',
+'.capyui-skbars{display:flex;flex-wrap:wrap;gap:4px;flex:1 1 auto;min-width:0;font-size:' + tSm + ';}',
+/* a step darker than the journal's grid: on the paper the bars are the
+   whole of the row, and inkFaint read as a smudge at 1280 x 720 */
+'.capyui-skbars .capyui-repbar{background:' + inkSoft + ';opacity:.42;}',
+'.capyui-skwant{flex:0 0 auto;font-size:' + tSm + ';color:' + accentInk + ';white-space:nowrap;}',
+'.capyui-skfoot{margin-top:9px;font-size:' + tSm + ';letter-spacing:.14em;text-transform:uppercase;color:' + inkSoft + ';',
+  'font-variant-numeric:tabular-nums;}',
+'.capyui-sksoft{margin-top:4px;font-size:' + tSm + ';font-style:italic;color:' + inkSoft + ';}',
+'.capyui-sksoft[hidden]{display:none;}',
+/* ...and a name found is STAMPED, not posted: the card arrives a size too big
+   and a few degrees off, lands, and wears a double ruled border in the accent
+   ink, which is the one thing on screen that says it went into the book. */
+'.capyui-moment.stamp{border:2px solid ' + accentInk + ';',
+  'box-shadow:' + shLg + ',inset 0 0 0 3px ' + paper + ',inset 0 0 0 4px ' + sysRgba(PALETTE.ibisHead, 0.35) + ';}',
+'.capyui-moment.stamp.show{animation:capyui-skstamp .5s cubic-bezier(.2,1.4,.4,1);}',
+'@keyframes capyui-skstamp{0%{transform:translate(-50%,0) rotate(-5deg) scale(1.3);opacity:0}',
+  '60%{transform:translate(-50%,0) rotate(-.2deg) scale(.97);opacity:1}100%{transform:translate(-50%,0) rotate(-.7deg) scale(1)}}',
+'@media (prefers-reduced-motion:reduce){.capyui-moment.stamp.show{animation:none;}}',
+/* TEN T3a sketchbook end. */
 /* the postcard, at the aspect it is authored in (64 x 40) */
 /* position:relative (L4, F1b): the photograph is an absolutely placed
    .capyui-shot and this box is what it fills — without it the picture took
@@ -25247,6 +25352,10 @@ export function createSystems(game) {
   // the file changes mode only when a place is actually chosen — so turning
   // the page and coming back to Carry on leaves the story exactly as it was.
   let titleFree = false;
+  // The notoriety ladder and the repertoire are declared long after the title
+  // is built, so the free wall's rank is read when the page is shown, once
+  // this module has got that far (T3a).
+  let titleNotoOk = false;
   function titleFreeCommit() {
     if (!titleFree || !jrFile) return;
     jrFile.journeyMode = 'free';
@@ -25647,7 +25756,34 @@ export function createSystems(game) {
     // The tally is only ever shown for somewhere you have actually been. On a
     // fresh file it says nothing at all, because "0 / 8" fifteen times over is
     // not information, it is wallpaper.
-    if (done > 0 || jrFileSeen[d.n]) {
+    // ---- ...AND ON THE FREE WALL IT IS WHAT THE PLACE CALLS IT (T3a) -----
+    // A task tally is the story's number. The flat wall is Free Roam's, so a
+    // place you have been shows its word ("a nuisance") on the picture and
+    // its secrets under the hint, off the same file counts the paper reads;
+    // a place with no word yet shows no chip at all, the wallpaper rule.
+    const freeTile = !atlas && !game.state.noFreePaper && !!jrFile && (done > 0 || !!jrFileSeen[d.n]);
+    if (freeTile) {
+      const fc = function (k) { const o = jrFile[k]; return (o && typeof o[d.n] === 'number') ? o[d.n] : 0; };
+      const pw = sysPlaceWord(fc('inc') + fc('scn'), fc('fed') + fc('pho') * 0.5);
+      let fa = 0, fh = 0;
+      const got = jrFile.finds || [];
+      for (let k = 0; k < FINDS.length; k++) {
+        if (FINDS[k].chapter !== d.n) continue;
+        fa++; if (got.indexOf(FINDS[k].id) >= 0) fh++;
+      }
+      // digits: sysNumWord's table is declared further down this function
+      const sec = fa ? fa + (fa === 1 ? ' secret' : ' secrets') + ' · ' + fh + ' noticed' : '';
+      // ON THE PICTURE on the wall, as the tally was: a third body line
+      // grew every row with a visited place in it (measured 92 / 94 / 107 px
+      // against T1a's one height). The hero has the room, so it keeps a line.
+      if (hero && sec) body.appendChild(sysEl('em', 'capyui-pickrec', sec));
+      const chipT = hero ? pw.word : [pw.word, fa ? fh + '/' + fa + ' noticed' : ''].filter(Boolean).join(' · ');
+      if (chipT) {
+        const chip = sysEl('span', 'capyui-picktally', chipT);
+        if (pw.warm) chip.classList.add('full');
+        art.appendChild(chip);
+      }
+    } else if (done > 0 || jrFileSeen[d.n]) {
       const tally = sysEl('span', 'capyui-picktally', memF ? (memF.enough ? 'remembered' : memK + ' of 2 to a memory') : done + '/' + ids.length);
       if (memF ? memF.enough : (done >= ids.length && ids.length)) tally.classList.add('full');
       // ON THE PICTURE, not on the tile. They are the same corner for the
@@ -25694,7 +25830,7 @@ export function createSystems(game) {
       for (let k = 0; k < ids.length; k++) {
         if (RECORDS[ids[k]] && fileRecs[ids[k]] !== undefined) { bestId = ids[k]; break; }
       }
-      if (bestId) {
+      if (bestId && !freeTile) {
         const rd = RECORDS[bestId];
         body.appendChild(sysEl('em', 'capyui-pickrec',
           rd.label + ' ' + fileRecs[bestId].toFixed(rd.dp) + rd.unit));
@@ -25849,6 +25985,12 @@ export function createSystems(game) {
     titleFree = !shelfAtlas && jrHasFile && journeyMode === 'story';
     p2H.textContent = shelfAtlas ? sysHOME_UI.whereStory : sysHOME_UI.whereFree;
     p2El.classList.toggle('flatlive', !shelfAtlas);
+    // ...and the free wall's stat is the rank and the names (T3a): "a nuisance
+    // / 7 of 50 names", off the file, the one number the sketchbook keeps.
+    if (!shelfAtlas && jrHasFile && titleNotoOk && !game.state.noFreePaper) {
+      const sc = notoScore(jrFile);
+      p2StatFlat = [notoName(notoTier(sc.score)) || 'nobody yet', sc.variety + ' of ' + sysREP.length + ' names'];
+    }
     const st = shelfAtlas ? p2StatAtlas : p2StatFlat;
     p2Stat.textContent = '';
     if (st) { p2Stat.appendChild(sysEl('b', null, st[0])); p2Stat.appendChild(document.createTextNode(st[1])); }
@@ -27134,7 +27276,22 @@ export function createSystems(game) {
     // the marquee's own state (L4, E4): see the .marq rule
     const wantMarq = !busy && !want && (wowLiveOn || wowEarnedOn || owned || !!(marqId && game.capy && game.capy.atHelm));
     if (wantMarq !== todoMarq) { todoMarq = wantMarq; todoEl.classList.toggle('marq', wantMarq); }
-    if (want) {
+    if (want && ((wowLiveOn && wowLiveLine && !game.state.noFreePaper) || (todoFreeShown && !todoTopId))) {
+      // ---- ONE THING AT A TIME ON THE TAB (T3a) ---------------------------
+      // A marquee under way is the tab's, name and live line together: the
+      // orca ride's tab read the top row's clue, which was the calving
+      // face's clock, because a finished marquee has no marqId and the tab
+      // fell through to a different task. And on a free file with nothing
+      // pinned, the tab is the sketchbook's: the place and its word, and the
+      // first want. Neither carries an arrow.
+      const live = wowLiveOn && !!wowLiveLine;
+      const t = live ? (marqNameEl.textContent || wowLiveLine) : freeTabTxt;
+      const sub = live ? wowLiveLine : freeTabSub;
+      if (todoTabTxt.textContent !== t) todoTabTxt.textContent = t;
+      if (todoTabDist.textContent !== '') todoTabDist.textContent = '';
+      todoTabAim.style.display = 'none';
+      if (todoTabSub.textContent !== sub) { todoTabSub.textContent = sub; todoTabSub.classList.toggle('on', !!sub); }
+    } else if (want) {
       const top = taskRec[todoTopId];
       const t = top && top.txt ? top.txt.textContent : '';
       // The tab has room for one instruction. A progress prefix swallowed the
@@ -27306,6 +27463,34 @@ export function createSystems(game) {
   /** Is a marquee under way right now, and how far through (0..1, or -1). */
   game.wowLiveAt = function () { return wowLiveOn ? (wowLiveT < 0 ? 0.5 : wowLiveT) : -1; };
   todoEl.appendChild(todoHeadEl);
+  // ---- THE SKETCHBOOK'S PAGE (ROADMAP-TEN T3a, noFreePaper) ---------------
+  // Built once, like every row; freePaperRefresh fills it and `.free` on the
+  // card is what shows it. The place and what it calls the animal, three
+  // unearned names as bars with a want each, and the tally. The marquee is
+  // one soft line at the foot, never a row.
+  const skEl = sysEl('div', 'capyui-sketch');
+  const skPlace = sysEl('div', 'capyui-skplace');
+  const skName = sysEl('b', null, '');
+  const skWord = sysEl('i', null, '');
+  skPlace.appendChild(skName); skPlace.appendChild(skWord);
+  skEl.appendChild(skPlace);
+  const skList = sysEl('ul', 'capyui-skrows');
+  skList.setAttribute('aria-label', 'names not yet earned here');
+  const skRows = [];
+  for (let i = 0; i < 3; i++) {
+    const li = sysEl('li', 'capyui-skrow');
+    const bars = sysEl('span', 'capyui-skbars');
+    const want = sysEl('i', 'capyui-skwant', '');
+    li.appendChild(bars); li.appendChild(want);
+    skList.appendChild(li);
+    skRows.push({ li: li, bars: bars, want: want, id: '' });
+  }
+  skEl.appendChild(skList);
+  const skFoot = sysEl('div', 'capyui-skfoot', '');
+  skEl.appendChild(skFoot);
+  const skSoft = sysEl('div', 'capyui-sksoft', '');
+  skEl.appendChild(skSoft);
+  todoEl.appendChild(skEl);
   let marqId = '';
   let marqSay = '';    // the authored sentence, before the metres are added
 
@@ -30657,25 +30842,27 @@ export function createSystems(game) {
     if (sysCardBusy(sysMomentDefer.pri)) return;
     const m = sysMomentDefer;
     sysMomentDefer = null;
-    showMomentNow(m.kicker, m.text, m.note, m.incidental, m.pri, m.hold);
+    showMomentNow(m.kicker, m.text, m.note, m.incidental, m.pri, m.hold, m.cls);
   }
   // `pri` (T2a): omitted, an incidental card is 0 and any other is 1, which
   // is what every caller meant before there were ranks. `hold` (s) overrides
   // the reading-time hold; the premise asks for five.
-  function showMoment(kicker, text, note, incidental, pri, hold) {
+  function showMoment(kicker, text, note, incidental, pri, hold, cls) {
     const pr = typeof pri === 'number' ? pri : (incidental ? 0 : 1);
     const busy = sysCardBusy(pr);
     if (busy && pr === 0) { sysMomentDropped++; return; }
     if (wowLiveOn || busy) {
       if (sysMomentDefer && sysMomentDefer.pri > pr) { sysMomentDropped++; return; }
-      sysMomentDefer = { kicker: kicker, text: text, note: note, incidental: !!incidental, at: sysWall(), pri: pr, hold: hold };
+      sysMomentDefer = { kicker: kicker, text: text, note: note, incidental: !!incidental, at: sysWall(), pri: pr, hold: hold, cls: cls };
       return;
     }
-    showMomentNow(kicker, text, note, incidental, pr, hold);
+    showMomentNow(kicker, text, note, incidental, pr, hold, cls);
   }
-  function showMomentNow(kicker, text, note, incidental, pri, hold) {
+  function showMomentNow(kicker, text, note, incidental, pri, hold, cls) {
     const pr = typeof pri === 'number' ? pri : (incidental ? 0 : 1);
     momentKick.textContent = kicker || '';
+    // the one card with a look of its own: a name going into the sketchbook (T3a)
+    momentEl.classList.toggle('stamp', cls === 'stamp' && !game.state.noFreePaper);
     momentText.textContent = text || '';
     momentNote.textContent = note || '';
     momentNote.style.display = note ? '' : 'none';
@@ -30684,7 +30871,7 @@ export function createSystems(game) {
     const holdS = game.state.noMomentPriority ? sysMOMENT_CARD / 1000
       : (typeof hold === 'number' ? hold : sysMomentHold(text, note));
     sysCardClaim(pr, holdS);
-    sysMomentShown.push({ k: String(kicker || ''), pri: pr, t: +sysWall().toFixed(2) });
+    sysMomentShown.push({ k: String(kicker || ''), pri: pr, t: +sysWall().toFixed(2), cls: cls || '', text: String(text || '') });
     if (sysMomentShown.length > 24) sysMomentShown.shift();
     if (momentTimer) clearTimeout(momentTimer);
     momentTimer = setTimeout(function () { momentWanted = false; momentVisibilityTick(); }, holdS * 1000);
@@ -34559,6 +34746,135 @@ export function createSystems(game) {
   // ids that are ticked but still on the paper, being struck through
   const todoLinger = Object.create(null);
   let todoChapShown = 0;
+  // ---- THE SKETCHBOOK (ROADMAP-TEN T3a, noFreePaper) ----------------------
+  // On a free file the paper is the place's page: see sysREP_WANT and
+  // sysPlaceWord at the top of the file for the words, and the skEl block
+  // for the shape. A cut flag hands back the story's paper exactly.
+  let todoFreeShown = false;
+  function freePaperOn() {
+    return !game.state.noFreePaper && game.state.journeyMode === 'free' && started;
+  }
+  /** What this place calls it, off the four counts it already keeps. */
+  function placeWordOf(n) {
+    return sysPlaceWord((jrChapInc[n] || 0) + (jrChapScene[n] || 0),
+                        (jrChapFed[n] || 0) + (jrChapPho[n] || 0) * 0.5);
+  }
+  // The prop types lying about in the live place, for "a generic name whose
+  // prop exists here". Walked once per arrival and again only when the
+  // registry changes size — a few hundred entries, no allocation per frame.
+  let skPropBiome = '', skPropN = -1;
+  const skPropHave = Object.create(null);
+  function skPropsHere(biome) {
+    const arr = game.props || [];
+    if (biome === skPropBiome && arr.length === skPropN) return skPropHave;
+    skPropBiome = biome; skPropN = arr.length;
+    for (const k in skPropHave) delete skPropHave[k];
+    for (let i = 0; i < arr.length; i++) {
+      const q = arr[i];
+      if (!q || q.removed || !q.type) continue;
+      if (q.biome && q.biome !== biome) continue;
+      skPropHave[q.type] = 1;
+    }
+    return skPropHave;
+  }
+  // A stable shuffle per place, so Sydney and Kyoto do not open on the same
+  // three verbs: an FNV-style hash of id and place, compared as a number.
+  function skHash(s) {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  /**
+   * THREE NAMES IT HAS NOT EARNED, BEST FIRST. The place's own names, then
+   * a named prop that is actually lying about here, then the verbs (which
+   * work anywhere), then the moves and the breadth names. Unfound only; the
+   * order inside a class is the per-place shuffle.
+   */
+  function freeSketchPick(biome) {
+    const have = skPropsHere(biome);
+    const out = [];
+    for (let i = 0; i < sysREP.length; i++) {
+      const p = sysREP[i];
+      if ((jrRep[p.id] || 0) > 0) continue;
+      if (p.biome && p.biome !== biome) continue;
+      let cls = 2, props = true, anyT = false;
+      for (let w = 0; w < p.want.length; w++) {
+        const t = p.want[w].t;
+        if (!t || p.want[w].k === 'move') continue;
+        anyT = true;
+        if (!have[t]) props = false;
+      }
+      if (p.biome) cls = 0;
+      else if (anyT) { if (!props) continue; cls = 1; }
+      else if (p.want[0] && (p.want[0].k === 'move' || p.want[0].kinds !== undefined)) cls = 3;
+      out.push({ p: p, s: cls * 4294967296 + skHash(p.id + biome) });
+    }
+    out.sort(function (a, b) { return a.s - b.s; });
+    return out.slice(0, 3).map(function (o) { return o.p; });
+  }
+  let skSig = '';
+  function freePaperRefresh(n) {
+    const cdef = chapterDef(n);
+    const biome = (cdef && cdef.biome) || (game.biome && game.biome.current) || '';
+    const pw = placeWordOf(n);
+    const nm = chapLabel(n);
+    if (skName.textContent !== nm) skName.textContent = nm;
+    if (skWord.textContent !== pw.line) skWord.textContent = pw.line;
+    skEl.classList.toggle('warm', !!pw.warm);
+    const pick = freeSketchPick(biome);
+    const sig = pick.map(function (p) { return p.id; }).join(',');
+    if (sig !== skSig) {
+      skSig = sig;
+      for (let i = 0; i < skRows.length; i++) {
+        const r = skRows[i], p = pick[i];
+        r.id = p ? p.id : '';
+        r.li.hidden = !p;
+        while (r.bars.firstChild) r.bars.removeChild(r.bars.firstChild);
+        if (!p) continue;
+        // repPage's silhouette: one bar per word, in the width of the word
+        const words = p.name.split(' ');
+        for (let w = 0; w < words.length; w++) {
+          const b = sysEl('i', 'capyui-repbar');
+          b.style.width = (words[w].length * 0.52).toFixed(2) + 'em';
+          r.bars.appendChild(b);
+        }
+        r.bars.setAttribute('role', 'img');
+        r.bars.setAttribute('aria-label', 'a name of ' + sysNumWord(words.length) + (words.length === 1 ? ' word' : ' words'));
+        r.want.textContent = sysREP_WANT[p.id] || 'trouble';
+      }
+    }
+    // the tally: names over the whole journey, then this place's secrets
+    let fa = 0, fh = 0;
+    for (let i = 0; i < FINDS.length; i++) {
+      if (FINDS[i].chapter !== n) continue;
+      fa++; if (findDone[FINDS[i].id]) fh++;
+    }
+    const foot = repFound() + ' of ' + sysREP.length + sysFREE_UI.names +
+      (fa ? '  ·  ' + fh + ' of ' + fa + ' noticed' : '');
+    if (skFoot.textContent !== foot) skFoot.textContent = foot;
+    // the story's tally line ("a memory kept") is not a free file's (T1a miss)
+    if (countEl.textContent !== foot) countEl.textContent = foot;
+    // the marquee, as an invitation and nothing more
+    const wd = wowOfChapter(n);
+    const wr = wd ? taskRec[wd.id] : null;
+    const soft = (wd && wr && !wr.done && typeof wd.wow === 'string')
+      ? sysFREE_UI.want + sysSay(wd.wow).toLowerCase() : '';
+    if (skSoft.textContent !== soft) skSoft.textContent = soft;
+    skSoft.hidden = !soft;
+    todoHead(sysFREE_UI.kick, '');
+    const tab = nm + '  ·  ' + (pw.word || repFound() + sysFREE_UI.names);
+    freeTabTxt = tab;
+    freeTabSub = pick[0] ? (sysREP_WANT[pick[0].id] || 'trouble') + '?  ·  ' + foot : foot;
+  }
+  let freeTabTxt = '', freeTabSub = '';
+  /** QA: what the free paper is showing, read off the elements themselves. */
+  game.state.qaFreePaper = function () {
+    return { on: todoFreeShown, place: skName.textContent, line: skWord.textContent,
+             rows: skRows.map(function (r) { return r.li.hidden ? null : { id: r.id, want: r.want.textContent, bars: r.bars.children.length }; }),
+             foot: skFoot.textContent, soft: skSoft.hidden ? '' : skSoft.textContent,
+             count: countEl.textContent, kick: todoKickEl.textContent,
+             boxes: todoEl.querySelectorAll('.capyui-task:not(.capyui-hidden) .capyui-box').length };
+  };
   // The movement last drawn, for the chapter last drawn. Reset on arrival, so
   // it can only ever go UP inside one visit to one place — which is what makes
   // "actNow > todoActShown" a curtain rather than a flicker.
@@ -34826,6 +35142,18 @@ export function createSystems(game) {
       if (srec.txt.textContent !== stxt) srec.txt.textContent = stxt;
       srec.li.classList.toggle('soon', !shopPin);
     }
+    // ---- FREE ROAM HAS NO LIST (T3a, noFreePaper) ------------------------
+    // Tasks still tick, silently, so nothing is lost on the way back to the
+    // story; the paper just stops asking for them. The shop's row stays,
+    // because it is a place to spend and not a thing to do, and it only takes
+    // the arrow when pinned. The way on and the traveller are the story's.
+    const freeP = freePaperOn();
+    if (freeP) {
+      winIds = [];
+      for (const k in show) if (k !== sysSHOP_ID) delete show[k];
+      top = shopPin ? sysSHOP_ID : '';
+    }
+    if (freeP !== todoFreeShown) { todoFreeShown = freeP; todoEl.classList.toggle('free', freeP); }
     for (let i = 0; i < winIds.length; i++) show[winIds[i]] = true;
     // ---- THE MARQUEE LINE (B1) --------------------------------------------
     // Computed AFTER `show` is filled and BEFORE anything is written, so the
@@ -34979,7 +35307,7 @@ export function createSystems(game) {
     // were added precisely because the first three chapters had none).
     // It is the same element the clue uses, so nothing new is laid out and
     // nothing moves when the last row folds away.
-    if (done >= rec.ids.length && rec.ids.length) {
+    if (!freeP && done >= rec.ids.length && rec.ids.length) {
       let best = '';
       // ---- WHICH OF THESE YOU CAN RACE YOURSELF ON (P3) -------------------
       // A ghost is stored per record id and replayed when the attempt reopens,
@@ -35109,6 +35437,8 @@ export function createSystems(game) {
       todoHead(ad ? ad.kick : 'To do',
                (ad && acts.length > 1) ? 'part ' + actNow + ' of ' + acts.length : '');
     }
+    // ...and on a free file the head and the page are the sketchbook's (T3a)
+    if (freeP) freePaperRefresh(n);
 
 
     if (todoChapShown !== n) {
@@ -38020,21 +38350,28 @@ export function createSystems(game) {
    * The number, and its parts. Cheap enough to call from a card refresh — it
    * walks two objects with at most nineteen keys between them.
    */
-  function notoScore() {
+  // `f` (T3a): a save file's own maps instead of the live ones, so the title
+  // card's free wall can say the rank before a journey is restored. Same
+  // arithmetic, one formula.
+  function notoScore(f) {
+    const cInc = f ? (f.inc || {}) : jrChapInc, cScn = f ? (f.scn || {}) : jrChapScene;
+    const cFed = f ? (f.fed || {}) : jrChapFed, cPho = f ? (f.pho || {}) : jrChapPho;
     let inc = 0, scn = 0, spread = 0;
-    for (const k in jrChapInc) inc += jrChapInc[k] || 0;
-    for (const k in jrChapScene) scn += jrChapScene[k] || 0;
+    for (const k in cInc) inc += +cInc[k] || 0;
+    for (const k in cScn) scn += +cScn[k] || 0;
     for (let n = 1; n <= chapMax; n++) {
-      if ((jrChapInc[n] || 0) > 0 || (jrChapScene[n] || 0) > 0) spread++;
+      if ((cInc[n] || 0) > 0 || (cScn[n] || 0) > 0) spread++;
     }
     // `repFound` is declared with the table it reads, a long way below this —
     // a hoisted function declaration, on the same terms as incAdd calling
     // repName. Nothing in this file asks for the number before the module has
     // finished building, and nothing may start to.
-    const variety = repFound();
+    let variety = 0;
+    if (f) { const r = f.rep || {}; for (const k in r) if (r[k] > 0) variety++; }
+    else variety = repFound();
     let charm = 0;
-    for (const k in jrChapFed) charm += (jrChapFed[k] || 0) * sysNOTO_FED;
-    for (const k in jrChapPho) charm += (jrChapPho[k] || 0) * sysNOTO_PHO;
+    for (const k in cFed) charm += (+cFed[k] || 0) * sysNOTO_FED;
+    for (const k in cPho) charm += (+cPho[k] || 0) * sysNOTO_PHO;
     const raw = inc + scn + spread * sysNOTO_SPREAD + variety * sysNOTO_VAR;
     return { inc: inc, scn: scn, spread: spread, variety: variety, charm: charm,
              score: Math.max(0, raw - charm) };
@@ -49569,6 +49906,8 @@ export function createSystems(game) {
     const incNow = sysWall();
     if (game.state.noMomentPriority || named || incNow - incCardAt >= sysINC_RECARD) {
       incCardAt = incNow;
+      // a name new to the sketchbook is stamped rather than posted (T3a)
+      if (!(named && freeStamp(named, sentence)))
       showMoment(tier === 2 ? 'A SCENE' : 'AN INCIDENT',
                  named ? named.name : sentence,
                  named ? sentence : '', !named, named ? 1 : 0);
@@ -49769,6 +50108,7 @@ export function createSystems(game) {
     jrRep[id] = (jrRep[id] || 0) + 1;
     mvEarned++;
     saveSoon();
+    if (freeStamp(row, row.say)) return true;   // new to the sketchbook (T3a)
     sfx('chime', { volume: 0.42, pitch: 1.26, force: true });
     showMoment(row.name, row.say, jrRep[id] > 1 ? sysNumWord(jrRep[id]) + ' times' : '');
     return true;
@@ -50007,6 +50347,8 @@ export function createSystems(game) {
    * tiers, and tier 2 gets its own look at the ring, which by then is longer).
    */
   for (let i = 0; i < sysREP_MOVE.length; i++) sysREP.push(sysREP_MOVE[i]);
+  // the title's free wall may read the ladder and the table from here on (T3a)
+  titleNotoOk = true;
   function repName(x, z) {
     const p = repMatch(repEv);
     if (!p) { repLast = ''; repLastAt = -1e9; return null; }
@@ -50034,6 +50376,115 @@ export function createSystems(game) {
 
   /** How many of the forty this journey holds. Also notoriety's fourth term. */
   function repFound() { let n = 0; for (const k in jrRep) if (jrRep[k] > 0) n++; return n; }
+  // ---- A NAME GOES INTO THE BOOK (ROADMAP-TEN T3a, noFreePaper) -----------
+  // On a free file the FIRST time a name is earned is the mode's reward, so
+  // it is the story card's rank (2) and not the system's (1): the stamp card,
+  // two notes rising a fourth, and the paper takes the hit and shows the
+  // page with the next silhouette already in its place. A name earned again
+  // is the ordinary card it always was. Returns false when it did nothing,
+  // so the caller shows that ordinary card.
+  const sysFREE_MILES = [15, 30, 45];
+  const sysFREE_MILE_KICK = { 15: 'fifteen names', 30: 'thirty names', 45: 'forty-five names' };
+  let freeMileSeen = -1;
+  function freeStamp(p, say) {
+    if (!p || !freePaperOn() || (jrRep[p.id] || 0) !== 1) return false;
+    const found = repFound();
+    const note = (say ? say + '  ·  ' : '') + found + ' of ' + sysREP.length;
+    showMoment(sysFREE_UI.stampKick, p.name, note, false, 2, undefined, 'stamp');
+    sfx('chime', { volume: 0.5, pitch: 1.1, force: true });
+    // a fourth up, as the memory's pair is (l7-voices keeps it under 1.5)
+    setTimeout(function () { sfx('chime', { volume: 0.56, pitch: 1.1 * 1.335, force: true }); }, 190);
+    musSwell(sysMINI_SWELL * 0.8);
+    todoAwayHold = sysTUCK_HOLD; todoAwayT = 0;
+    todoEl.classList.remove('stamp'); void todoEl.offsetWidth; todoEl.classList.add('stamp');
+    todoRefresh();
+    freeMileCheck(sysMomentHold(p.name, note) + 0.6);
+    return true;
+  }
+  /** At 15, 30 and 45 names the book says what it has become (rank 2). */
+  function freeMileCheck(after) {
+    const f = repFound();
+    if (freeMileSeen < 0) { freeMileSeen = f; return; }
+    let hit = 0;
+    for (let i = 0; i < sysFREE_MILES.length; i++) if (freeMileSeen < sysFREE_MILES[i] && f >= sysFREE_MILES[i]) hit = sysFREE_MILES[i];
+    freeMileSeen = f;
+    if (!hit) return;
+    const pool = sysFREE_MILE[hit];
+    const line = pool[f % pool.length];
+    setTimeout(function () {
+      showMoment(sysFREE_MILE_KICK[hit], (notoName() || 'a rumour').toUpperCase(), line, false, 2);
+      sfx('chime', { volume: 0.5, pitch: 1.0, force: true });
+      setTimeout(function () { sfx('chime', { volume: 0.55, pitch: 1.335, force: true }); }, 230);
+      musSwell(sysMINI_SWELL);
+    }, Math.max(0, after || 0) * 1000);
+  }
+  // ---- THE PLACE REMEMBERS, IN FREE ROAM (T3a, noFreeRemember) -----------
+  // A place it made five incidents in says so on the way back in, once, a
+  // beat after the place card; a place that is fond of it (notoWarm) has
+  // somebody toss it something on sight. Session-only and per arrival: the
+  // counts that decide it are the ones the file already keeps.
+  const sysFREE_BACK_INC = 5;     // incidents here before the place says so
+  const sysFREE_BACK_AT = 4.6;    // s after arrival: past the place card
+  const sysFREE_GIFT_R = 26;      // m: somebody this close can see it
+  let freeBackSaid = 0, freeGiftN = 0;
+  game.events.on('biome:enter', function (p) {
+    if (game.state.noFreeRemember || game.state.journeyMode !== 'free') return;
+    const name = (p && p.name) || '';
+    const n = chapterOf(name);
+    if (!(n > 0) || (p && p.from === name)) return;
+    setTimeout(function () {
+      if (!started || !game.biome || game.biome.current !== name || transBusy) return;
+      if ((jrChapInc[n] || 0) >= sysFREE_BACK_INC) {
+        freeBackSaid++;
+        toast(sysFREE_BACK[(freeBackSaid + n) % sysFREE_BACK.length], 'note');
+      }
+      if (game.notoWarm(n)) freeGift();
+    }, sysFREE_BACK_AT * 1000);
+  });
+  function freeGift() {
+    const c = game.capy && game.capy.position;
+    const arr = game.npcs || [];
+    if (!c || !game.physics || typeof game.physics.spawnProp !== 'function') return;
+    let best = null, bd = sysFREE_GIFT_R * sysFREE_GIFT_R;
+    for (let i = 0; i < arr.length; i++) {
+      const r = arr[i];
+      if (!r || !r.group || r.group.visible === false) continue;
+      if (r.biome && r.biome !== game.biome.current) continue;
+      const g = r.group.position;
+      const d = (g.x - c.x) * (g.x - c.x) + (g.z - c.z) * (g.z - c.z);
+      if (d < bd && d > 4) { bd = d; best = g; }
+    }
+    if (!best) return;
+    let pr = null;
+    try { pr = game.physics.spawnProp('snack', best.x, best.z, best.y + 1.15); } catch (e) { pr = null; }
+    if (!pr || !pr.body) return;
+    // thrown to land short and roll, as npc.js's own gift is
+    const dx = c.x - best.x, dz = c.z - best.z, d = Math.hypot(dx, dz) || 1;
+    const v = Math.min(6.5, d * 0.9);
+    pr.body.wakeUp();
+    pr.body.velocity.set(dx / d * v, 3.2, dz / d * v);
+    pr.owner = null; pr.disturbed = true;
+    freeGiftN++;
+    sfx('rustle', { volume: 0.4, pitch: 1.1 });
+  }
+  // The door guard (T3a), read by the three-wheek count at every door.
+  const sysDOOR_HUSH = 15;        // m from an unfinished marquee's own mark
+  let doorHushN = 0;
+  function doorHushed(p) {
+    if (game.state.flierWhistleT > 0) return true;
+    if (game.condor && game.condor.active) return true;
+    const n = game.biome ? chapterOf(game.biome.current) : 0;
+    const wd = n > 0 ? wowOfChapter(n) : null;
+    const wr = wd ? taskRec[wd.id] : null;
+    if (!wd || !wr || wr.done || !p) return false;
+    const h = sysHINTS[wd.id];
+    let pt = null;
+    try { pt = h && typeof h.where === 'function' ? h.where() : null; } catch (e) { pt = null; }
+    return !!(pt && Math.hypot(pt.x - p.x, pt.z - p.z) < sysDOOR_HUSH);
+  }
+  game.state.qaDoorHush = function () { return { n: doorHushN, now: doorHushed(game.capy && game.capy.position) }; };
+  game.state.qaFreeRemember = function () { return { said: freeBackSaid, gifts: freeGiftN }; };
+  game.state.qaFreeMile = function () { return { seen: freeMileSeen, found: repFound(), of: sysREP.length }; };
   /**
    * WHICH OF THE TWO YOU WERE (Q2), for the foot of the ledger.
    *
@@ -50114,6 +50565,8 @@ export function createSystems(game) {
     hideTick(dt);
     // the rank you start with is not news — seeded on the first frame (N1)
     if (notoSeenTier < 0 && started) notoSeenTier = notoTier();
+    // ...and so is the sketchbook's count, for its milestones (T3a)
+    if (freeMileSeen < 0 && started) freeMileSeen = repFound();
     if (notoPendT > 0) {
       notoPendT -= dt;
       // not over a crossing, and not over the card it is the sequel to
@@ -53678,7 +54131,15 @@ export function createSystems(game) {
             : atHan ? 'everything has left this city over this bridge since nineteen hundred and two.'
             : 'something leaves from here. it always has.');
       }
-      if (input.whistlePressed) {
+      // ---- THE DOOR DOES NOT TAKE A WHEEK MEANT FOR SOMETHING ELSE (T3a) --
+      // Rio's Arpoador, Pasto's plaza and the Uji bridge each sit a door on
+      // a marquee that is also called by wheeking: three calls for the
+      // fragata opened the departures board instead. The count holds while a
+      // flier is answering (condor.js's flierWhistleT, since T1e), while a
+      // bird is out, and inside sysDOOR_HUSH of the place's unfinished
+      // marquee. A guard, not a move: the doors stay where they are.
+      if (input.whistlePressed && doorHushed(p)) doorHushN++;
+      else if (input.whistlePressed) {
         homeSet(homeCount + 1);
         homeT = sysHOME_WINDOW;
         if (homeCount >= 3) {
