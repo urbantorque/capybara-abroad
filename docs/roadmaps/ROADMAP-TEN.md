@@ -796,6 +796,52 @@ kyoto.js:4337 is the pattern). Flag `noHkArcadeCam`. The magenta panel gets glyp
 Publish the next heli ring for `wowTarget`. Proof: 20 s along the shopfront keeps the animal under
 15% of the frame and there is no dither in the middle third.
 
+### T3f — shipped
+
+Everything is in `src/kowloon.js`. The proofs ran headless, mostly at rung 3 with five other agents
+on the machine. They measure behaviour, and the sign was also measured at rung 0 (`pf: 1`). GPU cost
+is left for the proof slot.
+
+- **Audit.** None of the three had shipped. systems.js has no generic lens-position hook (the torii
+  rail is gated `inKyoto`), so the lens is carried by the two hooks it already asks the live biome
+  for, `rideYaw()` and `rig()`, plus kowloon's own `camCeil`. No other file changes.
+- **The arcade lens (`noHkArcadeCam`, not parked: a few multiplies a frame and no draw).** Inside
+  the scaffold footprint (x −11.5 to −7.6, z −9 to 9, 0.6 m hysteresis) and below 3 m, the bearing
+  is kept in the band that puts the eye east of x −4.5, 1.5 m past the awning's edge. Which bearing
+  depends on the stick. Held straight: dead astern, clamped into the band. At rest for 1.2 s: square
+  on to the face (+x). Anything else: the bearing it has, clamped. `rig()` asks for 9 m at 23°.
+  `hkCamCeil` stops holding the eye at 3.15 once it is out over the road and instead solves the
+  sight line under the awning's edge. The helicopter keeps both hooks whenever it flies.
+  `game.kowloon.arcade()` is the harness read. `qa/ten-t3f-arcade.js`: 20 s with real keys up and
+  down the shopfront, cut against live, 13 samples each.
+
+  | measure | cut | live |
+  |---|---|---|
+  | middle-third cells dithered (of 64), mean / max | 20 / 34 | 1.15 / 4 |
+  | samples with any dither | 13 / 13 | 6 / 13 |
+  | animal's box share of frame, max | 0.124 | 0.055 |
+  | eye, mean x / y | −9.4 / 3.06 | −4.7 / 4.09 |
+
+  The residue is the bamboo pole directly in front of the animal. **The spec's "no dither in the
+  middle third" is not met**, but it went from a screen door to one pole (PNGs `-cut-0` / `-live-0`).
+  Square-up (`qa/ten-t3f-bits.js`): 4.5 s with no key gives a bearing of 1.571 and the eye at
+  (−1.2, 4.84), 1.7 m over the old ceiling. Set down on the carriageway, the hint is NaN on the next
+  read. With the helicopter taken, `rideYaw` is the heli's and the arcade is off.
+- **The bakery's lightbox (`noHkBakeGlyph`, not parked: one merged draw).** This is the reviewer's
+  "magenta panel". It is the bakery sign (2.4 × 4.6 m, `hkNeonPink`), not a neon row: the only
+  lightbox with no writing, and at the full EMIT_OVER where the street breathes at about 0.73. It
+  now has four stroke-built characters and a BAKERY block line in `hkGrille` on both faces, and it
+  sits at 0.78. The flag hides the glyphs and puts back 1.0. `qa/ten-t3f-sign.js`, rung 0, arrival
+  eye, the game's own post.render: in the sign's box the mean luminance goes from 180 to 159 and p95
+  from 191 to 176. The peak is 236 against 255 elsewhere in the frame (PNGs `ten-t3f-sign-live` /
+  `-flagged`, `ten-t3f-arrival-a`).
+- **`game.kowloon.wowTarget()`** returns `{x, y, z, kind: 'ring', i, of: 8}` for the next ring of a
+  lap in progress, and `null` otherwise, the same shape as `game.sahara.wowTarget`. In a heliDebug
+  lap it was null on the ground, then rings 0 to 7 in order, then null after the eighth.
+- **For A (T3a):** wowTarget is ready to read. The arcade lens makes `rideYaw` non-NaN under the
+  scaffold, so a generic frameShot's yaw there needs `over`, as it does under any ride.
+- Rung-0 GPU cost for both flags is owed to the proof slot.
+
 T3 seed (A): `PALETTE.kyoRidge`, `kyoGravelShade`, `kyoUnder`, `hanWillow`.
 
 ## T4 — the ending, the traveller, the marquee that needs a hand (hours 6–8)

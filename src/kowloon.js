@@ -265,6 +265,20 @@ let hkFerryPZ = 0, hkSignPY = 0;
 
 let hkSignGroup = null, hkSignBody = null, hkSignSway = 0, hkSignSwayV = 0;
 let hkBakeryGroup = null, hkTankGroup = null;
+// T3f: the bakery's lightbox and the writing on it. See hkBuildBakery.
+let hkBakeSignMat = null, hkBakeGlyph = null, hkBakeGlyphWas = null;
+// The street's signs breathe between about 0.62 and 0.85 of EMIT_OVER
+// (hkNeonBreathe at rest); a lettered box sits in that band, not over it.
+const hkBAKE_EMIT = 0.78;
+/** One boolean compare a frame; the material is only written on the edge. */
+function hkBakeGlyphTick(game) {
+  if (!hkBakeSignMat) return;
+  const on = !(game.state && game.state.noHkBakeGlyph);
+  if (on === hkBakeGlyphWas) return;
+  hkBakeGlyphWas = on;
+  if (hkBakeGlyph) hkBakeGlyph.visible = on;
+  emitSet(hkBakeSignMat, on ? hkBAKE_EMIT : 1);
+}
 let hkFishMesh = null, hkFishData = null, hkFishOut = 0;
 
 let hkClimbBest = 0, hkClimbTold = false;
@@ -759,8 +773,96 @@ function hkCamCeil(x, z) {
   // your head once you are above the awnings, so nothing clamps.
   if (p && p.y > hkAWN_Y) return Infinity;
   let c = hkCoverAt(x, z);
-  if (p) { const q = hkCoverAt(p.x, p.z); if (q < c) c = q; }
+  if (p) {
+    const q = hkCoverAt(p.x, p.z);
+    if (q < c) {
+      c = q;
+      // ---- ...UNLESS THE ARCADE LENS HAS THE EYE OUT OVER THE ROAD (T3f) --
+      // "A cover over either end is a cover across the line" is true of a
+      // lens that sits in the arcade with the animal. It is not true of one
+      // four metres out over the carriageway: that line leaves the cover at
+      // its EDGE, and all it has to do is pass under the awning there. So it
+      // is solved, the kyoto torii rail's way — for the line crossing the
+      // edge at fraction f of the way from the eye, ey + (ty - ey) f must stay
+      // under hkAWN_Y, which is ey <= (hkAWN_Y - ty f) / (1 - f). Measured at
+      // the scaffold's middle bay, the eye over the white line may stand at
+      // 6.6 and still see the animal's back under the boards; the old answer
+      // held it at 3.15 inside the lattice.
+      if (hkArcOn && q === hkAWN_Y && x > hkAWN_EDGE + 0.3 && p.x < hkAWN_EDGE) {
+        const f = (x - hkAWN_EDGE) / (x - p.x);
+        const lim = (hkAWN_Y - (p.y + hkARC_AIM) * f) / (1 - f);
+        if (lim > c) c = lim;
+      }
+    }
+  }
   return c;
+}
+
+// ---- THE ARCADE LENS (TEN T3f) ---------------------------------------------
+// The marquee's arrow points at the scaffold, so every player walks into it,
+// and at street level the scaffold is a cage: two rows of bamboo 1.55 m apart
+// under a first-floor overhang the ceiling above holds the lens beneath. With
+// the rig astern of an animal walking the shopfront, the eye sat INSIDE the
+// lattice at 3.15 m, the capsule opened every pole and transom along the line
+// into a screen door, and the boom cut on the stalls put the lens against the
+// animal's back (the review's frame: a capybara at 40 % of the picture, the
+// rest stipple).
+//
+// So inside the footprint, below the awning, the lens is asked out over the
+// carriageway: the bearing is kept in the band that puts the eye past
+// hkARC_EYE_X, and the rig takes 1.5 m more height, which hkCamCeil now lets
+// it have. Three rules for WHICH bearing in the band, because the stick is
+// camera-relative and a lens that swings under a held key walks the animal
+// into the wall (systems.js's orbit note, the same argument):
+//   - the stick held straight: dead astern, clamped into the band;
+//   - the stick at rest for hkARC_IDLE: square on to the face, +x, which is
+//     also the best advert for the climb the chapter is about;
+//   - anything else: the bearing it has, clamped into the band. A lens
+//     already over the road does not move.
+// Published through rideYaw() and rig(), the two hooks systems.js already
+// asks the live biome, so no file but this one knows the arcade exists; the
+// helicopter keeps both hooks whenever it is flying. `noHkArcadeCam` cuts it
+// (a few multiplies a frame and no draw, so it does not park).
+const hkARC_X0 = hkSCAF.x - 1, hkARC_X1 = hkSCAF.x + hkSCAF.out + 1;   // -11.5 .. -7.6
+const hkARC_Y = 3.0;                // m — below this the awning is over the animal
+const hkARC_HYST = 0.6;             // m — the footprint grows by this once inside
+const hkAWN_EDGE = -hkST_HALF + 0.5;   // x where hkCoverAt's west strip ends
+const hkARC_EYE_X = -4.5;           // the eye must stand east of this: 1.5 m past the edge
+const hkARC_DIST = 9.0;             // m
+const hkARC_PITCH = 0.40;           // rad, 23 degrees: the eye about 1.5 m over the old 3.15
+const hkARC_RAISE = 1.0;            // the rig's own look raise
+const hkARC_AIM = 0.5;              // m over the feet the sight line must reach
+const hkARC_IDLE = 1.2;             // s of no stick before it squares up to the face
+let hkArcOn = false, hkArcYaw = NaN, hkArcIdleT = 0;
+/** Wrap to (-PI, PI]. */
+function hkWrap(a) {
+  a = (a + Math.PI) % (Math.PI * 2);
+  if (a < 0) a += Math.PI * 2;
+  return a - Math.PI;
+}
+/** The nearest bearing to b whose eye stands east of hkARC_EYE_X. */
+function hkArcClamp(b, s0) {
+  b = hkWrap(b);
+  if (Math.sin(b) >= s0) return b;
+  const b1 = Math.asin(s0), b2 = Math.PI - b1;
+  return Math.abs(hkWrap(b - b1)) <= Math.abs(hkWrap(b - b2)) ? b1 : b2;
+}
+function hkUpdateArcadeCam(game, dt) {
+  const capy = game.capy, p = capy && capy.position;
+  const m = hkArcOn ? hkARC_HYST : 0;
+  const live = !!p && !(game.state && game.state.noHkArcadeCam) && !hkHeliOn &&
+               p.y < hkARC_Y && p.x > hkARC_X0 - m && p.x < hkARC_X1 + m &&
+               p.z > hkSCAF.z0 - m && p.z < hkSCAF.z1 + m;
+  if (!live) { hkArcOn = false; hkArcYaw = NaN; hkArcIdleT = 0; return; }
+  hkArcOn = true;
+  const input = game.input || {};
+  const ix = input.x || 0, iz = input.z || 0;
+  hkArcIdleT = Math.abs(ix) + Math.abs(iz) < 0.02 ? hkArcIdleT + dt : 0;
+  const s0 = clamp((hkARC_EYE_X - p.x) / (Math.cos(hkARC_PITCH) * hkARC_DIST), -1, 0.97);
+  const cur = typeof input.camYaw === 'number' && input.camYaw === input.camYaw ? input.camYaw : Math.PI * 0.5;
+  if (hkArcIdleT > hkARC_IDLE) hkArcYaw = Math.PI * 0.5;
+  else if (Math.abs(ix) < 0.15 && iz < -0.5 && capy.group) hkArcYaw = hkArcClamp(capy.group.rotation.y + Math.PI, s0);
+  else hkArcYaw = hkArcClamp(cur, s0);
 }
 
 /**
@@ -2950,6 +3052,42 @@ function hkBuildBakery(game, root) {
                               hkGlowMat(PALETTE.hkNeonPink));
   sign.position.set(bx + 2.6, 5.2, bz);
   grp.add(sign);
+  hkBakeSignMat = sign.material;
+  // ---- ...AND THE TWO SCRIPTS, WHICH THE NOTE ABOVE PROMISED (T3f) -------
+  // The sign was the one lightbox on the street with nothing written on it:
+  // 2.4 x 4.6 m of flat pink at the full EMIT_OVER, with every street sign
+  // breathing at about 0.73 of that, so from the arrival lens it was the
+  // brightest thing in the frame and it read as a missing texture. The
+  // writing is masked out of it the way the street's chars are — the dark
+  // thing on the bright thing — on both faces: four characters across the
+  // top, each a few strokes off a seeded hand, and a line of Latin under
+  // them. One merged mesh, one draw. `noHkBakeGlyph` hides it and puts the
+  // old intensity back; it is too small to be worth parking.
+  {
+    const G = hkMerger();
+    const ink = PALETTE.hkGrille;
+    let sd = 71;
+    const r = () => { sd = (sd * 1103515245 + 12345) & 0x7fffffff; return sd / 0x7fffffff; };
+    for (let s = -1; s <= 1; s += 2) {
+      const fx = bx + 2.6 + s * 0.17;
+      for (let c = 0; c < 4; c++) {
+        const cz = bz + (c - 1.5) * 1.05, cy = 5.2 + 0.52;
+        // a character is a frame of strokes, never a solid square: a top
+        // bar, one or two uprights and a couple of short bars inside
+        G.box(fx, cy + 0.34, cz, 0.04, 0.10, 0.72, ink);
+        G.box(fx, cy, cz + (r() - 0.5) * 0.3, 0.04, 0.78, 0.10, ink);
+        if (r() > 0.4) G.box(fx, cy - 0.06, cz - 0.3, 0.04, 0.62, 0.09, ink);
+        G.box(fx, cy + 0.05, cz + 0.12, 0.04, 0.09, 0.44 + r() * 0.2, ink);
+        G.box(fx, cy - 0.33, cz, 0.04, 0.10, 0.5 + r() * 0.22, ink);
+      }
+      // BAKERY, in blocks: six letters on the bottom band
+      for (let l = 0; l < 6; l++) {
+        G.box(fx, 5.2 - 0.66, bz + (l - 2.5) * 0.52, 0.04, 0.34, 0.30, ink);
+      }
+    }
+    hkBakeGlyph = new THREE.Mesh(G.build(), hkVC());
+    grp.add(hkBakeGlyph);
+  }
   root.add(grp);
   hkBakeryGroup = grp;
   hkStaticBox(game, cxb, 0.5, bz, 1.5, 1.0, 4.4);
@@ -5663,6 +5801,8 @@ export function createKowloon(game) {
       // X2: nobody flies out of a country
       if (hkHeliOn) { hkHeliOn = false; if (game.capy) game.capy.atHelm = false; }
       if (hkHeliMover) hkHeliMover.set(0);
+      // T3f: and no lens hint follows the animal out of the street
+      hkArcOn = false; hkArcYaw = NaN; hkArcIdleT = 0;
     },
   });
 
@@ -5713,10 +5853,29 @@ export function createKowloon(game) {
       if (o && typeof o.x === 'number') { hkHeliX = o.x; hkHeliY = o.y; hkHeliZ = o.z; hkHeliVX = hkHeliVY = hkHeliVZ = 0; }
       return this.heli();
     },
-    rideYaw() { return hkHeliOn ? hkHeliYaw : NaN; },
+    // T3f: the arcade lens borrows both hooks under the scaffold (hkArcOn is
+    // never set while the helicopter is flying). camYaw is FROM the animal TO
+    // the camera and rideYaw is a heading, so the bearing goes in half a turn
+    // round.
+    rideYaw() { return hkHeliOn ? hkHeliYaw : hkArcOn ? hkArcYaw - Math.PI : NaN; },
     rig() {
+      if (hkArcOn) return { w: 1, dist: hkARC_DIST, pitch: hkARC_PITCH, raise: hkARC_RAISE, lambda: 2.0 };
       if (!hkHeliOn) return null;
       return { w: 1, dist: 15, pitch: 0.22, raise: 1.0, lambda: 3.0 };
+    },
+    /** T3f harness read: the arcade lens as it stands this frame. */
+    arcade() { return { on: hkArcOn, yaw: hkArcYaw === hkArcYaw ? +hkArcYaw.toFixed(3) : null, idle: +hkArcIdleT.toFixed(2) }; },
+    /**
+     * T3f: where the live marquee wants the animal next, for the paper's arrow
+     * while game.wowLive is fresh — the next ring of a lap in progress. null
+     * off a lap (on the ground, or all eight flown), which is when the paper's
+     * own head row is the right thing to point at. Same shape as
+     * game.sahara.wowTarget: { x, y, z, kind: 'ring', i, of }, a fresh object.
+     */
+    wowTarget() {
+      if (!hkHeliOn || !hkRingRun || hkRingNext >= hkRING_N) return null;
+      const r = hkRINGS[hkRingNext];
+      return { x: r[0], y: r[1], z: r[2], kind: 'ring', i: hkRingNext, of: hkRING_N };
     },
     // A jump between two bamboo poles eleven metres over a road is a jump you
     // should be able to steer. Not the Drift's 0.64 — that is a world where the
@@ -5778,6 +5937,8 @@ export function createKowloon(game) {
       hkUpdateCrowd(game, dt);
       hkUpdateDrip(game, dt);
       hkUpdateTasks(game, dt);
+      hkUpdateArcadeCam(game, dt);   // T3f
+      hkBakeGlyphTick(game);         // T3f
 
       if (hkWaterMesh) hkWaterMesh.position.y = -0.5 + Math.sin(hkTime * 0.7) * 0.06;
     },
