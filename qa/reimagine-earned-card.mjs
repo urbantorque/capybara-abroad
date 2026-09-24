@@ -14,6 +14,7 @@ const withoutLearning = css(source)
   .replace("'.capyui-homevisit .capyui-jrled{min-height:44px;letter-spacing:.04em;text-transform:none;}',\r\n", '')
   .replace(/\/\* HOMECOMING title:[^]*?\/\* HOMECOMING title end\. \*\/\r?\n/, '')
   .replace(/\/\* HOMECOMING learning reference:[^]*?\/\* HOMECOMING learning reference end\. \*\/\r?\n/, '')
+  .replace(/\/\* TEN T2a story beats:[^]*?\/\* TEN T2a story beats end\. \*\/\r?\n/, '')
   .replace(/\/\* HOMECOMING atlas:[^]*?\/\* HOMECOMING atlas end\. \*\/\r?\n/, '')
   .replace('overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;', 'overflow-y:auto;overscroll-behavior:contain;');
 const withoutHomecomingTab = withoutLearning.replace(

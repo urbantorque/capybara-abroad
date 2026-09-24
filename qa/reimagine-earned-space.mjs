@@ -45,6 +45,10 @@ function fixture() {
         placeEarned=false,showPlaceLast='',wowEarnedOn=false,wowLiveOn=false,sysMomentDefer=null,
         sysFinClosing=false,tutOn=false,tutEl=null,sysTickLastAt=0;
     const sysMOMENT_CARD=${cardMs},sysMOMENT_DEFER=${deferSeconds};
+    // ROADMAP-TEN T2a: the card ranks the three functions now read
+    ${source.match(/  const sysPRI_HOLD_MIN[^\n]*\n  const sysPRI_HOLD_BASE[^\n]*\n  let sysCardPri[^\n]*\n  let sysMomentDropped[^\n]*\n  const sysMomentShown[^\n]*\n/)[0]}
+    const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+    ${fn('sysCardClaim')};${fn('sysCardBusy')};${fn('sysMomentHold')};
     ${top};${endingTop};${endingClosure};${fn('momentVisibilityTick')};${fn('showMoment')};${fn('showMomentNow')};${fn('sysMomentTick')};
     return {show:showMoment,now:showMomentNow,tick:sysMomentTick,
       earned:(on,title=on?'THE CONCERT':'')=>{placeEarned=on;showPlaceLast=title;},
@@ -209,7 +213,8 @@ for (const tier of [1, 2]) for (const named of [null, { name: 'A NAMED CHAIN' }]
   equal(args[1], named ? named.name : 'sentence', 'named reward contents unchanged');
 }
 const compact = source.match(/const wantMarq = ([^;]+);/)[1];
-const helmGate = new Function('busy', 'want', 'wowLiveOn', 'wowEarnedOn', 'marqId', 'game', 'return ' + compact);
+// T2a: `owned` (a live marquee or ride, sysFrameOwned) is false here: the inherited gate
+const helmGate = new Function('busy', 'want', 'wowLiveOn', 'wowEarnedOn', 'marqId', 'game', 'const owned = false; return ' + compact);
 for (const busy of [false, true]) for (const tucked of [false, true])
 for (const live of [false, true]) for (const encore of [false, true])
 for (const id of ['', 'marquee']) for (const helm of [false, true]) {

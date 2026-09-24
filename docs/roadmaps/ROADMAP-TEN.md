@@ -422,6 +422,63 @@ T1 seed (A): `PALETTE.monStone`, `monYachtNavy`, `gorTuffLo/Hi`, `gorPoplarOlive
   `ten-t2a-act2.png`.
 - Payoff: the player can say what just happened, and why it mattered.
 
+### T2a — shipped
+
+- **Card ranks** (`noMomentPriority`). `showMoment(k, t, note, incidental, pri, hold)`; an
+  omitted rank is 0 for an incidental card and 1 otherwise. `sysCardClaim` lets the done card's
+  story beats hold a rank too. A rank-0 card under a higher one is dropped; others wait in the one
+  deferred slot. Hold = clamp(0.9 + 0.045 s per character, 2.6, 6). Heat-ladder cards are rank 0
+  (1 with a repertoire name), and a repeat inside 10 s is left to the pips' label.
+- **The memory beat** (`noMemBeat`). The edge is read across the tick's `r.done` (held before,
+  held after), so a restore never plays it. 1.1 s later: the done card with a gilt edge, kicker
+  A MEMORY, the marquee's name, "for the shelf: <keep>", and "ACT I · ●○ · 1 OF 2 MEMORIES".
+  It is rank 3 for 5.6 s, and toasts and bubbles step out under it. Two chimes rising, musSwell,
+  `musStatement('full','done',2.4)`, a full confetti ring and the sysDONE pull-back. The keepsake
+  lands 1.5 s in, while the lens is out, and the keep card follows as the memory card goes.
+  chapterCeremony does not drop it again, and a same-tick 100% waits for the memory card.
+  `sysKeepsRestore` restores `keepHeld` keepsakes on a story file. The eveTick pill is folded.
+- **The act turn** (`noActTurn`). The act index is read before the tick and the memory beat
+  compares it after, which is the seed. 6 s after the memory: ACT II / the act title /
+  a `sysACT_LINES` line / the traveller's page for the place (two sentences, via `nbWrite` then
+  `nbText`) / the act's places, on the first new place's postcard. The page rustles and the
+  tune plays in another mode (`musStatement('full','act',0.5,'pent'|'major')`).
+  `game.journeyAct()` returns 1..5 on a story file and 0 otherwise. The bus gets `'story:act'`
+  `{act, title, ready, chapter}` and `'story:memory'` `{chapter, act, got}`. When `p.ready`
+  flips: ALL FIVE FOLDS / THE WAY HOME / "the shelf has room for all of it.", as act 5 with
+  ready true.
+- **One number.** The premise reads FIVE FOLDS OF A MAP / "two memories from each, then home.
+  an ibis is coming too." It is rank 2, held 5 s, and any key ends it after 1.5 s. The story
+  paper's footer reads "Act I · a memory here: the opera house concert, and one more thing off
+  this list". It reads "one more, then home" in the last fold and "Act I · 1 of 2 memories ·
+  Sydney remembered" once kept.
+- **First grace** (`noFirstGrace`). `sysGraceOn()` is true with no memory (story) or no
+  repertoire name (free). While it holds, `rivalOK()` is false and the chain caps at 3. The rule
+  toast is "somebody saw that.", and the rule is in Learn to Play §2. THE FIRST LOOK's 8 yuzu pay
+  on the chapter's first wheek. `game.graceOn()` is exported.
+- **Held-toast guard** (`noHeldWow`). Held lines carry `at`. The drain lets go unsaid any line
+  over 12 s old or from another place, and holds while `wowLiveOn` or a frameShot is live.
+  While a marquee or a ride is live (`sysFrameOwned()`), the paper does not tuck to a stale row
+  (it takes `.marq`), and the paper tip and the slide lesson wait.
+- **The atlas in the story's terms.** On the atlas a tile reads "remembered" or "n of 2 to a
+  memory", the rail fills by memory, and the Sydney hero says "a memory here opens the coast".
+  p2stat reads "0 of 10 memories · act I · A little further". On a fresh story file the title
+  was 731 px tall in a 720 window, which gave the page its own scrollbar. At 640 px wide or more
+  and 760 px tall or less, the atlas title padding goes from 18 to 12 px, and the page no longer
+  scrolls (`qa/ten-t2a-atlas.mjs`: nothing wider than half the window scrolls except the shelf).
+- **Proof.** `qa/ten-t2a-story.mjs` passes 22/22 (fresh profile, 1280x720, headful). The
+  premise is up 4.9 s at rank 2. The grace holds, with `rivalOK()` false. There is exactly one
+  A MEMORY card. A rank-0 card raised under it is dropped. The keepsake is 0.9 m from the animal.
+  ACT II fires after the Quay memory and emits `'story:act'` once with act 2. A reload plays no
+  act card. The atlas hero reads "remembered", and the page is 720/720 with no scroll. There are
+  0 runtime errors. `qa/ten-t2a-static.mjs` gives 26 checks and is registered in `qa/run.mjs`.
+  Screenshots: `qa/ten-t2a-memory.png`, `qa/ten-t2a-act2.png` and `qa/ten-t2a-atlas.png`.
+- **Misses.** The instrument fires the ticks through `game.completeTask`, the door a real tick
+  uses, and not by playing the concert with keys. The paper's own kicker (the act-part eyebrow)
+  still reads the chapter's movement, and the act rides the footer. The journal still shows the
+  clock and "NOTICED" in chapter one. A reload before the first wheek forfeits THE FIRST LOOK
+  (no save field). In the Sydney shot the pull-back framed a jacaranda between the lens and the
+  animal: the rig, not the beat. `web-design-guidelines` was not run on the change.
+
 **T2b · antarctic.js · the pod runs in open water.** Patrol `px = antLeadX(pz) + 10*sin(2a)`
 (4379-4386). The run gate is `sp > 4.0*(1 − 0.6*antBoatIce)` (4518-4531). One-shot toast: "they want
 open water. find the lead." Flag `noPodLead`. Proof: the closed-loop helm run

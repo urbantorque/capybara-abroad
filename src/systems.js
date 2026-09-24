@@ -6544,7 +6544,7 @@ const sysLEARN = [
     pad: 'The left stick steers it. RT runs; A hops. The controls below show the camera buttons.',
     try: 'In Sydney, replay the guided walk from Pause for a short practice route.' },
   { title: '2. Taking things and meeting others',
-    line: 'E takes or drops a nearby object. Q calls out. The prompt beside an object names its action; the same button can do something different on a ride.',
+    line: 'E takes or drops a nearby object. Q calls out. The prompt beside an object names its action; the same button can do something different on a ride. Three things done in front of people is AN INCIDENT, five is A SCENE, unless one of them reaches it first.',
     try: 'A loose hat, a bench and a nearby bird are enough for a first experiment.' },
   { title: '3. Tasks, memories and the journey',
     line: 'The star marks the big experience in a place. The smaller tasks around it help earn a memory. The journey card shows what is kept and what remains.',
@@ -6582,7 +6582,25 @@ const sysHOME_UI = {
   freeAsk: 'every place opens. the story waits.', freeAskYes: 'open every place', freeAskNo: 'stay in the story',
   freeDepart: 'anywhere. it is not in a hurry.',
   whereFree: 'Where to?', whereStory: 'Where next?',
+  // ---- THE STORY'S BEATS (ROADMAP-TEN T2a) --------------------------------
+  memKick: 'a memory', memShelf: 'for the shelf: ', homeKick: 'all five folds',
+  homeName: 'the way home', homeLine: 'the shelf has room for all of it.',
 };
+// THE ACT TURN'S LINE (T2a): one for each fold the map opens, indexed by the
+// act being entered (1..4; act one is never turned into). Two per act so a
+// second file does not hear the first one's sentence. The why is not said.
+const sysACT_LINES = [
+  [],
+  ['the map opens a fold. the bag went this way, and so does it.',
+   'a second fold of the map. somebody on the other side waves.'],
+  ['the third fold. every place in it keeps its own time.',
+   'the map opens again. the clocks on this side do not agree.'],
+  ['the fourth fold, and the edges of the map go cold.',
+   'further than the bag meant to go. it follows anyway.'],
+  ['the last fold. the bag is nearly where it started.',
+   'one fold left, and the way back is on it.'],
+];
+const sysROMAN = ['I', 'II', 'III', 'IV', 'V'];
 const sysLEARN_SHOP = {
   open: 'Try a practice purchase', wallet: 'Practice wallet: {n} yuzu',
   collect: 'Collect 5 practice yuzu', buy: 'Try buying {name} · {n} yuzu',
@@ -10836,6 +10854,44 @@ function sysBuildCSS() {
   'box-shadow:' + shLg + ';padding:14px 14px 16px;text-align:center;',
   'width:min(84vw,420px);}',
 '.capyui-done.show{opacity:1;transform:translate(-50%,-50%) rotate(-.9deg) scale(1);}',
+/* TEN T2a story beats: THE STORY'S TWO BEATS ON THE SAME PAPER (ROADMAP-TEN T2a).
+   A memory is the done card with a gilt edge: a gold hairline inside the paper,
+   a warm bloom behind it, and a name a step larger, because the name on it is
+   the thing the player just did and not the place it was done in. It arrives
+   from lower and smaller than a DONE card and overshoots once — the card is
+   being handed over, not posted. The act turn keeps the plain paper and leans
+   the other way: a page of the map, the title in the house caps, the
+   traveller's two sentences in italic under a quote. Gold is PALETTE.gold;
+   words stay on the ink, which is the only colour on this card that reads. */
+'.capyui-done.mem{width:min(86vw,460px);border:1px solid ' + sysRgba(PALETTE.gold, 0.85) + ';',
+  'box-shadow:' + shLg + ',0 0 0 5px ' + sysRgba(PALETTE.gold, 0.16) + ',0 0 64px 8px ' + sysRgba(PALETTE.yuzuGold, 0.34) + ';',
+  'transform:translate(-50%,-38%) rotate(-.9deg) scale(.86);',
+  'transition:opacity .42s ease,transform .78s cubic-bezier(.2,1.5,.4,1);}',
+'.capyui-done.mem.show{transform:translate(-50%,-50%) rotate(-.9deg) scale(1);}',
+/* shorter picture and a step higher: the pull-back puts the animal and the
+   keepsake landing by it in the lower third, and the card must not sit on them */
+'.capyui-done.mem,.capyui-done.act{top:39%;}',
+'.capyui-done.mem .capyui-doneart{aspect-ratio:64 / 30;}',
+'.capyui-done.mem::after{content:"";position:absolute;inset:5px;border:1px solid ' + sysRgba(PALETTE.goldDark, 0.45) + ';',
+  'border-radius:5px;pointer-events:none;}',
+'.capyui-done.mem .capyui-donekick,.capyui-done.act .capyui-donekick{font-size:clamp(11px,1.6vw,13px);letter-spacing:.5em;}',
+'.capyui-done.mem .capyui-donekick::before,.capyui-done.mem .capyui-donekick::after{content:"";display:inline-block;',
+  'vertical-align:middle;width:26px;height:1px;margin:0 10px 0 4px;background:' + sysRgba(PALETTE.goldDark, 0.7) + ';}',
+'.capyui-done.mem .capyui-donename{font-size:clamp(22px,5vw,36px);letter-spacing:.04em;}',
+'.capyui-done.mem .capyui-donerule{background:' + sysRgba(PALETTE.gold, 0.9) + ';width:min(34vw,170px);}',
+'.capyui-done.mem .capyui-donesub,.capyui-done.act .capyui-donesub{color:' + ink + ';letter-spacing:.2em;}',
+'.capyui-done.act{width:min(86vw,470px);}',
+'.capyui-done.act .capyui-doneart{aspect-ratio:64 / 26;}',
+'.capyui-done.act .capyui-donename{font-size:clamp(22px,4.8vw,34px);}',
+'.capyui-done.act .capyui-donelines{font-size:clamp(12px,2.2vw,14px);color:' + inkSoft + ';margin-top:9px;}',
+'@media (prefers-reduced-motion:reduce){.capyui-done.mem,.capyui-done.act{transition:opacity .3s ease;}}',
+'.capy-storybeat .capyui-toasts,.capy-storybeat .capynpc-bubble{visibility:hidden !important;}',
+/* ...and the story's atlas ends inside a 720 window (the T1 carry): measured
+   on a fresh story file, the card was 695 px under 18 + 18 of padding, 11 px
+   past the fold, so the page itself grew a scrollbar beside the shelf's own.
+   Six a side on a short desktop window, the atlas only. */
+'@media (min-width:640px) and (max-height:760px){.capyui-title:has(.capyui-p2:not(.flatlive)){padding-top:12px;padding-bottom:12px;}}',
+/* TEN T2a story beats end. */
 /* the postcard, at the aspect it is authored in (64 x 40) */
 /* position:relative (L4, F1b): the photograph is an absolutely placed
    .capyui-shot and this box is what it fills — without it the picture took
@@ -25427,7 +25483,12 @@ export function createSystems(game) {
       const hp = homecomingProgress(isDone);
       let mem = 0;
       for (let n = 1; n <= CHAPTERS.length; n++) { const m = homecomingMemory(n, isDone); if (m && m.enough) mem++; }
-      p2StatAtlas = [mem + ' of ' + CHAPTERS.length + ' memories', HOMECOMING_ACTS[hp.actIndex].title];
+      // ONE NUMBER (T2a): ten is the story's, two to a fold; nineteen is
+      // the collector's and lives on the journal's shelf.
+      let ten = 0;
+      for (let a = 0; a < hp.memories.length; a++) ten += Math.min(2, hp.memories[a].length);
+      p2StatAtlas = game.state.noMemBeat ? [mem + ' of ' + CHAPTERS.length + ' memories', HOMECOMING_ACTS[hp.actIndex].title]
+        : [ten + ' of 10 memories', 'act ' + sysROMAN[hp.actIndex] + ' · ' + HOMECOMING_ACTS[hp.actIndex].title];
     }
     // ...AND ON A FRESH FILE IT SAYS NOTHING (T2). It used to say "19 PLACES /
     // IN ANY ORDER", which is the third printing of a sentence the page-one
@@ -25488,6 +25549,13 @@ export function createSystems(game) {
     const ids = tasksInChapter(d.n);
     let done = 0;
     for (let k = 0; k < ids.length; k++) if (jrFileDone[ids[k]]) done++;
+    // ...AND ON THE ATLAS IT COUNTS WHAT THE STORY COUNTS (T2a). The T1
+    // proof read Sydney's tile as '0/20' and '20 things to do' on a story
+    // file whose paper counts memories; the atlas tile now says whether the
+    // place is remembered and how far the memory has got (0, 1 or 2 of the
+    // star-or-quiet-way and one small thing).
+    const memF = atlas && !game.state.noMemBeat ? homecomingMemory(d.n, function (id) { return !!jrFileDone[id]; }) : null;
+    const memK = memF ? (memF.enough ? 2 : (memF.coreDone ? 1 : 0) + (memF.supportDone > 0 ? 1 : 0)) : 0;
     const el = sysEl('button', 'capyui-pick');
     el.type = 'button';
     if (hero) el.classList.add('hero');
@@ -25557,6 +25625,7 @@ export function createSystems(game) {
     // exactly one thing worth telling a player who has never played this.
     if (hero) {
       body.appendChild(sysEl('em', 'capyui-pickfirst',
+        memF ? (memF.enough ? 'remembered' : d.n === 1 ? 'a memory here opens the coast' : 'one memory, and nobody watching') :
         atlas ? ids.length + ' things to do, and nobody watching' : 'nobody watching'));
     }
     el.appendChild(body);
@@ -25570,8 +25639,8 @@ export function createSystems(game) {
     if ((done > 0 || jrFileSeen[d.n]) && ids.length) {
       const bar = sysEl('span', 'capyui-pickbar');
       const fill = sysEl('i');
-      fill.style.width = Math.round(done / ids.length * 100) + '%';
-      if (done >= ids.length) bar.classList.add('full');
+      fill.style.width = Math.round((memF ? memK / 2 : done / ids.length) * 100) + '%';
+      if (memF ? memF.enough : done >= ids.length) bar.classList.add('full');
       bar.appendChild(fill);
       el.appendChild(bar);
     }
@@ -25579,8 +25648,8 @@ export function createSystems(game) {
     // fresh file it says nothing at all, because "0 / 8" fifteen times over is
     // not information, it is wallpaper.
     if (done > 0 || jrFileSeen[d.n]) {
-      const tally = sysEl('span', 'capyui-picktally', done + '/' + ids.length);
-      if (done >= ids.length && ids.length) tally.classList.add('full');
+      const tally = sysEl('span', 'capyui-picktally', memF ? (memF.enough ? 'remembered' : memK + ' of 2 to a memory') : done + '/' + ids.length);
+      if (memF ? memF.enough : (done >= ids.length && ids.length)) tally.classList.add('full');
       // ON THE PICTURE, not on the tile. They are the same corner for the
       // fifteen tiles whose picture is the full width of them — and on the
       // hero, whose picture is two fifths of it, the tally used to float
@@ -27035,6 +27104,12 @@ export function createSystems(game) {
   // `todoAwayHold` still protects a fresh task or marquee from vanishing.
   const sysTUCK_AFTER = 8.0;    // s after arrival or a deliberate reveal
   const sysTUCK_HOLD = 3.0;     // s the paper stays open after a tick (AAA A5: was 5)
+  /** A marquee or a ride is live: the frame is its own (T2a, noHeldWow). */
+  function sysFrameOwned() {
+    if (game.state.noHeldWow) return false;
+    const c = game.capy;
+    return wowLiveOn || !!(c && (c.atHelm || c.carriedBy || c.rideBody));
+  }
   function todoTuckTick(dt) {
     if (todoAwayHold > 0) todoAwayHold -= dt;
     const busy = !started || transBusy || jrShown || ledShown || albShown || pauseShown || game.state.paused;
@@ -27044,13 +27119,20 @@ export function createSystems(game) {
     // who checks the journal often lived under a paper that never tucked.
     if (!started || transBusy || todoAwayHold > 0) todoAwayT = 0;
     else if (!busy) todoAwayT += dt;
-    const want = !wowEarnedOn && todoAwayT > sysTUCK_AFTER;
+    // ...AND WHILE A MOMENT OWNS THE FRAME, ONLY ITS OWN WORDS (T2a,
+    // noHeldWow). MEASURED in the T1 proof: mid-race in Monaco the paper
+    // had tucked to its tab, and the tab read the top row — a stale errand
+    // under the one live instrument. While a marquee or a ride is live the
+    // paper does not tuck; it takes the .marq state, which is the marquee's
+    // readout and nothing else.
+    const owned = sysFrameOwned() && !!marqId;
+    const want = !wowEarnedOn && !owned && todoAwayT > sysTUCK_AFTER;
     if (want !== todoAway) {
       todoAway = want;
       todoEl.classList.toggle('away', want);
     }
     // the marquee's own state (L4, E4): see the .marq rule
-    const wantMarq = !busy && !want && (wowLiveOn || wowEarnedOn || !!(marqId && game.capy && game.capy.atHelm));
+    const wantMarq = !busy && !want && (wowLiveOn || wowEarnedOn || owned || !!(marqId && game.capy && game.capy.atHelm));
     if (wantMarq !== todoMarq) { todoMarq = wantMarq; todoEl.classList.toggle('marq', wantMarq); }
     if (want) {
       const top = taskRec[todoTopId];
@@ -27963,7 +28045,9 @@ export function createSystems(game) {
     eveCheckT -= dt;
     if (eveStart < 0 && eveStart !== -1e9 && eveCheckT <= 0) {
       eveCheckT = 1;
-      if (chapEnough(n)) { eveStart = game.state.time; jrEve[n] = 1; saveSoon(); toast('the light is going.'); }
+      // folded into the memory beat (T2a): the evening still comes, and the
+      // card that just said why does not get a pill under it
+      if (chapEnough(n)) { eveStart = game.state.time; jrEve[n] = 1; saveSoon(); if (!memBeatDone[n]) toast('the light is going.'); }
     }
     if (eveStart === -1) return;
     const want = eveStart === -1e9 ? 1 : clamp((game.state.time - eveStart) / sysEVE_T, 0, 1);
@@ -30253,32 +30337,42 @@ export function createSystems(game) {
   let doneTimer = 0;
   // `note` overrides the chapter's own sentence: the departure card for the
   // player who did not stay reads `left` on the same paper (L6, F4).
-  function showDone(n, sub, kicker, note) {
+  // `opt` (T2a) is the story's two beats on the same paper: `cls` is 'mem'
+  // or 'act', `name` replaces the place's name, `lines` the recap, `hold`
+  // (ms) the card's time up, and `art` another chapter's postcard.
+  function showDone(n, sub, kicker, note, opt) {
     const def = chapterDef(n);
     if (!def) return;
+    const o = opt || {};
+    doneEl.classList.toggle('mem', o.cls === 'mem');
+    doneEl.classList.toggle('act', o.cls === 'act');
     doneKick.textContent = kicker || 'that is the whole place';
     while (doneArt.firstChild) doneArt.removeChild(doneArt.firstChild);
     doneArt.style.background = sysMarkTint(def.biome, 0.30);
     // The same postcard the picker tile and the ledger leaf are drawn from —
     // the art is authored, it is this chapter's, and it had never once been
     // shown at a size worth looking at.
-    const g = sysBuildMark(def.biome);
+    const artDef = o.art ? chapterDef(o.art) : def;
+    if (o.art) doneArt.style.background = sysMarkTint(artDef.biome, 0.30);
+    const g = sysBuildMark(artDef.biome);
     if (g) doneArt.appendChild(g);
     // ...and over the authored mark, the game's own photograph of the big
     // one if it took one (L4, F1b), or the player's newest picture here.
-    albShotOn(def.biome, doneArt, 2);
-    doneName.textContent = def.name.toUpperCase();
+    albShotOn(artDef.biome, doneArt, 2);
+    doneName.textContent = (o.name || def.name).toUpperCase();
     const say = note || def.note || '';
     doneNote.textContent = say;
     doneNote.hidden = !say;
     // one sentence in the note's voice, italic under it (L6, E4 / W6)
-    const rl = chapRecap(n);
+    const rl = typeof o.lines === 'string' ? o.lines : chapRecap(n);
     doneLines.textContent = rl;
     doneLines.hidden = !rl;
     doneSub.textContent = sub || '';
+    // restart the entrance: a memory straight after a DONE card is a new card
+    if (o.cls) { doneEl.classList.remove('show'); void doneEl.offsetWidth; }
     doneEl.classList.add('show');
     if (doneTimer) clearTimeout(doneTimer);
-    doneTimer = setTimeout(function () { doneEl.classList.remove('show'); }, sysDONE_CARD);
+    doneTimer = setTimeout(function () { doneEl.classList.remove('show'); }, o.hold || sysDONE_CARD);
   }
 
   // --- biome transition: white-out + place card ---
@@ -30529,29 +30623,84 @@ export function createSystems(game) {
   // is about the thing that just happened.
   const sysMOMENT_DEFER = 8.0;
   let sysMomentDefer = null;
+  // ---- A CARD HAS A RANK (ROADMAP-TEN T2a, noMomentPriority) --------------
+  // MEASURED on the review's fresh Sydney file: the concert's card was
+  // replaced inside a second by AN INCIDENT for two bins, and the premise by
+  // a rank card — every writer had the same right to the middle of the
+  // screen. Four ranks now: 0 incidental (the heat ladder), 1 the system (a
+  // mini, a rank, a name), 2 the story (the premise, an act), 3 a memory. A
+  // lower card never replaces a higher one still up: a 0 is dropped, and
+  // anything else waits in the one deferred slot, the higher of two kept.
+  // The memory and act cards are the done card, not this one, so they claim
+  // the rank through sysCardClaim and this reads it.
+  const sysPRI_HOLD_MIN = 2.6, sysPRI_HOLD_MAX = 6.0;   // s: floor and cap
+  const sysPRI_HOLD_BASE = 0.9, sysPRI_HOLD_CH = 0.045; // s, and s per character
+  let sysCardPri = -1, sysCardUntil = 0;                // the rank on screen, wall s
+  let sysMomentDropped = 0;
+  const sysMomentShown = [];                            // QA: the last 24 cards
+  function sysCardClaim(pri, holdS) {
+    if (game.state.noMomentPriority) return;
+    const now = sysWall();
+    if (now >= sysCardUntil || pri >= sysCardPri) { sysCardPri = pri; sysCardUntil = now + holdS; }
+  }
+  function sysCardBusy(pri) {
+    return !game.state.noMomentPriority && sysWall() < sysCardUntil && pri < sysCardPri;
+  }
+  function sysMomentHold(text, note) {
+    const ch = String(text || '').length + String(note || '').length;
+    return clamp(sysPRI_HOLD_BASE + sysPRI_HOLD_CH * ch, sysPRI_HOLD_MIN, sysPRI_HOLD_MAX);
+  }
   function sysMomentTick() {
     momentVisibilityTick();
     if (!sysMomentDefer) return;
     if (wowLiveOn && sysWall() - sysMomentDefer.at < sysMOMENT_DEFER) return;
+    if (sysCardBusy(sysMomentDefer.pri)) return;
     const m = sysMomentDefer;
     sysMomentDefer = null;
-    showMomentNow(m.kicker, m.text, m.note, m.incidental);
+    showMomentNow(m.kicker, m.text, m.note, m.incidental, m.pri, m.hold);
   }
-  function showMoment(kicker, text, note, incidental) {
-    if (wowLiveOn) { sysMomentDefer = { kicker: kicker, text: text, note: note, incidental: !!incidental, at: sysWall() }; return; }
-    showMomentNow(kicker, text, note, incidental);
+  // `pri` (T2a): omitted, an incidental card is 0 and any other is 1, which
+  // is what every caller meant before there were ranks. `hold` (s) overrides
+  // the reading-time hold; the premise asks for five.
+  function showMoment(kicker, text, note, incidental, pri, hold) {
+    const pr = typeof pri === 'number' ? pri : (incidental ? 0 : 1);
+    const busy = sysCardBusy(pr);
+    if (busy && pr === 0) { sysMomentDropped++; return; }
+    if (wowLiveOn || busy) {
+      if (sysMomentDefer && sysMomentDefer.pri > pr) { sysMomentDropped++; return; }
+      sysMomentDefer = { kicker: kicker, text: text, note: note, incidental: !!incidental, at: sysWall(), pri: pr, hold: hold };
+      return;
+    }
+    showMomentNow(kicker, text, note, incidental, pr, hold);
   }
-  function showMomentNow(kicker, text, note, incidental) {
+  function showMomentNow(kicker, text, note, incidental, pri, hold) {
+    const pr = typeof pri === 'number' ? pri : (incidental ? 0 : 1);
     momentKick.textContent = kicker || '';
     momentText.textContent = text || '';
     momentNote.textContent = note || '';
     momentNote.style.display = note ? '' : 'none';
     momentWanted = true;
     momentIncidental = !!incidental;
+    const holdS = game.state.noMomentPriority ? sysMOMENT_CARD / 1000
+      : (typeof hold === 'number' ? hold : sysMomentHold(text, note));
+    sysCardClaim(pr, holdS);
+    sysMomentShown.push({ k: String(kicker || ''), pri: pr, t: +sysWall().toFixed(2) });
+    if (sysMomentShown.length > 24) sysMomentShown.shift();
     if (momentTimer) clearTimeout(momentTimer);
-    momentTimer = setTimeout(function () { momentWanted = false; momentVisibilityTick(); }, sysMOMENT_CARD);
+    momentTimer = setTimeout(function () { momentWanted = false; momentVisibilityTick(); }, holdS * 1000);
     momentVisibilityTick();
   }
+  /** The premise's own exit: any key after its first 1.5 s ends it. */
+  function sysMomentDismiss() {
+    if (momentTimer) clearTimeout(momentTimer);
+    momentTimer = 0; momentWanted = false; sysCardUntil = 0;
+    momentVisibilityTick();
+  }
+  // QA readback: the cards shown with their ranks, and how many were dropped.
+  game.state.qaMoments = function () {
+    return { shown: sysMomentShown.slice(), dropped: sysMomentDropped, pri: sysCardPri,
+             live: sysWall() < sysCardUntil, defer: sysMomentDefer ? sysMomentDefer.kicker : null };
+  };
 
   // ---- THE FRAME WAS SILENT (D6) -----------------------------------------
   //
@@ -30694,12 +30843,27 @@ export function createSystems(game) {
   function sysToastDrain() {
     if (!sysToastHeld.length) return;
     const now = game.state.time;
+    // ---- ...AND NOT OVER A MOMENT (T2a, noHeldWow) -----------------------
+    // MEASURED in the T1 proof: a line held at the arrival was let out on
+    // top of Monaco's race and the Göreme boarding, a minute stale. While a
+    // marquee is live or the lens is framing a shot, a held line keeps
+    // waiting; one older than sysHELD_STALE or from another place is let go
+    // unsaid, first, before either gate — a line is never late AND said.
+    if (!game.state.noHeldWow) {
+      const bio = game.biome ? (game.biome.current || '') : '';
+      for (let i = sysToastHeld.length - 1; i >= 0; i--) {
+        const h = sysToastHeld[i];
+        if ((h.bio && bio && h.bio !== bio) || now - (h.at === undefined ? now : h.at) > sysHELD_STALE) sysToastHeld.splice(i, 1);
+      }
+      if (!sysToastHeld.length || wowLiveOn || (shotReq && shotW > 0.002)) return;
+    }
     if (now - sysToastLastAt < sysFRESH_GAP || now - sysTickLastAt < sysFRESH_TICK_GAP) return;
     const t = sysToastHeld.shift();
     // a held line from a place since left goes unsaid (L7, E5)
     if (t.bio && game.biome && game.biome.current && t.bio !== game.biome.current) return;
     sysToastEnqueue(t.text, t.kind, true);
   }
+  const sysHELD_STALE = 12;   // s: a held line older than this goes unsaid (T2a)
   // ---- ONE VOICE AT A TIME (L6, E4 / writing W3, play 8) ------------------
   //
   // MEASURED (qa/l6r-writing-venice-053-toast.png, t = 53 s): eight text
@@ -30834,7 +30998,7 @@ export function createSystems(game) {
     if (k0 === 'say' && sysFreshBudget()) {
       const now = game.state.time;
       if (now - sysToastLastAt < sysFRESH_GAP || now - sysTickLastAt < sysFRESH_TICK_GAP) {
-        sysToastHeld.push({ text: text, kind: k0, bio: game.biome ? (game.biome.current || '') : '' });
+        sysToastHeld.push({ text: text, kind: k0, bio: game.biome ? (game.biome.current || '') : '', at: now });
         while (sysToastHeld.length > sysFRESH_HELD) sysToastHeld.shift();
         return;
       }
@@ -34785,6 +34949,16 @@ export function createSystems(game) {
       countEl.textContent = keepCount() + ' of ' + chapMax + ' memories  ·  ' + chapLabel(n) + '  ·  ' +
         (experience.coreDone ? 'one small thing left for the memory' :
           'a memory: the star, or its quiet way' + (experience.supportMissing ? ', and one small thing' : ''));
+      // ---- ONE NUMBER (T2a) ----------------------------------------------
+      // Ten is the story's number and it is counted two to a fold, so the
+      // footer says the act and names the marquee rather than the rule:
+      // "Act II · a memory here: the opera house concert, and one more
+      // thing off this list". Nineteen belongs to the journal's shelf.
+      if (!game.state.noMemBeat) countEl.textContent = storyFooter(n, experience);
+    } else if (!game.state.noMemBeat && game.state.journeyMode === 'story' && game.state.homecomingArc && experience) {
+      const ai = storyActOf(n), hp = storyProgress();
+      countEl.textContent = 'Act ' + sysROMAN[ai] + '  ·  ' + Math.min(2, hp.memories[ai].length) + ' of 2 memories  ·  ' +
+        (hp.ready ? sysHOME_UI.ready : chapLabel(n) + ' remembered');
     }
     todoFindsLine(n);
     // THE YUZU (L8, F1): the wallet sits just under the paper, and the paper's
@@ -37239,6 +37413,11 @@ export function createSystems(game) {
       const cd = chapterDef(r.def.chapter);
       if (cd && cd.biome && cd.biome !== game.biome.current) return false;
     }
+    // THE MEMORY EDGE (T2a) is read across this one assignment: held before,
+    // and the act before, so a restore or a second session never replays it.
+    const memStory = !silent && !game.state.noMemBeat && storyOn() && !!r.chapter;
+    const memWas = memStory ? keepHeld(r.chapter) : true;
+    const actWas = memStory ? storyProgress().actIndex : 0;
     r.done = true;
     r.li.classList.add('done');
     if (r.armed) sysArmedSet(id, false);   // the getaway is the tick (L6, E4)
@@ -37349,6 +37528,9 @@ export function createSystems(game) {
     // above returns first), which is correct — a restored file's own
     // `keptAt` already carries whatever this wrote in an earlier session.
     if (cn && jrKeptAt[cn] === undefined && keepHeld(cn)) jrKeptAt[cn] = jrTotalMs();
+    // ...and the story's memory, as its own moment (T2a). See memoryCeremony.
+    const memFire = memStory && !memWas && keepHeld(cn);
+    if (memFire) setTimeout(function () { memoryCeremony(cn, actWas); }, sysMEM_DELAY);
     // An out-of-order trip can leave Sydney's memory until last. Earning it
     // at home must stage homecoming now, without a reload or another border.
     if (game.biome && game.biome.current === 'sydney' && sysFinaleAll()) sysFinaleCheck();
@@ -37356,7 +37538,8 @@ export function createSystems(game) {
     if (chapComplete(cn) && !jrChapDone[cn]) {
       jrChapDone[cn] = true;
       ceremony = true;
-      setTimeout(function () { chapterCeremony(cn); }, 1100);
+      // a memory on the same tick has the floor first; the place waits for it
+      setTimeout(function () { chapterCeremony(cn); }, memFire ? sysMEM_DELAY + sysMEM_HOLD + 600 : 1100);
     }
     // ---- AND IF THAT WAS THE LAST ONE OF ALL -------------------------------
     // The final tick of the game is ALWAYS also the final tick of a chapter,
@@ -38231,7 +38414,10 @@ export function createSystems(game) {
     if (!bm || typeof bm.spawnOf !== 'function') return;
     const sp = bm.spawnOf(bm.current);
     for (let k = 1; k <= chapMax; k++) {
-      if (!chapComplete(k)) continue;
+      // keepHeld, not chapComplete (T2a): the memory beat hands a keepsake
+      // over at a memory, so a reload that only restored the complete ones
+      // took back what the animal had been given.
+      if (!((!game.state.noMemBeat && storyOn()) ? keepHeld(k) : chapComplete(k))) continue;
       const a = k * 2.399963, r = 0.7 + k * 0.12;
       // No restY: physSurfaceY asks the LIVE biome, which is already the one
       // being entered, so each lands on the ground that is actually there.
@@ -38760,6 +38946,179 @@ export function createSystems(game) {
     }, Math.max(sysFIN_BEAT, sysFinCodaTotal * 1000));
   }
 
+  // ======================================================================
+  // THE STORY'S BEATS (ROADMAP-TEN T2a)
+  // ======================================================================
+  // MEASURED on the review's fresh files: earning a memory printed three
+  // words on the paper ("a memory kept"), and a new act opened with no
+  // signal at all. The story's two biggest events were the two quietest in
+  // the game. Each gets its own moment now, on the done card's paper,
+  // because that card is already the biggest thing a place can say.
+  //
+  //   the memory  a held card (rank 3): the marquee's name, what goes on
+  //               the shelf, the act's two pips. A two-note chime, the lift,
+  //               the full statement, the done pull-back, and the keepsake
+  //               landing at the animal's feet while the lens is out.
+  //   the act     six seconds later, if the memory turned the fold: the act
+  //               and its title, one line from sysACT_LINES, the traveller's
+  //               page for the place just remembered, the tune in another
+  //               mode, and 'story:act' on the bus for rival.js and npc.js.
+  //
+  // Story files only. Free Roam keeps no memories; a legacy file keeps the
+  // chapter ceremony it always had. Cuts: noMemBeat, noActTurn.
+  const sysMEM_DELAY = 1100;    // ms after the tick, the chapter ceremony's own
+  const sysMEM_HOLD  = 5600;    // ms the memory card is up; the keep card follows
+  const sysMEM_DROP  = 1500;    // ms in: the keepsake lands while the lens is out
+  const sysACT_AFTER = 6000;    // ms after the memory beat the act turn plays
+  const sysACT_HOLD  = 6000;    // ms the act card is up (the rank-2 cap)
+  const memBeatDone = Object.create(null);   // chapter -> played this session
+  let storyActSeen = -1;        // the highest act turned in this session
+  let storyReadySeen = false;
+  function storyOn() { return !!game.state.homecomingArc && game.state.journeyMode === 'story'; }
+  function storyProgress() { return homecomingProgress(function (id) { return !!(taskRec[id] && taskRec[id].done); }); }
+  function storyActOf(n) {
+    for (let i = 0; i < HOMECOMING_ACTS.length; i++) if (HOMECOMING_ACTS[i].places.indexOf(n) >= 0) return i;
+    return 0;
+  }
+  /** The act the story is in, 1..5, or 0 when there is no story (free, legacy). */
+  game.journeyAct = function () {
+    if (!storyOn()) return 0;
+    return storyProgress().actIndex + 1;
+  };
+  /** The name the memory is remembered by: the marquee, or its quiet way. */
+  function memName(n) {
+    const m = chapExperience(n);
+    const id = m ? (m.signatureDone ? m.signature : (m.alternativeDone ? m.alternative : m.signature)) : '';
+    const d = id ? taskDefOf(id) : null;
+    if (d && typeof d.wow === 'string') return d.wow;
+    if (d && typeof d.mini === 'string') return d.mini;
+    return d ? d.text : chapLabel(n);
+  }
+  /** Two sentences of the traveller's page, which is all a card can hold. */
+  function nbShort(n) {
+    const t = nbText(n);
+    if (!t) return '';
+    const parts = t.match(/[^.!?]+[.!?]+/g) || [t];
+    let out = '';
+    for (let i = 0; i < parts.length && i < 2; i++) {
+      if (out && (out + parts[i]).length > 150) break;
+      out += parts[i];
+    }
+    return out.trim();
+  }
+  // ...and while one is up the frame is its own: the pills and the crowd's
+  // bubbles step out (measured on the first cut: the gardener's pill and a
+  // bubble stood either side of the memory card). A class on the root, so
+  // npc.js's bubbles go too without a hook; cleared when the card goes.
+  let storyBeatTimer = 0;
+  function storyBeatQuiet(ms) {
+    const root = document.documentElement;
+    root.classList.add('capy-storybeat');
+    if (storyBeatTimer) clearTimeout(storyBeatTimer);
+    storyBeatTimer = setTimeout(function () { root.classList.remove('capy-storybeat'); storyBeatTimer = 0; }, ms);
+  }
+  function storyCardFree() {
+    return started && !transBusy && !ledShown && !jrShown && !pauseShown && !sysFinClosing;
+  }
+  function memoryCeremony(n, actWas) {
+    if (!storyOn() || game.state.noMemBeat) return;
+    // Not over a crossing or an open sheet: wait for the world, up to ten
+    // tries a second apart, then play it anyway — a memory is never skipped.
+    let tries = 0;
+    const go = function () {
+      if (!storyCardFree() && tries++ < 10) { setTimeout(go, 1000); return; }
+      memoryPlay(n, actWas);
+    };
+    go();
+  }
+  function memoryPlay(n, actWas) {
+    const def = chapterDef(n);
+    memBeatDone[n] = true;
+    const p = storyProgress();
+    const ai = storyActOf(n);
+    const got = Math.min(2, p.memories[ai].length);
+    const pips = '●'.repeat(got) + '○'.repeat(Math.max(0, 2 - got));
+    // the card: rank 3, so nothing the heat ladder raises in the next five
+    // seconds can take its place, and any card already up gives way to it
+    sysCardClaim(3, sysMEM_HOLD / 1000);
+    storyBeatQuiet(sysMEM_HOLD);
+    if (momentWanted) { if (momentTimer) clearTimeout(momentTimer); momentTimer = 0; momentWanted = false; momentVisibilityTick(); }
+    showDone(n, 'act ' + sysROMAN[ai] + '  ·  ' + pips + '  ·  ' + got + ' of 2 memories',
+      sysHOME_UI.memKick, def.keep ? sysHOME_UI.memShelf + def.keep : '',
+      { cls: 'mem', name: sysSay(memName(n)), lines: '', hold: sysMEM_HOLD });
+    // the sound: two notes rising, the lift, and the whole tune after them
+    sfx('chime', { volume: 0.62, pitch: 1.0, force: true });
+    // a fourth up, not a fifth: 1.5 is outside the voice's own octave (l7-voices)
+    setTimeout(function () { sfx('chime', { volume: 0.7, pitch: 1.335, force: true }); }, 230);
+    musSwell(1);
+    musStatement('full', 'done', 2.4);
+    confettiAt(0.6, sysCONF_MAX);
+    // the lens steps back, so the place is in the frame with the animal
+    if (typeof game.frameShot === 'function') {
+      game.frameShot({ dist: sysCAM_DEF + sysDONE_DOLLY, pitch: sysDONE_PITCH,
+                       raise: sysDONE_RAISE, hold: sysDONE_HOLD });
+    }
+    // the keepsake lands while the lens is out; its card once this one goes
+    setTimeout(function () { sysDropKeep(n); }, sysMEM_DROP);
+    setTimeout(function () { if (!ledShown) showKeep(n); }, sysMEM_HOLD - 200);
+    game.events.emit('story:memory', { chapter: n, act: ai + 1, got: got });
+    // ...and did that turn the fold
+    const act = p.actIndex;
+    if (!game.state.noActTurn && act > Math.max(actWas, storyActSeen)) {
+      storyActSeen = act;
+      setTimeout(function () { actTurn(act, n); }, sysACT_AFTER);
+    }
+    if (!game.state.noActTurn && p.ready && !storyReadySeen) {
+      storyReadySeen = true;
+      setTimeout(function () { actTurn(-1, n); }, sysACT_AFTER);
+    }
+  }
+  /** The act turn: `ai` is the act being entered, or -1 for the way home. */
+  function actTurn(ai, n) {
+    let tries = 0;
+    const go = function () {
+      if (!storyCardFree() && tries++ < 10) { setTimeout(go, 1000); return; }
+      const home = ai < 0;
+      const act = home ? null : HOMECOMING_ACTS[ai];
+      const pool = home ? [] : (sysACT_LINES[ai] || []);
+      const line = home ? sysHOME_UI.homeLine : (pool.length ? pool[randInt(0, pool.length - 1)] : '');
+      // the traveller's page for the place just remembered, in quotes
+      nbWrite(n);            // the page as it stands today, as a departure writes it
+      const nb = nbShort(n);
+      const sub = home ? '5 of 5 folds' : act.places.map(chapLabel).join('  ·  ');
+      sysCardClaim(2, sysACT_HOLD / 1000);
+      storyBeatQuiet(sysACT_HOLD);
+      showDone(n, sub, home ? sysHOME_UI.homeKick : 'act ' + sysROMAN[ai], line,
+        { cls: 'act', name: home ? sysHOME_UI.homeName : act.title, lines: nb ? '“' + nb + '”' : '',
+          hold: sysACT_HOLD, art: home ? 1 : act.places[0] });
+      // the page turning, then the tune in another mode: the key change
+      sfx('rustle', { volume: 0.34, pitch: 0.9, ui: true, force: true });
+      setTimeout(function () { sfx('chime', { volume: 0.5, pitch: 1.26, force: true }); }, 320);
+      const mode = (musPal && musPal.scale === 'major') ? 'pent' : 'major';
+      if (!musStatement('full', 'act', 0.5, mode)) musSwell(0.8);
+      game.events.emit('story:act', { act: home ? HOMECOMING_ACTS.length : ai + 1,
+        title: home ? sysHOME_UI.homeName : act.title, ready: home, chapter: n });
+      todoRefresh();
+    };
+    go();
+  }
+  /** The paper's footer in the story (T2a): the act, and the memory by name. */
+  function storyFooter(n, experience) {
+    const ai = storyActOf(n), hp = storyProgress();
+    const sig = taskDefOf(experience.signature);
+    const star = sig ? String(typeof sig.wow === 'string' ? sig.wow : (sig.mini || sig.text)).toLowerCase() : '';
+    const left = hp.actIndex === HOMECOMING_ACTS.length - 1 && hp.memories[ai].length === 1;
+    const more = experience.supportMissing ? 'one more thing off this list' : '';
+    return 'Act ' + sysROMAN[ai] + '  ·  ' + (left ? 'one more, then home  ·  ' : '') +
+      (experience.coreDone ? 'a memory here: ' + (more || 'nearly')
+        : 'a memory here: ' + (star || 'the star') + (more ? ', and ' + more : ''));
+  }
+  // QA readback: which beats have played this session.
+  game.state.qaStory = function () {
+    const o = {}; for (const k in memBeatDone) o[k] = 1;
+    return { mem: o, actSeen: storyActSeen, ready: storyReadySeen, act: game.journeyAct() };
+  };
+
   function chapterCeremony(n) {
     const def = chapterDef(n);
     const rec = chapRec[n];
@@ -38865,7 +39224,9 @@ export function createSystems(game) {
     //
     // It lands WITH the card, not before it: the picture on the paper is what
     // tells you what the thing at your feet is.
-    setTimeout(function () { showKeep(n); sysDropKeep(n); }, sysKEEP_WAIT);
+    // ...unless the memory beat already handed it over this session (T2a):
+    // two of the same keepsake at the animal's feet is a bug, not a bonus.
+    if (!memBeatDone[n]) setTimeout(function () { showKeep(n); sysDropKeep(n); }, sysKEEP_WAIT);
     if (def.way && n !== chapMax) {
       setTimeout(function () {
         // ...unless the journey has just ended on some OTHER chapter's last
@@ -39293,10 +39654,27 @@ export function createSystems(game) {
       // it is following, the shelf it is filling, and the bird that is not
       // going to make that easy. Never again on this file; the journey card
       // says the count from here on. Cut: noPremise.
+      // ...and ONE NUMBER (T2a): ten is the story's, five folds of two.
+      // "Nineteen places, one memory from each" was the collector's number
+      // said as the story's, and the paper then counted to two per act.
+      // Rank 2, held five seconds, and any key ends it after the first 1.5.
       if (!game.state.noPremise && game.state.journeyMode === 'story') {
         setTimeout(function () {
-          if (started && !transBusy) showMoment("A TRAVELLER'S BAG", 'NINETEEN PLACES',
-            'one memory from each, for the shelf at home. an ibis is coming too.');
+          if (!started || transBusy) return;
+          const ranked = !game.state.noMomentPriority;
+          showMoment("A TRAVELLER'S BAG", ranked ? 'FIVE FOLDS OF A MAP' : 'NINETEEN PLACES',
+            ranked ? 'two memories from each, then home. an ibis is coming too.'
+                   : 'one memory from each, for the shelf at home. an ibis is coming too.',
+            false, 2, 5.0);
+          if (!ranked) return;
+          const at = sysWall();
+          const skip = function () {
+            if (sysWall() - at < 1.5) return;
+            window.removeEventListener('keydown', skip);
+            if (momentKick.textContent === "A TRAVELLER'S BAG" && momentWanted) sysMomentDismiss();
+          };
+          window.addEventListener('keydown', skip);
+          setTimeout(function () { window.removeEventListener('keydown', skip); }, 5200);
         }, 900);
       }
     }
@@ -47576,9 +47954,25 @@ export function createSystems(game) {
    *  `jrSeen` (read from the save before either site runs) already answers
    *  "have I been here" correctly, so no separate save key is needed. */
   function jrMarkSeen(n) {
-    if (n && !jrSeen[n]) yuzuAdd(sysYUZU_ARRIVAL, 'the first look');
+    // THE FIRST REWARD ANSWERS THE FIRST WHEEK, NOT THE ARRIVAL (T2a,
+    // noFirstGrace): eight yuzu for standing still was the first thing a
+    // fresh file was ever paid for. Owed here, paid on the chapter's first
+    // wheek below; a reload before it forfeits eight yuzu, which is the
+    // price of not adding a save field.
+    if (n && !jrSeen[n]) {
+      if (game.state.noFirstGrace) yuzuAdd(sysYUZU_ARRIVAL, 'the first look');
+      else sysFirstLookOwed = n;
+    }
     jrSeen[n] = 1;
   }
+  let sysFirstLookOwed = 0;
+  game.events.on('capy:wheek', function () {
+    if (!sysFirstLookOwed || !game.biome) return;
+    if (chapterOf(game.biome.current) !== sysFirstLookOwed) { sysFirstLookOwed = 0; return; }
+    sysFirstLookOwed = 0;
+    const cp = game.capy && game.capy.position;
+    yuzuAdd(sysYUZU_ARRIVAL, 'the first look', cp && cp.x, cp && cp.y + 1, cp && cp.z);
+  });
 
   game.events.on('task:complete', function (p) {
     const r = p && taskRec[p.id];
@@ -48248,8 +48642,27 @@ export function createSystems(game) {
     return true;
   };
   /** Is the world the player's right now — nothing over it, nothing staged. */
+  // ---- COSY FIRST, THEN TROUBLE (ROADMAP-TEN T2a, noFirstGrace) -----------
+  // The review's minute one: a heat ladder, an ibis theft and a rule toast
+  // before the player had done anything worth a memory. A fresh file is in
+  // its grace until it has one thing of its own: a memory (story), or a name
+  // from the repertoire (free). Computed, never saved — the file already
+  // says which. Re-read twice a second: rival.js asks every frame.
+  let sysGraceAt = -1, sysGraceMemo = false;
+  function sysGraceOn() {
+    if (game.state.noFirstGrace || !started) return false;
+    const now = sysWall();
+    if (now - sysGraceAt < 0.5) return sysGraceMemo;
+    sysGraceAt = now;
+    let any = false;
+    if (game.state.journeyMode === 'free') { for (const k in jrRep) { if (jrRep[k] > 0) { any = true; break; } } }
+    else any = keepCount() > 0;
+    sysGraceMemo = !any;
+    return sysGraceMemo;
+  }
+  game.graceOn = function () { return sysGraceOn(); };
   game.rivalOK = function () {
-    return started && !transBusy && !jrShown && !pauseShown && !game.state.paused &&
+    return started && !transBusy && !jrShown && !pauseShown && !game.state.paused && !sysGraceOn() &&
            sysOpenT < 0 && !tutOn && !(game.capy && (game.capy.atHelm || game.capy.carriedBy));
   };
   game.groundY = function (x, z) { return sysGroundY(x, z); };
@@ -48973,6 +49386,8 @@ export function createSystems(game) {
   let incX = 0, incZ = 0;  // where the first one happened
   let incCool = 0;         // s until another card may be earned
   let incCarded = 0;       // the tier already shown for this chain
+  let incCardAt = -1e9;    // wall s of the last heat-ladder card (T2a)
+  const sysINC_RECARD = 10;  // s: a repeat inside this is the pips' to say
   const incSeen = Object.create(null);   // prop id -> game time it last counted
   // ---- WHAT THE CHAIN IS MADE OF (Q1, ROADMAP-NEXT item 4) ---------------
   //
@@ -49036,13 +49451,20 @@ export function createSystems(game) {
       repEv.length = 0;   // Q1: a new chain is a new sentence
     }
     incN++;
+    // ...and in the first grace the ladder stops at AN INCIDENT (T2a): the
+    // chain still counts and still cards at three, but a file that has
+    // nothing yet is not chased for five.
+    if (sysGraceOn()) incN = Math.min(incN, sysINC_N);
     // ---- SAID ONCE, THE FIRST TIME IT IS EVER COUNTED (N1) ----------------
     // The rule was learnt by ear or not at all. One toast, on the save, on
     // the first rung of the first chain: what three is, what five is, and
-    // what ends it.
+    // what ends it. (T2a) Three words now; the arithmetic moved to Learn to
+    // Play §2, which is where a rule is read rather than raced.
     if (incN === 1 && !jrIncTold && !sysTutSaid.inc) {
       jrIncTold = true; sysTutSaid.inc = true; saveSoon();   // once a session too (L7, E5)
-      toast('somebody saw that. three things in front of people is AN INCIDENT, five is A SCENE — unless one of them reaches you first.');
+      toast(game.state.noFirstGrace
+        ? 'somebody saw that. three things in front of people is AN INCIDENT, five is A SCENE — unless one of them reaches you first.'
+        : 'somebody saw that.');
     }
     // Q1: ...and WHAT it was. After the same-prop gate and after the
     // did-anybody-see-it gate, so the ring holds exactly the events the
@@ -49141,9 +49563,16 @@ export function createSystems(game) {
     // away with it. Cut: noTakings.
     if (!game.state.noTakings) incPot += (tier === 2 ? 5 : 3) + (named ? 1 : 0);
     // A named chain is its own reward; only the generic caption yields space.
-    showMoment(tier === 2 ? 'A SCENE' : 'AN INCIDENT',
-               named ? named.name : sentence,
-               named ? sentence : '', !named);
+    // The heat ladder is rank 0 (T2a): it never takes the floor from a card
+    // that outranks it, and a second one inside ten seconds is said by the
+    // pips' own label ("5 of 5 · A SCENE") rather than by a second card.
+    const incNow = sysWall();
+    if (game.state.noMomentPriority || named || incNow - incCardAt >= sysINC_RECARD) {
+      incCardAt = incNow;
+      showMoment(tier === 2 ? 'A SCENE' : 'AN INCIDENT',
+                 named ? named.name : sentence,
+                 named ? sentence : '', !named, named ? 1 : 0);
+    }
     punch(tier === 2 ? 0.12 : 0.09);
     // ...and the people say the one thing they only say when it has been three
     // in a row. npc.js owns what that sounds like; this owns when.
@@ -52908,7 +53337,7 @@ export function createSystems(game) {
       // (ROADMAP-WOW2, T): while the walk is coming or under way the run is
       // answered by beat three, and this line waits for the next run after
       // it. Nothing else about it moves.
-      } else if (!slidSaid && !tutLive() && capy.grounded && !capy.carriedBy && !capy.rideBody &&
+      } else if (!slidSaid && !tutLive() && !sysFrameOwned() && capy.grounded && !capy.carriedBy && !capy.rideBody &&
                  !mounted && Math.sqrt(v.x * v.x + v.z * v.z) > 5.2) {
         slidT += dt;
         if (slidT > 1.2) {
@@ -52931,8 +53360,9 @@ export function createSystems(game) {
     // and sets `paperEver` there, so this fires only on a file the walk did
     // not run on — a restore that was never taught, or a walk skipped before
     // its sixth beat — and never twice.
+    // ...and never over a moment (T2a): it was the pill mid-race in Monaco.
     if (started && !paperEver && !tutLive() && !transBusy && !jrShown && !ledShown && !albShown &&
-        !pauseShown && !game.state.paused && !hudBare) {
+        !pauseShown && !game.state.paused && !hudBare && !sysFrameOwned()) {
       paperT += dt;
       // ...and in a pause in the crowd's talk (L7, E5 / writing W4): the one
       // line about the HUD must not go up under four bubbles. Eight seconds,
