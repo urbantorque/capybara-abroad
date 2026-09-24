@@ -1389,7 +1389,41 @@ function gorBuildScatter(game, root) {
       gorInstance(root, gorG.sph6, PALETTE.gorPot, pumpkin, false, true, 'gorScat:pumpkin:' + id));
   }
   gorScatMeshes = gorScatMeshes.filter(Boolean);
+  // ---- THE POPLARS WAIT FOR THE SUN (TEN T1c, noGorDawn) ----------------
+  // At five in the morning they were the brightest, most saturated thing in
+  // a blue-violet frame, brighter than the envelopes the frame is about. One
+  // material for every chunk's cones, cloned off the shared cache so nothing
+  // else painted gorPoplar moves, and the rim hook carried across by hand
+  // because Material.copy does not bring it. gorUpdatePoplars warms it.
+  gorPoplarMat = null; gorPoplarK = -1;
+  for (let i = 0; i < gorScatMeshes.length; i++) {
+    const m = gorScatMeshes[i];
+    if (m.name.indexOf('gorScat:poplar:') !== 0) continue;
+    if (!gorPoplarMat) {
+      gorPoplarMat = m.material.clone();
+      gorPoplarMat.onBeforeCompile = m.material.onBeforeCompile;
+      gorPoplarMat.customProgramCacheKey = m.material.customProgramCacheKey;
+    }
+    m.material = gorPoplarMat;
+  }
   if (solid) gorPoolDone(game, SB);
+}
+
+let gorPoplarMat = null, gorPoplarK = -1;
+const gorPoplarLit = new THREE.Color();
+/**
+ * Olive until the sun is on the horizon (gorSun 0.354), their own yellow by
+ * the time it has cleared the rim and a little over (0.60): the valley lights
+ * up with the marquee rather than before it. A colour uniform, written only
+ * when it changes, so there is nothing to park at any rung.
+ */
+function gorUpdatePoplars() {
+  if (!gorPoplarMat) return;
+  const k = (gorGame && gorGame.state && gorGame.state.noGorDawn) ? 1
+          : gorSmooth((gorSun - 0.354) / 0.25);
+  if (Math.abs(k - gorPoplarK) < 0.002) return;
+  gorPoplarK = k;
+  gorPoplarMat.color.setHex(PALETTE.gorPoplarOlive).lerp(gorPoplarLit.setHex(PALETTE.gorPoplar), k);
 }
 
 /**
@@ -3042,6 +3076,7 @@ function gorUpdateDecor(dt) {
   gorDecorMeshBask.instanceMatrix.needsUpdate = true;
   gorDecorMeshThroat.instanceMatrix.needsUpdate = true;
   gorUpdateDawnLine(dt);
+  gorUpdatePoplars();
 }
 
 /**

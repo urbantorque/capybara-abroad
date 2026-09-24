@@ -165,6 +165,34 @@ balloon is more than 2 m airborne, and aims at least 7 m off the basket when cha
 becomes true within 10 s, 5 runs out of 5. Stretch, both flagged `noGorDawn`: the poplars warm from
 olive with the dawn line (3097, 1215), and the dovecote treads use the tuff ramp (1995-2026).
 
+### T1c — shipped
+
+- **The pad (bc68e99).** On the ground `fall` is 0, so the chase aim was the basket and the bed
+  parked on it: baseline on dd25434, truck 3.0 m from the basket, the animal wedged 2.2 m out, 0 of
+  1 boarded. Now, before the first flight, the truck holds (20, 10) until the balloon is 2 m up.
+  After a flight it aims `gorCHASE_OFF` = 7 m off a grounded basket. `qa/ten-t1c-board.js` (fresh
+  save, real keys from the spawn to `hintTarget('aboard')`, hop) boarded in 0.7-1.4 s in 6 of 6
+  runs that reached the hint, with the truck 23.3 m off. One more run never reached the hint: the
+  field's cold envelope lies across the straight line from the plaza, and the instrument now
+  sidesteps it.
+- **The landing (6bd188f).** The in-air chase is unchanged, so `on-the-trailer` still ticks on a
+  landing ON the bed (bed 1.14 m off). A bed left over an empty basket pulls out to 6.4 m or more,
+  and with the animal still in the basket the truck holds. `gorTrailerRide` no longer counts the
+  basket as the bed. It used to fire the ride home on the touch and drive off without the animal.
+  `qa/ten-t1c-land.js` measured: bed pulled to 6.43 m; the truck came back from the square to a
+  grounded basket and stopped with the bed 7.59 m off. New harness-only api: `trailer()`,
+  `riding()`.
+- **The poplars (`noGorDawn`).** The 16 scatter poplar meshes share one cloned material (the rim
+  hook is carried over). Its colour is olive `gorPoplarOlive` until the horizon (gorSun 0.354),
+  then `gorPoplar` by 0.60. `qa/ten-t1c-poplar.js` read 8a8a5c pre-dawn, beb75a at sun 0.53 and
+  c8c05a from 0.78 on, and c8c05a with the flag set. It is a colour uniform written on change, so
+  it has no GPU term and is not parked by rung.
+- **Misses.** The 34 valley poplars merged in `gorBuildValley` (1092) and the town plane tree keep
+  their colours, because a merged vertex-colour mesh needs an attribute rewrite. The dovecote
+  treads were not reached: the reviewer's white zig-zag is at (-46, -36.7), 32 m off the cliff
+  face, and gorBuildCliff at 1995 is not it. A ride left inside 1.5 s stays live, so the truck
+  waits at the square (pre-existing).
+
 **T1d · quay.js · the passage steers itself clear.** Move `quayFORT` to x −20 (z and r unchanged)
 and check that the buoy pairs still bracket the channel (108). Add a head-on slide: when more than
 0.85 of the speed is going into the fort, apply a 0.25 rad/s yaw away and toast "S to go astern"
