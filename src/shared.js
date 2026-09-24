@@ -26,6 +26,7 @@ export const PALETTE = {
   sailShade:    0xe6dfcd,
   sandstone:    0xe4d3ad,
   sandstoneDark:0xcbb68d,
+  finPlinth:    0xd9cbad,      // the keepsake plinths on the homecoming lawn: dressed sandstone, warmer than stone, or ten of them read as concrete
   glass:        0xa9cdd6,
   // The floatplane off Rose Bay. Not a task: the one thing on this harbour you
   // cannot get on, cannot rob, and that does not care that you are there.
@@ -886,6 +887,7 @@ export const PALETTE = {
   palSkyLow:    0xf0dcc0,
   palFog:       0x9fd0cf,
   palFogUnder:  0x2b7f92,      // the fog you get when the camera is underwater
+  palDeepClear: 0x45b0c2,      // the same fog on a clear day: a step over palMid and bluer, so fifteen metres of water is still water and not murk
 
   // -------------------------------------------------------------------------
   // CHAPTER 13 — CAPPADOCIA. Volcanic tuff at first light, which is a colour
