@@ -253,6 +253,9 @@ const monROOF_Y    = 0.95;        // the deck, above the road
 const monROOF_HX   = 0.94, monROOF_HZ = 2.10;
 const monRIDE_GRACE = 0.30;       // s the ride survives a frame outside the box
 const monCAR_HY    = 0.0;         // ...so the body origin IS the road
+// TEN T1b: the most a frame's un-integrated travel may carry the rider — a
+// shed frame at 26.5 m/s drops 0.44 m; anything past 3 m is a re-place.
+const monSEAT_CARRY2 = 3 * 3;
 
 // ============================================================ THE GRAND PRIX ==
 // THE MARQUEE, AND IT IS YOURS TO DRIVE (X1).
@@ -1119,6 +1122,7 @@ function monBuildGround(game, root) {
   m.receiveShadow = true;
   m.castShadow = false;
   m.frustumCulled = false;
+  m.name = 'monGround';   // the race lens probe counts it (qa/ten-t1b-lens.js)
   root.add(m);
 }
 
@@ -2772,9 +2776,11 @@ function monBuildCircuit(game, root) {
  * empty track reads as a toy, and three at different spacings reads as a
  * session.
  *
- * The five rules for a kinematic carrier are kept exactly (see CONTRACT.md):
- * mass 0, KINEMATIC, allowSleep off, moved by VELOCITY against the PREVIOUS
- * TARGET, yaw through angularVelocity, and rendered from interpolatedPosition.
+ * The five rules for a kinematic carrier are kept (see CONTRACT.md): mass 0,
+ * KINEMATIC, allowSleep off, moved by VELOCITY against the PREVIOUS TARGET,
+ * yaw through angularVelocity — and the fifth is amended here (TEN T1b): the
+ * body is then PUT at the target and drawn from it, because a carrier on a
+ * track cannot lose the travel a shed frame's solver drops. See monUpdateCars.
  * The one thing this carrier does that no other in the game does is go
  * twenty-six metres a second, which is why it also DECLARES its frame through
  * carryFrame() rather than leaving the animal to the contact sweep: at that
@@ -3060,6 +3066,16 @@ function monMePlace(dt) {
     while (dy > Math.PI) dy -= Math.PI * 2;
     while (dy < -Math.PI) dy += Math.PI * 2;
     b.angularVelocity.set(0, dy / dt, 0);
+    // ---- ...AND THE BODY IS PUT WHERE THE CAR IS (TEN T1b) ---------------
+    // The velocity alone moved it only as far as world.step integrated, and
+    // from rung 2 that is two 1/60 substeps under a 1/20 clock: two thirds
+    // of every frame's travel. The shortfall never came back, so the body
+    // drove a two-thirds copy of the lap about the grid, and the car drawn
+    // off it with it — measured at rung 3 over one lap, 33.9 m on average
+    // and 59 m at worst between the driver and the car (qa/ten-t1b-seat.js).
+    // The velocity stays for the contacts; the position is the target.
+    b.position.set(tx, ty, tz);
+    b.quaternion.setFromEuler(0, yaw, 0);
   } else {
     b.velocity.set(0, 0, 0); b.angularVelocity.set(0, 0, 0);
     b.position.set(tx, ty, tz);
@@ -3067,6 +3083,11 @@ function monMePlace(dt) {
   }
   monMeTX = tx; monMeTY = ty; monMeTZ = tz; monMeYaw = yaw;
   if (dt > 0) monCarSpin(monMeG, monMeS);
+}
+/** Draw the red car at its own pose — the one the seat is written from. */
+function monMeDraw() {
+  monMeG.position.set(monMeTX, monMeTY, monMeTZ);
+  monMeG.rotation.set(0, monMeYaw, 0);
 }
 function monBuildCars(game, root) {
   monInitTrack();
@@ -3236,10 +3257,30 @@ function monUpdateCars(game, dt) {
     while (dy < -Math.PI) dy += Math.PI * 2;
     b.angularVelocity.set(0, dy / dt, 0);
     monCarTX[i] = tx; monCarTZ[i] = tz; monCarTY[i] = ty; monCarYaw[i] = monTrackTmp.yaw;
-    // RULE 5: rendered from interpolatedPosition, never from position.
+    // ---- RULE 5, AMENDED FOR THIS CARRIER (TEN T1b) ----------------------
+    // The velocity above is still what the contacts see, but the body is then
+    // PUT at the target and the car is drawn from the target. Left to the
+    // velocity, the body covers only what world.step integrates, and from
+    // rung 2 (two substeps under a 1/20 s clock) that is two thirds of the
+    // frame's travel with the rest dropped for good: the pack drove a shrunken
+    // copy of the lap through the town. The rider goes with the correction —
+    // the same shortfall its own body had, since the frame velocity carried it
+    // exactly as far as the solver carried the car — so the roof stays under
+    // it at every rung. A re-place (monCarPlace) is not a correction.
+    const ex = tx - b.position.x, ey = ty - b.position.y, ez = tz - b.position.z;
+    b.position.set(tx, ty, tz);
+    b.quaternion.setFromEuler(0, monTrackTmp.yaw, 0);
+    if (i === monRider && capy && capy.body && !capy.carriedBy && !capy.atHelm &&
+        ex * ex + ez * ez < monSEAT_CARRY2) {
+      const cb = capy.body;
+      cb.position.x += ex; cb.position.y += ey; cb.position.z += ez;
+      cb.previousPosition.x += ex; cb.previousPosition.y += ey; cb.previousPosition.z += ez;
+      cb.interpolatedPosition.x += ex; cb.interpolatedPosition.y += ey; cb.interpolatedPosition.z += ez;
+      if (capy.position) capy.position.set(cb.position.x, cb.position.y, cb.position.z);
+    }
     const g = monCarG[i];
-    g.position.copy(b.interpolatedPosition);
-    g.quaternion.copy(b.interpolatedQuaternion);
+    g.position.set(tx, ty, tz);
+    g.rotation.set(0, monTrackTmp.yaw, 0);
     // ROLL AND PITCH GO ON THE MESH ONLY (rule 4). A car leaning into the
     // hairpin is eight degrees of theatre; rate-integrating three axes to get
     // it would be tilting the box the passenger is standing in.
@@ -3326,6 +3367,41 @@ function monRaceLeave(game) {
   }
   if (monRaceT < 0) monRaceT = -1;
 }
+// ---- THE RACE LENS (TEN T1b, flag noMonRaceLens) -----------------------------
+// The follow rig was 13 m at 0.30 rad over a 1.2 m raise: an eye about five
+// metres over the car, looking along its bonnet. On the climb out of the
+// harbour the road is cut into the hill, and a lens that low, aimed where the
+// car points rather than where the road goes, filled the frame with the bank
+// — the reviewers' 60 % hillside. Three moves, all through hooks systems.js
+// already reads (rig, rideYaw, camFloor):
+//   - the eye 1.5 m higher on a shorter boom, so it looks down the road;
+//   - the yaw aimed at the road monLENS_AHEAD metres on (at the car's own
+//     lateral offset), so a bend is framed before the car is in it;
+//   - a floor monLENS_FLOOR over the road under the lens, and never less than
+//     monLENS_BANK over the ground there, so a cut bank cannot swallow it.
+// A camera term, not a picture term: nothing is drawn, so it costs nothing
+// on the GPU and does not park with the rung.
+const monLENS_DIST  = 9.5;    // m of boom (was 13)
+const monLENS_PITCH = 0.50;   // rad — with the raise, the eye 6.5 m over the car (was 5.0)
+const monLENS_RAISE = 2.0;    // m the aim sits over the car (was 1.2)
+const monLENS_AHEAD = 12;     // m down the lap the yaw is aimed at
+const monLENS_FLOOR = 2.5;    // m over the tarmac the lens may not go under
+const monLENS_BANK  = 1.2;    // m over the ground beside it
+const monLensTmp = { x: 0, y: 0, z: 0, yaw: 0, i: 0, t: 0 };
+function monLensOn() {
+  return monRaceOn && !(monGame && monGame.state && monGame.state.noMonRaceLens);
+}
+function monLensYaw() {
+  monTrackAt(monMeS + monLENS_AHEAD, monLensTmp);
+  const c = Math.cos(monLensTmp.yaw), sn = Math.sin(monLensTmp.yaw);
+  const ax = monLensTmp.x + monMeLat * c, az = monLensTmp.z - monMeLat * sn;
+  const dx = ax - monMeTX, dz = az - monMeTZ;
+  return (dx * dx + dz * dz > 1) ? Math.atan2(dx, dz) : monMeYaw;
+}
+function monLensFloor(x, z) {
+  monRoad(x, z);
+  return Math.max(monRoadY + monLENS_FLOOR, monTerrain(x, z) + monLENS_BANK);
+}
 function monUpdateRace(game, dt) {
   if (!monMeG || dt <= 0) return;
   const input = game.input, capy = game.capy;
@@ -3347,8 +3423,7 @@ function monUpdateRace(game, dt) {
     if (monMeV > 0) { monMeV = Math.max(0, monMeV - monME_BRAKE * dt); monMeS += monMeV * dt; monMePlace(dt); }
     else if (capy && capy.position && Math.abs(monMeS - (monMeLineS() + monME_GRID_S)) > 1 &&
              Math.hypot(capy.position.x - monMeTX, capy.position.z - monMeTZ) > 60) monMeToGrid();
-    monMeG.position.copy(monMeBody.interpolatedPosition);
-    monMeG.quaternion.copy(monMeBody.interpolatedQuaternion);
+    monMeDraw();
     if (monMeMover) monMeMover.set(0);
     return;
   }
@@ -3490,9 +3565,11 @@ function monUpdateRace(game, dt) {
     for (let j = 0; j < monCarG.length; j++) monRaceAhead[j] = monCarU[j] > monMeS;
   }
   // ---- the pose, the passenger, the line on the signpost ----------------
+  // ...ONE POSE FOR THE CAR AND THE SEAT (TEN T1b): the seat below is written
+  // from monMeTX/TY/TZ, so the car is drawn from them too. Drawn from
+  // interpolatedPosition it was a frame (or, shed, a lap's worth) elsewhere.
   monMePlace(dt);
-  monMeG.position.copy(monMeBody.interpolatedPosition);
-  monMeG.quaternion.copy(monMeBody.interpolatedQuaternion);
+  monMeDraw();
   monMeLean = damp(monMeLean, clamp(-steer * auth * 0.10 - (onKerb ? 0.04 : 0), -0.16, 0.16), 6, dt);
   monMeG.children[0].rotation.z = monMeLean;
   monMeG.children[0].rotation.x = damp(monMeG.children[0].rotation.x, clamp((gas - brake) * -0.03, -0.05, 0.05), 6, dt);
@@ -5698,11 +5775,20 @@ export function createMonaco(game) {
     // the camera sits behind the car while you drive it, close and low: the
     // helm rig is a ship's (21 m, 27°) and on a street with walls it was
     // shoved up to a plan view. See rideYaw in systems.js and the rig chain.
-    rideYaw() { return monRaceOn ? monMeYaw : NaN; },
+    // ...and with the race lens live (TEN T1b) it points down the road
+    // monLENS_AHEAD metres on, not along the bonnet — see monLensYaw.
+    rideYaw() { return monRaceOn ? (monLensOn() ? monLensYaw() : monMeYaw) : NaN; },
     rig() {
       if (!monRaceOn) return null;
+      if (monLensOn()) return { w: 1, dist: monLENS_DIST, pitch: monLENS_PITCH, raise: monLENS_RAISE, lambda: 3.0 };
       return { w: 1, dist: 13, pitch: 0.30, raise: 1.2, lambda: 3.0 };
     },
+    // Published only while the lens is live: the property is undefined the
+    // rest of the time, so systems.js falls through to its own floor and to
+    // the dive floor exactly as it did before this chapter had an opinion.
+    get camFloor() { return monLensOn() ? monLensFloor : undefined; },
+    /** Metres from the tarmac's centreline. Harness only (qa/ten-t1b-lens.js). */
+    roadD(x, z) { return monRoad(x, z); },
     raceDebug(o) {
       // the harness: hold the pedals without a keyboard
       if (o && o.take && !monRaceOn) monRaceTake(monGame);
