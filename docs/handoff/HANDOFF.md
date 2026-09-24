@@ -1,31 +1,35 @@
 # HANDOFF — state of play, 25 Sep 2026
 
-## ROADMAP-TEN (25 Sep), state after T3
+## ROADMAP-TEN (25 Sep), state after T4
 
 The pass is docs/roadmaps/ROADMAP-TEN.md, worked on branch `ten-pass`
 (master is still the published AAA build, d78cd7e). Eight reviewers scored
 the game; their evidence is ROADMAP-TEN-findings.json. Six waves, one agent
 per file set (the ownership table at the foot of the roadmap).
 
-T1, T2 (with its proof slot, f79470b) and T3 are merged and pushed (T3
-`f8895c4`, npm test 80/0). T3 gave Free Roam its own paper (silhouettes,
-"n of 50 names", stamp cards, one-height picker tiles, places that
-remember) and the paper nearest-first clarity; the ibis an arc (watcher in
-Act I, keepsake chase in Act III, hunched in the cold, a seat at the
-finale); crowds a bubble cap, a flash star and a traveller who turns up at
-each memory and walks the finale in (`game.travFinAt()`, `npc:travBag`);
-Kyoto a hill bowl and a cedar wood round the torii; Hoan Kiem willows and a
-pedalo; Kowloon an arcade lens and a lettered bakery sign. The CONTRACT
-entry "TEN T3" has the numbers and the misses.
+T1, T2 (with its proof slot, f79470b), T3 (with its proof slot, b662950,
+and the willow spill 1ccef83) and T4 are merged and pushed (T4
+`282c8ed`..`e464926`, npm test 81/0). T4 landed the ending (caption pill,
+held flash, 3 s linger, ledger 16 s after the close, the bag set by
+systems.js 1.8-1.9 m from the traveller, the paper folding under the place
+name, `liveLabel` record rows), keepsakes at 2.2x on plinths (+1 draw),
+the Sydney concert on the podium's own 0.9 s beat with lit sails (+13.2 %)
+and camSolid colonnade and sail crowns, the Pantanal herd cascade (nine in
+5 wheeks) and a flood sky at rung >= 1, Palawan's clear water and solid
+karst, and the Drift's soft cloud. The CONTRACT entry "TEN T4" has the
+numbers and the misses.
 
-Owed: the rung-0 headful A/B for `noFlashStar`, `noTravArc`, `noKyoFar`,
-`noToriiWood`, `noHanWillow`, `noHkBakeGlyph`. For systems.js (T4a): aim
-the tab and hint arrow at `game.<biome>.wowTarget()` (sahara, hanoi,
-kowloon publish one; nothing reads it), the Hanoi pho-run tab, record-row
-`liveLabel`, bubbles off the paper, place the bag at `travFinAt().bag`.
-qa/aaa-rival.mjs fails on the T2a grace, not on rival.js; use
-qa/ten-t3b-aaa-rival.mjs until the instrument cuts the grace. Next: T4,
-the ending and the traveller.
+Owed: the rung-0 headful A/B for `noFinPolish`, `noFinPlinth`,
+`noConcertBeat`, `noCloudSoft` (and T3's `noFlashStar`, `noTravArc`,
+`noKyoFar`, `noToriiWood`, `noHkBakeGlyph`), the rung-1 A/B for
+`noPanSkyFresnel`, the lagoon-wall A/B for `noPalKarstSolid`. For npc.js:
+lift `npcCONCERT_N` 8 -> 12 and scale `npcConcert`'s reach by the carry, or
+the opera-stage par of 10 stays out of reach. For systems.js: the Sydney
+parcel after `fin`, `noDepartures`, the journal by act, the pause "more",
+the Hanoi pho-run tab, a Palawan row in `sysSUB` (palawan.js is a second
+writer to the underwater fog and tint until then), the `wowTarget()` aim.
+The page load measures ~49 s on this machine; qa/ten-t4a-open.mjs waits
+150 s.
 
 ## Homecoming published for playtest (23 Sep, newest)
 

@@ -1,3 +1,99 @@
+## TEN T4 — THE ENDING, THE CONCERT AND FOUR PLACES (25 Sep 2026)
+
+Six builders on six disjoint files, merged into `ten-pass` with no
+conflicts (`282c8ed`..`e464926`); the six "shipped" blocks each landed
+after their own item. Every number is in the "### T4x — shipped" sections
+of docs/roadmaps/ROADMAP-TEN.md.
+
+**The ending lands (T4a, systems.js, shared.js).** The finale caption is
+a pill at bottom 17.3-18 %, 11.5:1; the flash is held, the last frame
+lingers 3 s and the ledger opens 16.0-16.3 s after the close (about 32 s
+from key release), with an epilogue (`noFinPolish`). The bag is set down
+by systems.js on `npc:travBag`: 1.78-1.92 m from the traveller, 1.51-1.95
+m from the animal, under the existing `noTravArc`; the coda waits on
+`travFinAt().st` home or done, capped at 30 s. A 15-place file titles
+FURTHER THAN IT MEANT and shows the "still out there" postcards. The paper
+folds while the place name is up (`noPlaceFold`). The chapter-one journal
+head reads "A little further · 0 of 2 memories"; a second Tab closes it.
+Record rows gain `liveLabel` (lantern, orca-ride, the-column); the
+opera-stage par is 10. `hud.panels()` holds the yuzu pill. DOM and timers
+only. ten-t4a-finale 14/14, ten-t4a-journal 6/6, aaa-rival 7/7 (the
+instrument now cuts the grace); ten-t4a-static (27 checks) registered.
+
+**Keepsakes on plinths (T4b, props.js, `noFinPlinth`).** In the ring the
+ten keepsakes stand on `PALETTE.finPlinth` plinths (one instanced mesh,
+no shadow, 16 cm, up to 58 cm across) at 2.2x mesh, body at 1x, upright
+on their own heading. +1 draw call (185 against 184), +320 triangles, one
+static body. A nudge at 0.36 m/s leaves one on the stone, a 3 m/s shove
+knocks it off at 1x; the ibis's `keepOut`/pin/`dropOwned` all hold. The
+plinth decision is made when the lawn is laid: at rung 1, 0 drawn.
+`sysFinaleStage`'s call needed no change (its options object falls to
+the `finaleOn` default). `game.physics.plinthAudit()`.
+
+**The concert on the beat (T4c, environment.js, `noConcertBeat`).**
+Sydney has no score beat (`rhythm: null`), so the podium keeps its own
+0.9 s pulse: two gold rings close at the animal's feet, a tick on the
+beat, the line "on stage · wheek as the gold rings meet". The judge (key
+press −0.15 s, ±0.12 s): on beat 3/3, carry 3; off beat 0/3, carry 1.2,
+"a touch early/late". Sails: stageGlow 1.0 a note, a one-draw additive
+sail pass while a concert is on, masked luminance 160.6 -> 181.8
+(+13.2 %). The first note kicks 5 carpet props off; the tick fires 3 of 7
+fireworks; encore 12 s. The colonnade is one camSolid compound (0 of 16
+poses with the band between lens and animal) and three camSolid crown
+boxes cover the sails above the shell colliders. Ring and glow park at
+rung 1. `game.env.beatAudit()`.
+
+**The herd and the flood sky (T4d, pantanal.js).** From the fourth wheek
+a call takes up to three, answers 0.12 s apart (`noHerdCascade`, CPU):
+all nine in 5 wheeks (was 9); with five following, near grazers trail the
+tail for 6 s. While the mirror is parked (rung >= 1) the water shows a
+two-stop sky and a tree band (`noPanSkyFresnel`, zero at rung 0): 96.7-
+98.0 % of water pixels change, 0.17-1.79 % outside. The warm was already
+shipped (`biomeWarm`, systems.js:43385; 99 programs through the jaguar),
+so no `noPanWarm`.
+
+**Palawan clear (T4e, palawan.js).** Under water the tint, not the fog,
+was the murk: `noPalClear` lifts it (coral-vs-water a*b* 11.9 -> 16.0 at
+10 m, manta dE 4.6 -> 6.2 at 15 m) through a chained
+`scene.onBeforeRender` over the `sysSUB` row. The karst no longer dithers
+for the lens capsule (`noPalKarstSolid`): holes 1.08 -> 0 and 0.58 ->
+0.01 per thousand. No draw, no program; neither parks.
+
+**The cloud is soft (T4f, drift.js, `noCloudSoft`).** 228 lobes, 46 banks
+and the landing bloom drawn smooth at 10x6 (+1 draw for the lit tops,
+lobes 8.2k -> 22.8k triangles, banks 10.7k -> 29.7k at no new draw), 12
+low wisps at y 2-6 (+1 draw, gone at rung 1). Hard-edge pixels 1.67 % ->
+1.08 %. `game.drift.cloudSoft()`.
+
+npm test: 81 checks, 0 failed. node --check on the seven changed src
+files; build 7323.0 KB, no collisions.
+
+**Honest misses.**
+- T4a/T4c: the house is capped at `npcCONCERT_N = 8` in npc.js and the
+  first note's reach never drops below 26 m, so on-beat and off-beat both
+  drew 8 and the par of 10 cannot be reached yet. The lift is npc.js's
+  (`npcConcert` ~5732: reach from the carry, cap 8 -> 12, a third row).
+- T4a: keepsakes at the coda lens are median 17-20 px, min 5.5-9 px, not
+  18; the ibis's wing sat over the bag in the last frame; the Sydney
+  parcel, `noDepartures`, the journal by act, the pause "more" and the
+  Hanoi pho-run tab were not done. The page load measured 48.8 s on this
+  machine (ten-t4a-open waits 150 s).
+- T4c: at the review's arcade pose the lens still sits 2.3 m off, on the
+  terminal pier (`bTerr`, no camSolid).
+- T4d: the fallback water is lighter than the mirror (133 against 109
+  mean); the crossing still opens on the fourth wheek either way.
+- T4e: coral chroma median 15.4, not 20 (the underwater hemisphere colour
+  is systems.js's); `palCLEAR_ROW_FAR = 62` must match `sysSUB.palawan.far`
+  and palawan.js is a second writer to fog and the sub tint, whose home
+  is a `sysSUB` row; the karst flag did not bring the holes back on a
+  reversed run; the manta clue was already shipped, unverified live.
+- T4f: a 54 m lobe still shows ten sides at grazing angles; the hexagonal
+  swim rings are the shared ring, not drift.js.
+- The proof slot owes the rung-0 headful A/B for `noFinPolish` (the held
+  flash), `noFinPlinth`, `noConcertBeat`, `noCloudSoft`, the rung-1 A/B
+  for `noPanSkyFresnel`, the lagoon-wall A/B for `noPalKarstSolid`, and a
+  Pantanal arrival p95 at rung 0 after the white card.
+
 ## TEN T3 — FREE ROAM GETS ITS OWN GAME; THE IBIS GETS AN ARC (25 Sep 2026)
 
 Six builders on six disjoint files, merged into `ten-pass` with no
