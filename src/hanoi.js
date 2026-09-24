@@ -5087,7 +5087,7 @@ function hanBuildWillows(game, root) {
     m.instanceMatrix.needsUpdate = true;
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
     m.computeBoundingSphere();
-    m.castShadow = true; m.receiveShadow = true;
+    m.castShadow = false; m.receiveShadow = true;
     g.add(m);
   }
   // the swaying copy, built once; the tick swaps it in and out by rung
@@ -5125,7 +5125,7 @@ function hanBuildWillows(game, root) {
   g.add(lotus);
   // ---- the boat --------------------------------------------------------
   const boat = new THREE.Mesh(hanBoatGeo(), mat(0xffffff, { vertexColors: true }));
-  boat.castShadow = true; boat.receiveShadow = true;
+  boat.castShadow = false; boat.receiveShadow = true;
   boat.rotation.order = 'YXZ';
   hanBoatA = rand(0, 6.283);
   hanBoatG = boat;
@@ -5177,9 +5177,13 @@ function hanWillowTick(game, dt) {
   if (live !== hanWillowLive) {
     hanWillowLive = live;
     hanWillowCrown.material = live ? hanWillowSwayMat : hanWillowFlatMat;
-    hanWillowCrown.castShadow = live;
-    hanWillowTrunk.castShadow = live;
-    hanBoatG.castShadow = live;
+    // NO SHADOWS AT ANY RUNG. The T3 proof slot timed them on the Arc at
+    // rung 0: crowns +0.40, trunks +0.35, boat +0.15 ms, in the chapter whose
+    // world pass is already the dearest in the game. The lake's own shade
+    // and the crowns' dark underside read as shade without them.
+    hanWillowCrown.castShadow = false;
+    hanWillowTrunk.castShadow = false;
+    hanBoatG.castShadow = false;
   }
   hanUpdateBoat(game, dt);
 }
