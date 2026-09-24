@@ -479,6 +479,14 @@ tick frame. Stretch: the lantern trail up the gap in the rows (1378).
   - Burst frame: 4.4 % against 1.4 %. That is more steam, because the ring now rises on the far
     rim and frames the animal.
   - `aurora` ticked in both runs, no errors. PNGs: `qa/ten-t2c-aurora-{live,off}-{before,tick,burst}.png`.
+- **Second increment: the light back.** On the steeper ramp at 0.56, the ribbon carried less than
+  half the bands' light, and the tick frame read as an empty sky at the low point of a breath. The
+  ramp is now 1.0, 0.85, 0.6, 0.3, 0. The folds use 0.6 + 0.4 across and 0.8 + 0.2 along, and the
+  peak is 0.66. Re-measured in the same run as the flag:
+  - Ribbon column: hem at 134 levels, falling to 44 levels at 20 % past the top, where the
+    column reaches the next curtain. There is one 23-level dip where it crosses that curtain.
+  - Bands: a 100-level plateau, then a single 66.7-level fall, then a 59-level plateau.
+  - Steam in the tick frame: 10.0 % against 15.7 %. At the resting lens: 5.7 % against 11.9 %.
 - **Missed:** the stretch, the lantern trail up the gap in the rows. The review's other ask, keeping
   bubbles and the paper off the frame, belongs to A (`noHeldWow` / T2a). Rung-0 GPU cost is owed to
   the proof slot.

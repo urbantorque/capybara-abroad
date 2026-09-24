@@ -2976,12 +2976,14 @@ function iceBuildAurora(root) {
     // to zero IS the fall-off, and a basic material is the one that reads it
     // (a Lambert emissive ignores vertex colour). One draw, not two. Four
     // rows live; two at rung 2 and up, the same ramp sampled coarser. The
-    // peak is the lower band's 0.46 lifted for the pleats (below), which take
-    // a third of the light out on average: measured, the hem sat at 120 levels
-    // against the panes' 170 at 0.46.
+    // peak is the lower band's 0.46 lifted for what the ramp and the pleats
+    // (below) take out: at 0.46 and a steeper ramp the ribbon carried under
+    // half the old light and, measured, the tick frame read as an empty sky
+    // at the low of a breath. 0.66 on this ramp is about seven tenths of it,
+    // most of it at the hem.
     const r = { mesh: null, sets: [iceRampGeo(len, seg, 4, cols[i], i), iceRampGeo(len, seg, 2, cols[i], i)], cur: 0,
                 phase: rand(0, 6.283), speed: rand(0.10, 0.24) * (i % 2 ? -1 : 1),
-                wave: rand(0.006, 0.013), amp: 18, ampUp: 14, peak: 0.56 };
+                wave: rand(0.006, 0.013), amp: 18, ampUp: 14, peak: 0.66 };
     const rm = new THREE.Mesh(r.sets[0].geo, new THREE.MeshBasicMaterial({
       vertexColors: true, transparent: true, opacity: 0, side: THREE.DoubleSide,
       depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
@@ -2998,7 +3000,7 @@ function iceBuildAurora(root) {
 }
 // The hem to the top, 46 m to 146 m: [height 0..1, brightness]. Monotone on
 // purpose; the proof is a row of the picture that never gets brighter going up.
-const iceRAMP = [[0, 1.0], [0.25, 0.7], [0.5, 0.4], [0.75, 0.16], [1, 0]];
+const iceRAMP = [[0, 1.0], [0.25, 0.85], [0.5, 0.6], [0.75, 0.3], [1, 0]];
 const iceRAMP_TAPER = 0.18;          // of the length, at each end, where the curtain thins to nothing
 /** One ribbon's geometry with its ramp baked into the vertex colours. */
 function iceRampGeo(len, seg, rows, col, seed) {
@@ -3033,7 +3035,7 @@ function iceRampGeo(len, seg, rows, col, seed) {
     // and dimmer columns running the whole height. Two sines along the length,
     // four or five columns a fold, a different pair per curtain. Whole
     // columns only, so every column still falls from the hem up.
-    k *= (0.55 + 0.45 * (0.5 + 0.5 * Math.sin(u * 57 + seed * 2.3))) * (0.75 + 0.25 * Math.sin(u * 23 - seed));
+    k *= (0.6 + 0.4 * (0.5 + 0.5 * Math.sin(u * 57 + seed * 2.3))) * (0.8 + 0.2 * Math.sin(u * 23 - seed));
     cols[v * 3] = c.r * k; cols[v * 3 + 1] = c.g * k; cols[v * 3 + 2] = c.b * k;
   }
   g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
