@@ -126,6 +126,9 @@ const icePUFFIN_N  = 150;
 const iceHOUSE_N   = 46;
 const iceSTAR_N    = 260;
 const iceSTEAM_N   = 54;
+const iceSTEAM_FADE = 0.8;           // s: T2c, a puff shrinks away over the last of its life
+const iceSTEAM_CULL = 4.0;           // m: T2c, and is not drawn this close to the eye
+const iceBURST_RING = [6, 9];        // m from the spring: T2c, the burst's puffs, on the far side
 const iceCURTAIN_N = 6;
 
 // ---- WHERE THE VENTS ARE, DECIDED ONCE AND BEFORE ANYTHING IS BUILT --------
@@ -207,6 +210,11 @@ let iceSteam = null;
 const iceSteamData = new Float32Array(iceSTEAM_N * 8);   // x,y,z,vx,vy,vz,life,scale
 let iceStars = null, iceStarMat = null, iceSkyRig = null;
 const iceCurtains = [];              // { mesh, matA, phase, base }
+// T2c (noAuroraRamp): one ribbon per curtain, lit from the hem up and gone at
+// the top; the two flat bands above stay built and are what the flag draws
+const iceRamps = [];                 // { mesh, sets: [{ geo, attr, base }] x2, cur, ... }
+const iceCurtainAng = [];            // the bearing of each curtain from the animal (rig-local)
+let iceSteamGeoOld = null, iceSteamGeoSoft = null;   // T2c (noSteamSoft): the octagon and the round one
 let icePuffinMesh = null;
 const icePuffinData = new Float32Array(icePUFFIN_N * 8); // x,y,z,yaw,vx,vy,vz,state
 // Where each of them was standing before it was shouted at. The flush used to
@@ -2669,6 +2677,14 @@ function iceBuildGeothermal(game, root) {
  */
 function iceBuildSteam(root) {
   const geo = new THREE.SphereGeometry(0.5, 5, 4);
+  // T2c (noSteamSoft): at the pool the lens is a metre from these and five
+  // sides read as an octagon; seven by five reads as a puff. Both built, the
+  // instanced mesh takes whichever is live (iceSteamSync).
+  iceSteamGeoOld = geo;
+  iceSteamGeoSoft = new THREE.SphereGeometry(0.5, 7, 5);
+  // ...at the octagon's area, not a bigger puff: a heptagon inscribed in the
+  // same radius covers 15 % more (2.74 r^2 against 2.38), so 0.93 of it
+  iceSteamGeoSoft.scale(0.93, 0.93, 0.93);
   // ---- A LAMBERT PUFF OF STEAM IS HALF BLACK, AND THIS IS THE NIGHT BIOME --
   //
   // The instrumented shot of the hot spring — the site of the one task in the
@@ -2692,10 +2708,20 @@ function iceBuildSteam(root) {
   iceSteam = im;
   iceSteamSync();
 }
-function iceSteamSpawn(x, y, z, up, spread, scale) {
-  for (let i = 0; i < iceSTEAM_N; i++) {
+function iceSteamSpawn(x, y, z, up, spread, scale, steal) {
+  // T2c: at the pool the plume keeps all 54 slots full (measured, 54 live at
+  // every sample), so the burst's ring found no room and never rose. A spawn
+  // that `steal`s takes the puff nearest its end instead, which under the
+  // shrink-out is already nearly nothing, so it goes without a pop.
+  let pick = -1, least = 1e9;
+  for (let i = 0; i < iceSTEAM_N && steal; i++) {
+    const life = iceSteamData[i * 8 + 6];
+    if (life <= 0) { pick = -1; break; }
+    if (life < least) { least = life; pick = i; }
+  }
+  for (let i = pick < 0 ? 0 : pick; i < iceSTEAM_N; i++) {
     const o = i * 8;
-    if (iceSteamData[o + 6] > 0) continue;
+    if (pick < 0 && iceSteamData[o + 6] > 0) continue;
     iceSteamData[o] = x + rand(-spread, spread);
     iceSteamData[o + 1] = y;
     iceSteamData[o + 2] = z + rand(-spread, spread);
@@ -2709,10 +2735,31 @@ function iceSteamSpawn(x, y, z, up, spread, scale) {
 }
 function iceSteamSync() {
   if (!iceSteam) return;
+  // ---- T2c: STEAM THAT DISSOLVES (noSteamSoft) ----------------------------
+  // A puff grew to its largest and vanished in one frame, and at the pool the
+  // lens sits inside the plume, so the aurora's payoff was shot through a heap
+  // of pale cards. Now it shrinks away over its last 0.8 s, and any puff
+  // within 4 m of the eye is not drawn at all: 54 distance checks. The round
+  // geometry parks at rung 1; the shrink and the cull only ever draw less.
+  const g = iceGame;
+  const soft = !(g && g.state && g.state.noSteamSoft);
+  const want = soft && !(g && g.state && (g.state.perfRung | 0) >= 1) ? iceSteamGeoSoft : iceSteamGeoOld;
+  if (want && iceSteam.geometry !== want) iceSteam.geometry = want;
+  const cam = soft && g && g.camera ? g.camera.position : null;
+  const cx = cam ? cam.x : 0, cy = cam ? cam.y : 0, cz = cam ? cam.z : 0;
+  const R2 = iceSTEAM_CULL * iceSTEAM_CULL;
   for (let i = 0; i < iceSTEAM_N; i++) {
     const o = i * 8;
     const life = iceSteamData[o + 6];
-    const s = life > 0 ? iceSteamData[o + 7] * (0.5 + (3.2 - Math.min(life, 3.2)) * 0.7) : 0;
+    let s = life > 0 ? iceSteamData[o + 7] * (0.5 + (3.2 - Math.min(life, 3.2)) * 0.7) : 0;
+    if (soft && s > 0) {
+      const e = clamp(life / iceSTEAM_FADE, 0, 1);
+      s *= e * e * (3 - 2 * e);
+      if (cam) {
+        const dx = iceSteamData[o] - cx, dy = iceSteamData[o + 1] - cy, dz = iceSteamData[o + 2] - cz;
+        if (dx * dx + dy * dy + dz * dz < R2) s = 0;
+      }
+    }
     iceSteam.setMatrixAt(i, iceXform(iceSteamData[o], iceSteamData[o + 1], iceSteamData[o + 2],
       0, 0, 0, s, s, s));
   }
@@ -2920,18 +2967,103 @@ function iceBuildAurora(root) {
         peak: band === 0 ? 0.46 : 0.22,
       });
     }
+    iceCurtainAng.push(ang);
+    // ---- T2c: THE RIBBON (noAuroraRamp) -------------------------------
+    // The two bands above were one colour edge to edge, top and bottom, so
+    // the ignition read as green glass panes. A curtain is brightest at the
+    // hem, where the particles hit hardest, and it has no top at all; under
+    // additive blending black is transparent, so a vertex colour that falls
+    // to zero IS the fall-off, and a basic material is the one that reads it
+    // (a Lambert emissive ignores vertex colour). One draw, not two. Four
+    // rows live; two at rung 2 and up, the same ramp sampled coarser. The
+    // peak is the lower band's 0.46 lifted for the pleats (below), which take
+    // a third of the light out on average: measured, the hem sat at 120 levels
+    // against the panes' 170 at 0.46.
+    const r = { mesh: null, sets: [iceRampGeo(len, seg, 4, cols[i], i), iceRampGeo(len, seg, 2, cols[i], i)], cur: 0,
+                phase: rand(0, 6.283), speed: rand(0.10, 0.24) * (i % 2 ? -1 : 1),
+                wave: rand(0.006, 0.013), amp: 18, ampUp: 14, peak: 0.56 };
+    const rm = new THREE.Mesh(r.sets[0].geo, new THREE.MeshBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0, side: THREE.DoubleSide,
+      depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
+    }));
+    rm.position.set(cxx, 0, czz);
+    rm.rotation.y = yaw;
+    rm.frustumCulled = false;
+    rm.renderOrder = -1;
+    rm.visible = false;
+    root.add(rm);
+    r.mesh = rm; r.attr = r.sets[0].attr; r.base = r.sets[0].base;
+    iceRamps.push(r);
   }
+}
+// The hem to the top, 46 m to 146 m: [height 0..1, brightness]. Monotone on
+// purpose; the proof is a row of the picture that never gets brighter going up.
+const iceRAMP = [[0, 1.0], [0.25, 0.7], [0.5, 0.4], [0.75, 0.16], [1, 0]];
+const iceRAMP_TAPER = 0.18;          // of the length, at each end, where the curtain thins to nothing
+/** One ribbon's geometry with its ramp baked into the vertex colours. */
+function iceRampGeo(len, seg, rows, col, seed) {
+  const g = new THREE.PlaneGeometry(len, 100, seg, rows);
+  g.translate(0, 96, 0);
+  const pos = g.attributes.position.array;
+  const n = pos.length / 3, cols = new Float32Array(n * 3);
+  const hem = new THREE.Color().setHex(PALETTE.iceAuroraHem);
+  const body = new THREE.Color().setHex(col);
+  const crown = new THREE.Color().setHex(PALETTE.iceAuroraMag);
+  const c = new THREE.Color();
+  for (let v = 0; v < n; v++) {
+    const x = pos[v * 3], t = clamp((pos[v * 3 + 1] - 46) / 100, 0, 1);
+    let k = 0;
+    for (let s = 1; s < iceRAMP.length; s++) {
+      if (t <= iceRAMP[s][0]) {
+        const a = iceRAMP[s - 1], b = iceRAMP[s];
+        k = lerp(a[1], b[1], (t - a[0]) / (b[0] - a[0]));
+        break;
+      }
+    }
+    // the hem is the brightest green there is, the body its own, and the
+    // crown goes violet — the oxygen at the bottom, the nitrogen above
+    if (t < 0.25) c.copy(hem).lerp(body, t / 0.25);
+    else c.copy(body).lerp(crown, clamp((t - 0.45) / 0.55, 0, 1) * 0.65);
+    // and no vertical cut edge: the ends thin the way the top does
+    const u = x / len + 0.5;
+    const e = clamp(Math.min(u, 1 - u) / iceRAMP_TAPER, 0, 1);
+    k *= e * e * (3 - 2 * e);
+    // THE PLEATS. A ramp alone is a lit fog bank (measured, the first ribbon
+    // read as one bright blob behind the pool); a curtain is folds, brighter
+    // and dimmer columns running the whole height. Two sines along the length,
+    // four or five columns a fold, a different pair per curtain. Whole
+    // columns only, so every column still falls from the hem up.
+    k *= (0.55 + 0.45 * (0.5 + 0.5 * Math.sin(u * 57 + seed * 2.3))) * (0.75 + 0.25 * Math.sin(u * 23 - seed));
+    cols[v * 3] = c.r * k; cols[v * 3 + 1] = c.g * k; cols[v * 3 + 2] = c.b * k;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  return { geo: g, attr: g.attributes.position, base: Float32Array.from(pos) };
 }
 
 function iceUpdateAurora(dt) {
   const lvl = iceAurora;
-  for (let i = 0; i < iceCurtains.length; i++) {
-    const c = iceCurtains[i];
+  // T2c: the ribbons, or (noAuroraRamp) the bands as they were; whichever is
+  // not drawn is hidden and its vertices never touched
+  const g = iceGame;
+  const ramp = iceRamps.length > 0 && !(g && g.state && g.state.noAuroraRamp);
+  const live = ramp ? iceRamps : iceCurtains, idle = ramp ? iceCurtains : iceRamps;
+  for (let i = 0; i < idle.length; i++) if (idle[i].mesh.visible) idle[i].mesh.visible = false;
+  // two rows at rung 2 and up: the same ramp, 123 vertices a ribbon, not 205
+  const set = ramp && g && g.state && (g.state.perfRung | 0) >= 2 ? 1 : 0;
+  for (let i = 0; i < live.length; i++) {
+    const c = live[i];
     const vis = lvl > 0.004;
     if (vis !== c.mesh.visible) c.mesh.visible = vis;
     if (!vis) continue;
+    if (ramp && c.cur !== set) {
+      c.cur = set; c.mesh.geometry = c.sets[set].geo;
+      c.attr = c.sets[set].attr; c.base = c.sets[set].base;
+    }
     c.phase += c.speed * dt;
     const a = c.attr.array, b = c.base;
+    // a band's amp is flat (ampUp 0); a ribbon's grows toward the top, which
+    // is the two bands' 18 and 30 as one sheet
+    const ampUp = c.ampUp || 0;
     // THE ANSWER (W1): a band running out along x from where the call came,
     // 400 m in the kick's three seconds, fading as it goes. See iceAuroraCall.
     const kick = iceAurKick;
@@ -2943,15 +3075,16 @@ function iceUpdateAurora(dt) {
       // is the only way it reads as a sheet in a magnetic field rather than a
       // flag in a breeze
       const up = (b[k + 1] - 46) / 100;
+      const amp = c.amp + ampUp * up;
       let ring = 0;
       if (kick > 0) {
         const dr = Math.abs(x - iceAurCallX) - ringR;
         ring = Math.exp(-dr * dr / (2 * 55 * 55)) * kick;
         if (ring > bright) bright = ring;
       }
-      a[k + 2] = Math.sin(x * c.wave + c.phase) * c.amp * (0.35 + up) * (1 + ring * 1.6) +
-                 Math.sin(x * c.wave * 2.7 - c.phase * 1.6) * c.amp * 0.3 * up +
-                 Math.sin(x * c.wave * 5 + iceTime * 4) * c.amp * 0.5 * up * ring;
+      a[k + 2] = Math.sin(x * c.wave + c.phase) * amp * (0.35 + up) * (1 + ring * 1.6) +
+                 Math.sin(x * c.wave * 2.7 - c.phase * 1.6) * amp * 0.3 * up +
+                 Math.sin(x * c.wave * 5 + iceTime * 4) * amp * 0.5 * up * ring;
       a[k + 1] = b[k + 1] + Math.sin(x * c.wave * 1.6 + c.phase * 0.7) * 7 * up + ring * 9 * up;
     }
     c.attr.needsUpdate = true;
@@ -4569,9 +4702,24 @@ function iceAuroraCall(game, p) {
         iceSteamSpawn(iceVents[i], iceVents[i + 1] + 0.2, iceVents[i + 2], 2.4, iceVents[i + 3] * 0.6, rand(0.5, 1.0));
       }
     }
-    for (let k = 0; k < 14; k++) {
-      const a = k / 14 * 6.283;
-      iceSteamSpawn(iceSPRING.x + Math.cos(a) * rand(0.5, 3), iceSPRING_Y + 0.2, iceSPRING.z + Math.sin(a) * rand(0.5, 3), 1.2, 0.6, rand(0.4, 0.8));
+    if (game.state && game.state.noSteamSoft) {
+      for (let k = 0; k < 14; k++) {
+        const a = k / 14 * 6.283;
+        iceSteamSpawn(iceSPRING.x + Math.cos(a) * rand(0.5, 3), iceSPRING_Y + 0.2, iceSPRING.z + Math.sin(a) * rand(0.5, 3), 1.2, 0.6, rand(0.4, 0.8));
+      }
+    } else {
+      // T2c: fourteen puffs within 3 m of the middle were fourteen puffs
+      // between the lens and the animal. Out at the rim instead, on the half
+      // of it across the water from where the shot above puts the eye (yaw
+      // PI, 14 m back), so they rise BEHIND it and frame it.
+      const ex = p.x, ez = p.z - 14;
+      const far = Math.atan2(iceSPRING.x - ex, iceSPRING.z - ez);
+      for (let k = 0; k < 14; k++) {
+        const a = far + (k / 13 - 0.5) * 2.4;
+        const r = rand(iceBURST_RING[0], iceBURST_RING[1]);
+        const x = iceSPRING.x + Math.sin(a) * r, z = iceSPRING.z + Math.cos(a) * r;
+        iceSteamSpawn(x, Math.max(iceSPRING_Y + 0.2, iceTerrain(x, z) + 0.1), z, 1.2, 0.6, rand(0.4, 0.8), true);
+      }
     }
     if (typeof game.sparks === 'function') game.sparks(p.x, p.y + 2, p.z, 40, { spd: 3.5, up: 4, grav: 1.5, drag: 0.6, life: 2.2, size: 0.28, rgb: [1.1, 2.2, 1.4] });
     iceSfx('chime', { volume: 0.9, pitch: 2.2 });
@@ -4592,10 +4740,49 @@ function iceAuroraCall(game, p) {
     iceAuroraDone = true;
     iceTask('aurora');
     if (typeof game.shake === 'function') game.shake(0.10);
+    if (!(game.state && game.state.noAuroraFrame)) iceAuroraFrame(game, p);
     iceToast('it heard that. it hears all of them — and it likes them IN TIME. again, in a second or two.');
   }
   return true;
 }
+/**
+ * T2c: THE CALL THAT TICKS IS A PICTURE (noAuroraFrame).
+ *
+ * Every fourth call in time had a shot and the one that pays the marquee had
+ * none: the lens stayed at the waterline looking at the rim, with the
+ * curtains a glow along the top edge. Now that call turns the eye to put the
+ * curtain the lens is already nearest facing in front of it, and looks UP.
+ * The yaw is the bearing from the animal to the eye, so it is the curtain's
+ * own bearing plus PI; the sky rig rides with the animal, so that bearing is
+ * the angle it was hung at. Any camera input still ends it on the spot.
+ */
+function iceAuroraFrame(game, p) {
+  if (!iceGame || typeof iceGame.frameShot !== 'function' || !iceCurtainAng.length) return;
+  const cam = game.camera && game.camera.position;
+  // where the lens is facing now, as a bearing from the eye to the animal
+  const look = cam ? Math.atan2(p.x - cam.x, p.z - cam.z) : 0;
+  let best = iceCurtainAng[0], bd = 9;
+  for (let i = 0; i < iceCurtainAng.length; i++) {
+    const d = Math.abs(Math.atan2(Math.sin(iceCurtainAng[i] - look), Math.cos(iceCurtainAng[i] - look)));
+    if (d < bd) { bd = d; best = iceCurtainAng[i]; }
+  }
+  // ...and never one of the fan's two ends: aimed at an end curtain the frame
+  // held it and one other (measured, the first framed run); one step in, it
+  // holds three
+  const inner = iceCurtainAng[1];
+  best = clamp(best, Math.min(inner, -inner), Math.max(inner, -inner));
+  iceAurFrameYaw = best + Math.PI;
+  iceGame.frameShot({ yaw: iceAurFrameYaw, pitch: iceAURFRAME[0], dist: iceAURFRAME[1], raise: iceAURFRAME[2], hold: iceAURFRAME[3] });
+}
+// pitch (negative: the eye below the look point, looking up), distance, raise, hold.
+// NOT the -14 degrees the review asked for: the lens floor is 1.7 m and the
+// animal soaks at -0.35, so an eye 2.2 m under a 0.8 m look point was clamped
+// back up to 2.0 and the lens looked DOWN ten degrees (measured, the first run
+// of qa/ten-t2c-aurora.js). The composition it wanted is the number that
+// matters: a look point 2.5 m up and the boom 3 degrees under it keeps the eye
+// just over the floor and looking a little up.
+const iceAURFRAME = [-3 * Math.PI / 180, 9, 2.5, 5];
+let iceAurFrameYaw = null;           // the last one asked for, for the harness
 /** The run of calls is over (the rhythm broken, or travel): filed once. */
 function iceAurRunFile(game) {
   if (iceAurRunBest > 0 && game && typeof game.record === 'function') game.record('aurora', iceAurRunBest);
@@ -5058,8 +5245,22 @@ export function createIceland(game) {
     /** THE CONDUCTOR, for the harness (L5): put the sky up, call, read the run. */
     auroraForce(level) { iceAuroraArmed = true; iceAurora = typeof level === 'number' ? level : 1; iceAurUpT = 0; iceAurFading = false; return iceAurora; },
     auroraCall() { const p = game.capy && game.capy.position; return iceAuroraCall(game, p); },
-    auroraAudit() { return { level: +iceAurora.toFixed(3), run: iceAurRun, best: iceAurRunBest, since: +iceAurSince.toFixed(2), burst: +iceAurBurst.toFixed(2), bursts: iceAurBursts, fading: iceAurFading, upT: +iceAurUpT.toFixed(1), calls: iceAurCalls, done: iceAuroraDone }; },
+    auroraAudit() { return { level: +iceAurora.toFixed(3), run: iceAurRun, best: iceAurRunBest, since: +iceAurSince.toFixed(2), burst: +iceAurBurst.toFixed(2), bursts: iceAurBursts, fading: iceAurFading, upT: +iceAurUpT.toFixed(1), calls: iceAurCalls, done: iceAuroraDone,
+      // T2c, for the harness: which sky is drawn and the last framed bearing
+      ramps: iceRamps.filter(r => r.mesh.visible).length, bands: iceCurtains.filter(c => c.mesh.visible).length,
+      rows: iceRamps.length ? (iceRamps[0].cur ? 2 : 4) : 0, frameYaw: iceAurFrameYaw }; },
     auroraAge(t) { iceAurUpT = t; return iceAurUpT; },
+    /** T2c, for the harness: the sky's meshes and the steam's, to hide-and-diff. */
+    t2cRig() {
+      let live = 0, drawn = 0;
+      for (let i = 0; i < iceSTEAM_N; i++) if (iceSteamData[i * 8 + 6] > 0) live++;
+      if (iceSteam) {
+        const m = new THREE.Matrix4(), v = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+        for (let i = 0; i < iceSTEAM_N; i++) { iceSteam.getMatrixAt(i, m); m.decompose(v, q, s); if (s.x > 0) drawn++; }
+      }
+      return { ramps: iceRamps.map(r => r.mesh), bands: iceCurtains.map(c => c.mesh), ang: iceCurtainAng.slice(),
+               steam: iceSteam, live, drawn, soft: !!iceSteam && iceSteam.geometry === iceSteamGeoSoft };
+    },
     /**
      * HOW FAR THE CAMERA SHOULD CRANE UP, 0..1 (systems.js reads it).
      *
