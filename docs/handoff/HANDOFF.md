@@ -1,32 +1,25 @@
-# HANDOFF — state of play, 24 Sep 2026
+# HANDOFF — state of play, 25 Sep 2026
 
-## The AAA pass (24 Sep, newest)
+## ROADMAP-TEN (25 Sep), state after T1
 
-The author handed over creative ownership with a 24-hour autonomous brief
-(docs/roadmaps/ROADMAP-AAA.md). Every milestone is an entry at the top of
-docs/CONTRACT.md with its numbers. **The repository moved:** the roadmaps
-are in docs/roadmaps/, the contract is docs/CONTRACT.md, and retired
-reviews and the long README are in docs/archive/. Older entries below cite
-the old root paths; the file names are unchanged.
+The pass is docs/roadmaps/ROADMAP-TEN.md, worked on branch `ten-pass`
+(master is still the published AAA build, d78cd7e). Eight reviewers scored
+the game; their evidence is ROADMAP-TEN-findings.json. Six waves, one agent
+per file set (the ownership table at the foot of the roadmap).
 
-What is new in play:
+T1 is merged (`dd592d7`) and pushed: Free Roam has the flat 19-tile picker
+and its own departures board, the story has its atlas and a way back, and
+the Monte Carlo car, the Göreme truck, the Quay ferry, the Pasto condor and
+the Cali chiva no longer break. Three of those five were one bug: from rung
+2 the solver steps less time than the frame, so anything driven by velocity
+or force drifts. Check any other track carrier for it. The CONTRACT entry
+"TEN T1" has the numbers and the misses; npm test 78/0.
 
-- **Look:** composite AO, a smooth shadow filter, form shade, near-clear
-  air, hero shading, rounded people, crowds and animals, and redrawn
-  Hanoi scooters.
-- **Feel:** a mischief beat, round dust, and the take.
-- **Consequences:** a march that costs 1–3 yuzu and an escape that pays 2.
-- **Clarity:** a one-line paper tab with an arrow; L opens the list.
-- **Story:** the premise card, the memory count, and the ibis rival
-  (src/rival.js).
-- **Access:** Free Roam from a story file.
-
-qa/aaa-*.mjs are the instruments.
-
-**Published:** master is at d78cd7e (Pages run 35945627179). The
-hosted HTML matches the local build byte for byte, and the soak is clean.
-Still open: Hanoi's frame pacing (grain() fill cost), and a blind human
-playtest.
+Owed from T1: the rung-0 headful A/B for `noWireFade`, `noGorDawn` and the
+`noSummonShot` framing; the travel-door guard on `flierWhistleT` (T3); the
+Quay spray and Monte Carlo's bank share (T6a spill). Instruments for a
+fresh story file set `state.journeyMode = 'free'` before `hud.cross`.
+Next: T2, the story's beats.
 
 ## Homecoming published for playtest (23 Sep, newest)
 

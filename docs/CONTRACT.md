@@ -1,3 +1,71 @@
+## TEN T1 — THE SPLIT, AND THE BROKEN MARQUEES (25 Sep 2026)
+
+Six builders on six disjoint files, merged into `ten-pass` with no
+conflicts (`6414748`..`dd592d7`). The item blocks with every number are
+the "### T1x — shipped" sections of docs/roadmaps/ROADMAP-TEN.md.
+
+**The two modes (T1a, systems.js).** Free Roam has the flat picker back: a
+compact Sydney tile and eighteen in chapter order, six columns, no folds.
+All 19 are in view at 1280x720 and 1440x900 with no scroll; the phone
+scrolls two columns. The story atlas is its own shelf, opened from pause,
+four columns, and now fits 1280x720 (it ran 64 px past the window). A digit
+on page one no longer starts anything; Begin and Free roam carry a
+subline; a free file that began as a story can go back to it. The paper's
+memory line, the journal head, the finale and the tutorial's exit beat
+answer to `journeyMode`. Tab, J and "choose a place" in Free Roam open a
+19-row departures board. Flag `noFreeDepart` (no GPU). ten-modes 23/23,
+aaa-freeroam 9/9, homecoming-atlas-live 38/38.
+
+**Monte Carlo (T1b).** The car keeps its driver. From rung 2 the solver
+steps 2/60 s of a frame that may be 1/20 s, so a velocity-driven car drove
+a shrunken lap. The body is now put at its track target: seat distance
+over a lap 33.9 m mean / 59 m worst -> 0.55 m (the seat offset), rungs 0
+and 3. A roof ride on a pack car holds 8-12 s (was 0.1-4.5). The race lens
+(`noMonRaceLens`, camera only) has the car in shot at 12 of 13 stations
+(was 4).
+
+**Göreme (T1c).** The truck holds until the balloon is 2 m up and stops
+7 m or more from a grounded basket: boarded 6 of 6 (was 0 of 1). A landing
+on the trailer no longer starts the ride home without the animal. The
+poplars stay olive until the sun is on the horizon (`noGorDawn`, one
+uniform write).
+
+**The Quay (T1d).** Fort Denison moved off the rhumb line (x 6 -> -20); a
+head-on contact slides the boat away; the wheel is on the roof, where the
+animal reads solid (visible fraction 0.69 -> 0.91, 10 of 10 frames). The
+passage finished 5 of 5 in 56-59 s under real keys. No flag.
+
+**The condor (T1e).** Two clock bugs, not the orbit height: cannon clears
+the force after each substep, and the script ran on game time 1.5-3x ahead
+of the solver. `noCondorSubstep` holds the force across substeps,
+`noCondorOpen` keeps the low orbit clear of the ground and re-centres a
+stuck one, `noSummonShot` frames the inbound bird once a visit. Q,Q,E at
+rung 3 mounted 5 of 5 (was 0 in reach).
+
+**Cali (T1f).** The same clock drifted the chiva's passenger off the roof
+at s 49. `noChivaHold` pins an idle passenger roof-local: on the roof at
+s 178 at rungs 0 and 3, drift 0.06 m. A missed bus gets one line and a
+"next in N s". The cables are one instanced mesh at half section in
+`caliWire`, dithered out within 5 m of the lens (`noWireFade`, parks at
+rung 1).
+
+npm test: 78 checks, 0 failed (T1a registers ten-t1a-modes-static).
+
+**Honest misses.**
+- No headful rung-0 A/B yet for `noWireFade`, `noGorDawn` or the
+  `noSummonShot` framing; the proof slot owes them.
+- Monte Carlo terrain share is 0.36 of the frame, over the 25 % target;
+  the cut banks fill it from any lens behind the car. The yachts and the
+  promenade (stretch) were not built.
+- The Quay spray was not built; the cream "sheets" are some other mesh.
+  The fort still takes about 8 s to shed.
+- The condor's jammed-bird rescue has no clean proof on the final code.
+  The travel-door guard (`homeOk && !(flierWhistleT > 0)`) is still to
+  add in systems.js (T3), so the Rio and Pasto whistle clash stands.
+- Göreme's merged valley poplars keep their colour; the dovecote treads
+  were not found.
+- Free Roam's "asks once" question is per session, not per save.
+
 ## AAA A7 — PUBLISHED (24 Sep 2026)
 
 master was fast-forwarded from `971e5bd` to `d78cd7e` (the aaa-polish branch)
