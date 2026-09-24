@@ -2061,6 +2061,7 @@ export function createNPCs(game) {
     slot.ox = 0;
     slot.side = 0; slot.cside = 0;  // a new line has not chosen a side yet (V3)
     slot.said = false;              // this line has not been read out yet (F4)
+    slot.capOn = false; slot.capGone = false; slot.capHeld = false;   // a fresh place in the queue (T3c)
     slot.life = 1.7 + text.length * 0.05;
     // ---- ...AND THEIR ARM KNOWS ABOUT IT (D8) ----------------------------
     // Every local in the game gestures while they speak and not one of the
@@ -4068,7 +4069,8 @@ export function createNPCs(game) {
         if (line && typeof r.speak === 'function') { r.lastLine = line; r.speak(line); }
       } else if (r.gSt === 'stand') {
         r.group.position.set(r.gBX, r.gBY, r.gBZ);
-        r.group.rotation.y = r.gBYaw + Math.PI;
+        // ...unless a memory has turned them round to look (T3c, npcCameoPlace)
+        r.group.rotation.y = r.chatT > 0 ? r.chatYaw : r.gBYaw + Math.PI;
         r.gHold -= dt;
         const cdx = capy.x - r.gBX, cdz = capy.z - r.gBZ;
         const close = cdx * cdx + cdz * cdz < npcTRAV_GLIMPSE_LEAVE_R * npcTRAV_GLIMPSE_LEAVE_R;
@@ -4397,6 +4399,7 @@ export function createNPCs(game) {
         o.z !== undefined ? o.z : (g ? g.position.z : 0)) }, lastLine: '' },
     };
     rec.anchor.speak = function (t, speech) { sayBubble(rec.anchor, t, speech); };
+    rec.anchor.trav = rec.trav;   // the bubble cap ranks the traveller first (T3c)
     // ---- A LOCAL IS A PERSON, AND A PERSON IS SOLID --------------------------
     // addBody() below is called from exactly one place, the boot spawn loop, so
     // its 32 bodies belong to Sydney and are removed from the world with it. The
@@ -5598,6 +5601,14 @@ export function createNPCs(game) {
   // the loaf takes about ten seconds to reach 1.0, and people drifting in over
   // the half minute either side of that is the picture, not a wait.
   const npcGATHER_MAX_D = npcGATHER_CEIL * npcGATHER_SPD * 0.7;
+  // T3c: the floor on the ring and the half-width of the lens's cone. The
+  // coda lens stands in the mouth (sysFinCodaYaw = PI/2 - open, systems.js),
+  // so "behind the lens" is the bearing of the mouth itself; 25 degrees each
+  // side is the 50-degree cone the finale review asked to keep clear. The
+  // floor is 6.0 for a ring of 5.5 because 'gather' counts a person arrived
+  // 0.45 m short of the slot: measured, a slot at 5.50 stood somebody at 5.27.
+  const npcGATHER_KEEP_R = 6.0;
+  const npcGATHER_CONE = 25 * Math.PI / 180;
   let npcGathered = false;
   /**
    * Bring a few people over to look at what you brought back.
@@ -5646,7 +5657,15 @@ export function createNPCs(game) {
       // behind the souvenirs from the approach, and jitter the radius so five
       // people are not a firing squad.
       let a = mouth + Math.PI * 0.25 + (i / Math.max(1, n - 1)) * Math.PI * 1.5;
-      const rad = npcGATHER_R + rand(-0.5, 0.8);
+      // ...and never inside 5.5 m, nor in the lens's own cone (T3c,
+      // `noTravArc`). MEASURED by the review: a pink shirt between the coda
+      // lens and the ring. The jitter reached 4.9 m, inside the plinths T4
+      // stands the keepsakes on, and the flower-bed turn below steps 40
+      // degrees at a time with no idea where the lens is — two steps from
+      // the last slot lands in the mouth.
+      const guard = !game.state.noTravArc;
+      const rad = guard ? Math.max(npcGATHER_KEEP_R, npcGATHER_R + rand(-0.5, 0.8))
+                        : npcGATHER_R + rand(-0.5, 0.8);
       // A SLOT IN A FLOWER BED CAN NEVER BE ARRIVED AT, and the first version
       // put one there — measured, `navBlocked` true at (29, 20), so that person
       // walked at a point they could not stand on until the ceiling stopped
@@ -5654,10 +5673,18 @@ export function createNPCs(game) {
       // on a bed-free 16 m lawn, so a free bearing always exists.
       let gx = 0, gz = 0;
       for (let k = 0; k < 8; k++) {
+        if (guard && Math.abs(npcWrapAngle(a - mouth)) < npcGATHER_CONE) { a += Math.PI * 2 / 9; continue; }
         gx = sysFIN_LAWN_X + Math.cos(a) * rad;
         gz = sysFIN_LAWN_Z + Math.sin(a) * rad;
         if (!navBlocked(gx, gz, 0.45)) break;
         a += Math.PI * 2 / 9;
+      }
+      // the turn can end in the cone if every bearing it tried was a bed:
+      // the last clear one outside it is on the far side of the mouth
+      if (guard && Math.abs(npcWrapAngle(a - mouth)) < npcGATHER_CONE) {
+        a = mouth + Math.PI;
+        gx = sysFIN_LAWN_X + Math.cos(a) * rad;
+        gz = sysFIN_LAWN_Z + Math.sin(a) * rad;
       }
       r.gathX = gx; r.gathZ = gz;
       setState(r, 'gather');
@@ -5938,6 +5965,361 @@ export function createNPCs(game) {
     });
   }
   game.events.on('finale:staged', npcTravellerHome);
+
+  // ===== THE TRAVELLER'S ARC (ROADMAP-TEN T3c, `noTravArc`) ================
+  // The review: the traveller is the one story a player could retell, and in
+  // play they were a journal fold and one bubble at the end. The premise card
+  // says A TRAVELLER'S BAG and never shows the traveller. Two answers here,
+  // both on the bus systems.js already speaks (T2a):
+  //
+  //   THE CAMEO. On 'story:memory' the traveller is somewhere in the picture,
+  //   20-30 m off, turned to look at the animal, for as long as the card is
+  //   up; on 'story:act' (the act turn, 6 s later) or when the animal walks
+  //   over, they walk off and are gone. A chapter whose own traveller is
+  //   already within 35 m does not get a second one: that one turns instead.
+  //   Nothing is said. The why is never said.
+  //
+  //   THE WALK-IN. On 'finale:staged' the lawn's traveller waits at their
+  //   spot until the animal comes onto the lawn, walks round OUTSIDE the ring
+  //   to the horseshoe's mouth, stands in it facing in and sets the bag
+  //   down (T4a places sysBagGroup: `game.travFinAt()` and 'npc:travBag'
+  //   say where), then walks back out of the lens's cone before the coda.
+  //
+  // The cameo is a new figure, so it parks at rung 1 like the glimpse does;
+  // the walk-in moves a figure that is already drawn and runs at every rung.
+  const npcCAMEO_D = [22, 20, 25, 28, 30];               // m, tried in this order: nearer reads
+  const npcCAMEO_TH = [0.65, -0.65, 0.5, -0.5, 0.8, -0.8, 0.95, -0.95, 1.1, -1.1]; // rad, at the animal
+  const npcCAMEO_LENS0 = 20 * Math.PI / 180;   // off the lens's axis: clear of the card
+  const npcCAMEO_LENS1 = 37 * Math.PI / 180;   // ...and still inside a 16:9 frame
+  const npcCAMEO_OWN_R = 35;     // m: the chapter's own traveller is close enough to turn
+  const npcCAMEO_HOLD = 10;      // s they stand and look: the card is 5.6, then 4 s clear
+  const npcCAMEO_NEAR = 6;       // m: the animal walking up sends them off
+  const npcCAMEO_WALK = 3.5;     // s of walking off before they are gone
+  const npcCAMEO_SPD = 1.4;      // m/s
+  const npcCAMEO_DY = 3;         // m of floor difference from the animal's allowed
+  const npcTRAVWALK_R = 9;       // m from the ring's centre that starts the walk-in
+  const npcTRAVWALK_SPD = 1.5;   // m/s, round the outside and in
+  const npcTRAVWALK_IN = 0.9;    // m outside the ring they stop at, in the mouth
+  const npcTRAVWALK_HAND = 2.6;  // s standing in the mouth, bent to the grass
+  const npcTRAVWALK_OFF = 35 * Math.PI / 180;  // home is at least this far off the mouth
+  const npcArcRayA = new CANNON.Vec3(), npcArcRayB = new CANNON.Vec3();
+  const npcArcRayR = new CANNON.RaycastResult();
+  const npcArcRayO = { collisionFilterMask: 1, skipBackfaces: true };
+  /** The highest static floor under (x, z) within 6 m of y0, or NaN. */
+  function npcArcFloor(x, z, y0) {
+    if (!game.world || !game.world.raycastClosest) return NaN;
+    npcArcRayA.set(x, y0 + 6, z); npcArcRayB.set(x, y0 - 6, z);
+    npcArcRayR.reset();
+    try { game.world.raycastClosest(npcArcRayA, npcArcRayB, npcArcRayO, npcArcRayR); } catch (e) { return NaN; }
+    if (!npcArcRayR.hasHit || npcArcRayR.hitNormalWorld.y < 0.6) return NaN;
+    return npcArcRayR.hitPointWorld.y;
+  }
+  /** Nothing solid between the lens and a head at (x, y + 1.5, z). */
+  function npcArcSeen(x, y, z) {
+    if (!game.world || !game.world.raycastClosest) return true;
+    const c = game.camera.position;
+    npcArcRayA.set(c.x, c.y, c.z); npcArcRayB.set(x, y + 1.5, z);
+    npcArcRayR.reset();
+    try { game.world.raycastClosest(npcArcRayA, npcArcRayB, npcArcRayO, npcArcRayR); } catch (e) { return true; }
+    return !npcArcRayR.hasHit;
+  }
+  let npcCameo = null;           // built once, on the first memory; hidden between
+  const npcCameoAud = { memories: 0, placed: 0, turned: 0, skipped: 0, left: 0, acts: 0,
+                        d: 0, x: 0, z: 0, biome: '', st: '' };
+  function npcCameoBuild(live, x, y, z) {
+    // A local, through addLocal's own door, built OUTSIDE a chapter build
+    // like npcTravFin: the capture tag does not own it, so this file hides it
+    // itself — on a crossing, on the walk off, and whenever the rung parks
+    // it — and moves it from place to place by rewriting `biome`, which is
+    // the one field localsStep gates a local on. No lines (it says nothing),
+    // no `trav` (it is not the chapter's traveller, and the shop, the regulars
+    // and the chat pairs all key on that), `near` 0 so it never turns to
+    // watch on its own: this step owns its head.
+    const r = addLocal({ biome: live, figure: npcTRAV_FIG, x: x, y: y, z: z, near: 0.01, cool: 999 });
+    if (!r || !r.group) return;
+    // ...and never picked to speak: the praise owed a marquee, the chain and
+    // the witness lines all go to the nearest local whose clock is out, and
+    // the memory beat is exactly when the owed praise is looking for one
+    r.cd = 1e9; r.talkCd = 1e9;
+    npcCameo = { rec: r, group: r.group, st: '', t: 0, biome: '', y: 0, yaw: 0,
+                 gx: 0, gz: 0, stepT: 0, vpitch: 1 };
+  }
+  function npcCameoHide() {
+    if (!npcCameo) return;
+    if (npcCameo.st) npcCameoAud.left++;
+    npcCameo.st = ''; npcCameoAud.st = '';
+    npcCameo.group.visible = false;
+    // out of every chapter's loop, and its collider out of every chapter's way
+    const r = npcCameo.rec;
+    r.biome = '';
+    if (r.body) {
+      r.body.position.set(0, -500, 0);
+      r.body.previousPosition.set(0, -500, 0);
+      r.body.interpolatedPosition.set(0, -500, 0);
+      r.body.aabbNeedsUpdate = true;
+    }
+  }
+  function npcCameoPlace() {
+    npcCameoAud.memories++;
+    if (game.state.noTravArc || (game.state.perfRung | 0) >= 1) { npcCameoAud.skipped++; return; }
+    const live = game.biome && game.biome.current;
+    const capy = game.capy && game.capy.position;
+    if (!live || !capy || !game.state.started) { npcCameoAud.skipped++; return; }
+    // the chapter's own traveller, if they are already near enough to see
+    for (let i = 0; i < locals.length; i++) {
+      const r = locals[i];
+      if (!r || !r.trav || r.biome !== live || !r.group || !r.group.visible || r === npcTravFin) continue;
+      if (r.gSt === 'leave' || r.gSt === 'done') continue;
+      const dx = capy.x - r.x, dz = capy.z - r.z;
+      if (dx * dx + dz * dz > npcCAMEO_OWN_R * npcCAMEO_OWN_R) continue;
+      r.chatYaw = Math.atan2(dx, dz);
+      r.chatT = npcCAMEO_HOLD;
+      npcCameoAud.turned++;
+      npcCameoAud.biome = live; npcCameoAud.d = +Math.sqrt(dx * dx + dz * dz).toFixed(1);
+      return;
+    }
+    let fy = npcArcFloor(capy.x, capy.z, capy.y);
+    if (fy !== fy) fy = capy.y;
+    // Past the animal, off to one side of the lens's line: in the picture,
+    // not behind it, and NOT in the middle — the memory card is the middle
+    // third of the frame for its 5.6 s (measured: the first cut stood them
+    // dead ahead at 25 m, squarely under the card). So a spot is taken only
+    // if its bearing FROM THE LENS is 20-37 degrees off the lens's own axis.
+    const cam = game.camera.position;
+    let fx = capy.x - cam.x, fz = capy.z - cam.z;
+    const fl = Math.sqrt(fx * fx + fz * fz);
+    if (fl < 1e-3) { fx = 0; fz = 1; } else { fx /= fl; fz /= fl; }
+    const api = live === 'sydney' ? game.env : game[live];
+    for (let di = 0; di < npcCAMEO_D.length; di++) {
+      const d = npcCAMEO_D[di];
+      for (let ti = 0; ti < npcCAMEO_TH.length; ti++) {
+        const th = npcCAMEO_TH[ti], cs = Math.cos(th), sn = Math.sin(th);
+        const dx = fx * cs - fz * sn, dz = fx * sn + fz * cs;
+        const x = capy.x + dx * d, z = capy.z + dz * d;
+        const lx = x - cam.x, lz = z - cam.z, ll = Math.sqrt(lx * lx + lz * lz) || 1;
+        const off = Math.acos(clamp((lx * fx + lz * fz) / ll, -1, 1));
+        if (off < npcCAMEO_LENS0 || off > npcCAMEO_LENS1) continue;
+        const gy = npcArcFloor(x, z, fy);
+        if (gy !== gy || Math.abs(gy - fy) > npcCAMEO_DY) continue;
+        if (gy < waterYAt(api, x, z, -Infinity) + 0.05) continue;   // not stood in a lake
+        if (!npcArcSeen(x, gy, z)) continue;
+        if (!npcCameo) npcCameoBuild(live, x, gy, z);
+        const c = npcCameo;
+        if (!c) { npcCameoAud.skipped++; return; }
+        c.biome = live; c.rec.biome = live; c.st = 'look'; c.t = npcCAMEO_HOLD; c.y = gy;
+        c.yaw = Math.atan2(capy.x - x, capy.z - z);
+        npcTravPut(c.rec, x, z, c.yaw, gy);
+        c.group.visible = true;
+        npcCameoAud.placed++;
+        npcCameoAud.biome = live; npcCameoAud.d = d; npcCameoAud.x = +x.toFixed(1); npcCameoAud.z = +z.toFixed(1);
+        return;
+      }
+    }
+    npcCameoAud.skipped++;
+  }
+  function npcCameoLeave() {
+    const c = npcCameo, capy = game.capy && game.capy.position;
+    if (!c || c.st !== 'look') return;
+    c.st = 'leave'; c.t = 0; c.stepT = 0;
+    // away from the animal, the way anybody leaves somebody they were watching
+    let ax = capy ? c.rec.x - capy.x : 0, az = capy ? c.rec.z - capy.z : 1;
+    const al = Math.sqrt(ax * ax + az * az) || 1;
+    c.gx = ax / al; c.gz = az / al;
+  }
+  function npcCameoStep(dt) {
+    const c = npcCameo;
+    if (!c || !c.st) return;
+    const live = game.biome && game.biome.current;
+    if (live !== c.biome || game.state.noTravArc || (game.state.perfRung | 0) >= 1) { npcCameoHide(); return; }
+    const g = c.group, r = c.rec, capy = game.capy && game.capy.position;
+    if (c.st === 'look') {
+      // localsStep has already stepped them (the breath, the small shuffle);
+      // this only owns the head: the look outranks everything but a flinch
+      c.t -= dt;
+      if (capy) {
+        const dx = capy.x - r.x, dz = capy.z - r.z;
+        r.chatYaw = Math.atan2(dx, dz); r.chatT = 0.3;
+        if (dx * dx + dz * dz < npcCAMEO_NEAR * npcCAMEO_NEAR) c.t = 0;
+      }
+      c.yaw = r.yaw;
+      if (c.t <= 0) npcCameoLeave();
+    } else if (c.st === 'leave') {
+      c.t += dt;
+      const nx = r.x + c.gx * npcCAMEO_SPD * dt, nz = r.z + c.gz * npcCAMEO_SPD * dt;
+      const gy = npcArcFloor(nx, nz, c.y);
+      if (gy === gy && Math.abs(gy - c.y) < 1) c.y = damp(c.y, gy, 7, dt);
+      c.yaw = npcDampAngle(c.yaw, Math.atan2(c.gx, c.gz), 6, dt);
+      npcTravPut(r, nx, nz, c.yaw, c.y);
+      // the glimpse's own footfall (X2): the one figure being watched walks
+      if (!game.state.noVoice2) {
+        c.stepT -= dt;
+        if (c.stepT <= 0) { c.stepT = 0.38; sfx('step', c, 0.24, 1.0); }
+      }
+      if (c.t >= npcCAMEO_WALK) npcCameoHide();
+    }
+    npcCameoAud.st = c.st;
+  }
+  game.events.on('story:memory', function (e) {
+    const ev = (e && e.npc) || e;
+    if (!ev) return;
+    npcCameoPlace();
+  });
+  game.events.on('story:act', function () {
+    npcCameoAud.acts++;
+    npcCameoLeave();                // the traveller seen leaving, on the turn
+  });
+  game.events.on('biome:enter', function () { npcCameoHide(); });
+
+  // ---- the walk-in ---------------------------------------------------------
+  let npcTravWalk = null;
+  /** Stand a local somewhere, with everything that follows a local about.
+   *  `fy`, when given, is the floor already measured; else the terrain's. */
+  function npcTravPut(r, x, z, yaw, fy) {
+    let y = r.y;
+    const gy = typeof fy === 'number' ? fy : localGroundY(x, z);
+    if (gy === gy) y = gy;
+    r.x = r.ax = r.tx = x; r.z = r.az = r.tz = z; r.y = r.baseY = y;
+    r.group.position.set(x, y, z);
+    if (r.anchor && r.anchor.group) r.anchor.group.position.set(x, y + 1.35, z);
+    if (r.body) {
+      const by = y + 0.85;
+      r.body.position.set(x, by, z);
+      r.body.previousPosition.set(x, by, z);
+      r.body.interpolatedPosition.set(x, by, z);
+      r.body.aabbNeedsUpdate = true;     // static: see the shuffle's note
+    }
+    r.yaw = yaw; r.face = yaw;
+    r.group.rotation.y = yaw;
+  }
+  function npcTravWalkAt(w) {
+    return { x: w.cx + Math.cos(w.a) * w.rad, z: w.cz + Math.sin(w.a) * w.rad };
+  }
+  function npcTravWalkStage(e) {
+    const ev = (e && e.npc) || e || {};
+    if (game.state.noTravArc) return;
+    const live = game.biome && game.biome.current;
+    if (live !== 'sydney' || !npcTravFin || !npcTravFin.group) return;
+    // once a session: a staging on a later return finds them where they ended
+    if (npcTravWalk && npcTravWalk.st === 'done') return;
+    const cx = typeof ev.x === 'number' ? ev.x : sysFIN_LAWN_X;
+    const cz = typeof ev.z === 'number' ? ev.z : sysFIN_LAWN_Z;
+    const ringR = typeof ev.r === 'number' ? ev.r : 2.6;
+    const open = typeof ev.mouth === 'number' ? ev.mouth : -Math.PI * 0.25;
+    const w = npcTravWalk || {};
+    if (!npcTravWalk) {
+      const p = npcTravFin.group.position;
+      w.sideA = Math.atan2(p.z - cz, p.x - cx);
+      w.sideR = Math.sqrt((p.x - cx) * (p.x - cx) + (p.z - cz) * (p.z - cz));
+      // THE STALL STAYS WHERE IT STANDS. addTraveller gives every traveller
+      // one, as a child of the figure, and a table that follows somebody
+      // round a lawn is not a table. Re-parented to the scene once, where it
+      // is, and shown and hidden with the figure below.
+      const st = npcTravFin.stallRoof && npcTravFin.stallRoof.parent;
+      if (st && st.parent === npcTravFin.group) { game.scene.attach(st); w.stall = st; }
+    }
+    w.cx = cx; w.cz = cz; w.ringR = ringR; w.open = open;
+    // home: back where they stood, unless that is in the lens's cone
+    const off = npcWrapAngle(w.sideA - open);
+    w.homeA = Math.abs(off) >= npcTRAVWALK_OFF ? w.sideA : open + (off >= 0 ? 1 : -1) * npcTRAVWALK_OFF;
+    w.a = w.sideA; w.rad = w.sideR;
+    w.st = 'wait'; w.t = 0; w.bagAt = null;
+    npcTravWalk = w;
+    npcTravPut(npcTravFin, cx + Math.cos(w.a) * w.rad, cz + Math.sin(w.a) * w.rad, npcTravFin.yaw);
+  }
+  game.events.on('finale:staged', npcTravWalkStage);
+  /** Walk `w.a` toward `to` round the circle at `w.rad`; true once there. */
+  function npcTravArcTo(w, to, dt) {
+    const da = npcWrapAngle(to - w.a);
+    const step = npcTRAVWALK_SPD * dt / Math.max(1, w.rad);
+    w.a += clamp(da, -step, step);
+    return Math.abs(da) <= step;
+  }
+  function npcTravWalkStep(dt) {
+    const w = npcTravWalk, r = npcTravFin;
+    if (!w || !r || !r.group) return;
+    if (w.stall) w.stall.visible = r.group.visible;
+    if (game.biome && game.biome.current !== 'sydney') return;
+    if (game.state.noTravArc || w.st === 'done') return;
+    const capy = game.capy && game.capy.position;
+    const was = npcTravWalkAt(w);
+    if (w.st === 'wait') {
+      if (!capy || !game.state.started) return;
+      const dx = capy.x - w.cx, dz = capy.z - w.cz;
+      if (dx * dx + dz * dz < npcTRAVWALK_R * npcTRAVWALK_R) w.st = 'round';
+      return;
+    }
+    if (w.st === 'round') {
+      if (npcTravArcTo(w, w.open, dt)) w.st = 'in';
+    } else if (w.st === 'in') {
+      w.rad = Math.max(w.ringR + npcTRAVWALK_IN, w.rad - npcTRAVWALK_SPD * dt);
+      if (w.rad <= w.ringR + npcTRAVWALK_IN + 1e-3) {
+        w.st = 'hand'; w.t = 0;
+        // beside the animal, which sits at the middle: a little toward the
+        // mouth, so the coda's lens (which looks in through it) has it
+        const px = -Math.sin(w.open), pz = Math.cos(w.open);
+        w.bagAt = { x: w.cx + Math.cos(w.open) * 0.6 + px * 0.7, z: w.cz + Math.sin(w.open) * 0.6 + pz * 0.7 };
+        const at = npcTravWalkAt(w);
+        emit('npc:travBag', { x: at.x, y: r.y, z: at.z, yaw: r.yaw, bx: w.bagAt.x, bz: w.bagAt.z, biome: 'sydney' });
+      }
+    } else if (w.st === 'hand') {
+      w.t += dt;
+      if (w.t >= npcTRAVWALK_HAND) w.st = 'out';
+    } else if (w.st === 'out') {
+      w.rad = Math.min(w.sideR, w.rad + npcTRAVWALK_SPD * dt);
+      if (w.rad >= w.sideR - 1e-3) w.st = 'home';
+    } else if (w.st === 'home') {
+      if (npcTravArcTo(w, w.homeA, dt)) w.st = 'done';
+    }
+    const at = npcTravWalkAt(w);
+    let yaw;
+    if (w.st === 'hand' || w.st === 'done') yaw = Math.atan2(w.cx - at.x, w.cz - at.z);   // facing in
+    else yaw = Math.atan2(at.x - was.x, at.z - was.z);                                      // the way they go
+    if (!(yaw === yaw)) yaw = r.yaw;
+    npcTravPut(r, at.x, at.z, w.st === 'hand' || w.st === 'done' ? yaw : npcDampAngle(r.yaw, yaw, 8, dt));
+    // bent to the grass with both hands down, for the length of the set-down
+    if (w.st === 'hand' && r.fig) {
+      const k = Math.sin(clamp(w.t / npcTRAVWALK_HAND, 0, 1) * Math.PI);
+      r.group.rotation.x = 0.32 * k;
+      if (r.fig.armL) r.fig.armL.rotation.x = -0.7 * k;
+      if (r.fig.armR) r.fig.armR.rotation.x = -0.7 * k;
+    }
+  }
+  /** For T4a: where the traveller is on the walk-in, and where the bag goes. */
+  game.travFinAt = function () {
+    const w = npcTravWalk, r = npcTravFin;
+    if (!w || !r || !r.group) return null;
+    return { st: w.st, x: +r.x.toFixed(2), z: +r.z.toFixed(2), yaw: +r.yaw.toFixed(3),
+             bag: w.bagAt, mouth: w.open, cx: w.cx, cz: w.cz, visible: !!r.group.visible };
+  };
+  function npcTravArcStep(dt) {
+    npcCameoStep(dt);
+    npcTravWalkStep(dt);
+  }
+  game.cameoAudit = function () {
+    const c = npcCameo, capy = game.capy && game.capy.position;
+    let dist = -1, faceErr = -1, px = null;
+    if (c && c.st && capy) {
+      const dx = capy.x - c.group.position.x, dz = capy.z - c.group.position.z;
+      dist = +Math.sqrt(dx * dx + dz * dz).toFixed(1);
+      faceErr = +Math.abs(npcWrapAngle(Math.atan2(dx, dz) - c.group.rotation.y)).toFixed(2);
+      // where their chest is on the screen, in CSS px (harness only)
+      const v = new THREE_.Vector3(c.group.position.x, c.group.position.y + 1.2, c.group.position.z).project(game.camera);
+      px = { x: Math.round((v.x * 0.5 + 0.5) * innerWidth), y: Math.round((-v.y * 0.5 + 0.5) * innerHeight), front: v.z < 1 };
+    }
+    return Object.assign({}, npcCameoAud, {
+      up: !!(c && c.st), visible: !!(c && c.group.visible), dist: dist, faceErr: faceErr, px: px });
+  };
+  /** The gathering on the lawn, for the harness: where each one was sent and is. */
+  game.gatherAudit = function () {
+    const out = [];
+    for (let i = 0; i < humans.length; i++) {
+      const r = humans[i];
+      if (!r || r.state !== 'gather' || r.gathQuiet) continue;
+      out.push({ gx: +r.gathX.toFixed(2), gz: +r.gathZ.toFixed(2),
+                 x: +r.group.position.x.toFixed(2), z: +r.group.position.z.toFixed(2) });
+    }
+    return out;
+  };
 
   // ---- THE GARDENER'S SIT-DOWN (ROADMAP-WOW3, Part D item 9) -------------
   // N4 shipped the stand-down (startChase refuses once game.state.finaleOn,
@@ -9281,9 +9663,98 @@ export function createNPCs(game) {
     flashes.push({ q, fm, t: 999 });
   }
   let flashCur = 0;
-  function fireFlash(x, y, z) {
+  // ---- THE FLASH IS A STAR, NOT A CARD (ROADMAP-TEN T3c, `noFlashStar`) ----
+  // MEASURED by the review on the frame the concert ticked: a flat grey
+  // square 180 x 185 px over the audience on the steps, drawn through a
+  // tourist's body. It was this quad — a 1 m box in sail, swelling to 2.5 m,
+  // 0.3 s, depth test off — seen from six metres. A camera flash is a point.
+  //
+  // So a four-point star in foam, 0.18 m across at six metres and scaled with
+  // the distance so it reads the same size on screen near or far (0.12-0.35
+  // m), turned to the lens, lit past white so the composite blooms it, and
+  // gone in 90 ms. Depth test stays off: a flash is seen through a crowd.
+  // The SAME two meshes as the card, re-shaped on the fire (no new draw, no
+  // new material): the card is what `noFlashStar` puts back, so the A/B is
+  // one flag on one pair. At rung 1 and up the star is parked and nothing is
+  // drawn at all — the pop is still heard.
+  const npcSTAR_ACROSS = 0.18;     // m at the reference distance
+  const npcSTAR_REF_D = 6;         // m
+  const npcSTAR_MIN = 0.12, npcSTAR_MAX = 0.35;
+  const npcSTAR_LIFE = 0.09;       // s
+  let npcStarGeo = null;
+  let npcStarFired = 0;            // for the harness
+  function npcStarShape() {
+    // four long points and four short ones, 1.0 across the long, in XY
+    const sh = new THREE_.Shape();
+    for (let k = 0; k < 8; k++) {
+      const a = k * Math.PI / 4, r = (k & 1) ? 0.11 : 0.5;
+      if (k === 0) sh.moveTo(Math.sin(a) * r, Math.cos(a) * r);
+      else sh.lineTo(Math.sin(a) * r, Math.cos(a) * r);
+    }
+    sh.closePath();
+    npcStarGeo = new THREE_.ShapeGeometry(sh);
+  }
+  /** Make flash `f` the star, or give it back its card. */
+  function npcFlashAs(f, star) {
+    if (f.star === star) return;
+    f.star = star;
+    if (star && !npcStarGeo) npcStarShape();
+    f.q.geometry = star ? npcStarGeo : gFlash;
+    f.fm.color.setHex(star ? PALETTE.foam : PALETTE.sail);
+    // past white, so the composite blooms it; the card never glowed
+    if (star) { f.fm.emissive.setHex(PALETTE.foam); f.fm.emissiveIntensity = 1.6; }
+    else f.fm.emissive.setScalar(0);
+    f.fm.side = star ? THREE_.DoubleSide : THREE_.FrontSide;
+    f.fm.needsUpdate = true;
+    f.q.frustumCulled = !star;
+  }
+  function fireStar(x, y, z) {
+    if ((game.state.perfRung | 0) >= 1) return;
     const f = flashes[flashCur];
     flashCur = (flashCur + 1) % flashes.length;
+    npcFlashAs(f, true);
+    npcV2.set(game.camera.position.x - x, game.camera.position.y - y, game.camera.position.z - z);
+    const l = npcV2.length() || 1;
+    // 0.12 m toward the lens: off the hand, still on the camera body
+    f.q.position.set(x + npcV2.x / l * 0.12, y + npcV2.y / l * 0.12, z + npcV2.z / l * 0.12);
+    const sc = clamp(npcSTAR_ACROSS * l / npcSTAR_REF_D, npcSTAR_MIN, npcSTAR_MAX);
+    f.q.scale.set(sc, sc, 1);
+    f.q.quaternion.copy(game.camera.quaternion);
+    f.q.visible = true;
+    f.fm.opacity = 1;
+    f.t = 0;
+    npcStarFired++;
+  }
+  /** The star's own clock. Every chapter: a local's photo fires anywhere. */
+  function updateStars(dt) {
+    for (let i = 0; i < flashes.length; i++) {
+      const f = flashes[i];
+      if (!f.star) continue;
+      if (f.t >= npcSTAR_LIFE) { if (f.q.visible) { f.q.visible = false; f.fm.opacity = 0; } continue; }
+      f.t += dt;
+      // full for two thirds of it, then out: a flash has no attack
+      f.fm.opacity = f.t < npcSTAR_LIFE * 0.66 ? 1 : clamp((npcSTAR_LIFE - f.t) / (npcSTAR_LIFE * 0.34), 0, 1);
+      f.q.quaternion.copy(game.camera.quaternion);
+    }
+  }
+  game.flashAudit = function () {
+    let up = 0, px = null;
+    for (let i = 0; i < flashes.length; i++) {
+      const q = flashes[i].q;
+      if (!q.visible) continue;
+      up++;
+      const v = q.position.clone().project(game.camera);
+      px = { x: Math.round((v.x * 0.5 + 0.5) * innerWidth), y: Math.round((-v.y * 0.5 + 0.5) * innerHeight),
+             op: +flashes[i].fm.opacity.toFixed(2), star: !!flashes[i].star };
+    }
+    return { fired: npcStarFired, up: up, px: px, scale: +flashes[0].q.scale.x.toFixed(3) };
+  };
+  game.flashAt = function (x, y, z) { fireFlash(x, y, z); };
+  function fireFlash(x, y, z) {
+    if (!game.state.noFlashStar) { fireStar(x, y, z); return; }
+    const f = flashes[flashCur];
+    flashCur = (flashCur + 1) % flashes.length;
+    npcFlashAs(f, false);
     // nudge the quad off the photographer's own arm, toward the camera
     npcV2.set(game.camera.position.x - x, game.camera.position.y - (y + 0.12), game.camera.position.z - z);
     const l = npcV2.length() || 1;
@@ -11377,7 +11848,10 @@ export function createNPCs(game) {
     // ...and everybody near enough to hear it looks over. This is the third
     // mischief chain, reaching the two chapters that have no `locals`.
     npcWitnessChain(rec);
-    try { game.toast('man overboard.'); } catch (e) { /* optional */ }
+    // ...and not over the title card (T3c): measured at 0.3 s, before Begin,
+    // and still up once the HUD came in. The splash and the shout are the
+    // world's; the pill is the player's, and there is no player yet.
+    if (game.state.started) { try { game.toast('man overboard.'); } catch (e) { /* optional */ } }
   }
 
   /** A diner discovers a capybara standing in the calamari. */
@@ -14908,6 +15382,138 @@ export function createNPCs(game) {
   const npcBUB_FLIP = 0.10;   // NDC the other side must be shorter by to change sides (V3)
   let npcBubPanelT = 0;
 
+  // ---- THE CAP (ROADMAP-TEN T3c, `noBubbleCap`) ----------------------------
+  // MEASURED by the review: four bubbles, a centre line, the paper and the
+  // wheek-home pill over the Uji bridge at the River Run start, and four
+  // bubbles plus two cut under the paper on the Sydney lawn. The slot pool is
+  // four and the quiet budget only ever counted INCIDENTAL lines at rung 0 —
+  // at rung 1 and up, where the reviewers were, nothing counted anything.
+  //
+  // So a cap on what is DRAWN, at every rung (it costs no GPU, it takes DOM
+  // away), decided once a frame before the draw loop:
+  //   * two up at once; ONE within 20 m of the chapter's marquee point, while
+  //     a marquee is live, or while a centre line (a say/why toast) is up —
+  //     a frame belongs to its moment;
+  //   * the traveller first, then a line said TO the animal (speech null: a
+  //     reaction, a task line), then idle talk; nearest first inside a class,
+  //     and one already up keeps its place against a newcomer 8 m nearer, or
+  //     two people a step apart swap bubbles every frame;
+  //   * a speaker beyond 25 m is not a bubble: a line to the animal goes to
+  //     the heard pill (on the same fence the off-frame path uses), idle talk
+  //     is let go;
+  //   * idle talk whose anchor projects into the top 18% of the frame is let
+  //     go — that is where the paper lives.
+  // A line over the cap is not dropped: it waits, hidden, on its own clock,
+  // and takes the place when one frees. One that loses a place it held fades
+  // on the existing 0.35 s tail instead of blinking out.
+  const npcBUBCAP_N = 2;
+  const npcBUBCAP_MARQ_R = 20;     // m from CHAPTERS[].marquee where the cap is one
+  const npcBUBCAP_FAR = 25;        // m: past this a speaker is heard, not drawn
+  const npcBUBCAP_TOP = 0.64;      // NDC y: the top 18% of the frame (1 - 2 * 0.18)
+  const npcBUBCAP_KEEP = 8;        // m of hysteresis for a line already up
+  const npcBubCapV = new THREE_.Vector3();
+  const npcBubCapRank = [];
+  let npcBubCapSub = false;        // a centre line is up (read on the panel tick)
+  let npcBubCapBiome = '', npcBubCapMq = null;
+  let npcBubCapPeak = 0;           // the most drawn at once, for the harness
+  function npcBubCapN() {
+    if (npcBubCapSub) return 1;
+    try { if (typeof game.wowLiveAt === 'function' && game.wowLiveAt() >= 0) return 1; } catch (e) { /* optional */ }
+    const live = game.biome && game.biome.current;
+    if (live !== npcBubCapBiome) {
+      npcBubCapBiome = live || '';
+      npcBubCapMq = null;
+      for (let i = 0; i < CHAPTERS.length; i++) {
+        if (CHAPTERS[i].biome === live) { npcBubCapMq = CHAPTERS[i].marquee || null; break; }
+      }
+    }
+    const c = game.capy && game.capy.position;
+    if (npcBubCapMq && c) {
+      const dx = c.x - npcBubCapMq.x, dz = c.z - npcBubCapMq.z;
+      if (dx * dx + dz * dz < npcBUBCAP_MARQ_R * npcBUBCAP_MARQ_R) return 1;
+    }
+    return npcBUBCAP_N;
+  }
+  function npcBubCapEnd(b) {
+    b.capGone = true;
+    if (b.shown) { if (b.t < b.life - 0.35) b.t = b.life - 0.35; }
+    else b.t = b.life;
+  }
+  function npcBubCap() {
+    npcBubCapRank.length = 0;
+    const off = !!game.state.noBubbleCap;
+    let fading = 0;
+    for (let i = 0; i < BUB; i++) {
+      const b = bubbles[i];
+      b.capOk = true;
+      if (b.capGone && b.shown && b.owner && b.t < b.life) fading++;
+      if (off || !b.owner || b.t >= b.life || b.capGone) continue;
+      const o = b.owner;
+      const d = Math.sqrt(npcSpeechDistance(o));
+      if (d > npcBUBCAP_FAR) {
+        if (!b.incidental && !b.said && npcHeardT <= 0 && game.hud && typeof game.hud.heard === 'function') {
+          b.said = true;
+          npcHeardT = npcSAY_HEAR_GAP;
+          try { game.hud.heard(b.txt.textContent, o); } catch (e) { /* never fatal */ }
+        }
+        b.capOk = false;
+        npcBubCapEnd(b);
+        npcBubCapAud.far++;
+        continue;
+      }
+      if (b.incidental) {
+        if (o.nodes && (o.nodes.head || o.nodes.bodyN)) {
+          npcBubCapV.setFromMatrixPosition((o.nodes.head || o.nodes.bodyN).matrixWorld);
+        } else if (o.group) npcBubCapV.copy(o.group.position);
+        else if (o.anchor && o.anchor.group) npcBubCapV.copy(o.anchor.group.position);
+        npcBubCapV.y += 0.64;
+        npcBubCapV.project(game.camera);
+        if (npcBubCapV.z < 1 && npcBubCapV.y > npcBUBCAP_TOP) {
+          b.capOk = false; npcBubCapEnd(b); npcBubCapAud.top++;
+          continue;
+        }
+      }
+      const cls = o.trav ? 0 : b.incidental ? 2 : 1;
+      b.capKey = cls * 1000 + d - (b.capOn ? npcBUBCAP_KEEP : 0);
+      npcBubCapRank.push(b);
+    }
+    if (off) return;
+    npcBubCapRank.sort(function (a, b) { return a.capKey - b.capKey; });
+    // a line fading out still holds its place for its last 0.35 s
+    // ...and so does one losing its place this frame: the newcomer that took
+    // it waits for the fade, or the pair of them is two up at a cap of one
+    // (measured: 7 frames of 2 under the Uji bridge before this)
+    const n = npcBubCapN();
+    let up = fading;
+    for (let i = n; i < npcBubCapRank.length; i++) {
+      const b = npcBubCapRank[i];
+      b.capOk = false;
+      if (b.capOn) { npcBubCapEnd(b); npcBubCapAud.lost++; up++; }   // it held a place: fade, do not blink
+      else if (!b.capHeld) { b.capHeld = true; npcBubCapAud.held++; }
+    }
+    for (let i = 0; i < n && i < npcBubCapRank.length; i++) if (npcBubCapRank[i].capOn) up++;
+    for (let i = 0; i < n && i < npcBubCapRank.length; i++) {
+      const b = npcBubCapRank[i];
+      if (b.capOn) continue;
+      if (up >= n) {
+        b.capOk = false;
+        if (!b.capHeld) { b.capHeld = true; npcBubCapAud.held++; }
+        continue;
+      }
+      b.capOn = true; up++;
+    }
+  }
+  const npcBubCapAud = { held: 0, lost: 0, far: 0, top: 0 };
+  game.bubbleCapAudit = function () {
+    let drawn = 0;
+    for (let i = 0; i < BUB; i++) if (bubbles[i].shown && bubbles[i].owner) drawn++;
+    return { drawn: drawn, peak: npcBubCapPeak, cap: game.state.noBubbleCap ? BUB : npcBubCapN(),
+             sub: npcBubCapSub, aud: Object.assign({}, npcBubCapAud) };
+  };
+  game.bubbleCapReset = function () {
+    npcBubCapPeak = 0; npcBubCapAud.held = npcBubCapAud.lost = npcBubCapAud.far = npcBubCapAud.top = 0;
+  };
+
   function updateBubbles(dt) {
     if (npcHeardT > 0) npcHeardT -= dt;
     npcBubPanelT -= dt;
@@ -14917,7 +15523,13 @@ export function createNPCs(game) {
       // an empty list and the bubble behaves exactly the way it did before.
       if (game.hud && typeof game.hud.panels === 'function') game.hud.panels(npcBubPanels);
       else npcBubPanels.length = 0;
+      // ...and whether a centre line is up (T3c): the same slow tick, the
+      // same kind of layout question. A pill on its way out does not count.
+      const hr = game.hud && game.hud.root;
+      npcBubCapSub = !game.state.noBubbleCap && !!(hr && hr.querySelector &&
+        hr.querySelector('.capyui-toast.in:not(.heard):not(.note)'));
     }
+    npcBubCap();
     // ---- CLEARED EVERY FRAME, WHICH THE M15 NOTE PROMISED AND THE CODE DID
     // NOT DO (V3). The clear sat inside the slow panel tick above, so for the
     // other eleven frames of every fifth of a second the list still held the
@@ -14950,6 +15562,12 @@ export function createNPCs(game) {
       }
       b.t += dt;
       const o = b.owner;
+      // over the cap (T3c): waiting, hidden, on its own clock — see npcBubCap
+      if (!b.capOk) {
+        if (b.shown) { b.el.style.display = 'none'; b.shown = false; }
+        if (b.t >= b.life) { b.owner = null; b.el.style.opacity = 0; }
+        continue;
+      }
       if (o.nodes && (o.nodes.head || o.nodes.bodyN)) {
         npcV1.setFromMatrixPosition((o.nodes.head || o.nodes.bodyN).matrixWorld);
       } else npcV1.copy(o.group.position);
@@ -15118,11 +15736,16 @@ export function createNPCs(game) {
         b.shown = false;
       }
     }
+    // the most drawn at once since the harness last asked (T3c proof)
+    let drawn = 0;
+    for (let i = 0; i < BUB; i++) if (bubbles[i].shown && bubbles[i].owner) drawn++;
+    if (drawn > npcBubCapPeak) npcBubCapPeak = drawn;
   }
 
   function updateFlashes(dt) {
     for (let i = 0; i < flashes.length; i++) {
       const f = flashes[i];
+      if (f.star) continue;           // the star keeps its own clock (updateStars)
       if (f.t > 0.3) { if (f.q.visible) { f.q.visible = false; f.fm.opacity = 0; } continue; }
       f.t += dt;
       const k = Math.sin(clamp(f.t / 0.3, 0, 1) * Math.PI);
@@ -16012,16 +16635,19 @@ export function createNPCs(game) {
       if (paLive()) npcBargeSweep(dt, paCast);
       localsStep(dt);
       npcGlimpseStep(dt);   // N2: after localsStep, so it wins the frame's position
+      npcTravArcStep(dt);   // T3c: after both, for the same reason
       localsChat(dt);
       localsCompany(dt);
       npcExStep(dt);
       updateBubbles(dt);
+      updateStars(dt);      // T3c: a local's photo fires in every chapter
       return;
     }
     npcUmbLive = 0;
     npcBargeSweep(dt, humans);
     localsStep(dt);
     npcGlimpseStep(dt);   // N2: after localsStep, so it wins the frame's position
+    npcTravArcStep(dt);   // T3c: after both, for the same reason
     npcExStep(dt);
 
     // ---- AND THE BIN CHICKENS WILL FOLLOW YOU (see THE HERD in systems.js) --
@@ -16100,6 +16726,7 @@ export function createNPCs(game) {
     if (colorDirty) { flushColors(); colorDirty = false; }
     updateBubbles(dt);
     updateFlashes(dt);
+    updateStars(dt);
     updateSplashes(dt);
   }
 
