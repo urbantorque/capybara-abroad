@@ -253,6 +253,9 @@ const monROOF_Y    = 0.95;        // the deck, above the road
 const monROOF_HX   = 0.94, monROOF_HZ = 2.10;
 const monRIDE_GRACE = 0.30;       // s the ride survives a frame outside the box
 const monCAR_HY    = 0.0;         // ...so the body origin IS the road
+// TEN T1b: the most a frame's un-integrated travel may carry the rider — a
+// shed frame at 26.5 m/s drops 0.44 m; anything past 3 m is a re-place.
+const monSEAT_CARRY2 = 3 * 3;
 
 // ============================================================ THE GRAND PRIX ==
 // THE MARQUEE, AND IT IS YOURS TO DRIVE (X1).
@@ -2772,9 +2775,11 @@ function monBuildCircuit(game, root) {
  * empty track reads as a toy, and three at different spacings reads as a
  * session.
  *
- * The five rules for a kinematic carrier are kept exactly (see CONTRACT.md):
- * mass 0, KINEMATIC, allowSleep off, moved by VELOCITY against the PREVIOUS
- * TARGET, yaw through angularVelocity, and rendered from interpolatedPosition.
+ * The five rules for a kinematic carrier are kept (see CONTRACT.md): mass 0,
+ * KINEMATIC, allowSleep off, moved by VELOCITY against the PREVIOUS TARGET,
+ * yaw through angularVelocity — and the fifth is amended here (TEN T1b): the
+ * body is then PUT at the target and drawn from it, because a carrier on a
+ * track cannot lose the travel a shed frame's solver drops. See monUpdateCars.
  * The one thing this carrier does that no other in the game does is go
  * twenty-six metres a second, which is why it also DECLARES its frame through
  * carryFrame() rather than leaving the animal to the contact sweep: at that
@@ -3060,6 +3065,16 @@ function monMePlace(dt) {
     while (dy > Math.PI) dy -= Math.PI * 2;
     while (dy < -Math.PI) dy += Math.PI * 2;
     b.angularVelocity.set(0, dy / dt, 0);
+    // ---- ...AND THE BODY IS PUT WHERE THE CAR IS (TEN T1b) ---------------
+    // The velocity alone moved it only as far as world.step integrated, and
+    // from rung 2 that is two 1/60 substeps under a 1/20 clock: two thirds
+    // of every frame's travel. The shortfall never came back, so the body
+    // drove a two-thirds copy of the lap about the grid, and the car drawn
+    // off it with it — measured at rung 3 over one lap, 33.9 m on average
+    // and 59 m at worst between the driver and the car (qa/ten-t1b-seat.js).
+    // The velocity stays for the contacts; the position is the target.
+    b.position.set(tx, ty, tz);
+    b.quaternion.setFromEuler(0, yaw, 0);
   } else {
     b.velocity.set(0, 0, 0); b.angularVelocity.set(0, 0, 0);
     b.position.set(tx, ty, tz);
@@ -3067,6 +3082,11 @@ function monMePlace(dt) {
   }
   monMeTX = tx; monMeTY = ty; monMeTZ = tz; monMeYaw = yaw;
   if (dt > 0) monCarSpin(monMeG, monMeS);
+}
+/** Draw the red car at its own pose — the one the seat is written from. */
+function monMeDraw() {
+  monMeG.position.set(monMeTX, monMeTY, monMeTZ);
+  monMeG.rotation.set(0, monMeYaw, 0);
 }
 function monBuildCars(game, root) {
   monInitTrack();
@@ -3236,10 +3256,30 @@ function monUpdateCars(game, dt) {
     while (dy < -Math.PI) dy += Math.PI * 2;
     b.angularVelocity.set(0, dy / dt, 0);
     monCarTX[i] = tx; monCarTZ[i] = tz; monCarTY[i] = ty; monCarYaw[i] = monTrackTmp.yaw;
-    // RULE 5: rendered from interpolatedPosition, never from position.
+    // ---- RULE 5, AMENDED FOR THIS CARRIER (TEN T1b) ----------------------
+    // The velocity above is still what the contacts see, but the body is then
+    // PUT at the target and the car is drawn from the target. Left to the
+    // velocity, the body covers only what world.step integrates, and from
+    // rung 2 (two substeps under a 1/20 s clock) that is two thirds of the
+    // frame's travel with the rest dropped for good: the pack drove a shrunken
+    // copy of the lap through the town. The rider goes with the correction —
+    // the same shortfall its own body had, since the frame velocity carried it
+    // exactly as far as the solver carried the car — so the roof stays under
+    // it at every rung. A re-place (monCarPlace) is not a correction.
+    const ex = tx - b.position.x, ey = ty - b.position.y, ez = tz - b.position.z;
+    b.position.set(tx, ty, tz);
+    b.quaternion.setFromEuler(0, monTrackTmp.yaw, 0);
+    if (i === monRider && capy && capy.body && !capy.carriedBy && !capy.atHelm &&
+        ex * ex + ez * ez < monSEAT_CARRY2) {
+      const cb = capy.body;
+      cb.position.x += ex; cb.position.y += ey; cb.position.z += ez;
+      cb.previousPosition.x += ex; cb.previousPosition.y += ey; cb.previousPosition.z += ez;
+      cb.interpolatedPosition.x += ex; cb.interpolatedPosition.y += ey; cb.interpolatedPosition.z += ez;
+      if (capy.position) capy.position.set(cb.position.x, cb.position.y, cb.position.z);
+    }
     const g = monCarG[i];
-    g.position.copy(b.interpolatedPosition);
-    g.quaternion.copy(b.interpolatedQuaternion);
+    g.position.set(tx, ty, tz);
+    g.rotation.set(0, monTrackTmp.yaw, 0);
     // ROLL AND PITCH GO ON THE MESH ONLY (rule 4). A car leaning into the
     // hairpin is eight degrees of theatre; rate-integrating three axes to get
     // it would be tilting the box the passenger is standing in.
@@ -3347,8 +3387,7 @@ function monUpdateRace(game, dt) {
     if (monMeV > 0) { monMeV = Math.max(0, monMeV - monME_BRAKE * dt); monMeS += monMeV * dt; monMePlace(dt); }
     else if (capy && capy.position && Math.abs(monMeS - (monMeLineS() + monME_GRID_S)) > 1 &&
              Math.hypot(capy.position.x - monMeTX, capy.position.z - monMeTZ) > 60) monMeToGrid();
-    monMeG.position.copy(monMeBody.interpolatedPosition);
-    monMeG.quaternion.copy(monMeBody.interpolatedQuaternion);
+    monMeDraw();
     if (monMeMover) monMeMover.set(0);
     return;
   }
@@ -3490,9 +3529,11 @@ function monUpdateRace(game, dt) {
     for (let j = 0; j < monCarG.length; j++) monRaceAhead[j] = monCarU[j] > monMeS;
   }
   // ---- the pose, the passenger, the line on the signpost ----------------
+  // ...ONE POSE FOR THE CAR AND THE SEAT (TEN T1b): the seat below is written
+  // from monMeTX/TY/TZ, so the car is drawn from them too. Drawn from
+  // interpolatedPosition it was a frame (or, shed, a lap's worth) elsewhere.
   monMePlace(dt);
-  monMeG.position.copy(monMeBody.interpolatedPosition);
-  monMeG.quaternion.copy(monMeBody.interpolatedQuaternion);
+  monMeDraw();
   monMeLean = damp(monMeLean, clamp(-steer * auth * 0.10 - (onKerb ? 0.04 : 0), -0.16, 0.16), 6, dt);
   monMeG.children[0].rotation.z = monMeLean;
   monMeG.children[0].rotation.x = damp(monMeG.children[0].rotation.x, clamp((gas - brake) * -0.03, -0.05, 0.05), 6, dt);
