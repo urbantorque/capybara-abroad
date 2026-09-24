@@ -1,3 +1,106 @@
+## TEN T3 — FREE ROAM GETS ITS OWN GAME; THE IBIS GETS AN ARC (25 Sep 2026)
+
+Six builders on six disjoint files, merged into `ten-pass` with no
+conflicts (`2c763b2`..`f8895c4`); the roadmap's six "shipped" blocks each
+landed after their own item. The item blocks with every number are the
+"### T3x — shipped" sections of docs/roadmaps/ROADMAP-TEN.md.
+
+**The sketchbook (T3a, systems.js, shared.js).** A Free Roam file's paper
+shows no tick boxes: the place line, three unfound silhouettes with a
+one-word want, "n of 50 names · n of m noticed" (`noFreePaper`; the
+repertoire has 50 names, not the roadmap's 45, and the paper counts from
+the table). A new name is a stamp card at rank 2 with two rising chimes;
+cards at 15, 30 and 45 names. The free picker: 19 tiles at one row height
+(the secrets count sits in the picture's chip; as a text line the rows grew
+to 92-107 px), stat "A RUMOUR / 1 OF 50 NAMES". A return with five
+incidents gives a pooled line, a warm place throws a snack from the nearest
+person (`noFreeRemember`). Both flags are CPU and DOM only. Small moments
+sort nearest-first; Kyoto opens on `torii-run`; "↓ 6 m" replaces "here";
+skill cards wait out climbs and rides; Manly's duck-dive clue. The aimed
+row at arrival: Kyoto 18 m, Hanoi 7 m, Palawan 32 m. The door guard reads
+`flierWhistleT` and `game.condor.active`. ten-t3a-free 18/18 live;
+ten-t3a-static (86 checks) is registered in run.mjs.
+
+**The ibis (T3b, rival.js, `noRivalArc`, CPU only).** Act I it watches: in
+at 22.5 s (was 75-110 s), on a bin lid 20 m off and 2.4 m up, gone inside
+10 m. Act III it takes the chapter's keepsake once and runs with one
+knee-high ray round walls (before the ray it flew the Gion fence and the
+animal stood at it 26 s); a sprint caught it in 4.4 s, unchased it tired
+at 28 s and dropped the keepsake 16.5 m off, a loose object both times.
+From act 4 in iceland, antarctic and the cave it stands hunched 8 m off,
+steals nothing, and eats a yuzu put by it (`rival:fed`). On
+`finale:staged` it lands in the horseshoe mouth facing the animal, with a
+yuzu if fed. `story:act` brings the next visit forward (120 s -> 32.5 s).
+`game.state.qaRivalAct` forces an act.
+
+**Crowds make room (T3c, npc.js).** A bubble cap (`noBubbleCap`, all
+rungs): peak bubbles 1 at the Sydney spawn (4 cut), 1 on Uji (3), 0 on the
+Sahara crest (2); a bubble that loses its place fades in place and still
+counts. The flash is a 0.179 m star gone by 100 ms (`noFlashStar`, parks at
+rung 1). The traveller stands 22 m off at each memory facing the animal,
+and walks the finale in: round the ring, bag down 3.5 m out in the mouth,
+one `npc:travBag`, home 97° off the gap, out of the coda's view
+(`noTravArc`; the cameo parks at rung 1, the walk-in runs at every rung).
+`game.travFinAt()` is T4a's bag hand-off.
+
+**Kyoto in its hills (T3d, kyoto.js).** Seven ridges 24-40 m high at
+200-260 m, open to the south-east, a Yasaka pagoda on the Gion axis merged
+in: one draw, 440 triangles, 3.2-15.9 % of the frame by direction
+(`noKyoFar`; kept at every rung as far.js keeps every static silhouette;
+fog off on the mesh, as fogged ridges read as snow, 0.60 against a 0.54
+sky). The torii wood: 50-54 cedars and ~200 understory mounds, trunks
+solid across a return (54/0/54); lawn between the gate-5 posts 13.7 % ->
+0.0 % (`noToriiWood`, parks at rung 1). Rake lines 0.10 m in
+`kyoGravelShade`: stripe share 47.2 % -> 27.5 % (no flag; the roadmap names
+none).
+
+**Hoan Kiem (T3e, hanoi.js, `noHanWillow`).** 34 instanced willows 1.0 m
+clear of the kerb, solid, 8 lotus clumps, a swan pedalo at 0.85 m/s that
+stops for the animal: 4 draws, 17.2 / 15.6 % of the frame live against
+cut; at rung 1 the sway and shadows go, the trees stay. The arrival yaw
+had already shipped (`sysGlimpseShot` settles at camYaw −2.526), so no
+second writer. `game.hanoi.wowTarget()` gives the bia hoi corner, the
+market, then null.
+
+**Kowloon (T3f, kowloon.js).** The arcade lens through `rideYaw()` and
+`rig()` (`noHkArcadeCam`, no draw): dithered cells in the middle third
+20 -> 1.15 of 64 (max 34 -> 4) along the shopfront under real keys. The
+magenta panel was the bakery sign, blank at full glow; it is lettered in
+`hkGrille` and glows at 0.78 (`noHkBakeGlyph`, one draw): mean 180 -> 159.
+`game.kowloon.wowTarget()` gives the next heli ring, 0-7, then null.
+
+npm test: 80 checks, 0 failed (T3a registers ten-t3a-static). node --check
+on every changed file; build 7282.7 KB, no collisions.
+
+**Honest misses.**
+- Nothing in systems.js reads a `wowTarget()` yet: sahara, hanoi and
+  kowloon all publish one and the tab and hint arrow do not aim at it.
+- T3a: Hong Kong's nearest open small moment is still 99+ m from arrival;
+  the Hanoi pho-run tab, record-row `liveLabel`, tips waiting in a climb
+  and bubbles kept off the paper and the yuzu pill were not done; the Rio
+  Q×3 door guard is proved statically only, the orca tab fix in source
+  only; the gift has no walk-over and does not emit `npc:gift`.
+- T3b: qa/aaa-rival.mjs stops at "A states off" on ten-pass with or
+  without T3b, because T2a's grace keeps a fresh free file's ibis off; the
+  same seven checks pass once the grace is cut (qa/ten-t3b-aaa-rival.mjs).
+  The instrument, not rival.js, needs the fix. Feeding is remembered for
+  the session only; the chase was a scripted sprint; the watcher can still
+  land behind a HUD card.
+- T3c: the cameo's sight test sees colliders only, so both Sydney runs
+  stood the traveller behind a tree crown. Memories came through
+  `completeTask` and `finale:staged` was emitted by the test. The bag
+  itself is T4a's.
+- T3d: ridges at 200-260 m, not 300-420 (Kyoto's fog would hide them);
+  the tunnel lawn number is from a pinned lens, not the run camera.
+- T3e: the boat has no collider; the sway is proved by material, not a
+  moving-frond diff.
+- T3f: 1-4 cells of dither remain in 6 of 13 samples (the bamboo pole in
+  front of the animal). Under the scaffold `rideYaw()` now returns a value,
+  so systems.js treats the animal as riding there.
+- The proof slot owes the rung-0 headful A/B for `noFlashStar`,
+  `noTravArc`, `noKyoFar`, `noToriiWood`, `noHanWillow` and
+  `noHkBakeGlyph`, and a headful look at the sign under bloom.
+
 ## TEN T2 — THE STORY SHOWS ITSELF (25 Sep 2026)
 
 Six builders on six disjoint files, merged into `ten-pass` with no

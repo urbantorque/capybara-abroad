@@ -1,28 +1,31 @@
 # HANDOFF — state of play, 25 Sep 2026
 
-## ROADMAP-TEN (25 Sep), state after T2
+## ROADMAP-TEN (25 Sep), state after T3
 
 The pass is docs/roadmaps/ROADMAP-TEN.md, worked on branch `ten-pass`
 (master is still the published AAA build, d78cd7e). Eight reviewers scored
 the game; their evidence is ROADMAP-TEN-findings.json. Six waves, one agent
 per file set (the ownership table at the foot of the roadmap).
 
-T1 and T2 are merged and pushed (T2 `1131dd0`, npm test 79/0). T2 gave
-the story its beats: ranked cards, one A MEMORY card with a keepsake, ACT
-II once, a grace before the ibis, and held toasts that expire
-(`game.journeyAct()`, `game.graceOn()`, bus `story:act` / `story:memory`).
-The orca ride ticks (3 of 3) and the orcas are round; the aurora is a
-ribbon with a framed tick; Arpoador is solid; the Sahara has a zenith and
-ring beams (`sahara.wowTarget()`); the cave pings, has ferns and crescent
-swifts. The CONTRACT entry "TEN T2" has the numbers and the misses.
+T1, T2 (with its proof slot, f79470b) and T3 are merged and pushed (T3
+`f8895c4`, npm test 80/0). T3 gave Free Roam its own paper (silhouettes,
+"n of 50 names", stamp cards, one-height picker tiles, places that
+remember) and the paper nearest-first clarity; the ibis an arc (watcher in
+Act I, keepsake chase in Act III, hunched in the cold, a seat at the
+finale); crowds a bubble cap, a flash star and a traveller who turns up at
+each memory and walks the finale in (`game.travFinAt()`, `npc:travBag`);
+Kyoto a hill bowl and a cedar wood round the torii; Hoan Kiem willows and a
+pedalo; Kowloon an arcade lens and a lettered bakery sign. The CONTRACT
+entry "TEN T3" has the numbers and the misses.
 
-Owed: the rung-0 headful A/B for the ten GPU flags of T2 and for T1's
-`noWireFade`, `noGorDawn` and `noSummonShot`; `noKelvin`; the lantern
-trail. For T3 in systems.js: the calving timer on the orca ride's paper
-subline, the hint arrow preferring `wowTarget()`, `atRio` to posto6 if the
-door moves, the `flierWhistleT` travel-door guard. Instruments for a fresh
-story file set `state.journeyMode = 'free'` before `hud.cross`. Next: T3,
-Free Roam's own game and the ibis's arc.
+Owed: the rung-0 headful A/B for `noFlashStar`, `noTravArc`, `noKyoFar`,
+`noToriiWood`, `noHanWillow`, `noHkBakeGlyph`. For systems.js (T4a): aim
+the tab and hint arrow at `game.<biome>.wowTarget()` (sahara, hanoi,
+kowloon publish one; nothing reads it), the Hanoi pho-run tab, record-row
+`liveLabel`, bubbles off the paper, place the bag at `travFinAt().bag`.
+qa/aaa-rival.mjs fails on the T2a grace, not on rival.js; use
+qa/ten-t3b-aaa-rival.mjs until the instrument cuts the grace. Next: T4,
+the ending and the traveller.
 
 ## Homecoming published for playtest (23 Sep, newest)
 
