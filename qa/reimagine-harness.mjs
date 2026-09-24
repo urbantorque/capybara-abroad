@@ -28,7 +28,7 @@ const artifactName = name => {
   return name;
 };
 
-export async function openHarness({ url = 'http://localhost:5188/',
+export async function openHarness({ url = process.env.CAPY_QA_URL || 'http://localhost:5188/',
   width = 1280, height = 760, deviceScaleFactor = 1,
   hasTouch = false, isMobile = false,
   channel = process.env.CAPY_QA_CHANNEL || 'msedge', storage = {},

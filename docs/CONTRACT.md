@@ -66,6 +66,63 @@ npm test: 78 checks, 0 failed (T1a registers ten-t1a-modes-static).
   were not found.
 - Free Roam's "asks once" question is per session, not per save.
 
+**The proof slot (after the merge, alone on the Arc GPU, headful Edge,
+rung 0 pinned by `capy3.prefs.v1` pf 1, fresh server on the merged tree).**
+
+GPU cost, `qa/aaa-ab.mjs` (post.render timer queries, 30-frame blocks
+alternating, 96 samples a side), live minus cut. The noise floor, taken
+the same way with a flag nothing reads, was −0.08 ms (Göreme), +0.21 ms
+(Rio) and +0.24 ms (Cali).
+- `noWireFade` (Cali spawn, three runs): +0.07, −0.07, +0.03 ms. Median
+  +0.03 ms, inside the noise and inside the 0.1 ms budget.
+- `noGorDawn` (Göreme, two runs): −0.41, +0.15 ms. Noise; it is one
+  uniform write.
+- `noChivaHold` (Cali) +0.03 ms. `noMonRaceLens` (Monaco, not racing)
+  +0.04 ms. The three condor flags together (Pasto −0.07; Rio +0.62,
+  then +0.09 on a repeat). All are behaviour or camera terms and
+  read as noise. `noFreeDepart` is UI and was not timed.
+
+Behaviour on the final code, rung 0 headful. Each is a builder's own
+instrument, rerun through `qa/ten-t1-proof-run.mjs`:
+- T1e condor, Q, Q, E at the Pasto plaza: mounted 2 of 2. The bird
+  was in the frame for 7 of the shot's 9 framed samples. On the first
+  framed sample the lens is on the sky and the bird has not yet come in.
+- T1e jam (`ten-t1e-stuck.js`, the bird put under the stall roof at
+  1.9 m): as shipped, it climbed to 5.8–13.4 m and was in talon reach
+  in 9 samples. With `noCondorOpen` set it stayed at 1.9–3.3 m with 0 in
+  reach. The rescue is the orbit floor. The watchdog never fired (stuckT
+  peaked at 2.55 s), so its re-centre path is still unexercised.
+- T1f chiva, `roofPlace(0)` with no input: on the roof at s 177.2, drift
+  0.05 m or less, through 4 cable hits.
+- T1d helm hide-and-diff: 10 of 10 frames over 0.85, mean 0.934. Step
+  down puts the animal on the foredeck.
+- T1c boarding, real keys from the spawn: 3 of 3 aboard in 0.6–0.7 s,
+  with the truck 23.3 m from the basket.
+- T1b seat over a full lap: 0.55 m mean and max, lap done. The race lens
+  at 13 stations, cut then live: the car was in shot 5 → 12, in the
+  middle third 13/13, and terrain share went 0.332 → 0.356, with 7/13
+  stations over 25%. The rung-3 miss holds at rung 0: the terrain share
+  comes from the banks, not the lens.
+- T1a picker: flat 19/19 in view with no pill at 1280x720 and 1440x900.
+  The atlas at 1280x720 still shows a page scrollbar (titleScroll).
+
+What the pictures show (qa/ten-t1-proof-*.png, qa/ten-t1a-*-proof.png):
+the flat wall is clean. The animal is in the red car and in the basket.
+It is on the chiva roof with the band, and it is small but solid at the
+roof wheel. The condor carries it over the plaza. The frames around
+those moments are still crowded, and these are named for T2–T6:
+- Quay: the wake's pale foam boulders and cream sheets take the lower
+  third of the helm frame (the spray, T6a).
+- Monte Carlo: palm fronds cross the lower third of the race lens at
+  s 120. Tutorial pills ("top left is the paper…") and a stale paper
+  row show mid-race.
+- Pasto shot: three NPC bubbles overlap at the bottom, one runs off
+  the left edge, the paper is expanded, and a dark slab cuts in at
+  the right.
+- Göreme basket: two bubbles and the puff pill sit over the boarding.
+- Cali ride: a yellow pole fills the right third, and a toast lies across
+  the middle.
+
 ## AAA A7 — PUBLISHED (24 Sep 2026)
 
 master was fast-forwarded from `971e5bd` to `d78cd7e` (the aaa-polish branch)
