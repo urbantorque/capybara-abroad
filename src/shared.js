@@ -4909,7 +4909,7 @@ export const RECORDS = {
   // Chapter 17. Three of the four things worth doing WELL down there are
   // things you cannot do at all in any other chapter, which is a reasonable
   // definition of what a chapter is for.
-  'orca-ride':       { label: 'held station for', unit: ' s', better: 'higher', dp: 1, par: 18 },
+  'orca-ride':       { label: 'held station for', liveLabel: 'holding station for', unit: ' s', better: 'higher', dp: 1, par: 18 },
   'penguin-highway': { label: 'the hill in', unit: ' s', better: 'lower', dp: 1, par: 24 },
   'blue-ice':        { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1, par: 12 },
   'floe-drift':      { label: 'carried', unit: ' m', better: 'higher', dp: 0, par: 90 },
@@ -4948,7 +4948,11 @@ export const RECORDS = {
   //
   // Chapter 1. The house is capped at eight (npcCONCERT_N) and the tick asks
   // for two of them in place. Six is three quarters of the forecourt.
-  'opera-stage':   { label: 'drew a house of', unit: ' people', better: 'higher', dp: 0, par: 6 },
+  // ...and ten since TEN T4a: the concert became a performance (T4c), where
+  // a wheek on the beat reaches the whole forecourt and one off it does not.
+  // Six was the off-beat house; the par is the on-beat one. The tick stays
+  // at its two, and the house's cap is T4c's to lift past npcCONCERT_N.
+  'opera-stage':   { label: 'drew a house of', unit: ' people', better: 'higher', dp: 0, par: 10 },
   // Chapters 2 and 6, the two chapters with a bird. A ride has no clock on it
   // — it ends when you let go, so seconds aloft would reward sitting there —
   // and the height is already `thermal-peak`. What the flight teaches is the
@@ -4982,7 +4986,10 @@ export const RECORDS = {
   // Chapter 9. Six light it; the wood has twenty-two and a wheek wakes up to
   // four. Ten is the six and one more good shout. Once per session — the
   // lantern stays lit by design (see driLit in drift.js's onEnter).
-  'lantern':       { label: 'lit it with', unit: ' lampflies', better: 'higher', dp: 0, par: 10 },
+  // `liveLabel` (TEN T4a): the words while the attempt is open, where the
+  // label is the past tense of a finished one ('lit it with 5 lampflies' was
+  // read on the way up, with nothing lit). Only on the rows that need it.
+  'lantern':       { label: 'lit it with', liveLabel: 'carrying', unit: ' lampflies', better: 'higher', dp: 0, par: 10 },
   // Chapter 10. The middle of the square is under water for about 84 s of
   // the 205 s cycle — 12.5 s of the rise past tide 0.676, 57.4 s of high
   // water, 14 s of the fall — and the surge runs at 1.35 m/s toward the Molo
@@ -5013,7 +5020,7 @@ export const RECORDS = {
   // was missing. The column is 28 m (cavCOL.h), the tick asks for 17, and a
   // step off the very top lands the full height; twenty-five is the top,
   // give or take the metre you lose stepping off.
-  'the-column':    { label: 'dropped', unit: ' m', better: 'higher', dp: 0, par: 25 },
+  'the-column':    { label: 'dropped', liveLabel: 'dropping', unit: ' m', better: 'higher', dp: 0, par: 25 },
   // ---- THE WINDOWS (L6, F2 / design 2.5) ----------------------------------
   // Five clocks on five movers, and the countdown IS the live line: the
   // chapter hands `recordLive(id, secondsToGo)` over every frame while you are

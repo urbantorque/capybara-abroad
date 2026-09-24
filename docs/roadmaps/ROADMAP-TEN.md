@@ -1121,6 +1121,63 @@ T3 seed (A): `PALETTE.kyoRidge`, `kyoGravelShade`, `kyoUnder`, `hanWillow`.
   traveller within 2 m of the bag, and the ledger no sooner than 16 s after the sit. The board PNG
   lists open places first. The Tab close is a key test.
 
+### T4a — shipped
+
+Watched end to end on a story file fast-forwarded to ready (every task but four places' written
+into the save, not played), Sydney, the animal walked in with real keys and left to sit.
+`qa/ten-t4a-finale.mjs` passes 14/14; `qa/ten-t4a-static.mjs` (27 checks) is registered; npm
+test 81/0. Screenshots: `qa/ten-t4a-{bag,coda-0,coda-1,last,ledger,ledger-foot}.png`.
+
+- **The finale** (`noFinPolish`, DOM and timers only). The coda caption is the toast's paper pill
+  at bottom 18% (measured 17.3-18%), the keepsake line at clamp(15px,2.8vw,17px), full ink on
+  both (11.5:1), fading in again on each note (`.beat`). The keepsake's flash is `flash(p, 24)`
+  re-armed every 45 ms for its note (up to 0.5 s), except inside 5.5 m of the lens: the balloon
+  scrap by the mouth, held white 3 m from the glass, bloomed over a third of the frame. The
+  closing "and that is the lot." no longer toasts over the first captions (two pills at 18%); it
+  is the last frame's only words. **The last frame**: at the hush the animal naps (the opening's
+  `capyForceNap`), and the lens comes in to 4.2 m in front of its face, three-quarters, snapped
+  to the middle of a gap between two keepsakes (the first cut had an esky filling the bottom
+  third) and scored for clearance from the seated ibis and the traveller home from the
+  set-down (cuts two and three had the wing, then the traveller's hat, on the glass); side-on is
+  allowed when the face looks at the mouth, where both of them stand.
+  The ledger waits `sysFIN_LINGER` 3 s past the hush and never sooner than 16 s after the
+  closing beat: measured 16.04-16.26 s close to ledger, 32-33 s from releasing the keys. The
+  crowd's bubbles and pills step out for all of it (`storyBeatQuiet`: "That one is not from
+  here." stood over the last frame). Staging passes `{ finale: true, scale: 2.2 }` as a fifth
+  argument to `physics.stageKeep`, and `finaleOn` is set before the loop, for T4b.
+- **The bag** (`noTravArc`). On npc.js's `'npc:travBag'` the opening's `sysBagGroup` lands 1.3 s
+  into the bend with a 0.25 s settle and one soft thud. npc.js's spot put it 2.99 m from the
+  bent figure; it is now aimed at the animal, 1.9 m from the traveller's feet at most:
+  measured 1.78-1.92 m from the traveller and 1.95 m from the animal. The close WAITS for the
+  traveller to walk back out of the line ('home'), capped at 30 s sat. `game.finAudit()`,
+  `game.finBag()`, `game.finKeepPx()` for the harness.
+- **The epilogue** (`noFinPolish`). The final ledger lists the places never stood in under the
+  remembered ones as grey postcards, "still out there" (the mark greyscale, the name in ink).
+  The title steps up: 13 kept is FURTHER THAN IT MEANT, 19 is MISCHIEF COMPLETE (measured on
+  15: FURTHER THAN IT MEANT). No save field.
+- **The journal.** In chapter one (standing in Sydney, nowhere else seen) the head drops the
+  clock and 'noticed'. Tab closes it when focus is on the card and not a control; Shift+Tab
+  walks in (`qa/ten-t4a-journal.mjs`).
+- **The paper** folds to its tab while the arrival's place name is up (`noPlaceFold`; not while
+  the slot carries a marquee line).
+- **Carry-ins.** `qa/aaa-rival.mjs` cuts the T2a grace after arrival and passes 7/7 (Kyoto).
+  `RECORDS[].liveLabel` is read by the live record line: lantern 'carrying', orca-ride 'holding
+  station for', the-column 'dropping'. Bubbles dodge the yuzu pill (`hud.panels` adds
+  `walletEl`; the paper was already in it). Concert par 10 in the record row; the tick stays.
+- **For the merger.** T4b: the plinth/2.2x can key on the fifth `stageKeep` argument or on
+  `game.state.finaleOn`. `qa/reimagine-earned-card.mjs` strips `/* TEN T4a finale: */` blocks
+  (g flag). `qa/ten-t4a-open.mjs` is the harness with a 150 s load: with six agents on the
+  machine the page's load event measured 48.8 s and openHarness's 20 s timed out three times.
+- **Misses.** Keepsakes at the coda lens measured median 17-20 px, min 7-9 px at 1280 before
+  T4b's 2.2x: the 18 px floor is T4b's to meet. Not done: the Sydney parcel after `fin`, the
+  departures board (`noDepartures`), the journal grouped by act, the pause menu's "more", the
+  Hanoi pho run's tab over the whole ride. The bag sits 1.95 m from the animal because npc.js
+  stops the traveller 0.9 m outside the ring; nearer needs npc.js's `npcTRAVWALK_IN`. In the
+  fourth cut of the last frame the ibis's head and wing still stood in the lower right corner
+  over the bag (it sits 1.05 r in the mouth; the lens cannot always clear it). The
+  finale was proved at rung 1 on a shared machine; rung-0 cost of the held flash is the proof
+  slot's.
+
 **T4b · props.js · keepsakes you can see** (`noFinPlinth`). Staged keepsake mesh at 2.2x (the mesh
 only, not the body), on one instanced PALETTE.stone plinth per keepsake (2694). Proof: the finale
 PNG, and a draw-call count of +1.

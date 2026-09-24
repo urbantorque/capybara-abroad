@@ -4,6 +4,10 @@
 //   B. again, chase it with real keys and wheek (Q) inside six metres: it
 //      drops the fruit plus one (rival:dropped) and a drop appears.
 //   node qa/aaa-rival.mjs [chapter]
+// TEN T4a: a fresh file is in the T2a grace (graceOn(): no memory yet, or no
+// repertoire name yet on a free file), and in it rivalOK is false, so the bird
+// never came and 'A states' read empty. The grace is cut after arrival, the way
+// qa/ten-t3b-aaa-rival.mjs does; the seven checks are A4's own, unchanged.
 import assert from 'node:assert/strict';
 import { openHarness } from './reimagine-harness.mjs';
 const chapter = process.argv[2] || 'kyoto';
@@ -21,6 +25,8 @@ async function waitFruit() {
 }
 try {
   await h.start(); await h.arrive(chapter); await h.page.bringToFront(); await h.page.waitForTimeout(2500);
+  console.log('grace', await h.page.evaluate(() => window.__capy.graceOn()));
+  await h.page.evaluate(() => { window.__capy.state.noFirstGrace = true });
   await h.page.evaluate(() => { const g = window.__capy; window.__r = []; for (const n of ['rival:stole', 'rival:dropped', 'rival:escaped']) g.events.on(n, e => window.__r.push(n)); });
   // ---- A
   await h.page.evaluate(() => { const g = window.__capy, p = g.capy.position, y = g.capy.group.rotation.y; g.dropGive(p.x + Math.sin(y) * 10, p.z + Math.cos(y) * 10, 1); });

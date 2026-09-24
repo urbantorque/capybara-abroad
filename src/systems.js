@@ -10067,6 +10067,20 @@ function sysBuildCSS() {
 '.capyui-coda.show{opacity:1;}',
 '.capyui-coda i{display:block;font-style:italic;text-transform:none;letter-spacing:0;',
   'font-size:' + tLg + ';margin-top:4px;color:' + inkSoft + ';}',
+/* TEN T4a finale: ...AND IT IS A CAPTION YOU CAN READ (noFinPolish). The review:
+   "a small grey line at the top of the screen", over sky, across a tree
+   crown, measured below 3:1. Low in the frame where a film puts its words,
+   on the toast's own paper so it is one object the game has already taught,
+   the keepsake line two steps up, full ink on both. Each note fades it in
+   again (`.beat`), so nineteen names read as nineteen, not as one flicker. */
+'.capyui-coda.pill{top:auto;bottom:18%;left:50%;right:auto;transform:translateX(-50%);',
+  'max-width:min(88vw,520px);background:' + paper + ';border:1px solid ' + paper2 + ';',
+  'border-radius:999px;padding:8px 26px 10px;box-shadow:' + shLg + ';color:' + ink + ';}',
+'.capyui-coda.pill i{font-size:clamp(15px,2.8vw,17px);color:' + ink + ';font-weight:700;}',
+'.capyui-coda.pill.beat{animation:capyCodaBeat .34s ease-out;}',
+'@keyframes capyCodaBeat{from{opacity:.2;transform:translateX(-50%) translateY(5px);}',
+  'to{opacity:1;transform:translateX(-50%) translateY(0);}}',
+/* TEN T4a finale end. */
 /* the bars. 3:2, which is the shape a postcard actually is, held with vh so a
    letterbox on a tall phone is not the whole screen. */
 '.capyui-pbar{position:absolute;left:0;right:0;height:9vh;max-height:88px;',
@@ -11144,6 +11158,21 @@ function sysBuildCSS() {
    entry in it. */
 '.capyui-lednote{grid-column:2 / 4;margin-top:3px;font-size:clamp(11px,1.9vw,12px);',
   'color:' + inkSoft + ';font-style:italic;line-height:1.38;overflow-wrap:anywhere;}',
+/* TEN T4a finale: STILL OUT THERE. the places never stood in, as postcards that
+   have not been written yet. The mark keeps its shape and loses its colour;
+   the name is ink, not grey, because it has to be readable to be a door. */
+'.capyui-ledout{margin-top:clamp(10px,2.4vw,16px);opacity:0;',
+  'animation:capyui-ledin ' + dSlow + ' ' + mGlide + ' forwards;}',
+'.capyui-ledouth{font-size:' + tSm + ';letter-spacing:.16em;text-transform:uppercase;color:' + ink + ';',
+  'text-align:center;margin-bottom:8px;}',
+'.capyui-ledoutg{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;}',
+'.capyui-ledpc{width:86px;display:flex;flex-direction:column;align-items:center;gap:4px;',
+  'padding:6px;background:' + paper + ';border:1px dashed ' + rule + ';border-radius:' + rSm + ';',
+  'transform:rotate(-.8deg);font-size:clamp(10px,1.8vw,11px);color:' + ink + ';text-align:center;}',
+'.capyui-ledpc:nth-child(even){transform:rotate(.7deg);}',
+'.capyui-ledpcm{width:72px;height:45px;border-radius:' + rSm + ';overflow:hidden;filter:grayscale(1);opacity:.55;}',
+'.capyui-ledpcm svg{display:block;width:100%;height:100%;}',
+/* TEN T4a finale end. */
 '.capyui-ledkeep{flex:0 0 auto;width:19px;height:19px;display:block;}',
 '.capyui-ledkeep svg{display:block;width:100%;height:100%;}',
 '.capyui-ledfoot{margin-top:clamp(12px,2.6vw,20px);text-align:center;',
@@ -27268,15 +27297,21 @@ export function createSystems(game) {
     // paper does not tuck; it takes the .marq state, which is the marquee's
     // readout and nothing else.
     const owned = sysFrameOwned() && !!marqId;
+    // ...AND WHILE THE PLACE IS BEING NAMED (TEN T4a, noPlaceFold). The
+    // arrival's name card and the expanded paper were up together for the
+    // first four seconds of every chapter: two cards, one frame. The paper
+    // waits as its tab until the name has gone, then its own clock runs.
+    const placeUp = !game.state.noPlaceFold && placeEl.classList.contains('show') && !placeEl.classList.contains('line');
     const want = !wowEarnedOn && !owned && todoAwayT > sysTUCK_AFTER;
-    if (want !== todoAway) {
-      todoAway = want;
-      todoEl.classList.toggle('away', want);
+    const tuck = want || (!wowEarnedOn && !owned && placeUp);
+    if (tuck !== todoAway) {
+      todoAway = tuck;
+      todoEl.classList.toggle('away', tuck);
     }
     // the marquee's own state (L4, E4): see the .marq rule
     const wantMarq = !busy && !want && (wowLiveOn || wowEarnedOn || owned || !!(marqId && game.capy && game.capy.atHelm));
     if (wantMarq !== todoMarq) { todoMarq = wantMarq; todoEl.classList.toggle('marq', wantMarq); }
-    if (want && ((wowLiveOn && wowLiveLine && !game.state.noFreePaper) || (todoFreeShown && !todoTopId))) {
+    if (tuck && ((wowLiveOn && wowLiveLine && !game.state.noFreePaper) || (todoFreeShown && !todoTopId))) {
       // ---- ONE THING AT A TIME ON THE TAB (T3a) ---------------------------
       // A marquee under way is the tab's, name and live line together: the
       // orca ride's tab read the top row's clue, which was the calving
@@ -27291,7 +27326,7 @@ export function createSystems(game) {
       if (todoTabDist.textContent !== '') todoTabDist.textContent = '';
       todoTabAim.style.display = 'none';
       if (todoTabSub.textContent !== sub) { todoTabSub.textContent = sub; todoTabSub.classList.toggle('on', !!sub); }
-    } else if (want) {
+    } else if (tuck) {
       const top = taskRec[todoTopId];
       const t = top && top.txt ? top.txt.textContent : '';
       // The tab has room for one instruction. A progress prefix swallowed the
@@ -31505,6 +31540,7 @@ export function createSystems(game) {
   function ledBuild() {
     while (ledList.firstChild) ledList.removeChild(ledList.firstChild);
     let places = 0, kept = 0, done = 0, rows = 0;
+    const ledOut = [];                  // the places never stood in (final card only)
     for (let n = 1; n <= chapMax; n++) {
       const def = chapterDef(n);
       const rec = chapRec[n];
@@ -31521,7 +31557,10 @@ export function createSystems(game) {
       for (let i = 0; i < FINDS.length && !anyFind; i++) {
         if (findDone[FINDS[i].id] && findWhere[FINDS[i].id] === n) anyFind = true;
       }
-      if (!d && !jrSeen[n] && !anyFind) continue;
+      if (!d && !jrSeen[n] && !anyFind) {
+        if (ledFinal && !game.state.noFinPolish) ledOut.push(def);
+        continue;
+      }
       const row = sysEl('div', 'capyui-ledrow');
       row.style.animationDelay = (rows * sysLED_STAGGER) + 'ms';
       rows++;
@@ -31685,6 +31724,29 @@ export function createSystems(game) {
       ? 'all those places, and not one of them agreed with another about what you were.'
       : '';
     ledLast.hidden = !ledFinal;
+    // ---- ...AND WHERE IT HAS NOT BEEN (TEN T4a, noFinPolish) --------------
+    // The story needs ten places and the world has nineteen, so the final
+    // card of a first ending is a list that stops, and nothing on it or on
+    // the lawn pointed at the rest. They go under the remembered ones as grey
+    // postcards, the place's own mark with the colour taken out, and one
+    // heading that is not an instruction. The ending's last row is a door.
+    if (ledOut.length) {
+      const wrap = sysEl('div', 'capyui-ledout');
+      wrap.style.animationDelay = (rows * sysLED_STAGGER) + 'ms';
+      wrap.appendChild(sysEl('div', 'capyui-ledouth', 'still out there'));
+      const grid = sysEl('div', 'capyui-ledoutg');
+      for (let i = 0; i < ledOut.length; i++) {
+        const card = sysEl('div', 'capyui-ledpc');
+        const mk = sysEl('div', 'capyui-ledpcm');
+        const mark = sysBuildMark(ledOut[i].biome);
+        if (mark) mk.appendChild(mark);
+        card.appendChild(mk);
+        card.appendChild(sysEl('span', null, ledOut[i].name));
+        grid.appendChild(card);
+      }
+      wrap.appendChild(grid);
+      ledList.appendChild(wrap);
+    }
     // A journey of nowhere is still a card, and it should say something.
     if (!rows) {
       const row = sysEl('div', 'capyui-ledrow');
@@ -31699,7 +31761,16 @@ export function createSystems(game) {
     ledShown = true;
     // Complete collections retain their title. The ordinary route celebrates
     // coming home, without claiming that every optional place was visited.
-    ledTitle.textContent = ledFinal ? (sysFinaleFull() ? 'MISCHIEF COMPLETE' : 'BACK WHERE IT BEGAN') : 'THE JOURNEY SO FAR';
+    // ...AND IT STEPS UP WITH HOW FAR IT WENT (TEN T4a, noFinPolish): ten is
+    // the story, thirteen places remembered is further than the bag went,
+    // and all nineteen is the old title, which had needed every box ticked.
+    let ledTitleFinal = sysFinaleFull() ? 'MISCHIEF COMPLETE' : 'BACK WHERE IT BEGAN';
+    if (ledFinal && !game.state.noFinPolish) {
+      const kc = keepCount();
+      if (kc >= chapMax) ledTitleFinal = 'MISCHIEF COMPLETE';
+      else if (kc >= 13 && ledTitleFinal !== 'MISCHIEF COMPLETE') ledTitleFinal = 'FURTHER THAN IT MEANT';
+    }
+    ledTitle.textContent = ledFinal ? ledTitleFinal : 'THE JOURNEY SO FAR';
     // The old card's line, kept word for word for the one player who gets
     // here — plus the way out that did not used to exist. Reloading was the
     // ONLY thing you could do with the end of this game, and a sandbox whose
@@ -32451,10 +32522,10 @@ export function createSystems(game) {
   // and the per-frame path writes one string, and only when it differs, which
   // in practice is about once a second.
   // ---------------------------------------------------------------------------
-  let jrCountPre = '', jrCountPost = '', jrCountLast = '';
+  let jrCountPre = '', jrCountPost = '', jrCountLast = '', jrClockOff = false;
   function jrTick() {
     const total = jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0);
-    const s = jrCountPre + sysFmtTime(total) + jrCountPost;
+    const s = jrCountPre + (jrClockOff ? '' : sysFmtTime(total)) + jrCountPost;
     if (s === jrCountLast) return;
     jrCountLast = s;
     jrCount.textContent = s;
@@ -32498,7 +32569,24 @@ export function createSystems(game) {
     // heard about this" is worth knowing.
     const noto = notoChip();
     jrCountPost = (nf ? '  ·  ' + nf + ' noticed' : '') + (noto ? '  ·  ' + noto : '');
-    jrCountLast = jrCountPre + sysFmtTime(total) + jrCountPost;
+    // ---- ...BUT NOT IN CHAPTER ONE (TEN T4a) ------------------------------
+    // The review, fresh file, first journal: "A LITTLE FURTHER · 1 OF 2
+    // MEMORIES · 14:35 · 3 NOTICED". A ticking clock is a speedrun's number,
+    // and 'noticed' is a word nothing on screen has explained yet. While the
+    // animal has stood nowhere but Sydney the head is the act and its count
+    // alone; both come back with the first border crossed.
+    jrClockOff = false;
+    {
+      let seenN = 0;
+      for (const k in jrSeen) if (jrSeen[k]) seenN++;
+      const hereN = game.biome ? chapterOf(game.biome.current) : 1;
+      if (hereN === 1 && seenN <= 1) {
+        jrClockOff = true;
+        jrCountPre = jrCountPre.replace(/\s+·\s+$/, '');
+        jrCountPost = noto ? '  ·  ' + noto : '';
+      }
+    }
+    jrCountLast = jrCountPre + (jrClockOff ? '' : sysFmtTime(total)) + jrCountPost;
     jrCount.textContent = jrCountLast;
     const here = game.biome ? chapterOf(game.biome.current) : 1;
     // ---- the shelf ---------------------------------------------------------
@@ -36110,7 +36198,7 @@ export function createSystems(game) {
     // Not counting yet: the standing best IS the line, formatted by the one
     // function in this file that formats a record. Nothing new to format.
     recNowEl.textContent = live
-      ? def.label + ' ' + recLiveVal.toFixed(def.dp) + def.unit
+      ? (def.liveLabel || def.label) + ' ' + recLiveVal.toFixed(def.dp) + def.unit   // liveLabel: the open tense (TEN T4a)
       : (recText(recLiveId) || def.label);
     // ---- WHAT THE SECOND LINE IS, AND WHY IT IS THREE CASES (v36) ---------
     // The standing best is the target once there is one. Before there is one
@@ -39051,10 +39139,13 @@ export function createSystems(game) {
       const def = chapterDef(k);
       if (!def || def.keepNone) continue;
       const a = open + sysFIN_GAP / 2 + (i / n) * span;
+      // `{ finale: true }` (TEN T4a): the ring, not the shelf, is asking. T4b's
+      // plinth and the 2.2x mesh answer it (and `finaleOn`, set above); a
+      // props.js that predates them ignores the fifth argument.
       try {
         ph.stageKeep(def.biome,
                      sysFIN_X + Math.cos(a) * sysFIN_R,
-                     sysFIN_Z + Math.sin(a) * sysFIN_R);
+                     sysFIN_Z + Math.sin(a) * sysFIN_R, undefined, { finale: true, scale: 2.2 });
       } catch (e) { /* one souvenir is not worth the ending */ }
     }
     sysFinStaged = true;
@@ -39097,6 +39188,7 @@ export function createSystems(game) {
       codaHideT -= dt;
       if (codaHideT <= 0) codaEl.classList.remove('show');
     }
+    sysFinBagStep(dt);
     if (!sysFinStaged || sysFinDone || sysFinClosing || !game.capy) return;
     const p = game.capy.position;
     if (!p) return;
@@ -39105,11 +39197,127 @@ export function createSystems(game) {
     // reached by walking to a coordinate, it is reached by stopping.
     if (dx * dx + dz * dz < sysFIN_IN * sysFIN_IN && (game.capy.loaf || 0) >= sysFIN_LOAF) {
       sysFinT += dt;
-      if (sysFinT >= sysFIN_HOLD) sysFinaleClose();
+      if (sysFinT >= sysFIN_HOLD && (sysFinBagReady() || sysFinT >= sysFIN_BAG_WAIT)) sysFinaleClose();
     } else {
       sysFinT = 0;
     }
   }
+
+  // ---- THE BAG COMES HOME (TEN T4a, noTravArc) -----------------------------
+  // npc.js walks the lawn's traveller round the outside of the horseshoe to
+  // its mouth once the animal is on the lawn (T3c), bends for 2.6 s and says
+  // 'npc:travBag' with a spot beside the middle. The bag is the opening's own
+  // (sysBagGroup), set down half way through the bend with a small settle, so
+  // the last frame has in it what the first one had. And the closing beat
+  // WAITS for it: a player who sits before the traveller has come round
+  // watches them come (they are walking to it), and the coda does not start
+  // until they have walked back out of the lens's line ('home'). Capped, so
+  // a traveller who never comes cannot hold the ending hostage.
+  const sysFIN_BAG_WAIT = 30;         // s sat, at most, before it closes without them
+  const sysFIN_BAG_DROP = 1.3;        // s into the bend the bag touches the grass
+  const sysFIN_BAG_REACH = 1.9;       // m from the traveller's feet, at most: a lean, bent
+  let sysFinBag = null;               // { x, z, yaw, t } while the set-down plays
+  let sysFinBagDown = false;
+  game.events.on('npc:travBag', function (e) {
+    const ev = (e && e.npc) || e;
+    if (!ev || game.state.noTravArc || typeof ev.bx !== 'number') return;
+    if (game.biome && game.biome.current !== 'sydney') return;
+    // npc.js's spot is beside the middle, and the traveller stops 0.9 m
+    // outside the ring: MEASURED 2.99 m between the bent figure and the bag,
+    // which from the lens is a bag thrown, not set down. So it lands on the
+    // line from their hands to that spot, at arm's length plus a lean
+    // (sysFIN_BAG_REACH) — still beside the animal, which sits in the middle.
+    // MEASURED again: aimed at npc.js's spot the bag sat 1.80 m from the hands
+    // and 2.15 m from the animal; aimed at the ring's middle, 2.44 m, because
+    // the animal is sat wherever it stopped and not on the centre. So it is
+    // aimed at the ANIMAL, reached as far as a lean goes, never nearer it
+    // than a body's width, with a 0.25 m step to npc.js's side.
+    let bx = ev.bx, bz = ev.bz;
+    const cp = game.capy && game.capy.position;
+    if (typeof ev.x === 'number' && typeof ev.z === 'number') {
+      const tx = cp ? cp.x : sysFIN_X, tz = cp ? cp.z : sysFIN_Z;
+      const dx = tx - ev.x, dz = tz - ev.z, d = Math.sqrt(dx * dx + dz * dz);
+      if (d > 1e-3) {
+        const ux = dx / d, uz = dz / d;
+        const side = ((ev.bx - ev.x) * -uz + (ev.bz - ev.z) * ux) >= 0 ? 1 : -1;
+        const r = clamp(d - 0.7, 0.4, sysFIN_BAG_REACH);
+        bx = ev.x + ux * r - uz * side * 0.25;
+        bz = ev.z + uz * r + ux * side * 0.25;
+      }
+    }
+    // facing the way the traveller faces, turned a little, the way a bag is
+    // put down by somebody and not placed by a level designer
+    sysFinBag = { x: bx, z: bz, yaw: (typeof ev.yaw === 'number' ? ev.yaw : 0) + 0.5, t: -sysFIN_BAG_DROP };
+  });
+  function sysFinBagStep(dt) {
+    const b = sysFinBag;
+    if (!b) return;
+    b.t += dt;
+    if (b.t < 0) return;
+    const bag = sysBagBuild();
+    const gy = sysGroundY(b.x, b.z);
+    // 0.25 s from a hand's height to the grass, with the flap's small bounce
+    const k = clamp(b.t / 0.25, 0, 1);
+    bag.position.set(b.x, gy + 0.14 * (1 - k) * (1 - k), b.z);
+    bag.rotation.set(0, b.yaw, (1 - k) * 0.18);
+    bag.visible = true;
+    if (!sysFinBagDown) { sysFinBagDown = true; try { sfx('thud', { volume: 0.22, pitch: 0.75, at: { x: b.x, y: gy, z: b.z } }); } catch (e) {} }
+    if (k >= 1) sysFinBag = null;
+  }
+  /** The traveller has been, set the bag down and gone back out of the line. */
+  function sysFinBagReady() {
+    if (game.state.noTravArc || typeof game.travFinAt !== 'function') return true;
+    const w = game.travFinAt();
+    if (!w || !w.visible) return true;
+    return sysFinBagDown && (w.st === 'home' || w.st === 'done');
+  }
+  // off the lawn it is nobody's bag: hidden on any other chapter, and put back
+  // where it was set on the way home (the save does not carry it: `fin` does)
+  game.events.on('biome:enter', function (p) {
+    if (!sysBagGroup || !sysFinBagDown) return;
+    const to = (p && (p.name || p.biome || p.to)) || (game.biome && game.biome.current);
+    sysBagGroup.visible = to === 'sydney';
+  });
+  game.finAudit = function () {
+    const w = typeof game.travFinAt === 'function' ? game.travFinAt() : null;
+    const bp = sysBagGroup ? sysBagGroup.position : null;
+    let bagToCapy = -1, bagToTrav = -1;
+    if (bp && game.capy) bagToCapy = +Math.hypot(bp.x - game.capy.position.x, bp.z - game.capy.position.z).toFixed(2);
+    if (bp && w && w.bag) bagToTrav = +Math.hypot(bp.x - w.bag.x, bp.z - w.bag.z).toFixed(2);
+    return { staged: sysFinStaged, done: sysFinDone, closing: sysFinClosing, sat: +sysFinT.toFixed(2),
+             bagDown: sysFinBagDown, bagVisible: !!(sysBagGroup && sysBagGroup.visible), bagToCapy: bagToCapy,
+             bagToSpot: bagToTrav, trav: w, napped: sysFinNapped,
+             closeAt: sysFinCloseAt, ledAt: sysFinLedAt,
+             ledGap: sysFinCloseAt > 0 && sysFinLedAt > 0 ? +(sysFinLedAt - sysFinCloseAt).toFixed(2) : -1,
+             coda: codaEl.classList.contains('show') ? codaEl.textContent : '', pill: codaEl.classList.contains('pill'),
+             keeps: sysFinaleKeeps().length };
+  };
+  /** Harness only: the bag's spot while it is on the lawn, or null. */
+  game.finBag = function () {
+    if (!sysBagGroup || !sysBagGroup.visible) return null;
+    return { x: +sysBagGroup.position.x.toFixed(2), y: +sysBagGroup.position.y.toFixed(2), z: +sysBagGroup.position.z.toFixed(2) };
+  };
+  /** Harness only: each staged keepsake's height on screen, in CSS px. */
+  game.finKeepPx = function () {
+    const ph = game.physics, list = sysFinaleKeeps(), hs = [];
+    if (!ph || typeof ph.keepOut !== 'function') return null;
+    const box = new THREE.Box3(), v = new THREE.Vector3();
+    for (let i = 0; i < list.length; i++) {
+      const def = chapterDef(list[i]);
+      const p = def && !def.keepNone ? ph.keepOut(def.biome) : null;
+      if (!p || !p.mesh) continue;
+      box.setFromObject(p.mesh);
+      let lo = Infinity, hi = -Infinity;
+      for (let c = 0; c < 8; c++) {
+        v.set(c & 1 ? box.max.x : box.min.x, c & 2 ? box.max.y : box.min.y, c & 4 ? box.max.z : box.min.z).project(game.camera);
+        const y = (-v.y * 0.5 + 0.5) * innerHeight;
+        if (y < lo) lo = y; if (y > hi) hi = y;
+      }
+      hs.push(+(hi - lo).toFixed(1));
+    }
+    const s = hs.slice().sort(function (a, b) { return a - b; });
+    return { n: hs.length, min: s[0] || 0, median: s[s.length >> 1] || 0, max: s[s.length - 1] || 0 };
+  };
 
   // ---- THE CODA (L4, F4 / audio #3) ----------------------------------------
   // The last minute of the game was a chime and a swell — the same chime
@@ -39222,11 +39430,35 @@ export function createSystems(game) {
         const midi = arc ? base + musDegOff(notes[ti][0]) : base + musThemeOff(ti);
         try { musLiftNote(inst, musSnap(now + t), midi, pan, 0.14, gapK * 1.6); sysFinCodaN++; sysFinCodaTune.push(ti); sysFinCodaPitch.push(midi); } catch (e) { /* one voice missing */ }
       }
-      (function (biome, delay, name, keep, empty) {
+      (function (biome, delay, name, keep, empty, hold) {
         setTimeout(function () {
+          const polish = !game.state.noFinPolish;
           try {
             const p = !empty && ph && typeof ph.keepOut === 'function' ? ph.keepOut(biome) : null;
-            if (p && typeof ph.flash === 'function') ph.flash(p, 10);
+            if (p && typeof ph.flash === 'function') {
+              ph.flash(p, polish ? 24 : 10);
+              // HELD FOR ITS NOTE (TEN T4a). A flash is 60 ms of wall clock
+              // (physFLASH_MS), which at the coda's 7 m is one blink on one
+              // box among nineteen: the review never saw which was lit. The
+              // flash re-armed every 45 ms keeps the box white for as long as
+              // its own note sounds, up to half a second, so the eye can be
+              // led round the horseshoe one keepsake at a time.
+              // ...but not one near the glass: MEASURED, the balloon scrap on
+              // the horn by the mouth, 3 m from the coda's lens, held white for
+              // half a second bloomed over a third of the frame and the caption
+              // (qa/ten-t4a-coda-1.png). Inside sysFIN_FLASH_NEAR it blinks once.
+              const cam = game.camera && game.camera.position, bp = p.body && p.body.position;
+              const near = cam && bp && Math.hypot(bp.x - cam.x, bp.y - cam.y, bp.z - cam.z) < sysFIN_FLASH_NEAR;
+              if (polish && !near) {
+                const until = sysWall() + Math.min(0.5, hold);
+                const again = function () {
+                  if (sysWall() >= until || !sysFinClosing) return;
+                  try { ph.flash(p, 24); } catch (e) { return; }
+                  setTimeout(again, 45);
+                };
+                setTimeout(again, 45);
+              }
+            }
           } catch (e) { /* a keepsake that will not flash is still a keepsake */ }
           // ...and its name, with the note (L6, E5)
           try {
@@ -39235,11 +39467,13 @@ export function createSystems(game) {
             const i = document.createElement('i');
             i.textContent = keep || '';
             codaEl.appendChild(i);
+            codaEl.classList.toggle('pill', polish);
+            if (polish) { codaEl.classList.remove('beat'); void codaEl.offsetWidth; codaEl.classList.add('beat'); }
             codaEl.classList.add('show');
-            codaHideT = sysFIN_NOTE_GAP * 3;
+            codaHideT = polish ? Math.max(sysFIN_NOTE_GAP * 3, hold + 0.3) : sysFIN_NOTE_GAP * 3;
           } catch (e) { /* a caption */ }
         }, delay * 1000);
-      })(def.biome, t, def.name, def.keep, def.keepNone);
+      })(def.biome, t, def.name, def.keep, def.keepNone, gapK);
       t += gapK;
     }
     // ...and the twentieth (M5): the tag's held do', on the ocarina, named
@@ -39256,13 +39490,100 @@ export function createSystems(game) {
     setTimeout(function () {
       try { if (musVol && ac) musVol.gain.setTargetAtTime(0.0001, ac.currentTime, 0.18); } catch (e) {}
       sysFinHushed = true;
+      try { if (!game.state.noFinPolish && sysFinClosing) sysFinaleLastFrame(); } catch (e) { /* the coda ends on its hush alone */ }
     }, hushAt * 1000);
     return hushAt + sysFIN_HUSH;
+  }
+  // ---- THE LAST FRAME IS THE FIRST ONE (TEN T4a, noFinPolish) --------------
+  // The game opens on the animal asleep by a stranger's bag (sysOpeningPlay).
+  // The review's ending cut from the last keepsake's name straight to a
+  // receipt, "roughly one breath". So in the hush the caption goes, the
+  // animal's head goes down (the opening's own capyForceNap), and the lens
+  // comes in off the horseshoe to the two of them, the bag the traveller has
+  // just set down beside it: the opening image, found again. Nobody says so.
+  // The ledger waits sysFIN_LINGER past the hush for it, and never opens
+  // sooner than sysFIN_LEDGER_MIN after the closing beat.
+  const sysFIN_LINGER = 3;            // s the last frame is held, in the silence
+  const sysFIN_FLASH_NEAR = 5.5;      // m from the lens inside which a keepsake's flash is not held
+  const sysFIN_LEDGER_MIN = 16;       // s from the closing beat to the ledger, at least
+  const sysFIN_LAST_DIST = 4.2;       // m: the opening's 8.6 halved, one animal and one bag
+  let sysFinNapped = false;
+  function sysFinaleLastFrame() {
+    // the last words, alone: the closing sentence in the caption's own pill,
+    // the keepsake line with no name over it, and then nothing
+    try {
+      codaEl.textContent = '';
+      const i = document.createElement('i');
+      i.textContent = 'and that is the lot.';
+      codaEl.appendChild(i);
+      codaEl.classList.add('pill', 'show');
+      codaEl.classList.remove('beat'); void codaEl.offsetWidth; codaEl.classList.add('beat');
+      codaHideT = sysFIN_HUSH;
+    } catch (e) { /* a caption */ }
+    try { capyForceNap(1); sysFinNapped = true; } catch (e) { /* awake is still an ending */ }
+    // THE LENS FACES IT. The animal walked in through the mouth, so it faces
+    // the back of the horseshoe and the coda's lens had its back: MEASURED,
+    // the first last frame was a rump and a wing, the seated ibis 1 m from
+    // the glass. camYaw is the bearing from the animal to the lens, so its
+    // own heading puts the lens in front of its face, a quarter-turn off for
+    // three-quarters, on whichever side keeps the lens further from the bird.
+    // ...AND THROUGH A GAP. From the animal's front the lens stands outside
+    // the back of the horseshoe, and the second cut had a keepsake (an esky)
+    // filling the bottom third of the frame. The bearing is snapped to the
+    // middle of the nearest gap between two staged keepsakes, so the two of
+    // them frame the shot's lower corners instead of standing in it.
+    let yaw = sysFinCodaYaw + 0.35;
+    try {
+      const cp = game.capy.position, ry = game.capy.group.rotation.y;
+      let seat = null;
+      try { const ra = game.rivalAudit && game.rivalAudit(); seat = ra && ra.seat; } catch (e) { seat = null; }
+      const sx = seat ? (seat.x !== undefined ? seat.x : seat[0]) : NaN, sz = seat ? (seat.z !== undefined ? seat.z : seat[1]) : NaN;
+      // the keepsakes' bearings from the animal, world atan2(z, x), sorted
+      const th = [], ph = game.physics, earned = sysFinaleKeeps();
+      for (let i = 0; i < earned.length && ph && typeof ph.keepOut === 'function'; i++) {
+        const def = chapterDef(earned[i]);
+        const k = def && !def.keepNone ? ph.keepOut(def.biome) : null;
+        if (k && k.body) th.push(Math.atan2(k.body.position.z - cp.z, k.body.position.x - cp.x));
+      }
+      th.sort(function (a, b) { return a - b; });
+      const cands = [];
+      for (let i = 0; i < th.length; i++) {
+        const a = th[i], b = i + 1 < th.length ? th[i + 1] : th[0] + Math.PI * 2;
+        cands.push(Math.PI / 2 - (a + b) / 2);          // phi -> camYaw
+      }
+      if (!cands.length) cands.push(ry - 0.45, ry + 0.45);
+      // ...and the traveller, home from the set-down: MEASURED, the third cut
+      // had their hat filling the left third and the bird the right. Both are
+      // kept clear of the lens; the nearer of them scores the bearing.
+      let tx = NaN, tz = NaN;
+      try { const w = game.travFinAt && game.travFinAt(); if (w && w.visible) { tx = w.x; tz = w.z; } } catch (e) { /* nobody home */ }
+      let best = -Infinity;
+      for (let i = 0; i < cands.length; i++) {
+        const y = cands[i];
+        const off = Math.abs(Math.atan2(Math.sin(y - ry), Math.cos(y - ry)));
+        if (off > 1.65) continue;                        // at worst side-on: never its back
+        const cx = cp.x + Math.sin(y) * sysFIN_LAST_DIST, cz = cp.z + Math.cos(y) * sysFIN_LAST_DIST;
+        let clear = 4;
+        if (sx === sx) clear = Math.min(clear, Math.hypot(cx - sx, cz - sz));
+        if (tx === tx) clear = Math.min(clear, Math.hypot(cx - tx, cz - tz));
+        // clear of the two first (3.5 m is clear), then three-quarters (0.45
+        // off the nose); side-on is allowed when the face looks at the mouth,
+        // where the bird sits and the traveller goes home
+        const sc = Math.min(clear, 3.5) * 3 - Math.abs(off - 0.45);
+        if (sc > best) { best = sc; yaw = y; }
+      }
+    } catch (e) { /* the coda's own bearing stands */ }
+    if (typeof game.frameShot === 'function') {
+      game.frameShot({ dist: sysFIN_LAST_DIST, near: true, pitch: 0.2, raise: 0.35,
+                       yaw: yaw, hold: sysFIN_HUSH + sysFIN_LINGER + 1.5 });
+    }
+    sysFinCodaT = -1;                 // the drift stops: this frame is still
   }
   let sysFinHushed = false;
   function sysFinaleClose() {
     if (sysFinClosing || sysFinDone) return;
     sysFinClosing = true;
+    sysFinCloseAt = sysWall();
     momentVisibilityTick();       // an incident already on screen yields this frame
     sysFinDone = true;
     // ...and the notebook's last page (L6, F4): the traveller's line on the
@@ -39271,7 +39592,10 @@ export function createSystems(game) {
     // spent, so the file that carries `fin` carries the page with it.
     nbClose();
     saveSoon();
-    toast('and that is the lot.', 'last');
+    // Under noFinPolish off the sentence waits for the last frame, where it is
+    // the only words on the screen: said here, the pill sat on top of the
+    // coda's first three captions (qa/ten-t4a-coda-0.png, two pills at 18%).
+    if (game.state.noFinPolish) toast('and that is the lot.', 'last');
     // the lens: the ceremony's pull-back, walked round the horseshoe
     // THE LENS LOOKS IN THROUGH THE MOUTH (L6, E5). camYaw is the bearing
     // from the animal to the camera, with the camera at (sin, cos) of it —
@@ -39282,7 +39606,10 @@ export function createSystems(game) {
     // left, which was two tourists' backs in both settled frames.
     sysFinCodaYaw = Math.PI / 2 - sysFinOpen;
     sysFinCodaT = 0;
-    const sysFinCodaTotal = sysFinaleCoda();
+    // ...and the last frame's linger past the hush (TEN T4a), added here so the
+    // coda's own sum stays the phrase and its hush
+    const sysFinCodaPhrase = sysFinaleCoda();
+    const sysFinCodaTotal = sysFinCodaPhrase + (game.state.noFinPolish ? 0 : sysFIN_LINGER);
     if (typeof game.frameShot === 'function') {
       game.frameShot({ dist: sysFIN_CODA_DIST, pitch: sysFIN_CODA_PITCH, raise: sysFIN_CODA_RAISE, hold: sysFinCodaTotal + 1, yaw: sysFinCodaYaw });
     }
@@ -39302,17 +39629,27 @@ export function createSystems(game) {
     // longer the thing that opens this card, the flag has to be set on the path
     // that is. It also stops the receipt being drawable a second time, and it
     // is what the rescue and the ghost-replay key read to know the run is over.
+    const sysFinLedMs = Math.max(sysFIN_BEAT, sysFinCodaTotal * 1000,
+                                 game.state.noFinPolish ? 0 : sysFIN_LEDGER_MIN * 1000);
+    // ...and the frame is the ending's own for all of it (TEN T4a): the
+    // crowd's bubbles and any pill step out, the memory card's own quiet.
+    // MEASURED: "That one is not from here." stood over the last frame.
+    if (!game.state.noFinPolish) storyBeatQuiet(sysFinLedMs);
     setTimeout(function () {
       sysFinClosing = false;
       sysFinCodaT = -1;
       ended = true;
       hudRoot.classList.toggle('bare', hudBare);
-      codaEl.classList.remove('show');
+      codaEl.classList.remove('show', 'pill', 'beat');
+      // the animal is let go under the card; unpaused, its own damp wakes it
+      if (sysFinNapped) { sysFinNapped = false; try { capyForceNap(-1); } catch (e) {} }
+      sysFinLedAt = sysWall();
       ledShow(true);
       // the ledger brings the score back, over four seconds
       try { if (musVol && ac) musVol.gain.setTargetAtTime(musMuted ? 0.0001 : musLevel, ac.currentTime + 0.5, 1.6); } catch (e) {}
-    }, Math.max(sysFIN_BEAT, sysFinCodaTotal * 1000));
+    }, sysFinLedMs);
   }
+  let sysFinCloseAt = -1, sysFinLedAt = -1;   // wall seconds, for finAudit
 
   // ======================================================================
   // THE STORY'S BEATS (ROADMAP-TEN T2a)
@@ -40884,7 +41221,18 @@ export function createSystems(game) {
     // one key for moving between destinations close them instead — but handing
     // it "straight back to the browser" walks focus out of a modal that has
     // paused the world, which is the same leak the pause card had.
-    if (jrShown && c === 'Tab') { sysFocusWrap(jrEl, e); return; }
+    // ...BUT THE KEY THAT OPENED IT MAY CLOSE IT (TEN T4a). The review pressed
+    // Tab twice and was left staring at a paused world with the card still
+    // up. With focus on the card itself (where jrShow puts it) or nowhere,
+    // Tab closes; once focus is on a control, Tab walks the controls as P2
+    // built it, and Shift+Tab always walks in from the end.
+    if (jrShown && c === 'Tab') {
+      const a = document.activeElement;
+      const inCtl = !!(a && a !== jrCard && a !== jrEl && jrEl.contains(a) &&
+        (/^(BUTTON|INPUT|SELECT|TEXTAREA|A|SUMMARY)$/.test(a.tagName) || a.hasAttribute('tabindex')));
+      if (!inCtl && !e.shiftKey) { e.preventDefault(); jrHide(); return; }
+      sysFocusWrap(jrEl, e); return;
+    }
     // ESCAPE IS THE PAUSE KEY IN EVERY GAME EVER MADE, and here it did nothing
     // at all unless the board was already open — so the one key a player reaches
     // for when the doorbell goes left the capybara stood in traffic. It used to
@@ -47735,6 +48083,10 @@ export function createSystems(game) {
       };
       add(todoEl);
       add(mapEl);
+      // ...and the yuzu pill under the paper (TEN T4a, T3a's miss): a line
+      // landed across "0 yuzu" in the review's Sydney shots, the one number
+      // the garden spends. npc.js dodges every box in this list already.
+      add(walletEl);
       return out;
     },
     toast: toast,
