@@ -446,6 +446,38 @@ walk-through. Add an `inZone('posto6')` box for A's T3 door guard. Bounce (`noRi
 sand-bounce vertex colour on seaward faces, weighted by normal and height, and 1 in 6 windows lit
 (2320). Proof: hide-and-diff on the frontage band, mean luminance +15% or more.
 
+### T2d — shipped
+
+- **The rock is solid.** Arpoador's 22 stones are drawn from a seeded `rioRnd` (LCG), so the rock is
+  the same on every visit. Every stone gets a collider, all 22 on ONE static body: a ConvexPolyhedron
+  that is the drawn `sph6`'s own hexagonal waist and cap on a prism down to the lowest ground under
+  it. It has no invisible corner, and the animal's nose never ends up inside the stone. A stone of
+  s > 1.4 (11 of 22) keeps off the summit (r < 5) and off the wedge facing the calçadão (bearing
+  0.96 ± 0.5 rad), so the way up stays open. A smaller one is sunk until its crown is 0.56 m, a step
+  and not a wall. The 22 clappers no longer stand inside a stone (`rioRockIn`). Nav boxes go into
+  `rioSolids`.
+- **Proof** (`qa/ten-t2d-rock.js`, rung 1-3 headless): audit-solid2's horizontal ray at ground +
+  0.5 m, 8 bearings × 22 stones. With the body there are **0 walk-throughs in 176 drawn hits**. With
+  it lifted out (the chapter as it shipped) there are **176 in 176**. Shove test: the animal pushed
+  at each big stone at 3 m/s for 1.5 s is inside a waist below the cap for 0 ticks in 11 stones (it
+  climbs onto the cap or is stopped). The wedge's navBlocked: 3 of 87 samples, all at r 4-4.5 on a
+  sunk small stone's nav box on the slope. Physics lets the animal step it. A ray laid exactly along
+  a polyhedron edge misses in cannon (`qa/ten-t2d-rayprobe.js`), so the audit casts ±5 cm either side.
+- **`inZone('posto6')`** is the box x −50…−38, z −12…2: the sand and the calçadão east of the rock,
+  5.4 m clear of its 13 m. `game.rio.posto6` = {x −44, z −5} is its middle, for an arrow or a board.
+  Nothing reads it yet. T3a's door guard (or CHAPTERS `way`) chooses whether to move the door.
+- **Bounce (`noRioBounce`)**, baked. Seaward (−z) faces of the frontage have their colour × (1 + 1.3 ·
+  facing · height · rioBounce), fading to 45% at 34 m. One window in six is lit (`rioSequin` × 1.6,
+  keyed on block/floor, not rand). Two colour arrays are swapped on the flag's edge, so it costs no
+  draw, no uniform and nothing per frame beyond one compare. It does not park, because it costs no
+  GPU.
+- **Proof** (`qa/ten-t2d-bounce.js`, hide-and-diff mask on the frontage mesh, pinned lens, scene to
+  an RT before the composite): mean luminance live vs cut at three lenses on the sand is **+18.3 /
+  +16.7 / +16.3 % sRGB-encoded** (+30.2 / +31.6 / +21.5 % linear). Read by eye as
+  ten-t2d-bounce-on/off.png: warmer, lifted walls and lamp windows. **Owed:** the headful composite
+  number from the proof slot. The live-camera frame was not taken (camYaw does not hold inland at
+  arrival).
+
 **T2e · sahara.js · a place to aim at.** `game.sahara.wowTarget()` returns the next ring or the
 minaret, for A's T3 paper. Ring beams (`noSahRingBeam`, rung 1 or above) visible from 150 m (5768,
 169). Zenith band (`noSahZenith`): the top 35% of the dome lerps to `PALETTE.sahZenith` by elevation

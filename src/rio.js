@@ -1657,18 +1657,91 @@ function rioUpdateWaves(game, dt) {
  * it is also the way out of the chapter: it is the one place in the biome that
  * points at open ocean.
  */
+// ---- THE ROCK IS SOLID (ROADMAP-TEN T2d) ------------------------------------
+// The twenty-two boulders were `rand()` spheres with no collider, on the one
+// rock the chapter's star moment happens on: the animal stood inside a stone,
+// the stone dithered round it and it sank through to the surf (reviewer,
+// tb2-rio-03-grab.png). Two things, and the second needs the first:
+//
+//  - SEEDED. The same rock on every visit, so a collider laid under a stone
+//    is under that stone, and so the instrument can name them. A plain LCG,
+//    the envRnd shape; nothing else in the chapter draws from it.
+//  - SOLID AS DRAWN. rioG.sph6 is a six-sided, four-ring sphere, so a stone
+//    is a hexagon at its waist and a hexagonal cap over it. The collider is
+//    that exact cap on a hexagonal prism running down to the lowest ground
+//    under it: one ConvexPolyhedron per stone, all on ONE body the way the
+//    frontage pools its walls. No invisible corner, no nose inside the rock.
+//
+// And the rock still has to be climbed: the applause, the call and the bird
+// all happen on its top. A stone of s > 1.4 is a wall to the animal, so those
+// keep off the summit (r < 5, inside the arpoador check's 8 m, where the
+// clappers stand) and off the wedge that faces the calçadão, which is the way
+// up from the sand. A smaller one is sunk until its crown stands 0.56 m over
+// its ground, under the 0.62 m the animal steps up without a hop.
+let rioRndSeed = 0x9e3779b9;
+function rioRnd(a, b) {
+  rioRndSeed = (rioRndSeed * 1664525 + 1013904223) >>> 0;
+  return a + (rioRndSeed / 4294967296) * (b - a);
+}
+const rioROCK_BIG = 1.4;               // over this a stone is a wall to the animal
+const rioROCK_SUMMIT = 5.0;            // the clear top, metres from the centre
+const rioROCK_WAY = 0.96;              // bearing of the way up (toward -48,-6), radians
+const rioROCK_WAY_HALF = 0.5;          // and its half-width, radians
+const rioROCK_CROWN = 0.56;            // a small stone's crown over its own ground
+const rioRockStones = [];              // {x, z, s, sy, sz, y, big}: world space, for the instrument
+/** One stone as the physics sees it: sph6's waist and cap, on a prism to `lo`.
+ *  Local to (0, yc, 0). Winding checked outward (qa/ten-t2d-rock.js logs
+ *  cannon's "points into the shape" warning if it ever is not). */
+function rioRockShape(s, sy, sz, lo) {
+  const V = [], F = [];
+  const K = 0.70710678;                // sph6's rings sit at 45° either side of the waist
+  for (let k = 0; k < 6; k++) V.push(new CANNON.Vec3(-Math.cos(k * Math.PI / 3) * s, lo, Math.sin(k * Math.PI / 3) * sz));
+  for (let k = 0; k < 6; k++) V.push(new CANNON.Vec3(-Math.cos(k * Math.PI / 3) * s, 0, Math.sin(k * Math.PI / 3) * sz));
+  for (let k = 0; k < 6; k++) V.push(new CANNON.Vec3(-Math.cos(k * Math.PI / 3) * s * K, sy * K, Math.sin(k * Math.PI / 3) * sz * K));
+  V.push(new CANNON.Vec3(0, sy, 0));
+  F.push([5, 4, 3, 2, 1, 0]);                                        // the bottom
+  for (let k = 0; k < 6; k++) {
+    const n = (k + 1) % 6;
+    F.push([k, n, 6 + n, 6 + k]);                                    // the prism
+    F.push([6 + k, 6 + n, 12 + n, 12 + k]);                          // the waist to the ring
+    F.push([12 + k, 12 + n, 18]);                                    // the ring to the crown
+  }
+  return new CANNON.ConvexPolyhedron({ vertices: V, faces: F });
+}
 function rioBuildArpoador(game, root) {
   const M = rioMerger();
   const cx = rioARPOADOR.x, cz = rioARPOADOR.z;
+  const rock = new CANNON.Body({ mass: 0, material: (game.mats && game.mats.ground) || undefined });
+  rioRndSeed = 0x9e3779b9;
+  rioRockStones.length = 0;
   // a tumble of boulders sitting on the dome the terrain already provides
-  for (let i = 0; i < 22; i++) {
-    const a = rand(0, 6.28), r = rand(0, rioARPOADOR.r * 0.85);
+  for (let i = 0, tries = 0; i < 22 && tries < 400; tries++) {
+    const a = rioRnd(0, 6.28), r = rioRnd(0, rioARPOADOR.r * 0.85);
+    const s = rioRnd(1.1, 3.0), syK = rioRnd(0.45, 0.7), szK = rioRnd(0.8, 1.2);
+    const big = s > rioROCK_BIG, reach = s * Math.max(1, szK);
+    if (big) {
+      if (r - reach < rioROCK_SUMMIT) continue;
+      let da = Math.abs(a - rioROCK_WAY) % 6.2832;
+      if (da > Math.PI) da = 6.2832 - da;
+      if (da < rioROCK_WAY_HALF + Math.atan2(reach, Math.max(r, 1))) continue;
+    }
     const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
     const y = rioTerrain(x, z);
-    const s = rand(1.1, 3.0);
-    M.sph(x - cx, y - rioTerrain(cx, cz) + s * 0.25, z - cz, s, s * rand(0.45, 0.7), s * rand(0.8, 1.2),
+    const sy = s * syK, sz = s * szK;
+    const yc = y + (big ? s * 0.25 : Math.min(s * 0.25, rioROCK_CROWN - sy));
+    M.sph(x - cx, yc - rioTerrain(cx, cz), z - cz, s, sy, sz,
       i % 3 ? PALETTE.rioGranite : PALETTE.rioGraniteDk);
+    // down to the lowest ground under the waist: the dome falls away seaward
+    const lo = Math.min(y, rioTerrain(x + s, z), rioTerrain(x - s, z),
+                        rioTerrain(x, z + sz), rioTerrain(x, z - sz)) - 0.4;
+    rock.addShape(rioRockShape(s, sy, sz, lo - yc), new CANNON.Vec3(x, yc, z));
+    // the nav index takes boxes: the waist's flats, cap-high
+    rioSolids.add(x, (lo + yc + sy * 0.7) * 0.5, z, s * 0.87, (yc + sy * 0.7 - lo) * 0.5, sz * 0.87, 0);
+    rioRockStones.push({ x, z, s, sy, sz, y: yc, big });
+    i++;
   }
+  rioSyncBody(rock);
+  game.world.addBody(rock);
   const mesh = new THREE.Mesh(M.build(), rioVC());
   mesh.position.set(cx, rioTerrain(cx, cz), cz);
   mesh.castShadow = true; mesh.receiveShadow = true;
@@ -1677,14 +1750,26 @@ function rioBuildArpoador(game, root) {
   // The people already up there, waiting for it. They used to be sixteen
   // identical white boxes with no heads and no motion, in a chapter whose own
   // toast says "the whole rock is clapping" — see rioUpdatePeople, where they
-  // now do.
-  for (let i = 0; i < 22; i++) {
+  // now do. None of them stands inside a stone now the stones are solid.
+  for (let i = 0, t = 0; i < 22 && t < 200; t++) {
     const a = rand(0, 6.28), r = rand(2, rioARPOADOR.r * 0.62);
     const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+    if (rioRockIn(x, z, 0.5)) continue;
     // everybody up here is looking the same way, because there is only one
     // thing to look at and it goes down over Dois Irmãos every single evening
     rioAddPerson(x, rioTerrain(x, z), z, -1.57 + rand(-0.35, 0.35), rioPPL_ROCK);
+    i++;
   }
+}
+/** Inside a big stone's waist (plus `pad`), in plan. */
+function rioRockIn(x, z, pad) {
+  for (let i = 0; i < rioRockStones.length; i++) {
+    const st = rioRockStones[i];
+    if (!st.big) continue;
+    const dx = (x - st.x) / (st.s + pad), dz = (z - st.z) / (st.sz + pad);
+    if (dx * dx + dz * dz < 1) return true;
+  }
+  return false;
 }
 
 // ========================================================= PAO DE ACUCAR ====
@@ -2367,8 +2452,11 @@ function rioBuildFrontage(game, root) {
         M.box(x, fy + 0.46, rioFRONT_Z - rioFRONT_D * 0.5 - 1.06, w - 0.5, 0.92, 0.09,
               f % 2 ? PALETTE.rioArchShade : PALETTE.rioPavePale);
         // the window behind it, recessed and dark, so the slab has a depth
+        const w0 = M.n;
         M.box(x, fy + 1.35, rioFRONT_Z - rioFRONT_D * 0.5 + 0.04, w - 1.5, 1.7, 0.10,
               PALETTE.rioGraniteDk);
+        // one in six of them lit (T2d), keyed on the place, not on rand()
+        if (((b * 7 + k * 3 + f * 5) % 6) === 0) rioBounceWin.push(w0, M.n);
         // AND THE BACK, which is what you see from the avenue — i.e. from the
         // one place in the chapter the player spends the marquee moment. It was
         // a blank thirty-metre slab. A ribbon window per floor is one box and
@@ -2446,9 +2534,62 @@ function rioBuildFrontage(game, root) {
     }
   }
   SG.done();
-  const mesh = new THREE.Mesh(M.build(), rioVC());
+  const geo = M.build();
+  rioBounceBake(geo);
+  const mesh = new THREE.Mesh(geo, rioVC());
   mesh.castShadow = true; mesh.receiveShadow = true;
   root.add(mesh);
+}
+// ---- THE BEACH THROWN BACK UP THE WALL (T2d, noRioBounce) -------------------
+// The sun is north of the beach (this is the southern hemisphere) and it is
+// law, so every seaward face of the Avenida sits in its own shade all day, and
+// half the beach frame was grey slabs with black windows (reviewer,
+// tb1-rio-06-wander.png). What really lights that wall is the thing in front
+// of it: a hundred metres of pale sand in full sun. So the bounce is laid over
+// the sun rather than re-basing it, as extra light, not as a new paint: each
+// vertex's colour times (1 + K · facing · height · rioBounce), where facing is
+// how square the face stands to the sea (−z) and height fades it from the
+// shopfronts, which see the most sand, to 45 % at the roofline. And one
+// window in six gets its lamp on (rioSequin). Baked: two colour arrays and a
+// swap on the flag's edge, so it costs no draw, no uniform, no frame.
+const rioBOUNCE_K = 1.3;               // the sand's share at the foot of a square face
+const rioBOUNCE_FADE = 34;             // metres over which it falls to 45 %
+const rioBOUNCE_LAMP = 1.6;            // a lit window is a lamp, not paint: over 1 so it reads in the shade
+const rioBounceWin = [];               // [start, end) vertex ranges of the lit windows
+let rioBounceAttr = null, rioBounceA = null, rioBounceB = null, rioBounceOn = true;
+function rioBounceBake(geo) {
+  const pos = geo.attributes.position.array, nor = geo.attributes.normal.array;
+  const attr = geo.attributes.color, col = attr.array;
+  rioBounceA = new Float32Array(col);
+  rioBounceB = new Float32Array(col);
+  const tint = new THREE.Color(PALETTE.rioBounce), lit = new THREE.Color(PALETTE.rioSequin);
+  const B = rioBounceB, n = col.length / 3;
+  for (let i = 0; i < n; i++) {
+    const face = -nor[i * 3 + 2];
+    if (face <= 0.05) continue;
+    const gy = rioTerrain(pos[i * 3], rioFRONT_Z);
+    const up = 1 - 0.55 * clamp((pos[i * 3 + 1] - gy) / rioBOUNCE_FADE, 0, 1);
+    const k = rioBOUNCE_K * face * up;
+    B[i * 3] *= 1 + k * tint.r; B[i * 3 + 1] *= 1 + k * tint.g; B[i * 3 + 2] *= 1 + k * tint.b;
+  }
+  for (let j = 0; j < rioBounceWin.length; j += 2) {
+    for (let i = rioBounceWin[j]; i < rioBounceWin[j + 1]; i++) {
+      B[i * 3] = lit.r * rioBOUNCE_LAMP; B[i * 3 + 1] = lit.g * rioBOUNCE_LAMP; B[i * 3 + 2] = lit.b * rioBOUNCE_LAMP;
+    }
+  }
+  rioBounceWin.length = 0;
+  rioBounceAttr = attr;
+  rioBounceOn = !(rioGame && rioGame.state && rioGame.state.noRioBounce);
+  col.set(rioBounceOn ? rioBounceB : rioBounceA);
+}
+/** The flag's edge, and nothing else: one compare a frame when it is still. */
+function rioBounceTick(game) {
+  if (!rioBounceAttr) return;
+  const on = !game.state.noRioBounce;
+  if (on === rioBounceOn) return;
+  rioBounceOn = on;
+  rioBounceAttr.array.set(on ? rioBounceB : rioBounceA);
+  rioBounceAttr.needsUpdate = true;
 }
 
 // ============================================================== THE AVENUE ===
@@ -4698,8 +4839,16 @@ function rioInZone(name, x, z) {
   // it (z 84..118.7) does land in the zone, which is why nobody noticed.
   // Widened rather than given a zone of its own: it is the same stone.
   if (name === 'santateresa') return z > 70 && x < 40;
+  // POSTO 6 (T2d): the fishermen's end of the sand, where Copacabana stops
+  // and the rock starts. A box on the beach and the calçadão east of
+  // Arpoador, clear of its 13 m by five, so a door can stand here and the
+  // rock can belong to the bird and the applause (T3a's door guard reads it).
+  if (name === 'posto6') {
+    return x > rioPOSTO6.x0 && x < rioPOSTO6.x1 && z > rioPOSTO6.z0 && z < rioPOSTO6.z1;
+  }
   return false;
 }
+const rioPOSTO6 = { x0: -50, x1: -38, z0: -12, z1: 2, x: -44, z: -5 };
 
 // =============================================================== LIFECYCLE ===
 export function createRio(game) {
@@ -4808,6 +4957,11 @@ export function createRio(game) {
      *  taken on trust. Same class as salute() above. */
     clap() { return rioClap; },
     kiosk: { x: rioKIOSK.x, z: rioKIOSK_STAND },
+    /** The middle of inZone('posto6'), for an arrow or a board (T2d). */
+    posto6: { x: rioPOSTO6.x, z: rioPOSTO6.z },
+    /** Arpoador's stones as built, world space (T2d): {x, z, s, sy, sz, y, big}.
+     *  Read by qa/ten-t2d-rock.js; the array is the live one, do not write it. */
+    rockStones() { return rioRockStones; },
     calcadao: { x: 0, z: (rioPROM_Z + 2.6) * 0.5 },
     terrainHeight: rioTerrain,
     // Built from the static boxes themselves — see makeSolidIndex in shared.js.
@@ -5006,6 +5160,7 @@ export function createRio(game) {
       if (!rioBuilt) return;
       if (!game.biome.isActive('rio')) return;
       rioTime += dt;
+      rioBounceTick(game);
       if (rioFar) rioFar.update(game, dt);
       rioUpdateFlyover(game, dt);
       rioUpdateFragataRide(game);
