@@ -239,6 +239,12 @@ let caliWires = null;               // [{ s, x0, z0, x1, z1, y, hit, side }]
 // How many cables this ride has been got under cleanly. Scored at the mirador.
 let caliWireClear = 0;
 let caliWireMesh = null;
+// T1f (noWireFade): the cable as a thin instanced line, and the old one kept for the flag
+let caliWireThin = null, caliWireOld = null, caliWireFadeA = null, caliWireMid = null;
+let caliWireFadeN = 0;              // segments with any fade on them last frame
+const caliWIRE_THIN = 0.0375;       // m — half the 0.075 section the review called a bar
+const caliWIRE_FADE_R = 5.0;        // m from the lens a segment starts to go
+const caliWIRE_FADE_W = 1.5;        // ...and gone entirely by 3.5
 let caliBandGroup = null, caliBandDuck = 0, caliBandMembers = null;
 let caliCityLights = null, caliCityMat = null;
 let caliMiradorGlow = null, caliMiradorPool = null;
@@ -2095,6 +2101,8 @@ const caliWIRE_LINES = [
 function caliBuildWires(game, root) {
   caliWires = [];
   const M = caliMerger();
+  const Mold = caliMerger();   // T1f: the cables as they were, drawn only under noWireFade
+  const thin = [];             // ...and as they are: caliPush9 rows, one per catenary segment
   for (let i = 0; i < caliWIRE_AT.length; i++) {
     const s = caliWIRE_AT[i] * caliRouteLen;
     const a = caliRouteAt(s);
@@ -2126,8 +2134,10 @@ function caliBuildWires(game, root) {
         const qy = top - sag * (1 - Math.pow(2 * u - 1, 2));
         const flat = Math.hypot(qx - px, qz - pz);
         const len = Math.hypot(flat, qy - py);
-        M.box((px + qx) * 0.5, (py + qy) * 0.5, (pz + qz) * 0.5, 0.075, 0.075, len,
-              PALETTE.caliCable, -Math.atan2(qy - py, flat), a.yaw + Math.PI / 2, 0);
+        Mold.box((px + qx) * 0.5, (py + qy) * 0.5, (pz + qz) * 0.5, 0.075, 0.075, len,
+                 PALETTE.caliCable, -Math.atan2(qy - py, flat), a.yaw + Math.PI / 2, 0);
+        caliPush9(thin, (px + qx) * 0.5, (py + qy) * 0.5, (pz + qz) * 0.5,
+                  -Math.atan2(qy - py, flat), a.yaw + Math.PI / 2, 0, caliWIRE_THIN, caliWIRE_THIN, len);
         px = qx; pz = qz; py = qy;
       }
     }
@@ -2197,6 +2207,71 @@ function caliBuildWires(game, root) {
   m.frustumCulled = false;
   root.add(m);
   caliWireMesh = m;
+  // ---- T1f: THE LINE ITSELF (noWireFade) ---------------------------------
+  // The review, at the spawn: five or six cables across the upper-left third
+  // of the first frame as heavy bars, thicker than the palm trunks, running
+  // into the lens — caliWIRE_Y + 1.42 is the walking camera's own eye height
+  // for most of the town. Half the section, in dark metal a shade off the
+  // poles (PALETTE.caliWire), and one instance per segment so that each can
+  // take the crowd's own dither (vLensFade, per instance through aLensFade)
+  // as the lens comes within caliWIRE_FADE_R of it. The pennants, the washing
+  // and the shoes are the telegraph and stay in the merged mesh, undimmed.
+  const old = new THREE.Mesh(Mold.build(), caliVC());
+  old.castShadow = true;
+  old.frustumCulled = false;
+  old.visible = false;
+  root.add(old);
+  caliWireOld = old;
+  const im = caliInstance(root, new THREE.BoxGeometry(1, 1, 1), PALETTE.caliWire, thin, true, false);
+  if (im) {
+    const n = thin.length / 9;
+    caliWireFadeA = new THREE.InstancedBufferAttribute(new Float32Array(n), 1);
+    caliWireFadeA.setUsage(THREE.DynamicDrawUsage);
+    im.geometry.setAttribute('aLensFade', caliWireFadeA);
+    caliWireMid = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      caliWireMid[i * 3] = thin[i * 9]; caliWireMid[i * 3 + 1] = thin[i * 9 + 1]; caliWireMid[i * 3 + 2] = thin[i * 9 + 2];
+    }
+    caliWireThin = im;
+  }
+}
+
+/**
+ * THE LINE GOES WHEN THE LENS IS ON IT (T1f, `noWireFade`).
+ *
+ * Per segment, the distance from the rendered eye to the segment's middle: a
+ * segment is two metres at most, so the middle is within a metre of its
+ * nearest point, and the ramp is wider than that. Written only when a value
+ * changes; 126 multiply-adds a frame. Parks at rung 1 and up — every k back
+ * to zero, the thin line drawn whole, and the loop not run. The flag puts the
+ * old cables back and hides these.
+ */
+function caliUpdateWireFade(game) {
+  if (!caliWireThin || !caliWireFadeA) return;
+  const off = !!game.state.noWireFade;
+  if (caliWireThin.visible === off) {
+    caliWireThin.visible = !off;
+    if (caliWireOld) caliWireOld.visible = off;
+  }
+  const cam = game.camera;
+  const park = off || !cam || (game.state.perfRung | 0) >= 1;
+  if (park && caliWireFadeN === 0) return;
+  const arr = caliWireFadeA.array, mid = caliWireMid;
+  const cx = park ? 0 : cam.position.x, cy = park ? 0 : cam.position.y, cz = park ? 0 : cam.position.z;
+  const R2 = caliWIRE_FADE_R * caliWIRE_FADE_R;
+  let dirty = false, lit = 0;
+  for (let i = 0; i < arr.length; i++) {
+    let k = 0;
+    if (!park) {
+      const dx = mid[i * 3] - cx, dy = mid[i * 3 + 1] - cy, dz = mid[i * 3 + 2] - cz;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 < R2) k = clamp((caliWIRE_FADE_R - Math.sqrt(d2)) / caliWIRE_FADE_W, 0, 1);
+    }
+    if (k > 0) lit++;
+    if (arr[i] !== k) { arr[i] = k; dirty = true; }
+  }
+  caliWireFadeN = lit;
+  if (dirty) caliWireFadeA.needsUpdate = true;
 }
 
 /**
@@ -4958,7 +5033,9 @@ export function createCali(game) {
                clearScore: caliWireClear, hits: caliWireHits, lean: +caliBandLean.toFixed(2), duck: +caliBandDuck.toFixed(2),
                night: +caliNightT.toFixed(2), bulbs: caliChivaBulbs ? +caliChivaBulbs.material.color.r.toFixed(2) : null,
                perfectT: +caliPerfectT.toFixed(2), yaw: +caliChivaYaw.toFixed(3), yawRate: +caliChivaYawRate.toFixed(3),
-               held: caliHoldN, missed: caliMissN, backIn: +caliBackIn().toFixed(1) };
+               held: caliHoldN, missed: caliMissN, backIn: +caliBackIn().toFixed(1),
+               wireSegs: caliWireFadeA ? caliWireFadeA.count : 0, wireFaded: caliWireFadeN,
+               wireThin: !!(caliWireThin && caliWireThin.visible), wireOld: !!(caliWireOld && caliWireOld.visible) };
     },
     /** For the harness (L5): the hazards, in route order. */
     wireList() {
@@ -5162,6 +5239,7 @@ export function createCali(game) {
       caliStepChiva(game, dt);
       caliUpdateCart(game, dt);
       caliCheckWires(game, dt);
+      caliUpdateWireFade(game);
       caliUpdateKites(dt);
       caliUpdateLoros(game, dt);
       caliUpdateNight();
