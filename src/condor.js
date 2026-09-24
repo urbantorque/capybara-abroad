@@ -359,6 +359,46 @@ let condorStalled = false;
 // long enough that the passenger has to have actually fallen away.
 let condorRegrabT = 0;
 let condorGrabRelease = false;  // a dismount's held key must be released first
+// ---- THE BIRD CAN BE CAUGHT (TEN T1e, `noCondorOpen`) ----------------------
+// Measured on a fresh file at the plaza spawn (qa/ten-t1e-diag.js): a leap took
+// the talons, the pair flew into a stall 3 s later, and the released bird sat
+// 1.9 m over the paving, jammed under the stall's roof, at 0.2 m/s, for as long
+// as anyone watched. `circling`, `lowered`, the orbit asking for 6.6 m, and the
+// seek pushing it straight up into the canvas. talonInReach() read false every
+// frame, because condorPickupReady wants 4 m of air under the bird, and the
+// paper went on saying "hold E under it". The reviewer's run at rung 3 saw the
+// same bird on the plaza, 0 of 100 samples in reach.
+//
+// Three repairs, none of which touches the flight model:
+//  - the orbit's height is never less than condorOPEN_LIFT over whatever is
+//    under the seek point (terrain or townscape, condorGroundTop) plus the hang;
+//  - a watchdog: lowered, circling and not ready for condorOPEN_T in a row, it
+//    goes and circles over the nearest open piece of sky instead of the animal;
+//  - and a jammed bird gets out: its contacts are switched off (condorGhostT)
+//    until it is clear of anything a stall could be, then switched back on.
+const condorOPEN_LIFT = 3.5;            // metres of sky kept under the talons
+const condorOPEN_T = 3.0;               // seconds lowered-but-not-ready before it moves
+const condorOPEN_GIVE_UP = 35;          // the animal wandered off: follow it again
+const condorPIN_V = 1.5;                // m/s: slower than this, that low, it is jammed
+const condorGHOST_AGL = 4.5;            // a stall roof is ~3 m; clear of that, collide again
+let condorOpenT = 0;                    // the watchdog's clock (condorAudit().stuckT)
+let condorOpenOn = false, condorOpenX = 0, condorOpenZ = 0;
+let condorOpens = 0;                    // re-centres, per summon
+let condorOpenSaid = false;             // the line is said once per summon
+let condorGhostT = 0;                   // > 0 while it climbs out with no contacts
+let condorPins = 0;                     // times it was found jammed, per summon
+// ---- THE SUMMON SHOT (TEN T1e, `noSummonShot`) -----------------------------
+// The call spawns the bird 46 m out at a random bearing and 56 m up and nothing
+// looked at it: the reviewer's frame said "look at the size of that thing" over
+// empty paving, the bird behind the lens. Once per chapter visit, the first
+// time the inbound bird comes inside condorSHOT_R, the lens is turned to put it
+// over the animal; the whistle gets an answer 0.6 s after it is blown.
+const condorSHOT_R = 30;
+const condorSHOT_LEAD = 1.4;            // seconds of flight the yaw is aimed ahead by
+let condorShotVisit = false;            // latched per chapter visit
+let condorShotArmed = false;            // this summon may still take the shot
+let condorShots = 0;
+let condorEchoT = 0;                    // > 0: the answering wheek is pending
 // ---- THE ROLL (L1) ---------------------------------------------------------
 // Twelve seconds of hanging on was the marquee, and the bird could already
 // flap (Q), tuck (Shift) and steer. Space while carrying, with air under the
@@ -408,6 +448,10 @@ const condorVelSnap = new CANNON.Vec3();
 const condorRel = new CANNON.Vec3();
 const condorSeek = new CANNON.Vec3();
 const condorHeadDir = new CANNON.Vec3();
+// T1e: the open-sky search's one ray, allocated once
+const condorRayFrom = new CANNON.Vec3();
+const condorRayTo = new CANNON.Vec3();
+const condorRayRes = new CANNON.RaycastResult();
 const condorMomArm = new CANNON.Vec3();
 const condorMomF = new CANNON.Vec3();
 const condorSyncVel = new CANNON.Vec3();
@@ -580,6 +624,26 @@ export function createCondor(game) {
      * returns false when there is nothing to release.
      */
     release() { return condorRelease(true); },
+    /**
+     * WHERE IT WILL COME DOWN, if that is not over the animal (T1e). The open
+     * point the watchdog chose, or null while the orbit is following the
+     * animal. The bird itself flies there, so the paper's arrow on the bird is
+     * already right; this is for anything that wants the spot, not the bird.
+     */
+    openSpot() { return condorOpenOn ? { x: condorOpenX, z: condorOpenZ } : null; },
+    /** Harness and soak only; nothing in src reads it. stuckT is the watchdog's
+     *  clock and must never sit past condorOPEN_T for long. */
+    condorAudit() {
+      return { state: condorState, lowered: condorLowered, stuckT: +condorOpenT.toFixed(2),
+               opens: condorOpens, open: condorOpenOn ? [+condorOpenX.toFixed(1), +condorOpenZ.toFixed(1)] : null,
+               pins: condorPins, ghost: +condorGhostT.toFixed(2), ready: !!condorBody && condorApi.active && condorPickupReady(),
+               talon: +Math.min(99, condorTalonDist()).toFixed(2), shots: condorShots,
+               carryStuckT: +condorStuckT.toFixed(2),
+               // the attitude and the force the last substeps flew on, per kg
+               upY: condorBody ? +(1 - 2 * (condorBody.quaternion.x * condorBody.quaternion.x +
+                                            condorBody.quaternion.z * condorBody.quaternion.z)).toFixed(2) : 0,
+               fy: +(condorFrameF.y / condorMASS).toFixed(2), holds: condorHoldN, aiT: +condorAiT.toFixed(2) };
+    },
     update(dt) { condorUpdate(dt); },
   };
   condorApi = api;
@@ -598,6 +662,8 @@ export function createCondor(game) {
     // a teleport that happens between frames is already through the constraint
     // solver — and out the other side at 90 m/s — by the time update() sees it.
     game.world.addEventListener('preStep', condorGuardPreStep);
+    game.world.addEventListener('preStep', condorHoldForces);   // T1e
+    game.world.addEventListener('postStep', condorCountStep);   // T1e
   }
 
   // ---- AND THE LAST NAMED REFERENCE, WHICH A GREP FOR `game.pasto` MISSES --
@@ -618,6 +684,8 @@ export function createCondor(game) {
   // border, exactly as it always did; the host only decides whether a new one
   // can be called on the other side.
   game.events.on('biome:enter', function () {
+    condorShotVisit = false;                 // the summon shot is once per visit
+    if (game.state) game.state.flierWhistleT = 0;
     condorDespawn(true);
     if (condorHost() && condorState === 'gone') condorDetachBody();
   });
@@ -996,6 +1064,32 @@ function condorSummon() {
     if (rideId && game.taskDone(rideId)) condorRodeOnce = true;
   }
 
+  // ---- A WHISTLE AT THE BIRD IS NOT A WHISTLE AT THE DOOR (T1e) -----------
+  // Rio's travel door and Pasto's crater door count Q presses inside the same
+  // circle the bird is called in, and the third press of a slow descent opened
+  // the departures board over the chapter's star moment. Every press this
+  // function spends on the bird marks the next six seconds as the bird's;
+  // systems.js reads it in homeOk. This file is its one writer (the decay is in
+  // condorUpdate).
+  if (condorState !== 'gone' && condorState !== 'carrying' && game.state) game.state.flierWhistleT = 6;
+
+  // ---- ...AND ONE BLOWN WHILE IT IS STILL COMING IN IS NOT LOST (T1e) -----
+  // The inbound spiral is four seconds of GAME time, and at rung 3 a frame is
+  // 60-80 ms, so a player who waits five seconds on the wall clock and whistles
+  // again whistles at an inbound bird — which returned false and did nothing,
+  // and the bird then circled at 14 m waiting for a press that had been made.
+  if (condorState === 'inbound') {
+    if (!condorLowered) {
+      if (typeof game.sfx === 'function') game.sfx('whistle');
+      condorLowered = true;
+      condorOrbitYTarget = condorORBIT_LOW_Y;
+      condorOrbitRTarget = condorORBIT_LOW_R;
+      if (typeof game.toast === 'function') game.toast('the condor drops lower…');
+      return true;
+    }
+    return false;
+  }
+
   // whistling again while it circles brings it down into actual reach
   if (condorState === 'circling') {
     if (typeof game.sfx === 'function') game.sfx('whistle');
@@ -1051,6 +1145,11 @@ function condorSummon() {
   condorGroup.visible = true;
   condorSetState('inbound');
   condorBoredT = 0;
+  condorOpenReset();
+  if (game.state) game.state.flierWhistleT = 6;          // see the note at the top
+  // once per visit; a flag that is cut simply never arms it (costs nothing)
+  condorShotArmed = !condorShotVisit && !(game.state && game.state.noSummonShot);
+  condorEchoT = (game.state && game.state.noSummonShot) ? 0 : 0.6;
 
   if (typeof game.sfx === 'function') game.sfx('whistle');
   // ---- ...AND THE TASK IT TICKS BELONGS TO THE HOST -----------------------
@@ -1105,6 +1204,8 @@ function condorDetachBody() {
 }
 
 function condorDespawn(silent) {
+  condorOpenReset();
+  condorShotArmed = false; condorEchoT = 0;
   condorLaunchGrace = 0;
   condorLaunchLift = 0;
   condorStalled = false;
@@ -1126,7 +1227,7 @@ function condorDespawn(silent) {
 
 function condorSetState(s) {
   condorState = s;
-  condorStateT = 0; condorRolls = 0; condorRollT = 0;
+  condorStateT = 0; condorRolls = 0; condorRollT = 0; condorAiT = 0;
   if (condorApi) {
     condorApi.state = s;
     condorApi.mounted = (s === 'carrying');
@@ -1140,6 +1241,8 @@ function condorMount() {
   const game = condorGame;
   const capy = game && game.capy;
   if (!capy || !capy.body || condorConstraint) return false;
+  // T1e: collide again, follow the animal again (the counts stay for the audit)
+  condorOpenOn = false; condorOpenT = 0; condorGhost(false);
   // The pilot's hands are empty at the moment of the grab. Without this the
   // filtered stick still holds whatever the capybara was walking in when the
   // talons closed, and the first half second of every ride is a turn nobody
@@ -1428,6 +1531,58 @@ function condorGuardCore(isPreStep) {
   condorPrevVX = condorSyncVel.x; condorPrevVZ = condorSyncVel.z;
 }
 
+// ---- A FORCE IS FOR THE WHOLE FRAME, NOT ITS FIRST SUBSTEP (T1e) -----------
+// Every force in this file is written by update(), which main.js runs AFTER
+// world.step — so it is spent by the NEXT frame's step. cannon-es clears
+// body.force at the end of every internal step (World.clearForces), so a frame
+// that takes two substeps gave the bird its lift, its seek and its wingbeat
+// for the first 1/60 s and plain gravity for the second. From rung 2 the world
+// takes two substeps every frame (MAIN_SHED_SUBSTEPS): the bird lived on half
+// of everything it asked for, and measured at rung 3 it fell out of the high
+// orbit straight onto the plaza 1.5 s after it arrived (qa/ten-t1e-condor.js,
+// before: y 16.3 -> 0.7 m, and sat there). The frame's force and torque are
+// kept on the first substep and put back on every later one, so a rung-3 frame
+// flies the bird the way a rung-0 frame does. `noCondorSubstep` is the old way.
+// ...AND THE SCRIPT RUNS ON THE SAME CLOCK AS THE BODY. The inbound spiral, the
+// orbit's angle and its height easing were all written against `dt`, the game's
+// clock, while the body they steer lives on the solver's. At rung 0 those agree.
+// From rung 2 a frame is clamped to 1/20 s and the world takes two 1/60 steps
+// of it (one, when a substep runs long and cannon-es bails), so the target
+// moved 1.5-3x faster than the bird could: the four-second descent from 56 m
+// became a 20 m/s dive through the high orbit and into the plaza. The AI states
+// advance by what the solver actually simulated (condorAiDt), counted here.
+let condorSubN = 0;                     // internal steps since the last update
+let condorAiT = 0;                      // solver seconds in the current AI state
+let condorAiRatio = 1;                  // solver seconds per game second, smoothed
+function condorCountStep() { condorSubN++; }
+let condorFrameFresh = false;           // update() has written this frame's forces
+let condorFrameHeld = false;            // ...and the first substep has kept them
+let condorHoldN = 0;                    // later substeps given the frame's force (audit)
+const condorFrameF = new CANNON.Vec3();
+const condorFrameTq = new CANNON.Vec3();
+function condorHoldForces() {
+  if (!condorBody || !condorInWorld) return;
+  if (condorFrameFresh) {
+    // cannon-es has already added m*g to the accumulator by the time preStep
+    // fires, and adds it again on every substep. Kept with it, the second
+    // substep flew under two gravities (measured: a low orbit asked for 6.9 m
+    // held at 3.8, a hair under condorPickupReady's 4 m, for good).
+    const W = condorGame.world, m = condorBody.mass;
+    condorFrameF.set(condorBody.force.x - m * W.gravity.x,
+                     condorBody.force.y - m * W.gravity.y,
+                     condorBody.force.z - m * W.gravity.z);
+    condorFrameTq.copy(condorBody.torque);
+    condorFrameFresh = false;
+    condorFrameHeld = true;
+    return;
+  }
+  if (!condorFrameHeld || (condorGame && condorGame.state && condorGame.state.noCondorSubstep)) return;
+  // cleared by the substep before, so this is the frame's force, not twice it
+  condorBody.force.vadd(condorFrameF, condorBody.force);
+  condorHoldN++;
+  condorBody.torque.vadd(condorFrameTq, condorBody.torque);
+}
+
 function condorOnPostStep() {
   if (condorState !== 'carrying' && condorLaunchGrace <= 0) return;
   const capy = condorGame && condorGame.capy;
@@ -1464,6 +1619,15 @@ function condorUpdate(dt) {
     return;
   }
 
+  // a frame that returns before the forces are written has none to keep
+  condorFrameFresh = false; condorFrameHeld = false;
+  // what the solver simulated since the last update (see condorCountStep);
+  // `noCondorSubstep` puts the script back on the game's clock
+  const stepDt = game.world && game.world.dt > 0 ? game.world.dt : 1 / 60;
+  const aiDt = (game.state && game.state.noCondorSubstep) ? dt : Math.min(0.1, condorSubN * stepDt);
+  condorSubN = 0;
+  condorAiRatio = damp(condorAiRatio, clamp(aiDt / dt, 0.2, 1.5), 2, dt);
+
   // ---- teleport guard: repair the mount BEFORE anything reads it ------------
   condorGuardMount();
 
@@ -1472,6 +1636,16 @@ function condorUpdate(dt) {
 
   // the post-landing unwind outlives the bird, so it runs ahead of every early-out
   condorSettle(dt);
+
+  // T1e: the door guard decays here and nowhere else; the answer to the call
+  // is a second, lower wheek 0.6 s behind it (`noSummonShot` never arms it).
+  if (game.state && game.state.flierWhistleT > 0) game.state.flierWhistleT = Math.max(0, game.state.flierWhistleT - dt);
+  if (condorEchoT > 0) {
+    condorEchoT -= dt;
+    if (condorEchoT <= 0 && condorState !== 'gone' && typeof game.sfx === 'function') {
+      game.sfx('whistle', { pitch: 0.8, volume: 0.5 });
+    }
+  }
 
   if (condorState === 'gone') {
     condorLaunchGrace = 0;
@@ -1573,16 +1747,28 @@ function condorUpdate(dt) {
   // AI STATES — inbound spiral, lazy orbit, exit. Force-driven, never a rail.
   // ==========================================================================
   if (condorState !== 'carrying') {
-    const cx = capy ? capy.body.position.x : 0;
-    const cy = capy ? capy.body.position.y : 1.4;
-    const cz = capy ? capy.body.position.z : 26;
+    let cx = capy ? capy.body.position.x : 0;
+    let cy = capy ? capy.body.position.y : 1.4;
+    let cz = capy ? capy.body.position.z : 26;
+    // T1e: the watchdog moved the orbit to open sky. Same height over the
+    // ground there as the animal has where it stands, so walking under it is
+    // the same pickup as ever. Wander off and the bird follows again.
+    if (condorOpenOn) {
+      if (condorState !== 'circling' || Math.hypot(cx - condorOpenX, cz - condorOpenZ) > condorOPEN_GIVE_UP) {
+        condorOpenOn = false;
+      } else {
+        cy = condorTerrain(condorOpenX, condorOpenZ) + (cy - condorTerrain(cx, cz));
+        cx = condorOpenX; cz = condorOpenZ;
+      }
+    }
 
+    condorAiT += aiDt;                  // T1e: the solver's clock, see condorCountStep
     if (condorState === 'inbound') {
-      const k = clamp(condorStateT / condorINBOUND_T, 0, 1);
+      const k = clamp(condorAiT / condorINBOUND_T, 0, 1);
       const ease = k * k * (3 - 2 * k);
       condorOrbitR = lerp(condorSpawnR, condorORBIT_HIGH_R, ease);
       condorOrbitY = lerp(condorSpawnY - cy, condorORBIT_HIGH_Y, ease);
-      condorOrbitAng += (2.35 - 1.1 * ease) * dt;
+      condorOrbitAng += (2.35 - 1.1 * ease) * aiDt;
       if (k >= 1) {
         condorSetState('circling');
         condorBoredT = 0;
@@ -1595,9 +1781,9 @@ function condorUpdate(dt) {
         }
       }
     } else if (condorState === 'circling') {
-      condorOrbitR = damp(condorOrbitR, condorOrbitRTarget, 1.4, dt);
-      condorOrbitY = damp(condorOrbitY, condorOrbitYTarget, 1.2, dt);
-      condorOrbitAng += (condorLowered ? 1.55 : 1.15) * dt;
+      condorOrbitR = damp(condorOrbitR, condorOrbitRTarget, 1.4, aiDt);
+      condorOrbitY = damp(condorOrbitY, condorOrbitYTarget, 1.2, aiDt);
+      condorOrbitAng += (condorLowered ? 1.55 : 1.15) * aiDt;
       condorBoredT += dt;
       if (condorBoredT > condorBORED) {
         condorSetState('leaving');
@@ -1605,16 +1791,24 @@ function condorUpdate(dt) {
         if (typeof game.toast === 'function') game.toast('the condor gives up on you');
       }
     } else if (condorState === 'leaving') {
-      condorOrbitR = damp(condorOrbitR, 70, 0.9, dt);
-      condorOrbitY = damp(condorOrbitY, 70, 0.8, dt);
-      condorOrbitAng += 0.9 * dt;
-      if (condorStateT > 9) { condorDespawn(true); return; }
+      condorOrbitR = damp(condorOrbitR, 70, 0.9, aiDt);
+      condorOrbitY = damp(condorOrbitY, 70, 0.8, aiDt);
+      condorOrbitAng += 0.9 * aiDt;
+      if (condorAiT > 9) { condorDespawn(true); return; }
     }
 
     // seek target on the orbit
     const tx = cx + Math.cos(condorOrbitAng) * condorOrbitR;
     const tz = cz + Math.sin(condorOrbitAng) * condorOrbitR;
-    const ty = cy + condorOrbitY;
+    let ty = cy + condorOrbitY;
+    // T1e: THE LOW ORBIT HAS A FLOOR. 6.6 m over the animal is 6.6 m over the
+    // paving only while nothing stands between them; over a fountain, a stall
+    // row or a hillside it was an order to fly into it. Never less than
+    // condorOPEN_LIFT of air under the hanging talons, whatever is below.
+    if (condorState === 'circling' && !(game.state && game.state.noCondorOpen)) {
+      const floorY = condorGroundTop(tx, tz) + condorHANG + condorOPEN_LIFT;
+      if (ty < floorY) ty = floorY;
+    }
     condorSeek.set(tx - condorBody.position.x, ty - condorBody.position.y, tz - condorBody.position.z);
     const derr = condorSeek.length();
     const want = clamp(derr * 1.5, 0, 26);
@@ -1652,6 +1846,10 @@ function condorUpdate(dt) {
     condorFlapPhase += (2.4 + clamp(condorSeek.y * 0.25, 0, 4)) * dt;
     condorAiBeat = damp(condorAiBeat, clamp(condorSeek.y * 0.14, 0, 1), 3, dt);
     condorLandSpeed = 0;
+
+    condorGhostTick(dt);
+    if (condorState === 'circling' && !(game.state && game.state.noCondorOpen)) condorOpenWatch(dt, cy);
+    if (condorShotArmed && (condorState === 'inbound' || condorState === 'circling')) condorShotCheck();
 
     // Tested last so a mount takes effect from the NEXT frame — the seek force
     // above must not be applied against a constraint that did not exist when it
@@ -2184,6 +2382,7 @@ function condorUpdate(dt) {
     }
   }
 
+  condorFrameFresh = true;              // see condorHoldForces
   condorAnimate(dt, airspeed, bank, pitch, mounted);
   condorRender(dt);
 }
@@ -2467,6 +2666,167 @@ function condorTryMount(dt) {
   // a leap into the talons counts even without the grab key
   const leapt = !capy.grounded && capy.body.velocity.y > 0.6 && d < condorREACH + 1.0;
   if ((grabbed || leapt) && condorPickupReady()) condorMount();
+}
+
+// ---------------------------------------------------------------------------
+// THE BIRD CAN BE CAUGHT (T1e). See condorOPEN_LIFT for the measurement.
+// ---------------------------------------------------------------------------
+/** Everything the watchdog holds goes back to "following the animal". */
+function condorOpenReset() {
+  condorOpenT = 0; condorOpenOn = false; condorOpens = 0;
+  condorOpenSaid = false; condorPins = 0;
+  condorGhost(false);
+}
+
+/** Contacts off (on = true) while a jammed bird climbs out, and back on. Its
+ *  own collide listener still fires; nothing else reads collisionResponse. */
+function condorGhost(on) {
+  condorGhostT = on ? 4.0 : 0;          // 4 s is a safety expiry, not the rule
+  if (condorBody) condorBody.collisionResponse = !on;
+}
+
+/** The rule for switching them back: clear of anything a stall could be, and
+ *  over whatever tall thing the obstacle table knows about. */
+function condorGhostTick(dt) {
+  if (condorGhostT <= 0) return;
+  condorGhostT -= dt;
+  const p = condorBody.position;
+  // with no contacts the paving is not a floor either: measured, a ghost that
+  // had not yet climbed sank to 1.3 m under the plaza. It keeps a floor.
+  const floorY = condorTerrain(p.x, p.z) + condorRADIUS + 0.1;
+  if (p.y < floorY) {
+    p.y = floorY;
+    if (condorBody.velocity.y < 0) condorBody.velocity.y = 0;
+    condorBody.previousPosition.copy(p);
+    condorBody.interpolatedPosition.copy(p);
+  }
+  if (condorGhostT <= 0 || (p.y - condorTerrain(p.x, p.z) > condorGHOST_AGL &&
+                            p.y > condorGroundTop(p.x, p.z) + condorHANG)) condorGhost(false);
+}
+
+/**
+ * THE WATCHDOG. Runs while circling. Three seconds in a row of "lowered, at its
+ * height, and still not ready" — or of sitting jammed low and slow, which is
+ * what a crash into a stall leaves — and it stops circling the animal and
+ * circles the nearest open piece of sky instead.
+ */
+function condorOpenWatch(dt, cy) {
+  const game = condorGame;
+  const capy = game.capy;
+  if (!capy || !capy.body) return;
+  const p = condorBody.position, v = condorBody.velocity;
+  const agl = p.y - condorTerrain(p.x, p.z);
+  const sp = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+  const pinned = agl < condorHANG + condorOPEN_LIFT - 1 && sp < condorPIN_V;
+  // "at its height" is the eased orbit arriving, so the 2.5 s descent after the
+  // second whistle is not mistaken for a refusal
+  const settled = condorLowered && condorRegrabT <= 0 &&
+                  Math.abs(condorOrbitY - condorOrbitYTarget) < 1.0;
+  if (!(pinned || (settled && !condorPickupReady()))) { condorOpenT = 0; return; }
+  condorOpenT += dt;
+  if (condorOpenT < condorOPEN_T) return;
+  condorOpenT = 0;
+  if (pinned) { condorPins++; condorGhost(true); }
+  const ax = capy.body.position.x, az = capy.body.position.z;
+  // Already over open sky with the animal under it: moving again would only
+  // chase it round the plaza. Stay, and let the ghost do the rest.
+  if (condorOpenOn && Math.hypot(ax - condorOpenX, az - condorOpenZ) < 4) return;
+  if (condorOpenFind(ax, az, cy - condorTerrain(condorOpenOn ? condorOpenX : ax, condorOpenOn ? condorOpenZ : az))) {
+    condorOpenOn = true;
+    condorOpens++;
+    condorBoredT = Math.min(condorBoredT, condorBORED - 12);   // time to walk 20 m
+  }
+  if (!condorOpenSaid && typeof game.toast === 'function') {
+    condorOpenSaid = true;
+    const host = condorHost();
+    const line = host && host.flier && typeof host.flier.openLine === 'string' ? host.flier.openLine
+      : (game.biome && game.biome.current === 'pasto'
+        ? 'it will not come down under the flags. somewhere with more sky.'
+        : 'it will not come down here. somewhere with more sky.');
+    game.toast(line);
+  }
+}
+
+/**
+ * THE NEAREST OPEN SKY. 8 bearings at 8, 14 and 20 m round the animal; a point
+ * is open if nothing stands ON it (a ray down finds only the ground) and at
+ * least six of eight launch headings from it clear everything the avoidance
+ * table knows for 18 m at the talon height. Nearest ring wins, then the most
+ * headings. Runs on the watchdog's event only — 24 rays and ~600 table reads.
+ */
+const condorOPEN_RINGS = [8, 14, 20];
+function condorOpenFind(ax, az, hOver) {
+  const world = condorGame && condorGame.world;
+  if (!(hOver > 0.2)) hOver = 0.35;
+  let best = -1, bx = 0, bz = 0;
+  for (let ri = 0; ri < condorOPEN_RINGS.length && best < 0; ri++) {
+    const r = condorOPEN_RINGS[ri];
+    for (let k = 0; k < 8; k++) {
+      const a = k * Math.PI / 4;
+      const x = ax + Math.cos(a) * r, z = az + Math.sin(a) * r;
+      if (!condorOverGround(x, z)) continue;
+      const th = condorTerrain(x, z);
+      if (condorGroundTop(x, z) > th + 0.5) continue;
+      if (world && typeof world.raycastClosest === 'function') {
+        // stops short of the ground: the collider and terrainHeight disagree by
+        // a few centimetres on a lattice, and the ground is not an obstacle
+        condorRayFrom.set(x, th + 12, z); condorRayTo.set(x, th + 0.6, z);
+        condorRayRes.reset();
+        world.raycastClosest(condorRayFrom, condorRayTo, { skipBackfaces: true }, condorRayRes);
+        if (condorRayRes.hasHit && condorRayRes.body && condorRayRes.body.mass === 0 &&
+            condorRayRes.body !== condorBody) continue;
+      }
+      const yo = th + hOver + condorORBIT_LOW_Y - condorHANG - 0.5;
+      let clear = 0;
+      for (let j = 0; j < 8; j++) {
+        const b = j * Math.PI / 4, cb = Math.cos(b), sb = Math.sin(b);
+        if (condorGroundTop(x + cb * 6, z + sb * 6) < yo &&
+            condorGroundTop(x + cb * 12, z + sb * 12) < yo &&
+            condorGroundTop(x + cb * 18, z + sb * 18) < yo) clear++;
+      }
+      if (clear >= 6 && clear > best) { best = clear; bx = x; bz = z; }
+    }
+  }
+  if (best < 0) return false;
+  condorOpenX = bx; condorOpenZ = bz;
+  return true;
+}
+
+/**
+ * THE SUMMON SHOT. Once per visit, the first frame the inbound bird is inside
+ * condorSHOT_R of the animal: the lens goes round behind the animal, away from
+ * where the bird will be condorSHOT_LEAD from now, and looks up. Not a
+ * cutscene — frameShot yields to the mouse, Z/X and the stick.
+ */
+function condorShotCheck() {
+  const game = condorGame;
+  const capy = game.capy;
+  if (!capy || !capy.body) return;
+  const p = condorBody.position, a = capy.body.position;
+  const dx = p.x - a.x, dy = p.y - a.y, dz = p.z - a.z;
+  if (dx * dx + dy * dy + dz * dz > condorSHOT_R * condorSHOT_R) return;
+  condorShotArmed = false;
+  condorShotVisit = true;
+  if ((game.state && game.state.noSummonShot) || typeof game.frameShot !== 'function') return;
+  // lead round the ORBIT, not along the tangent: a straight line 1.4 s long on
+  // a 15 m circle at 20 m/s points 40 degrees short of where the bird will be
+  const v = condorBody.velocity;
+  const r2 = dx * dx + dz * dz;
+  const w = r2 > 1 ? clamp((dx * v.z - dz * v.x) / r2, -2.5, 2.5) : 0;
+  // w is per SOLVER second and the hold is on the wall clock; from rung 2 the
+  // solver runs slower than the wall (see condorCountStep), so the lead is too
+  const ang = Math.atan2(dz, dx) + w * condorSHOT_LEAD * condorAiRatio;
+  const lx = Math.cos(ang), lz = Math.sin(ang);
+  // Measured first as the review proposed it (dist 11, pitch -22 deg, raise 1.5):
+  // the camera sank to its floor looking level at the animal and the bird was in
+  // 0 of 7 sampled frames. The bird is 12-25 m UP and circling, so the lens goes
+  // further back, only a little above the animal, and looks up at a point 5 m
+  // over it: the animal sits in the bottom third of a 48-degree frame and the
+  // far half of the circle is sky. The lead puts the middle of the hold, not its
+  // start, on the far side.
+  game.frameShot({ yaw: Math.atan2(lx, lz) + Math.PI, dist: 15, pitch: 0.08,
+                   raise: 5.0, hold: 2.6 });
+  condorShots++;
 }
 
 // ---------------------------------------------------------------------------

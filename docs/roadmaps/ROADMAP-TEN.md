@@ -306,6 +306,48 @@ crossing of 30 m frames the bird above the animal (hold 2.6 s), with an echo whe
 spawn mounts in 5 runs out of 5, and talonInReach is above 0 in the samples. A PNG shows the bird in
 shot.
 
+### T1e — shipped
+
+The cause was not the orbit height. It was the clock. main.js runs update() after world.step, and
+cannon-es clears body.force after every internal step. From rung 2 a frame has two 1/60 substeps, or
+one when a substep runs long and cannon bails. So the bird's lift, seek and wingbeat covered one
+substep and plain gravity covered the rest. On top of that, the inbound and orbit script ran on game
+time while the body ran on solver time, which is 0.33 to 0.67 of it at rung 3. Measured at rung 3,
+the four-second descent became a 20 m/s dive that ran through the 14 m orbit onto the plaza. There
+it sat at 0.7 m (ten-t1e-condor, first run) or hovered at 3.8 m, just under condorPickupReady's 4 m.
+
+- `noCondorSubstep`: the frame's force and torque are kept on the first substep and put back on
+  every later one, with gravity taken out, because cannon adds m*g before preStep. The AI states
+  (inbound k, orbit angle, height easing, leaving) advance by the substeps the solver actually took
+  (`condorCountStep`). After the fix, rung 3 inbound ends at 13.9-17 m and the low orbit holds 6.4-7.2 m.
+- `noCondorOpen`: the seek target is never lower than groundTop + HANG + 3.5. The watchdog runs when
+  the bird is lowered and settled but not ready, or jammed (under 3.95 m AGL and slower than
+  1.5 m/s), for 3 s straight. It then circles the nearest open point: 8 bearings × 8/14/20 m, a ray
+  down finds no static body, and 6 of 8 launch headings are clear for 18 m. It says "it will not come
+  down under the flags. somewhere with more sky." once per summon (in Rio, "…here…" unless
+  `host.flier.openLine` is set). A jammed bird has its contacts off, over a terrain floor, until it
+  is 4.5 m clear. `game.condor.openSpot()` and `game.condor.condorAudit()` (`stuckT`, opens, pins,
+  ghost, ready, talon, shots, holds, aiT) are published for the soak.
+- A whistle during the inbound spiral now lowers the bird. At rung 3 the reviewer's second Q landed
+  there and did nothing.
+- `game.state.flierWhistleT = 6` is set on every Q the bird spends (spawn, inbound, circling,
+  leaving). condor.js is its one writer, decays it, and zeroes it on biome:enter. **The homeOk guard
+  in systems.js is still A's to add**: `&& !(game.state.flierWhistleT > 0)`.
+- `noSummonShot`: once per chapter visit, the first time the inbound bird is inside 30 m, frameShot
+  runs with {dist 15, pitch 0.08, raise 5, hold 2.6}. The yaw leads round the orbit, scaled to solver
+  time. The review's {11, −22°, 1.5} framing sank to the camera floor with the bird in 0 of 7 frames.
+  An answering wheek plays at pitch 0.8 and volume 0.5, 0.6 s after the call.
+
+Proof, rung 3 headless, with five other agents on the CPU: qa/ten-t1e-condor.js (Q, Q, E at the
+plaza spawn) mounted in 5 of 5 runs on the final code, every time on E, with talonInReach true in 2 to
+4 samples before the grab. The intermediate builds (no force hold, or a hold that kept gravity) managed
+1 of 3. Over the five runs the bird was inside the frustum in 21 of 44 sampled
+frames of the shot, and qa/ten-t1e-shot-run3.png shows it above the animal. qa/ten-t1e-stuck.js
+could not reproduce the stall jam by teleport once the force fix was in. Before the fix, the
+watchdog fired 1-3 times a run and moved the orbit to (−5.7, 20.3). Not done: the paper's where()
+already follows the bird (systems.js:32408), so it needed nothing. The rung-0 headful look at the
+shot is left to the proof slot.
+
 **T1f · cali.js · the chiva holds on.** With no move key held and the animal inside the roof box
 plus 0.4 m, snap its horizontal velocity to the chiva's frame velocity each substep (2601, 2615).
 The missed-her beat: "she does not stop for anybody. she goes round again." plus the next-in time on
