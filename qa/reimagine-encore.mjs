@@ -31,7 +31,8 @@ assert.equal(pub.read().wowEarnedBiome, '');
 assert.equal(pub.read().wowLiveSince, 0);
 assert.ok(e.includes("Math.ceil(envEncoreT) + ' s', 1, 'opera-stage')"), 'Sydney explicit opt-in');
 assert.ok(s.includes('const wl = !!marqId && wowLiveSince < sysWOW_LIVE_STALE;'), 'musical live eligibility unchanged');
-assert.ok(s.includes('const want = !wowEarnedOn && todoAwayT > sysTUCK_AFTER;'), 'active action cannot auto-tuck');
+// T2a: a live marquee or ride (sysFrameOwned) cannot auto-tuck either
+assert.ok(s.includes('const want = !wowEarnedOn && !owned && todoAwayT > sysTUCK_AFTER;'), 'active action cannot auto-tuck');
 assert.ok(s.includes("marqEl.classList.toggle('continuation', earned)"), 'display-only visibility class');
 assert.ok(s.includes('if (!game.state.paused && !game.state.noEarnedFocus'), 'paused panels hide continuation');
 const blockStart = s.indexOf('const earnedBio = game.biome');
