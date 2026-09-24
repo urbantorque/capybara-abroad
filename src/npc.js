@@ -8321,6 +8321,13 @@ export function createNPCs(game) {
         // metre the chapter put them on; the moment it clears, localOwnEnd has
         // already pointed them back at the anchor and the shuffle takes over
         // and walks them there. See THE MISCHIEF ECONOMY.
+        // THE COOLDOWNS RUN WHATEVER THEY ARE DOING (AAA A3). They were
+        // counted down only in the shuffle below, so a person who went on an
+        // errand or a walking route after a march kept "cooling" for ever and
+        // never came for you again — measured in Kyoto, cooling 9.2 twenty-one
+        // seconds into an eighteen-second cooldown.
+        if (r.marCool > 0) r.marCool -= dt;
+        if (r.ownCool > 0) r.ownCool -= dt;
         if (r.escT >= 0) {
           // THE AUTHORITY carrying you out ranks above everything (L3, F1)
           escStep(r, dt);
@@ -8354,8 +8361,6 @@ export function createNPCs(game) {
           // and braces rather than a rule.
           marStep(r, dt);
         } else {
-          if (r.marCool > 0) r.marCool -= dt;
-          if (r.ownCool > 0) r.ownCool -= dt;
           r.stepT -= dt;
           if (r.stepT <= 0) {
             r.stepT = npcLOC_STEP_GAP * rand(0.45, 2.1);

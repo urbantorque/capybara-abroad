@@ -53,6 +53,7 @@ try {
   const w2 = await wallet();
   const m = await h.page.evaluate(() => window.__m);
   console.log(JSON.stringify({ w0, w1, w2, ev: m.ev, toasts: m.toasts.filter(t => /yuzu|got away|lost them|picked up|reached/.test(t)).slice(0, 8) }));
+  if (!marching) console.log('second march refused:', JSON.stringify(await h.page.evaluate(() => { const a = window.__capy.marchAudit(); return { why: a.why }; })));
   ok(marching, 'a second march');
   ok(escaped, 'running, they gave up or lost you');
   ok(w2 > w1, 'the escape paid');
