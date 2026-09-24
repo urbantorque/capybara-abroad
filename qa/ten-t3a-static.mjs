@@ -47,6 +47,14 @@ has('if (game.notoWarm(n)) freeGift();', 'a place that is fond of it gives it so
 has('if (game.state.flierWhistleT > 0) return true;', 'the door ignores a wheek a flier is answering');
 has('if (input.whistlePressed && doorHushed(p)) doorHushN++;', 'the door guard sits on the three-wheek count');
 has('const sub = live ? wowLiveLine : freeTabSub;', 'a live marquee\'s tab carries its own line, not another row\'s clock');
+// paper clarity, all modes
+has('const near = todoByNear(experience.supportOpen);', 'the small moment offered is the nearest open one');
+has("const txt = vert ? tell.trim() + ' ' + Math.abs(dh).toFixed(0) + ' m'", '"here" is not said with the target six metres below');
+has('if (sysSkillT <= 0 && !jrShown && !bodyBusy) {', 'a skill card waits for the ground');
+has("altLine: 'the ibis came when it was called.", 'a skill taught by its second teacher says whose');
+has("'HOLD E as each white one reaches you. under, not over.'", 'the duck-dive clue says which way');
+const shared = readFileSync('src/shared.js', 'utf8');
+assert.ok(shared.includes("supports: ['torii-run', 'zen-ruin', 'bamboo-dash', 'matcha-raid', 'the-bell']"), 'Kyoto opens on Gion rows'); n++;
 // the CSS lives in a marked block the earned-card check can strip
 has('/* TEN T3a sketchbook:', 'the sketchbook CSS opens a marked block');
 has('/* TEN T3a sketchbook end. */', 'the sketchbook CSS closes its marked block');

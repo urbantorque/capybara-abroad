@@ -33611,7 +33611,8 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.manly && game.manly.castle); } },
     'duck-dive':      { clue: function () {
                       const c = game.capy;
-                      if (c && c.swimming) return 'HOLD E as the white bit reaches you';
+                      // under, not over (T3a): the review's player hopped every wave
+                      if (c && c.swimming) return 'HOLD E as each white one reaches you. under, not over.';
                       return 'get in the water first, out where it is breaking';
                     },
                     where: function () { return hintObj(game.manly && game.manly.bank()); } },
@@ -34750,6 +34751,30 @@ export function createSystems(game) {
   // On a free file the paper is the place's page: see sysREP_WANT and
   // sysPlaceWord at the top of the file for the words, and the skEl block
   // for the shape. A cut flag hands back the story's paper exactly.
+  // ---- THE NEAREST SMALL MOMENT (T3a) --------------------------------------
+  // Sorted by live distance when the open set changes (an arrival, a tick),
+  // and held until it changes again: re-sorting on every refresh would swap
+  // the top row, and the arrow with it, each time the animal walked past the
+  // midpoint of two rows. A row with no mark keeps its authored place last.
+  let todoNearKey = '', todoNearIds = [];
+  function todoByNear(ids) {
+    // `transBusy` in the key: a refresh during the white-out sorts from the
+    // last place's position, and the first one after it sorts again
+    const key = (game.biome ? game.biome.current : '') + (transBusy ? '~' : '|') + ids.join(',');
+    if (key === todoNearKey) return todoNearIds.slice();
+    todoNearKey = key;
+    const c = game.capy && game.capy.position;
+    const d = Object.create(null);
+    for (let i = 0; i < ids.length; i++) {
+      const h = sysHINTS[ids[i]];
+      let pt = null;
+      try { pt = h && typeof h.where === 'function' ? h.where() : null; } catch (e) { pt = null; }
+      d[ids[i]] = (pt && c) ? Math.hypot(pt.x - c.x, pt.z - c.z) : 1e9 + i;
+    }
+    todoNearIds = ids.slice().sort(function (a, b) { return d[a] - d[b]; });
+    return todoNearIds.slice();
+  }
+  game.state.qaNearRows = function () { return { key: todoNearKey, ids: todoNearIds.slice() }; };
   let todoFreeShown = false;
   function freePaperOn() {
     return !game.state.noFreePaper && game.state.journeyMode === 'free' && started;
@@ -35068,11 +35093,15 @@ export function createSystems(game) {
     // Explicit pins still reach every task; none of those tasks is removed.
     const experience = chapExperience(n);
     if (experience && !chapEnough(n) && pi < 0 && !travPin && !shopPin) {
-      const choices = experience.supportMissing ? experience.supportOpen.slice(0, 2) : [];
+      // NEAREST FIRST (T3a). The authored order put Kyoto's arrival paper
+      // on a row in Uji, 400 m across the river: the small moment offered
+      // is now the open one closest to where the animal is standing.
+      const near = todoByNear(experience.supportOpen);
+      const choices = experience.supportMissing ? near.slice(0, 2) : [];
       winIds = choices;
       if (!experience.signatureDone) winIds.push(experience.signature);
       if (game.state.homecomingArc) {
-        winIds = experience.supportMissing ? experience.supportOpen.slice(0, 1) : [];
+        winIds = experience.supportMissing ? near.slice(0, 1) : [];
         if (!experience.coreDone) winIds.push(experience.signature, experience.alternative);
       }
       top = winIds[0] || '';
@@ -36541,7 +36570,9 @@ export function createSystems(game) {
     // five of your own kind falling in behind you, and `the-crossing` is the
     // water not being somewhere you are on your way through.
     { task: 'gather',         skill: 'herd',   name: 'THE HERD', alt: 'bin-chicken',
-      line: 'wheek at anything small. keep wheeking, or they wander off.' },
+      line: 'wheek at anything small. keep wheeking, or they wander off.',
+      // taught by the ibis at the bin, not the herd (T3a): the line says whose
+      altLine: 'the ibis came when it was called. so will anything small. keep wheeking.' },
     { task: 'the-crossing',   skill: 'float',  name: 'THE FLOAT',
       line: 'you can just sit in it now. any water, anywhere.' },
     { task: 'cross-the-road', skill: 'flow',   name: 'RIGHT OF WAY',
@@ -51073,14 +51104,22 @@ export function createSystems(game) {
         game.capy.learn(s.skill, on);
         if (on && !sysSkillTold[s.skill]) {
           sysSkillTold[s.skill] = 1;
-          if (sysSkillSeeded) sysSkillQueue.push(s);
+          // taught by the second teacher, it says so in its own line (T3a)
+          const byAlt = !(r && r.done) && !findDone[s.task] && !!(r2 && r2.done);
+          if (sysSkillSeeded) sysSkillQueue.push(byAlt && s.altLine ? { name: s.name, line: s.altLine } : s);
         }
       }
       sysSkillSeeded = true;
       // One at a time, and not on top of the end card.
+      // ...and not while the animal's hands are full (T3a): a lesson card
+      // over a climb, a ride or a flight is read by nobody and covers the
+      // one thing that is being looked at. It waits for the ground.
+      const cq = game.capy;
+      const bodyBusy = !!(cq && (cq.clinging || cq.carriedBy || cq.rideBody || cq.atHelm)) ||
+                       !!(game.condor && game.condor.mounted);
       if (sysSkillQueue.length) {
-        sysSkillT -= dt;
-        if (sysSkillT <= 0 && !jrShown) {
+        if (!bodyBusy) sysSkillT -= dt;
+        if (sysSkillT <= 0 && !jrShown && !bodyBusy) {
           const s = sysSkillQueue.shift();
           sysSkillT = 4.6;
           showMoment(s.name, s.line);
@@ -52836,7 +52875,12 @@ export function createSystems(game) {
       const th = (hintY === hintY) ? hintY : bh;
       const dh = th - p.y;
       const tell = dh > sysHINT_RISE ? ' ↑' : dh < -sysHINT_RISE ? ' ↓' : '';
-      const txt = near ? 'here' : (hd < 100 ? hd.toFixed(0) + ' m' + tell : '99+ m' + tell);
+      // ...AND "HERE" ONLY WHEN IT IS (T3a). Standing on the roof over the
+      // target, or on the quay above a dive, read "here" with the thing six
+      // metres below: the flat distance was nothing and the answer was down.
+      const vert = near && tell !== '';
+      const txt = vert ? tell.trim() + ' ' + Math.abs(dh).toFixed(0) + ' m'
+        : near ? 'here' : (hd < 100 ? hd.toFixed(0) + ' m' + tell : '99+ m' + tell);
       if (topRec.dist.textContent !== txt) topRec.dist.textContent = txt;
       if (!topRec.aim.classList.contains('on')) topRec.aim.classList.add('on');
       topRec.arrow.style.opacity = near ? '0' : '1';
