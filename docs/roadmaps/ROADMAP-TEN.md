@@ -989,6 +989,58 @@ pass is already 13 ms, so the willows are instanced, with no grain() material. S
 arrival lens is yawed toward the Old Quarter corner by a frameShot (4639, 4798). Publish the next
 drop lantern for `wowTarget`. Proof: aaa-ab cost 0.1 ms or less, and an arrival PNG.
 
+### T3e — shipped
+
+Everything is in `src/hanoi.js` (`hanBuildWillows`, `hanWillowTick`, `hanUpdateBoat`). The proofs ran
+headless at rung 0, pinned by the prefs file (`pf: 1`). They measure behaviour and hide-and-diff
+numbers. GPU cost is left for the proof slot.
+
+- **Audit.** The arrival yaw had already shipped. The B2 glimpse (`sysGlimpseShot`, systems.js
+  ~43592) turns the Hanoi arrival onto the chapter's marquee, the pho stall on Hang Ngang. Measured
+  on a fresh free file with the real clock (`qa/ten-t3e-arrive.js`), the shot's yaw is 3.756 and
+  the lens settles at camYaw −2.526, looking NNE over the lake's north-west corner into the Old
+  Quarter. No second frameShot was added, because two writers on one arrival would fight. The
+  willow ring keeps a clear cone of ±0.30 rad about that view out to 35 m, so no trunk stands in
+  the shot. Arrival PNG: `qa/ten-t3e-arrive-b.png`.
+- **`noHanWillow`.** There are 34 willows. Each of 40 bearings round `hanLAKE` walks inward from
+  1.02 to 0.92 of the ellipse and takes the first spot 1.0 m clear of the ring road's kerb. The ring
+  road runs over the shore on the east and west, so some trunks stand in the shallows. Every tree
+  leans 0.14–0.30 rad toward the lake, so its crown hangs over the water and not over the scooters.
+  The spawn, the Huc gate, the shuttlecock ring, the puppet pool and every `hanBlock` are kept
+  clear. The crown is a small round head with 22 + 12 fronds, in `hanLeaf`/`hanLeafDk` at the top
+  and `PALETTE.hanWillow` at the tips. It is built upside down, so the sway ramp (`swayMesh`,
+  0.42 m at the tip, 0.6 hz) moves the frond ends and not the head. Each instance stands it upright
+  with a half-turn about x. That is a rotation, so the winding is kept. The trunks are one static
+  body of 34 boxes. There are **8 lotus clumps**: one merged shape of 9 pads, 3 open `petalPink`
+  flowers and 2 buds, drawn larger than life so they read at 30–60 m. There is one **swan
+  pedalo** with two riders on a 15 × 9 m loop in the west basin. It moves at 0.85 m/s and stops
+  when the animal is within 6 m. That is four draws, all flat Lambert with vertex colour and no
+  grain(). **At rung 1 and up** the crowns swap back to the plain material, so there is no sway,
+  and nothing here casts a shadow. The trees stay, because they are the lake edge. With the flag
+  set, the group is hidden and the trunk body leaves the world.
+- **Proof, `qa/ten-t3e-willow.js`** (hand clock, pinned lenses):
+
+  | measure | result |
+  |---|---|
+  | trees / lotus clumps | 34 / 8 |
+  | bodies, live → flagged → cleared | 154 → 153 → 154 |
+  | rung 1 | sway off, shadow off, still drawn |
+  | hide-and-diff, live against flagged | 17.2 % (SW corner), 15.6 % (NE), 66.7 % (one tree at 10 m) |
+  | boat, free | 7.8 m in 10 s |
+  | boat, animal 3 m away | v 0, 0 m in 2 s, stops counted 1 |
+
+  PNGs: `-sw-live` / `-sw-off` / `-sw-rung1`, `-near-live` / `-near-off`.
+- **`game.hanoi.wowTarget()`** returns `{x, y, z, kind: 'lantern'|'stall', i, of, name}` while the
+  animal is on the Cub with a run on. `kind` is 'stall' when the rack is empty and only a refill can
+  finish the run. With nobody on the Cub, or no run, it returns `null`. Measured: null idle, then
+  the bia hoi corner (i 0), then the market (i 1, which matches `dropAt(1)`), then null once the run
+  was cleared. It has the same shape as `game.sahara.wowTarget`, ready for A's paper.
+- **Misses.** The boat has no collider, so the animal can swim through it. The pedalo stopping for
+  the animal stands in for one. The sway is proved by material state only (swapped in at rung 0,
+  out at rung 1). No moving-frond pixel diff was taken, because the scooters move in the same
+  frames. Rung-0 GPU cost for `noHanWillow` is owed to the proof slot. Test hook:
+  `game.hanoi.willow()`.
+
 **T3f · kowloon.js · the arcade lens.** When the animal is inside the scaffold footprint below 3 m,
 publish a camera hint that pulls the lens +x over the carriageway and 1.5 m up (73, 859, 1535;
 kyoto.js:4337 is the pattern). Flag `noHkArcadeCam`. The magenta panel gets glyph blocks (2172).

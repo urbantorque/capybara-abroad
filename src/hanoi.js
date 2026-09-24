@@ -4851,6 +4851,339 @@ function hanBuildForeground(game, root) {
   root.add(g);
 }
 
+// ============================================================ THE WILLOWS ====
+/**
+ * THE LAKE IS A PLACE TO SIT (ROADMAP-TEN T3e, `noHanWillow`).
+ *
+ * Reviewed from the arrival: eighty metres of green water, a tower, a red
+ * bridge, and a bank of bare concrete with two or three trees on it. The real
+ * Hoan Kiem is ringed with willows leaning out over the water, and they are
+ * what make the lake the quiet middle of the chapter rather than a hole in it.
+ * So: a ring of them, some lotus, and one pedal boat going round.
+ *
+ * WHERE THEY CAN STAND. The ring road hugs the shore — the kerb is 0-3 m off
+ * the waterline, and on the east and west sides the carriageway runs over it.
+ * So each bearing walks inward from just past the shore to 0.92 of the ellipse
+ * and takes the first spot whose trunk is 0.7 m clear of the kerb: on the bank
+ * where there is one, in the shallows where there is not. Real ones stand in
+ * the water too. The lean is always toward the lake, so the crown hangs over
+ * the water and not over the scooters.
+ *
+ * WHAT IT COSTS. Hanoi's world pass is already the dearest in the game, most
+ * of it grain() on big meshes, so nothing here has a grain() material: plain
+ * flat Lambert with vertex colour. Four draws — trunks, crowns, lotus, boat —
+ * the first three instanced; every lotus clump is one instance of one shape. At rung 1 and
+ * up the sway comes off (the crowns swap back to the plain material) and
+ * nothing here casts a shadow. The trees themselves stay: they are the lake
+ * edge, the way a shophouse is the street.
+ *
+ * THE CROWN HANGS FROM ITS OWN TOP. sway() moves a vertex by how far up its
+ * geometry's window it is, which on a tree moves the top most. A willow's
+ * fronds move most at the BOTTOM. So the crown is built upside down — local +y
+ * runs down the frond, 0 at the crown, the tip at the far end — and each
+ * instance stands it the right way up with a half-turn about x. A rotation,
+ * not a mirror: the winding survives, and the sway's own transpose carries the
+ * wind back into the flipped frame (see _swayInject).
+ */
+const hanWILLOW_BEAR = 40;          // bearings tried round the ellipse
+const hanWILLOW_KERB = 1.0;         // m a trunk stands clear of the ring road's edge
+const hanWILLOW_S0 = 1.02, hanWILLOW_S1 = 0.92;   // ellipse scale searched, shore first
+const hanWILLOW_H = 5.0;            // m of trunk to the crown, before the tree's own scale
+const hanWILLOW_HANG = 4.0;         // m the outer fronds fall from the crown
+const hanWILLOW_SWAY = 0.42;        // m at a frond's tip in a full gust
+const hanWILLOW_EYE = 0.30;         // rad either side of the arrival's view kept clear...
+const hanWILLOW_EYE_R = 35;         // ...out to this far from the spawn
+const hanWILLOW_EYE_YAW = 0.617;    // the view the arrival glimpse settles on (qa/ten-t3e-arrive.js)
+const hanLOTUS_N = 8;
+// The boat: a loop in the west basin, clear of the tower's islet by 8.9 m at
+// its nearest, and in the arrival frame. A pedal pace, and it stops for the
+// animal — two people on a swan do not run a capybara down.
+const hanBOAT = { cx: -28, cz: -67, rx: 15, rz: 9, v: 0.85, shy: 6.0 };
+let hanWillowG = null, hanWillowTrunk = null, hanWillowCrown = null, hanWillowBody = null;
+let hanWillowSwayMat = null, hanWillowFlatMat = null;
+let hanWillowOn = true, hanWillowLive = true, hanWillowBodyIn = false;
+let hanWillowN = 0, hanLotusN = 0;
+let hanBoatG = null, hanBoatA = 0, hanBoatV = hanBOAT.v, hanBoatStops = 0, hanBoatShy = false;
+const hanWillowPts = [];            // { x, z, y, lean, cx, cy, cz } — for the audit
+
+/** The crown, upside down: a dome above the ring, two rings of fronds below. */
+function hanWillowCrownGeo() {
+  const K = hanMerger();
+  // the dome, which in the flipped frame is NEGATIVE y — above the crown
+  // ...AND IT IS A HEAD, NOT A LID. The first cut was a dome 4.7 m across and
+  // 1.8 high over ribbons a metre wide, and from the road the ring read as a
+  // row of jellyfish: a willow's crown is small and round and nearly all of
+  // the tree is what falls off it.
+  K.sph(0, -0.55, 0, 1.75, 1.15, 1.75, PALETTE.hanLeaf, 8);
+  K.sph(0.45, -1.15, -0.3, 1.05, 0.7, 1.05, PALETTE.hanWillow, 8);
+  const top = new THREE.Color(), tip = new THREE.Color(), cc = new THREE.Color();
+  const ring = (R, n, L, w0, cTop, cTip, ph) => {
+    top.set(cTop); tip.set(cTip);
+    for (let i = 0; i < n; i++) {
+      const th = (i + ph) / n * Math.PI * 2 + rand(-0.12, 0.12);
+      const ca = Math.cos(th), sa = Math.sin(th);
+      const Li = L * rand(0.66, 1.0);
+      const v = [];
+      for (let j = 0; j <= 3; j++) {
+        const f = j / 3;
+        // out, then down: the frond leaves the crown sideways and falls
+        const r = R + 0.7 * Math.sin(Math.min(1, f * 1.6) * Math.PI / 2);
+        const w = w0 * (1 - 0.78 * f);
+        const tw = 0.10 * f;                       // a little twist, or every frond is a spoke
+        const x = r * ca, z = r * sa, y = Li * f;
+        const tx = -sa * Math.cos(tw) + ca * Math.sin(tw), tz = ca * Math.cos(tw) + sa * Math.sin(tw);
+        cc.copy(top).lerp(tip, f);
+        v.push(K.vert(x - tx * w * 0.5, y, z - tz * w * 0.5, cc),
+               K.vert(x + tx * w * 0.5, y, z + tz * w * 0.5, cc));
+      }
+      for (let j = 0; j < 3; j++) {
+        const a = v[j * 2], b = v[j * 2 + 1], c = v[j * 2 + 2], d = v[j * 2 + 3];
+        K.tri(a, b, d); K.tri(a, d, c);
+      }
+    }
+  };
+  ring(1.55, 22, hanWILLOW_HANG, 0.58, PALETTE.hanLeaf, PALETTE.hanWillow, 0);
+  ring(0.95, 12, hanWILLOW_HANG * 0.78, 0.55, PALETTE.hanLeafDk, PALETTE.hanLeaf, 0.5);
+  return K.build();
+}
+
+/** A lotus clump: nine pads, three open flowers and two buds, merged, at y 0. */
+function hanLotusGeo() {
+  const K = hanMerger();
+  const pad = new THREE.CircleGeometry(0.5, 7);
+  pad.rotateX(-Math.PI / 2);
+  for (let k = 0; k < 9; k++) {
+    const a = rand(0, 6.283), r = k === 0 ? 0 : rand(0.5, 2.1), d = rand(0.55, 1.25);
+    K.add(pad, hanXform(Math.cos(a) * r, k * 0.004, Math.sin(a) * r, 0, rand(0, 6.283), 0, d, 1, d),
+          k % 3 === 2 ? PALETTE.hanLeaf : PALETTE.lilyPad);
+  }
+  pad.dispose();
+  // THE FLOWERS ARE BIGGER THAN LIFE, on purpose: a 20 cm flower at the lake's
+  // 30-60 m is two pixels, and a lotus nobody can see is a lily pad.
+  for (let f = 0; f < 5; f++) {
+    const a = f * 1.3 + rand(-0.3, 0.3), r = rand(0.3, 1.6);
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    const bud = f >= 3;
+    const h = bud ? 0.62 : 0.42;
+    K.cyl(x, h * 0.5, z, 0.035, h, PALETTE.hanLeafDk, 0, 0, 0, 4);
+    if (bud) {
+      K.cone(x, h + 0.12, z, 0.10, 0.30, PALETTE.petalPink, 0, 0, 0, 4);
+      continue;
+    }
+    for (let p = 0; p < 6; p++) {
+      const ph = p / 6 * Math.PI * 2 + a;
+      K.cone(x + Math.sin(ph) * 0.13, h + 0.12, z + Math.cos(ph) * 0.13, 0.10, 0.34, PALETTE.petalPink, 0.55, ph, 0, 4);
+    }
+    K.cyl(x, h + 0.06, z, 0.08, 0.08, PALETTE.hanOchre, 0, 0, 0, 8);
+  }
+  return K.build();
+}
+
+/** The swan pedalo, pointing +z, waterline at y 0. */
+function hanBoatGeo() {
+  const K = hanMerger();
+  K.rbox(0, 0.10, 0, 1.3, 0.50, 2.5, PALETTE.hanTrim, 0.35, 0, 0, 0, 2, 0.78);
+  K.box(0, 0.37, 0, 1.36, 0.08, 2.56, PALETTE.hanTarpRed);
+  K.box(0, 0.44, -0.35, 1.0, 0.12, 0.45, PALETTE.hanShopDk);
+  // the neck, raked back, and the head on it
+  K.cyl(0, 0.86, 1.02, 0.10, 0.95, PALETTE.hanTrim, -0.32, 0, 0, 8);
+  K.sph(0, 1.34, 0.93, 0.13, 0.12, 0.20, PALETTE.hanTrim, 8);
+  K.cone(0, 1.32, 1.17, 0.05, 0.16, PALETTE.hanOchre, Math.PI / 2, 0, 0, 4);
+  // the awning on four posts
+  for (let s = 0; s < 4; s++) {
+    K.cyl((s & 1 ? 0.55 : -0.55), 0.96, -0.3 + (s & 2 ? 0.55 : -0.55), 0.025, 1.0, PALETTE.hanShopDk, 0, 0, 0, 4);
+  }
+  K.box(0, 1.48, -0.3, 1.34, 0.06, 1.34, PALETTE.hanTarpRed);
+  // and the two people pedalling it, one in a nón lá
+  for (let s = -1; s <= 1; s += 2) {
+    K.sph(s * 0.26, 0.74, -0.35, 0.17, 0.24, 0.14, s < 0 ? PALETTE.hanShirtW : PALETTE.hanWash1, 8);
+    K.sph(s * 0.26, 1.08, -0.35, 0.11, 0.12, 0.11, PALETTE.hanSkin, 8);
+  }
+  K.cone(-0.26, 1.21, -0.35, 0.20, 0.14, PALETTE.hanConical, 0, 0, 0, 4);
+  return K.build();
+}
+
+function hanWillowSpotOk(x, z) {
+  if (hanLaneAt(x, z) - hanLaneW < hanWILLOW_KERB) return false;
+  if (Math.hypot(x - hanHUC.x0, z - hanHUC.z0) < 7) return false;          // the gate
+  if (Math.hypot(x - hanCAU.x, z - hanCAU.z) < 8) return false;            // the shuttlecock ring
+  if (Math.hypot(x - hanPUPPET.x, z - (hanPUPPET.z - 1.4)) < 8) return false;   // the pool
+  const sd = Math.hypot(x - hanSPAWN.x, z - hanSPAWN.z);
+  if (sd < 9) return false;
+  if (sd < hanWILLOW_EYE_R) {
+    let d = Math.atan2(x - hanSPAWN.x, z - hanSPAWN.z) - hanWILLOW_EYE_YAW;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    if (Math.abs(d) < hanWILLOW_EYE) return false;
+  }
+  for (let i = 0; i < hanBLOCK.length; i++) {
+    const b = hanBLOCK[i];
+    if (Math.hypot(x - b.x, z - b.z) < b.r + 1.2) return false;
+  }
+  return true;
+}
+
+function hanBuildWillows(game, root) {
+  const g = new THREE.Group();
+  g.name = 'hanoi-willows';
+  // ---- the spots -------------------------------------------------------
+  const L = hanLAKE;
+  for (let k = 0; k < hanWILLOW_BEAR; k++) {
+    const a = (k + 0.5 + rand(-0.22, 0.22)) / hanWILLOW_BEAR * Math.PI * 2;
+    for (let s = hanWILLOW_S0; s >= hanWILLOW_S1 - 1e-6; s -= 0.01) {
+      const x = L.cx + L.rx * s * Math.sin(a), z = L.cz + L.rz * s * Math.cos(a);
+      if (!hanWillowSpotOk(x, z)) continue;
+      // the inward normal of the ellipse, which is where the tree leans
+      let nx = -(x - L.cx) / (L.rx * L.rx), nz = -(z - L.cz) / (L.rz * L.rz);
+      const nl = Math.hypot(nx, nz) || 1;
+      nx /= nl; nz /= nl;
+      const y = Math.max(hanTerrain(x, z), L.bed) - 0.15;
+      const lean = rand(0.14, 0.30), sc = rand(0.85, 1.15);
+      const H = hanWILLOW_H * sc;
+      hanWillowPts.push({ x: x, z: z, y: y, lean: lean, sc: sc, nx: nx, nz: nz,
+                          cx: x + nx * Math.sin(lean) * H, cy: y + Math.cos(lean) * H, cz: z + nz * Math.sin(lean) * H });
+      break;
+    }
+  }
+  const n = hanWillowPts.length;
+  hanWillowN = n;
+  if (!n) return;
+  // ---- the trunks ------------------------------------------------------
+  const T = hanMerger();
+  T.cone(0, 0.22, 0, 0.42, 0.5, PALETTE.hanTrunk, 0, 0, 0, 8);
+  T.cyl(0, 1.4, 0, 0.26, 2.8, PALETTE.hanTrunk, 0, 0, 0, 8);
+  T.cyl(0, 3.8, 0, 0.18, 2.4, PALETTE.hanTrunk, 0, 0, 0, 8);
+  T.cyl(0.4, 4.2, 0.1, 0.08, 1.4, PALETTE.hanTrunk, 0, 0.4, -0.7, 4);
+  T.cyl(-0.35, 4.4, -0.1, 0.07, 1.2, PALETTE.hanTrunk, 0, 0.2, 0.8, 4);
+  const trunk = new THREE.InstancedMesh(T.build(), mat(0xffffff, { vertexColors: true }), n);
+  const crownGeo = hanWillowCrownGeo();
+  hanWillowFlatMat = mat(0xffffff, { vertexColors: true, side: THREE.DoubleSide });
+  const crown = new THREE.InstancedMesh(crownGeo, hanWillowFlatMat, n);
+  const ax = new THREE.Vector3(), qx = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
+  const qy = new THREE.Quaternion();
+  const body = hanPoolBody(game);
+  for (let i = 0; i < n; i++) {
+    const P = hanWillowPts[i];
+    // tilt +y toward the lake: about (nz, 0, -nx), which carries y onto (nx, 0, nz)
+    ax.set(P.nz, 0, -P.nx).normalize();
+    hanQ.setFromAxisAngle(ax, P.lean);
+    qy.setFromAxisAngle(hanV3b.set(0, 1, 0), rand(0, 6.283));
+    hanQ.multiply(qy);
+    hanM.compose(hanV3.set(P.x, P.y, P.z), hanQ, hanSc.set(P.sc, P.sc, P.sc));
+    trunk.setMatrixAt(i, hanM);
+    trunk.setColorAt(i, hanCol.setScalar(rand(0.86, 1.08)));
+    // the crown, upright from its flipped frame, and a yaw of its own
+    const cs = rand(0.9, 1.2);
+    qy.setFromAxisAngle(hanV3b.set(0, 1, 0), rand(0, 6.283));
+    hanQ.copy(qy).multiply(qx);
+    hanM.compose(hanV3.set(P.cx, P.cy, P.cz), hanQ, hanSc.set(cs, rand(0.85, 1.12) * P.sc, cs));
+    crown.setMatrixAt(i, hanM);
+    crown.setColorAt(i, hanCol.setScalar(rand(0.9, 1.07)));
+    // SOLID AT THE FOOT. Two metres of the lower trunk, upright; the lean
+    // over that is under half a metre and the animal meets the foot anyway.
+    hanPoolBox(body, P.x + P.nx * Math.sin(P.lean) * 0.8, P.y + 1.2, P.z + P.nz * Math.sin(P.lean) * 0.8, 0.55, 2.4, 0.55);
+    hanBlock(P.x, P.z, 0.5);
+  }
+  for (const m of [trunk, crown]) {
+    m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    m.computeBoundingSphere();
+    m.castShadow = true; m.receiveShadow = true;
+    g.add(m);
+  }
+  // the swaying copy, built once; the tick swaps it in and out by rung
+  swayMesh(crown, { amount: hanWILLOW_SWAY, axis: 'y', lo: 0, hi: hanWILLOW_HANG, stiff: 1.25, hz: 0.6 });
+  hanWillowSwayMat = crown.material;
+  hanWillowTrunk = trunk; hanWillowCrown = crown;
+  // ---- the lotus -------------------------------------------------------
+  const lg = hanLotusGeo();
+  const lotus = new THREE.InstancedMesh(lg, mat(0xffffff, { vertexColors: true }), hanLOTUS_N);
+  let ln = 0;
+  for (let tries = 0; tries < 400 && ln < hanLOTUS_N; tries++) {
+    const a = rand(0, 6.283), s = rand(0.55, 0.86);
+    const x = L.cx + L.rx * s * Math.sin(a), z = L.cz + L.rz * s * Math.cos(a);
+    if (Math.hypot(x - hanTOWER.x, z - hanTOWER.z) < 10) continue;
+    if (Math.hypot(x - hanNGOC.x, z - hanNGOC.z) < 16) continue;
+    if (hanSegD(x, z, hanHUC.x0, hanHUC.z0, hanHUC.x1, hanHUC.z1) < 6) continue;
+    const bx = (x - hanBOAT.cx) / hanBOAT.rx, bz = (z - hanBOAT.cz) / hanBOAT.rz;
+    const br = Math.hypot(bx, bz);
+    if (br > 0.62 && br < 1.4) continue;                       // the boat's water
+    let near = false;
+    for (let j = 0; j < ln; j++) {
+      lotus.getMatrixAt(j, hanM);
+      if (Math.hypot(hanM.elements[12] - x, hanM.elements[14] - z) < 14) { near = true; break; }
+    }
+    if (near) continue;
+    const sc = rand(0.85, 1.3);
+    lotus.setMatrixAt(ln++, hanXform(x, hanWATER + 0.035, z, 0, rand(0, 6.283), 0, sc, sc, sc));
+  }
+  lotus.count = ln;
+  hanLotusN = ln;
+  lotus.instanceMatrix.needsUpdate = true;
+  lotus.computeBoundingSphere();
+  lotus.castShadow = false; lotus.receiveShadow = true;
+  lotus.userData.noShadow = true;
+  g.add(lotus);
+  // ---- the boat --------------------------------------------------------
+  const boat = new THREE.Mesh(hanBoatGeo(), mat(0xffffff, { vertexColors: true }));
+  boat.castShadow = true; boat.receiveShadow = true;
+  boat.rotation.order = 'YXZ';
+  hanBoatA = rand(0, 6.283);
+  hanBoatG = boat;
+  g.add(boat);
+  hanWillowBody = body;
+  hanWillowBodyIn = !!hanPoolDone(game, body);
+  hanWillowG = g;
+  root.add(g);
+  hanUpdateBoat(game, 0);
+}
+
+function hanUpdateBoat(game, dt) {
+  if (!hanBoatG) return;
+  const B = hanBOAT, capy = game.capy;
+  let want = B.v;
+  const shy = !!(capy && capy.position &&
+    Math.hypot(capy.position.x - hanBoatG.position.x, capy.position.z - hanBoatG.position.z) < B.shy);
+  if (shy) want = 0;
+  if (shy && !hanBoatShy) hanBoatStops++;
+  hanBoatShy = shy;
+  hanBoatV = damp(hanBoatV, want, 1.2, dt);
+  // the loop's own speed at this angle, so the boat keeps a pace and does not
+  // race round the ends of the ellipse
+  const sp = Math.hypot(B.rx * Math.cos(hanBoatA), B.rz * Math.sin(hanBoatA));
+  hanBoatA += hanBoatV * dt / Math.max(1, sp);
+  if (hanBoatA > Math.PI * 2) hanBoatA -= Math.PI * 2;
+  const x = B.cx + B.rx * Math.sin(hanBoatA), z = B.cz + B.rz * Math.cos(hanBoatA);
+  hanBoatG.position.set(x, hanWaterHeightAt(x, z) - 0.06 + Math.sin(hanTime * 1.3) * 0.02, z);
+  hanBoatG.rotation.set(Math.sin(hanTime * 0.9) * 0.02, Math.atan2(B.rx * Math.cos(hanBoatA), -B.rz * Math.sin(hanBoatA)),
+                        Math.sin(hanTime * 1.1 + 1.0) * 0.03);
+}
+
+/** The flag, the rung, and the boat. Runs every live frame; changes on an edge. */
+function hanWillowTick(game, dt) {
+  if (!hanWillowG) return;
+  const st = game.state || {};
+  const on = !st.noHanWillow;
+  if (on !== hanWillowOn) {
+    hanWillowOn = on;
+    hanWillowG.visible = on;
+    // ...and the trunks stop being solid when they stop being drawn
+    if (hanWillowBody && game.world) {
+      if (on && !hanWillowBodyIn) { game.world.addBody(hanWillowBody); hanWillowBodyIn = true; }
+      else if (!on && hanWillowBodyIn) { game.world.removeBody(hanWillowBody); hanWillowBodyIn = false; }
+    }
+  }
+  if (!on) return;
+  const live = (st.perfRung | 0) < 1;
+  if (live !== hanWillowLive) {
+    hanWillowLive = live;
+    hanWillowCrown.material = live ? hanWillowSwayMat : hanWillowFlatMat;
+    hanWillowCrown.castShadow = live;
+    hanWillowTrunk.castShadow = live;
+    hanBoatG.castShadow = live;
+  }
+  hanUpdateBoat(game, dt);
+}
+
 function hanBuild(game) {
   if (hanBuilt) return;
   hanBuilt = true;
@@ -4883,6 +5216,7 @@ function hanBuild(game) {
   hanBuildSigns(hanRoot);
   hanBuildLocals(game);
   hanBuildForeground(game, hanRoot);
+  hanBuildWillows(game, hanRoot);   // T3e, after everything that hanBlock()s the shore
   hanBuildFar(hanRoot);
 
   if (typeof game.registerShadowTarget === 'function' && hanTrainG) {
@@ -5139,6 +5473,7 @@ export function createHanoi(game) {
         }
       }
       hanUpdateLake(dt);
+      hanWillowTick(game, dt);
       hanBike2Tick(game);
       hanUpdateBikes(game, dt);
       hanUpdateCub(game, dt);   // X5
@@ -5245,6 +5580,31 @@ export function createHanoi(game) {
     return api.cub();
   };
   api.rideYaw = function () { return hanCubOn ? hanCubYaw : NaN; };
+  /**
+   * T3e: where the live marquee wants the animal next, for the paper's arrow
+   * while game.wowLive is fresh — the next drop lantern, or the stall when the
+   * rack is empty and only a refill can finish the run. null with nobody on the
+   * Cub or no run on, which is when the paper's own head row is right. Same
+   * shape as game.sahara.wowTarget: { x, y, z, kind, i, of, name }, fresh.
+   */
+  api.wowTarget = function () {
+    if (!hanCubOn || !hanCubRun || hanCubNext >= hanDROPS.length) return null;
+    if (hanCubBowlsOn() <= 0) {
+      return { x: hanCUB.x, y: hanGROUND + 1, z: hanCUB.z, kind: 'stall', i: hanCubNext, of: hanDROPS.length, name: 'the pho stall' };
+    }
+    const d = hanDROPS[hanCubNext];
+    return { x: d[0], y: hanGROUND + 1, z: d[1], kind: 'lantern', i: hanCubNext, of: hanDROPS.length, name: d[2] };
+  };
+  /** T3e test hook: the willows, the lotus and the boat as they stand. */
+  api.willow = function () {
+    return { n: hanWillowN, lotus: hanLotusN, on: hanWillowOn, live: hanWillowLive,
+             vis: !!(hanWillowG && hanWillowG.visible), body: hanWillowBodyIn,
+             sway: !!(hanWillowCrown && hanWillowCrown.material === hanWillowSwayMat && hanWillowSwayMat !== hanWillowFlatMat),
+             shadow: !!(hanWillowCrown && hanWillowCrown.castShadow),
+             boat: hanBoatG ? { x: +hanBoatG.position.x.toFixed(2), z: +hanBoatG.position.z.toFixed(2), a: +hanBoatA.toFixed(3),
+                                v: +hanBoatV.toFixed(3), stops: hanBoatStops, shy: hanBoatShy } : null,
+             pts: hanWillowPts.map(function (P) { return [+P.x.toFixed(1), +P.z.toFixed(1), +P.y.toFixed(2)]; }) };
+  };
   // above the awnings (ground + 3.2, 2.2 m deep off every shop): a chase
   // camera at three metres was a red tarpaulin for most of the run
   api.rig = function () { return hanCubOn ? { w: 1, dist: 7.5, pitch: 0.55, raise: 0.9, lambda: 3.0 } : null; };
