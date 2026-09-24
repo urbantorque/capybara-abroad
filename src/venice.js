@@ -364,6 +364,27 @@ function venMerger() {
     xform: venXform, cylSegs: [4, 8, 16], coneSegs: [4], sphSegs: [], normals: 'recompute', jitter: 0.060,
   });
 }
+// THE ROUNDED ANIMAL (AAA pass). A merger that draws every call twice, the
+// second time with makeMerger's `round` on, and hangs the second geometry on
+// the first as `roundTwin`; venRoundOn hands it to the rounded person's switch
+// (npc.js, game.personRound), so a pigeon is the same animal with its edges
+// off, on the same flag and the same rung. Boxes under 4.5 cm (wings, bills,
+// feet on a bird) come out as they went in.
+function venTwin(rf) {
+  const A = venMerger(), B = venMerger(), T = {};
+  B.round = rf || 0.4;
+  for (const k in A) {
+    if (typeof A[k] !== 'function' || k === 'build') continue;
+    T[k] = function () { const r = A[k].apply(A, arguments); B[k].apply(B, arguments); return r === A ? T : r; };
+  }
+  T.build = function () { const g = A.build(); g.userData.roundTwin = B.build(); return g; };
+  return T;
+}
+function venRoundOn(m, twin) {
+  const tw = twin || (m && m.geometry.userData.roundTwin);
+  if (m && tw && venGame && venGame.personRound) { venGame.personRound(m, tw); m.userData.roundAnimal = true; }
+  return m;
+}
 /**
  * EVERY SURFACE IN THIS CHAPTER WAS ONE FLAT VALUE.
  *
@@ -2864,8 +2885,10 @@ function venBoardAt(x, z) {
  * colours inside each, instanceColor over the top for the morph — which
  * MULTIPLIES, so the parts are authored pale (see the Rio crowd note).
  */
-function venPigeonGeo(parts) {
-  const M = venMerger();
+// The body and the head carry a rounded twin (AAA pass, venTwin); the wings are
+// 3 cm plates and would come back identical, so they are drawn once.
+function venPigeonGeo(parts, round) {
+  const M = round ? venTwin(0.4) : venMerger();
   parts(M);
   return M.build();
 }
@@ -2880,7 +2903,7 @@ function venBuildPigeons(root) {
       M.box(s2 * 0.105, -0.055, -0.12, 0.05, 0.04, 0.16, 0x9c9c9c);   // the wing bar
       M.box(s2 * 0.05, -0.14, 0.02, 0.03, 0.09, 0.03, 0xe0a08c);      // and a foot
     }
-  });
+  }, true);
   // ---- the head: crown, beak, and the neck that catches the light ---------
   const gh = venPigeonGeo((M) => {
     M.box(0, 0, 0, 0.13, 0.14, 0.15, 0xbdbdbd);
@@ -2890,7 +2913,7 @@ function venBuildPigeons(root) {
     // short of a body whose front face is 18 cm ahead of its centre, so a
     // hundred and eighty heads floated a finger's width off their own birds.
     M.box(0, -0.085, -0.14, 0.115, 0.1, 0.26, 0x9fb0a8, 0.32);
-  });
+  }, true);
   // ---- and the wings, out. ONE MESH PER WING, because a flap is the two of
   // them going the SAME way and a single instance can only turn one way about
   // its own z: a shared mesh rolled about z is a bird rowing sideways.
@@ -2906,7 +2929,7 @@ function venBuildPigeons(root) {
     m.castShadow = true; m.frustumCulled = false;
     m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
     root.add(m);
-    return m;
+    return venRoundOn(m);     // a no-op for the wings, which carry no twin
   };
   const im = mk(gb, venPIGEON_N), ih = mk(gh, venPIGEON_N);
   const iwR = mk(wingGeo(1), venPIGEON_N), iwL = mk(wingGeo(-1), venPIGEON_N);

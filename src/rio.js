@@ -424,6 +424,27 @@ function rioMerger() {
     xform: rioXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [], normals: 'recompute', jitter: 0.055,
   });
 }
+// THE ROUNDED ANIMAL (AAA pass). A merger that draws every call twice, the
+// second time with makeMerger's `round` on, and hangs the second geometry on
+// the first as `roundTwin`; rioRoundOn hands it to the rounded person's switch
+// (npc.js, game.personRound), so a frigatebird is the same animal with its edges
+// off, on the same flag and the same rung. Boxes under 4.5 cm (wings, bills,
+// feet on a bird) come out as they went in.
+function rioTwin(rf) {
+  const A = rioMerger(), B = rioMerger(), T = {};
+  B.round = rf || 0.4;
+  for (const k in A) {
+    if (typeof A[k] !== 'function' || k === 'build') continue;
+    T[k] = function () { const r = A[k].apply(A, arguments); B[k].apply(B, arguments); return r === A ? T : r; };
+  }
+  T.build = function () { const g = A.build(); g.userData.roundTwin = B.build(); return g; };
+  return T;
+}
+function rioRoundOn(m, twin) {
+  const tw = twin || (m && m.geometry.userData.roundTwin);
+  if (m && tw && rioGame && rioGame.personRound) { rioGame.personRound(m, tw); m.userData.roundAnimal = true; }
+  return m;
+}
 /**
  * EVERY SURFACE IN THIS CHAPTER WAS ONE FLAT VALUE.
  *
@@ -3134,7 +3155,7 @@ const rioBirdM2 = new THREE.Matrix4();
 const rioBIRD_TAIL_Z = -0.47;      // where the fork leaves the body
 
 function rioBuildBirds(root) {
-  const M = rioMerger();
+  const M = rioTwin(0.4);   // body and head rounded on the twin (AAA pass)
   // A FRIGATEBIRD IN PLAN IS A LETTER W. Long swept wings with a real crook in
   // them, a short body, and a tail that forks — which is the only part of it
   // anybody can name and is therefore the part that has to be right.
@@ -3181,6 +3202,7 @@ function rioBuildBirds(root) {
   rioBirdMesh.castShadow = false;     // a shadow at 40 m over sand is a smudge
   rioBirdMesh.userData.noShadow = true;   // ...and this is what makes it stick
   root.add(rioBirdMesh);
+  rioRoundOn(rioBirdMesh);
   // the fork: two blades hinged at the root, built about the hinge so a
   // scale.x scissors them and a rotation.x pitches them (see rioUpdateBirds)
   const F = rioMerger();

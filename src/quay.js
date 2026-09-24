@@ -336,6 +336,27 @@ function quayMerger() {
     xform: quayXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [], normals: 'recompute', jitter: 0.055,
   });
 }
+// THE ROUNDED ANIMAL (AAA pass). A merger that draws every call twice, the
+// second time with makeMerger's `round` on, and hangs the second geometry on
+// the first as `roundTwin`; quayRoundOn hands it to the rounded person's switch
+// (npc.js, game.personRound), so a whale is the same animal with its edges
+// off, on the same flag and the same rung. Boxes under 4.5 cm (wings, bills,
+// feet on a bird) come out as they went in.
+function quayTwin(rf) {
+  const A = quayMerger(), B = quayMerger(), T = {};
+  B.round = rf || 0.4;
+  for (const k in A) {
+    if (typeof A[k] !== 'function' || k === 'build') continue;
+    T[k] = function () { const r = A[k].apply(A, arguments); B[k].apply(B, arguments); return r === A ? T : r; };
+  }
+  T.build = function () { const g = A.build(); g.userData.roundTwin = B.build(); return g; };
+  return T;
+}
+function quayRoundOn(m, twin) {
+  const tw = twin || (m && m.geometry.userData.roundTwin);
+  if (m && tw && quayGame && quayGame.personRound) { quayGame.personRound(m, tw); m.userData.roundAnimal = true; }
+  return m;
+}
 
 /**
  * EVERY SURFACE IN THIS CHAPTER WAS ONE FLAT VALUE.
@@ -5598,7 +5619,10 @@ const quayWHALE_L = 13;                // m, nose to flukes
 let quayWhaleGroup = null, quayWhaleT = -1, quayWhaleX = 0, quayWhaleZ = 0, quayWhaleYaw = 0, quayWhaleSplashed = false;
 let quayWhaleSeen = false;             // this passage; reset at the cast-off
 function quayBuildWhale(root) {
-  const M = quayMerger();
+  // and a rounded twin (AAA pass), at 0.15 not 0.4: the slabs are 2 m long and
+  // at 0.4 each one rounds off its own ends and the whale reads as a string of
+  // beads; at 0.15 the edges come off and the body stays one animal
+  const M = quayTwin(0.15);
   const dark = 0x2c3540, pale = 0xd8dde2;
   // the body, nose at +z, in eight slabs tapering to the tail
   for (let i = 0; i < 8; i++) {
@@ -5623,6 +5647,7 @@ function quayBuildWhale(root) {
   quayWhaleGroup.position.set(0, -30, 0);
   quayWhaleGroup.visible = false;
   root.add(quayWhaleGroup);
+  quayRoundOn(m);
 }
 function quayUpdateWhale(game, dt) {
   if (!quayWhaleGroup) return;

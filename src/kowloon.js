@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matEmit, emitSet, EMIT_OVER, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, makeMerger, makeMover, warnOnce, hangThing } from './shared.js';
+import { PALETTE, mat, matEmit, emitSet, EMIT_OVER, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, makeMerger, makeMover, warnOnce, hangThing, roundBoxGeo } from './shared.js';
 import { farLayer, farMover, farBundle, farTone } from './far.js';
 
 // ===========================================================================
@@ -3196,6 +3196,12 @@ function hkBuildMarket(game, root) {
   fm.frustumCulled = false;
   root.add(fm);
   hkFishMesh = fm;
+  // A FISH IS NOT A BRICK. Its rounded twin, the same box with the edges off,
+  // on the rounded person's switch (npc.js, game.personRound; AAA pass).
+  if (hkGame && hkGame.personRound) {
+    hkGame.personRound(fm, roundBoxGeo(0.36, 0.14, 0.14, 0.45, 3));
+    fm.userData.roundAnimal = true;
+  }
 }
 
 // ============================================================== THE CROWD ===

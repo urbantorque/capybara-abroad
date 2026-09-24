@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, grainOwn, makeSolidIndex, swayMesh, makeMerger, makeMover } from './shared.js';
+import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, grainOwn, makeSolidIndex, swayMesh, makeMerger, makeMover, roundBoxGeo } from './shared.js';
 import { farLayer, farMover, farLights, farBundle, farTone } from './far.js';
 
 // ===========================================================================
@@ -448,6 +448,27 @@ function iceMerger() {
     return M.add(iceG.rock, iceXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
   };
   return M;
+}
+// THE ROUNDED ANIMAL (AAA pass). A merger that draws every call twice, the
+// second time with makeMerger's `round` on, and hangs the second geometry on
+// the first as `roundTwin`; iceRoundOn hands it to the rounded person's switch
+// (npc.js, game.personRound), so a fox is the same animal with its edges
+// off, on the same flag and the same rung. Boxes under 4.5 cm (wings, bills,
+// feet on a bird) come out as they went in.
+function iceTwin(rf) {
+  const A = iceMerger(), B = iceMerger(), T = {};
+  B.round = rf || 0.4;
+  for (const k in A) {
+    if (typeof A[k] !== 'function' || k === 'build') continue;
+    T[k] = function () { const r = A[k].apply(A, arguments); B[k].apply(B, arguments); return r === A ? T : r; };
+  }
+  T.build = function () { const g = A.build(); g.userData.roundTwin = B.build(); return g; };
+  return T;
+}
+function iceRoundOn(m, twin) {
+  const tw = twin || (m && m.geometry.userData.roundTwin);
+  if (m && tw && iceGame && iceGame.personRound) { iceGame.personRound(m, tw); m.userData.roundAnimal = true; }
+  return m;
 }
 /**
  * EVERY SURFACE IN THIS CHAPTER WAS ONE FLAT VALUE.
@@ -3576,6 +3597,9 @@ function iceBuildSheep(root) {
     bm.name = 'iceSheep' + f;
     bm.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     if (hm) { hm.name = 'iceSheepHead' + f; hm.instanceMatrix.setUsage(THREE.DynamicDrawUsage); }
+    // the head is the unit box scaled per sheep; its rounded twin is the unit
+    // box with its edges off, on the rounded person's switch (AAA pass)
+    if (hm) iceRoundOn(hm, roundBoxGeo(1, 1, 1, 0.4, 2));
     iceSheep.push({ body: bm, head: hm, data: data, def: F });
   }
 }
@@ -5222,7 +5246,7 @@ let iceWhaleBlow = 0;
 const iceWhalePos = new THREE.Vector3();
 
 function iceBuildWhale(root) {
-  const M = iceMerger();
+  const M = iceTwin(0.4);   // belly, jaw, flippers and flukes rounded on the twin (AAA pass)
   // A humpback is a fat torpedo with an enormous jaw and two absurd flippers,
   // and at this palette the read is entirely silhouette: dark on top, white
   // underneath, and the flippers are a third of her length.
@@ -5260,6 +5284,7 @@ function iceBuildWhale(root) {
   iceWhaleGroup.add(mesh);
   iceWhaleGroup.visible = false;
   root.add(iceWhaleGroup);
+  iceRoundOn(mesh);
 
   // The fin, which is what you actually see for the first fifteen seconds. Its
   // own object so it can be drawn while she is not.
@@ -5436,7 +5461,7 @@ const iceFOX_RUN = 4.2;               // m/s — a trotting fox, and it is quick
 const iceFOX_KEEP = 4.5;              // m it stops short at, which is the joke
 
 function iceBuildFox(root) {
-  const M = iceMerger();
+  const M = iceTwin(0.4);   // muzzle, ears and legs rounded on the twin (AAA pass)
   // A WINTER FOX IS A ROUND WHITE THING WITH NO CORNERS. Short muzzle, short
   // ears, enormous tail — it is built to lose as little heat as possible and it
   // looks it, which is the whole silhouette.
@@ -5469,6 +5494,7 @@ function iceBuildFox(root) {
   iceFoxTail.add(tail);
   iceFoxGroup.add(iceFoxTail);
   root.add(iceFoxGroup);
+  iceRoundOn(body);
   iceFoxT = 0; iceFoxStare = 0;
 }
 

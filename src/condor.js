@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, clamp, damp, lerp } from './shared.js';
+import { PALETTE, mat, rand, clamp, damp, lerp, roundBoxGeo } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT B — THE CONDOR SIDEKICK (chapter 2).
@@ -727,10 +727,26 @@ function condorXf(px, py, pz, rx, ry, rz, sx, sy, sz) {
 }
 
 /** One vertex-coloured flat Lambert mesh from a parts list. */
-function condorPart(parts) {
+function condorPart(parts, round) {
   const m = new THREE.Mesh(condorMerge(parts), mat(PALETTE.condorRuff, { vertexColors: true }));
   m.castShadow = true;
+  if (round) condorRoundOn(m, parts);
   return m;
+}
+// THE ROUNDED BIRD (AAA pass). The body and the head get a twin in which every
+// box of 4.5 cm or more is the same box with its edges off (roundBoxGeo, a
+// chamfer at 0.4 of its thinnest side), handed to the rounded person's switch
+// (npc.js, game.personRound): a condor with a barrel, not a crate, on the same
+// flag and rung. The wings stay slabs: they are feathers, and they flap.
+function condorRoundOn(m, parts) {
+  if (!condorGame || !condorGame.personRound) return;
+  const tw = parts.map(function (p) {
+    const q = p.g.type === 'BoxGeometry' ? p.g.parameters : null;
+    if (!q || Math.min(q.width, q.height, q.depth) < 0.045) return p;
+    return { g: roundBoxGeo(q.width, q.height, q.depth, 0.4, 2), c: p.c, m: p.m };
+  });
+  condorGame.personRound(m, condorMerge(tw));
+  m.userData.roundAnimal = true;
 }
 
 // ---- PLUMAGE, AND IT BELONGS TO THE HOST ----------------------------------
@@ -833,7 +849,7 @@ function condorBuildMesh(root, plume) {
     bodyParts.push({ g: new THREE.BoxGeometry(0.09, 0.42, 0.11), c: SKIN, m: condorXf(s * legX, -0.42, 0.10) });
     bodyParts.push({ g: new THREE.BoxGeometry(0.15, 0.07, 0.22), c: SKIN, m: condorXf(s * legX, -0.66, 0.14) });
   }
-  root.add(condorPart(bodyParts));
+  root.add(condorPart(bodyParts, true));
 
   // --- head on its own pivot so it can track the direction of travel ---
   condorHeadPivot = new THREE.Object3D();
@@ -848,7 +864,7 @@ function condorBuildMesh(root, plume) {
     { g: new THREE.BoxGeometry(0.07, 0.10, 0.07), c: BEAK, m: condorXf(0, 0.16, 0.42, 0.5) },
     { g: new THREE.SphereGeometry(0.038, 6, 4), c: PALETTE.capyEye, m: condorXf(0.115, 0.26, 0.24) },
     { g: new THREE.SphereGeometry(0.038, 6, 4), c: PALETTE.capyEye, m: condorXf(-0.115, 0.26, 0.24) },
-  ]));
+  ], true));
 
   // --- WINGS: 4.6 m of them, broad in the chord, and each panel carries a
   //     condorRuff top surface. Andean condors are read from above by the huge

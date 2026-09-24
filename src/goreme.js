@@ -352,6 +352,27 @@ function gorMerger() {
   };
   return M;
 }
+// THE ROUNDED ANIMAL (AAA pass). A merger that draws every call twice, the
+// second time with makeMerger's `round` on, and hangs the second geometry on
+// the first as `roundTwin`; gorRoundOn hands it to the rounded person's switch
+// (npc.js, game.personRound), so a horse is the same animal with its edges
+// off, on the same flag and the same rung. Boxes under 4.5 cm (wings, bills,
+// feet on a bird) come out as they went in.
+function gorTwin(rf) {
+  const A = gorMerger(), B = gorMerger(), T = {};
+  B.round = rf || 0.4;
+  for (const k in A) {
+    if (typeof A[k] !== 'function' || k === 'build') continue;
+    T[k] = function () { const r = A[k].apply(A, arguments); B[k].apply(B, arguments); return r === A ? T : r; };
+  }
+  T.build = function () { const g = A.build(); g.userData.roundTwin = B.build(); return g; };
+  return T;
+}
+function gorRoundOn(m, twin) {
+  const tw = twin || (m && m.geometry.userData.roundTwin);
+  if (m && tw && gorGame && gorGame.personRound) { gorGame.personRound(m, tw); m.userData.roundAnimal = true; }
+  return m;
+}
 /**
  * EVERY SURFACE IN THIS CHAPTER WAS ONE FLAT VALUE.
  *
@@ -1411,8 +1432,9 @@ let gorToldCats = false;
 const gorCats = [];
 const gorCAT_COL = [0xc8b49a, 0x4a4038, 0xd8d2c6, 0x8a6a4a, 0x2f2a26];
 function gorBuildCats(root) {
-  // one cat, at the origin, facing +z, about 45 cm nose to tail
-  const C = gorMerger();
+  // one cat, at the origin, facing +z, about 45 cm nose to tail; and its
+  // rounded twin (AAA pass), a loaf of a cat rather than a brick of one
+  const C = gorTwin(0.4);
   C.box(0, 0.17, 0, 0.16, 0.15, 0.42, 0xffffff);                 // body
   C.sph(0, 0.27, 0.24, 0.10, 0.095, 0.09, 0xffffff, 6);          // head
   C.box(-0.055, 0.35, 0.24, 0.05, 0.07, 0.02, 0xffffff);         // ears
@@ -1444,7 +1466,7 @@ function gorBuildCats(root) {
   }
   if (m.instanceColor) m.instanceColor.needsUpdate = true;
   root.add(m);
-  gorCatMesh = m;
+  gorCatMesh = gorRoundOn(m);
 }
 function gorUpdateCats(game, dt) {
   if (!gorCatMesh) return;
@@ -2250,7 +2272,8 @@ function gorBuildCliff(game, root) {
   // thing that makes four hundred birds off a cliff read as a flock rather than
   // as film grain. Sixty triangles each against twelve, and they are the second
   // most looked-at thing in the chapter.
-  const pg = gorMerger();
+  // body and head rounded on the twin (AAA pass); the wings are 4 cm and stay card
+  const pg = gorTwin(0.4);
   // FOUR BOXES, NOT FIVE: the body is drawn long enough to be its own tail,
   // which at this size is the same silhouette for a fifth less. 260 birds is
   // 12,480 triangles and every one of them is in the frame at once.
@@ -2267,7 +2290,7 @@ function gorBuildCliff(game, root) {
   pm.userData.noShadow = true;
   pm.name = 'gorPigeons';
   root.add(pm);
-  gorPigeonMesh = pm;
+  gorPigeonMesh = gorRoundOn(pm);
   gorUpdatePigeons(0);
 }
 /**
@@ -4020,7 +4043,7 @@ let gorHerdSeed = [];
 const gorHerdPos = new THREE.Vector3();
 
 function gorHorseGeo(mane) {
-  const M = gorMerger();
+  const M = gorTwin(0.4);      // and its rounded twin (AAA pass)
   // barrel, neck, head, four legs, tail. A horse at this palette is a silhouette
   // and the silhouette is entirely in the neck angle.
   M.box(0, 1.02, 0, 0.66, 0.72, 2.05, PALETTE.gorSoil);
@@ -4050,6 +4073,7 @@ function gorBuildHerd(game, root) {
   gorHerdMesh.frustumCulled = false;
   gorHerdMesh.name = 'gorHerd';
   root.add(gorHerdMesh);
+  gorRoundOn(gorHerdMesh);
   gorHerdSeed = [];
   for (let i = 0; i < gorHERD_N - 1; i++) {
     gorHerdSeed.push({
@@ -4082,6 +4106,7 @@ function gorBuildHerd(game, root) {
   gorMareGroup.name = 'gorMare';
   gorMareGroup.add(mesh);
   root.add(gorMareGroup);
+  gorRoundOn(mesh);
 
   const b = new CANNON.Body({
     mass: 0, type: CANNON.Body.KINEMATIC,

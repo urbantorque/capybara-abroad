@@ -289,6 +289,27 @@ function cavMerger() {
     xform: cavXform, cylSegs: [4, 8], coneSegs: [8], sphSegs: [8], normals: 'recompute', jitter: 0.040,
   });
 }
+// THE ROUNDED ANIMAL (AAA pass). A merger that draws every call twice, the
+// second time with makeMerger's `round` on, and hangs the second geometry on
+// the first as `roundTwin`; cavRoundOn hands it to the rounded person's switch
+// (npc.js, game.personRound), so a swift is the same animal with its edges
+// off, on the same flag and the same rung. Boxes under 4.5 cm (wings, bills,
+// feet on a bird) come out as they went in.
+function cavTwin(rf) {
+  const A = cavMerger(), B = cavMerger(), T = {};
+  B.round = rf || 0.4;
+  for (const k in A) {
+    if (typeof A[k] !== 'function' || k === 'build') continue;
+    T[k] = function () { const r = A[k].apply(A, arguments); B[k].apply(B, arguments); return r === A ? T : r; };
+  }
+  T.build = function () { const g = A.build(); g.userData.roundTwin = B.build(); return g; };
+  return T;
+}
+function cavRoundOn(m, twin) {
+  const tw = twin || (m && m.geometry.userData.roundTwin);
+  if (m && tw && cavGame && cavGame.personRound) { cavGame.personRound(m, tw); m.userData.roundAnimal = true; }
+  return m;
+}
 
 function cavVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
@@ -2795,7 +2816,7 @@ function cavBuildShaftLife(root) {
   const floor = cavTerrain(D.x, D.z);
   // ---- the swifts --------------------------------------------------------
   {
-    const M = cavMerger();
+    const M = cavTwin(0.4);   // the body rounded on the twin (AAA pass)
     // A DART AND TWO SWEPT WINGS. A swift's silhouette is the most recognisable
     // in the air and it is entirely in the wings: back-swept, thin, and much
     // longer than the body. Twelve triangles.
@@ -2813,6 +2834,7 @@ function cavBuildShaftLife(root) {
       cavSwirlPh[i * 3 + 2] = rand(0, 6.283);          // ...and which way round
     }
     root.add(cavSwirl);
+    cavRoundOn(cavSwirl);
   }
   // ---- and the litter coming down the hole -------------------------------
   {

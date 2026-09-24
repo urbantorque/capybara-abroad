@@ -527,6 +527,27 @@ function panMerger() {
   };
   return M;
 }
+// THE ROUNDED ANIMAL (AAA pass). A merger that draws every call twice, the
+// second time with makeMerger's `round` on, and hangs the second geometry on
+// the first as `roundTwin`; panRoundOn hands it to the rounded person's switch
+// (npc.js, game.personRound), so a caiman is the same animal with its edges
+// off, on the same flag and the same rung. Boxes under 4.5 cm (wings, bills,
+// feet on a bird) come out as they went in.
+function panTwin(rf) {
+  const A = panMerger(), B = panMerger(), T = {};
+  B.round = rf || 0.4;
+  for (const k in A) {
+    if (typeof A[k] !== 'function' || k === 'build') continue;
+    T[k] = function () { const r = A[k].apply(A, arguments); B[k].apply(B, arguments); return r === A ? T : r; };
+  }
+  T.build = function () { const g = A.build(); g.userData.roundTwin = B.build(); return g; };
+  return T;
+}
+function panRoundOn(m, twin) {
+  const tw = twin || (m && m.geometry.userData.roundTwin);
+  if (m && tw && panGame && panGame.personRound) { panGame.personRound(m, tw); m.userData.roundAnimal = true; }
+  return m;
+}
 
 function panVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
@@ -1795,7 +1816,7 @@ function panBuildFazenda(game, root) {
  * BUMP on the shoulder, and nothing else about it survives the distance.
  */
 function panBuildCattle(root) {
-  const M = panMerger();
+  const M = panTwin(0.4);   // muzzle and dewlap rounded on the twin (AAA pass)
   M.sph(0, 0.94, 0, 0.42, 0.44, 1.00, PALETTE.panNelore, 6);
   M.sph(0, 1.30, -0.28, 0.30, 0.28, 0.34, PALETTE.panNeloreLt, 6);   // THE HUMP
   M.sph(0, 0.90, 0.86, 0.24, 0.26, 0.34, PALETTE.panNelore, 6);      // the head
@@ -1839,6 +1860,7 @@ function panBuildCattle(root) {
                    ph: rand(0, 6.28), moving: 0, pen: i < 11 });
   }
   root.add(panCattle);
+  panRoundOn(panCattle);
 }
 
 /**
@@ -2834,7 +2856,7 @@ function panBuildHerd(root) {
   // they must READ as the same animal — the whole point of the chapter is that
   // nobody here is remarkable — so this is deliberately the same silhouette:
   // a loaf with a blunt head on the front of it and no neck to speak of.
-  const M = panMerger();
+  const M = panTwin(0.4);   // the snout rounded on the twin (AAA pass)
   M.sph(0, 0.46, 0, 0.42, 0.40, 0.72, PALETTE.panCapy, 6);
   M.sph(0, 0.56, 0.62, 0.29, 0.27, 0.34, PALETTE.panCapy, 6);
   M.box(0, 0.70, 0.86, 0.30, 0.20, 0.22, PALETTE.panCapyDk);
@@ -2899,11 +2921,12 @@ function panBuildHerd(root) {
   panHerdLegF.instanceColor = new THREE.InstancedBufferAttribute(ca, 3);
   panHerdLegR.instanceColor = new THREE.InstancedBufferAttribute(ca, 3);
   root.add(panHerdMesh);
+  panRoundOn(panHerdMesh);
 }
 
 // ------------------------------------------------------------- the jacares --
 function panBuildCaimans(game, root) {
-  const M = panMerger();
+  const M = panTwin(0.4);   // and a rounded twin (AAA pass): a caiman, not a stack of planks
   // A jacare is a very long flat thing with a ridge down it, and from six
   // metres up the only readable parts of it are the SNOUT and the tail.
   M.box(0, 0.16, 0, 0.62, 0.28, 1.9, PALETTE.panCaiman);
@@ -3009,6 +3032,7 @@ function panBuildCaimans(game, root) {
   }
   panCaimans.instanceMatrix.needsUpdate = true;
   root.add(panCaimans);
+  panRoundOn(panCaimans);
 }
 
 /**
@@ -3135,7 +3159,7 @@ function panBuildEgrets(root) {
   // call — and it is what a great egret waiting in the shallows actually is:
   // a vertical body on two very long legs, the neck folded into an S so the
   // head sits back over the shoulders, and the wings CLOSED along the flank.
-  const S = panMerger();
+  const S = panTwin(0.4);   // tail, wings and neck rounded on the twin (AAA pass)
   for (let s = -1; s <= 1; s += 2) {
     S.box(s * 0.055, 0.30, 0, 0.035, 0.60, 0.035, PALETTE.panJabiruHd);   // the legs
     S.box(s * 0.055, 0.02, 0.05, 0.05, 0.03, 0.14, PALETTE.panJabiruHd);  // and the feet
@@ -3153,6 +3177,7 @@ function panBuildEgrets(root) {
   panEgretStand.frustumCulled = false;
   panEgretStand.castShadow = true;
   root.add(panEgretStand);
+  panRoundOn(panEgretStand);
 }
 
 /**
@@ -3248,7 +3273,7 @@ function panBuildCrossing(game, root) {
 }
 
 function panBuildOtters(root) {
-  const M = panMerger();
+  const M = panTwin(0.4);   // the bib rounded on the twin (AAA pass)
   M.sph(0, 0, 0, 0.28, 0.26, 0.78, PALETTE.panOtter, 6);
   M.sph(0, 0.06, 0.68, 0.22, 0.20, 0.26, PALETTE.panOtter, 6);
   M.box(0, 0.14, 0.86, 0.26, 0.14, 0.2, PALETTE.panOtterBib);
@@ -3259,10 +3284,11 @@ function panBuildOtters(root) {
   panOtterMesh.frustumCulled = false;
   panOtterMesh.castShadow = true;
   root.add(panOtterMesh);
+  panRoundOn(panOtterMesh);
 }
 
 function panBuildJabiru(root) {
-  const M = panMerger();
+  const M = panTwin(0.4);   // the folded wings rounded on the twin (AAA pass)
   // white, black head, RED collar. It is a metre and a half tall and it is the
   // tallest flying bird in South America.
   M.sph(0, 0, 0, 0.34, 0.36, 0.62, PALETTE.panJabiru, 6);
@@ -3277,6 +3303,7 @@ function panBuildJabiru(root) {
   panJabiru.castShadow = true;
   panJabiru.position.set(panNEST.x + 5, panBedH(panNEST.x, panNEST.z) + 1.4, panNEST.z + 6);
   root.add(panJabiru);
+  panRoundOn(panJabiru);
 }
 
 function panBuildMacaws(root) {

@@ -48,6 +48,29 @@ const rivCATCH_H = 1.4;         // m, vertical, so a hop reaches it low
 const rivWHEEK_R = 6.0;         // m: a wheek inside this frightens it
 const rivGIVE_UP_T = 9.0;       // s of fleeing before it is gone
 const rivGIVE_UP_D = 30;        // m: or this far
+// ---- AND THE SQUARE HAS OPINIONS (AAA A4) ----------------------------------
+// The author asked for more humour and more randomness in what people say.
+// The theft is the funniest thing that happens in front of them, so the
+// nearest bystander to the bird says something about it — two times in three,
+// from a pool, through game.sayNear, the same door every chapter's own
+// remarks use. Nobody names a place: the bird is in all nineteen.
+const rivSAY = {
+  stole: ['Is that bird with you? It looks like it is with you.',
+          'That bird has done this before. Look at it.',
+          'Not the ibis. Anything but the ibis.',
+          'It flew a very long way for one piece of fruit.',
+          'Somebody should do something. Not me.',
+          'The bird has a plan and the capybara does not.'],
+  dropped: ['Ha. The bird blinked first.',
+            'Did you see its face? It did not expect that.',
+            'Serves it right, honestly.',
+            'One shout and it folded. Good.'],
+  escaped: ['And it is gone. They always go.',
+            'Well. That was a yuzu.',
+            'It will be back. It is always back.',
+            'Round one to the bird.'],
+};
+function rivPick(a) { return a[Math.floor(Math.random() * a.length)]; }
 
 export function createRival(game) {
   const root = new THREE.Group();
@@ -86,6 +109,10 @@ export function createRival(game) {
   const say = (text) => { if (typeof game.toast === 'function') game.toast(text); };
   const honk = (v, pch) => { if (typeof game.sfx === 'function') game.sfx('gull', { volume: v, pitch: pch, at: root.position }); };
   const gy = (x, z) => (typeof game.groundY === 'function' ? game.groundY(x, z) : 0);
+  const remark = (kind) => {
+    if (Math.random() > 0.67 || typeof game.sayNear !== 'function') return;
+    try { game.sayNear(root.position.x, root.position.z, 18, rivPick(rivSAY[kind])); } catch (e) { /* optional */ }
+  };
 
   function hide(nextWait) {
     state = 'off'; t = 0; root.visible = false; carry.visible = false; target = null; worth = 0;
@@ -100,6 +127,7 @@ export function createRival(game) {
     say(reason + '  ·  it dropped your yuzu, and one of its own');
     if (typeof game.confetti === 'function') game.confetti(x, root.position.y + 0.6, z, 6);
     try { game.events.emit('rival:dropped', { x: x, z: z, how: reason }); } catch (e) { /* bus optional */ }
+    remark('dropped');
     worth = 0;
     state = 'out'; t = 0;
   }
@@ -140,7 +168,15 @@ export function createRival(game) {
       from.set(d.x + dir.x * 16, gy(d.x, d.z) + 9, d.z + dir.z * 16);
       root.position.copy(from); root.visible = true; state = 'in'; t = 0;
       honk(0.5, 0.75);
-      if (!lastSeen) say('the ibis from the Gardens. it has seen your yuzu.');
+      if (!lastSeen) {
+        say('the ibis from the Gardens. it has seen your yuzu.');
+        // ...and the first time, the lens turns so the bird is in the frame
+        // beyond the animal: yaw is the bearing from the animal to the camera,
+        // so it is the bearing AWAY from the fruit. Any input takes it back.
+        if (typeof game.frameShot === 'function') {
+          try { game.frameShot({ yaw: Math.atan2(cp.x - d.x, cp.z - d.z), hold: 2.6 }); } catch (e) { /* optional */ }
+        }
+      }
       lastSeen = 1;
       return;
     }
@@ -160,6 +196,7 @@ export function createRival(game) {
         honk(0.6, 0.72);
         say('the ibis has your yuzu. catch it, or wheek at it.');
         try { game.events.emit('rival:stole', { x: target.x, z: target.z, worth: worth }); } catch (e) { /* optional */ }
+        remark('stole');
       }
       return;
     }
@@ -198,6 +235,7 @@ export function createRival(game) {
         say('the ibis got away with a yuzu.');
         honk(0.45, 0.85);
         try { game.events.emit('rival:escaped', { worth: worth }); } catch (e) { /* optional */ }
+        remark('escaped');
         worth = 0; carry.visible = false;
         state = 'out'; t = 0;
       }

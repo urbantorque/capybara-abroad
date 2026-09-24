@@ -1,3 +1,39 @@
+## AAA A1b — THE ANIMALS, ROUNDED; THE IBIS INTRODUCED AND DISCUSSED (24 Sep 2026)
+
+**The animals.** Boxy animals in fifteen chapter files now have rounded
+twins on `noPersonRound`:
+
+- camels, storks, cobras and goats in Marrakech;
+- cats, 260 pigeons and horses in Cappadocia;
+- pigeons in Venice;
+- penguins, petrels, the skua and seals in Antarctica;
+- caimans, cattle, the capybara herd, egrets, otters and the jabiru in the
+  Pantanal;
+- a heron, gulls, a pelican, fish, a turtle, a whale and a fox elsewhere;
+- the condor's body and head.
+
+The mechanism is the same everywhere: each chapter merger draws the animal a
+second time with `round`, and the twin is registered through
+`game.personRound`. Long slabs such as the seals and the Quay whale take 0.15–0.2,
+because at 0.4 they read as strings of beads. Thin wings stay planes.
+
+The cost is about 70k triangles across 174 penguins and 19k across 260
+pigeons, only while the switch is live. Every cut and live mesh pair matches
+in size within 7 cm, in colour and in attributes
+(`qa/_aaa-animal-bbox.mjs`, scratch). `qa/aaa-animals.mjs` writes a
+cut/live sheet per chapter.
+
+The registry now drops meshes that have left the graph every 64
+registrations, so a condor re-plumed all afternoon does not keep every twin
+it ever made. A parked chapter keeps its parent links and stays.
+
+**The ibis, framed.** Its first appearance in a session turns the lens so the
+bird is beyond the animal, and any input takes it back. The nearest
+bystander comments two times in three when it steals, drops or escapes, from
+three small pools. No phrase is in more than three files (l6-tics).
+
+npm test: 77/0.
+
 ## AAA A3b — THE TAKINGS: CAUSE TROUBLE, THEN GET AWAY WITH IT (24 Sep 2026)
 
 An incident was a card and confetti and nothing you could spend. The only

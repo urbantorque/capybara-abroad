@@ -243,6 +243,27 @@ function kyoMerger() {
     xform: kyoXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [], normals: 'recompute', jitter: 0.060,
   });
 }
+// THE ROUNDED ANIMAL (AAA pass). A merger that draws every call twice, the
+// second time with makeMerger's `round` on, and hangs the second geometry on
+// the first as `roundTwin`; kyoRoundOn hands it to the rounded person's switch
+// (npc.js, game.personRound), so a heron is the same animal with its edges
+// off, on the same flag and the same rung. Boxes under 4.5 cm (wings, bills,
+// feet on a bird) come out as they went in.
+function kyoTwin(rf) {
+  const A = kyoMerger(), B = kyoMerger(), T = {};
+  B.round = rf || 0.4;
+  for (const k in A) {
+    if (typeof A[k] !== 'function' || k === 'build') continue;
+    T[k] = function () { const r = A[k].apply(A, arguments); B[k].apply(B, arguments); return r === A ? T : r; };
+  }
+  T.build = function () { const g = A.build(); g.userData.roundTwin = B.build(); return g; };
+  return T;
+}
+function kyoRoundOn(m, twin) {
+  const tw = twin || (m && m.geometry.userData.roundTwin);
+  if (m && tw && kyoGame && kyoGame.personRound) { kyoGame.personRound(m, tw); m.userData.roundAnimal = true; }
+  return m;
+}
 /**
  * EVERY SURFACE IN THIS CHAPTER WAS ONE FLAT VALUE.
  *
@@ -1375,7 +1396,7 @@ const kyoHERON_LIFT_R = 14;
 let kyoHeronWait = 0, kyoHeronLiftDone = false, kyoWheekT = 0;
 
 function kyoBuildHeron(root) {
-  const M = kyoMerger();
+  const M = kyoTwin(0.4);   // body, neck and head rounded on the twin (AAA pass)
   // A HERON IS A LINE AND TWO ANGLES: a long body held level, a neck folded
   // into a Z, and legs that are most of the animal. Grey above, white below,
   // and the black eyestripe is the only mark on it that matters at distance.
@@ -1416,6 +1437,7 @@ function kyoBuildHeron(root) {
   kyoHeronWing.visible = false;
   kyoHeronGroup.add(kyoHeronWing);
   root.add(kyoHeronGroup);
+  kyoRoundOn(body);
   kyoHeronPhase = 0; kyoHeronT = 0; kyoHeronAt = 0;
   kyoHeronWadeX = kyoHERON_A.x; kyoHeronWadeZ = kyoHERON_A.z;
 }

@@ -302,6 +302,27 @@ function manMerger() {
     xform: manXform, cylSegs: [4, 8], coneSegs: [8], sphSegs: [8], normals: 'recompute', jitter: 0.052,
   });
 }
+// THE ROUNDED ANIMAL (AAA pass). A merger that draws every call twice, the
+// second time with makeMerger's `round` on, and hangs the second geometry on
+// the first as `roundTwin`; manRoundOn hands it to the rounded person's switch
+// (npc.js, game.personRound), so a gull is the same animal with its edges
+// off, on the same flag and the same rung. Boxes under 4.5 cm (wings, bills,
+// feet on a bird) come out as they went in.
+function manTwin(rf) {
+  const A = manMerger(), B = manMerger(), T = {};
+  B.round = rf || 0.4;
+  for (const k in A) {
+    if (typeof A[k] !== 'function' || k === 'build') continue;
+    T[k] = function () { const r = A[k].apply(A, arguments); B[k].apply(B, arguments); return r === A ? T : r; };
+  }
+  T.build = function () { const g = A.build(); g.userData.roundTwin = B.build(); return g; };
+  return T;
+}
+function manRoundOn(m, twin) {
+  const tw = twin || (m && m.geometry.userData.roundTwin);
+  if (m && tw && manGame && manGame.personRound) { manGame.personRound(m, tw); m.userData.roundAnimal = true; }
+  return m;
+}
 
 function manVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
@@ -2886,7 +2907,7 @@ function manPerchDX(i) {
   return n > 0 ? ((i / n) | 0) * 0.62 : 0;
 }
 function manBuildGulls(root) {
-  const M = manMerger();
+  const M = manTwin(0.4);   // body and folded wings rounded on the twin (AAA pass)
   // WINGS FOLDED, NOT SPREAD. The first cut gave every gull a sixty-centimetre
   // span of flat plate — measured on a screenshot, a standing flock read as a
   // row of paper aeroplanes lying on the pavement, because a wing that is
@@ -2922,6 +2943,7 @@ function manBuildGulls(root) {
     manGullData[o + 6] = rand(0, 6.28);
   }
   root.add(manGullMesh);
+  manRoundOn(manGullMesh);
 }
 function manUpdateGulls(game, dt) {
   if (!manGullMesh) return;
@@ -3164,7 +3186,7 @@ function manUpdateBuoys() {
 }
 
 function manBuildPelican(root) {
-  const M = manMerger();
+  const M = manTwin(0.4);   // the back rounded on the twin (AAA pass)
   M.sph(0, 0.5, 0, 0.42, 0.38, 0.72, PALETTE.manPelican, 6);
   M.box(0, 0.62, -0.55, 0.5, 0.34, 0.4, PALETTE.manPelicanBk);
   M.cyl(0, 0.92, 0.28, 0.13, 0.7, PALETTE.manPelican, 0.34, 0, 0, 6);
@@ -3176,6 +3198,7 @@ function manBuildPelican(root) {
   manPelican.castShadow = true;
   manPelican.position.set(manPOOL.x1 + 1.1, manPOOL.wall + 0.9, manPOOL.z0 + 3);
   root.add(manPelican);
+  manRoundOn(manPelican);
 }
 
 function manBuildGroper(root) {

@@ -415,6 +415,27 @@ function antMerger() {
     xform: antXform, cylSegs: [4, 8, 12], coneSegs: [4], sphSegs: [8], normals: 'recompute', jitter: 0.030,
   });
 }
+// THE ROUNDED ANIMAL (AAA pass). A merger that draws every call twice, the
+// second time with makeMerger's `round` on, and hangs the second geometry on
+// the first as `roundTwin`; antRoundOn hands it to the rounded person's switch
+// (npc.js, game.personRound), so a penguin is the same animal with its edges
+// off, on the same flag and the same rung. Boxes under 4.5 cm (wings, bills,
+// feet on a bird) come out as they went in.
+function antTwin(rf) {
+  const A = antMerger(), B = antMerger(), T = {};
+  B.round = rf || 0.4;
+  for (const k in A) {
+    if (typeof A[k] !== 'function' || k === 'build') continue;
+    T[k] = function () { const r = A[k].apply(A, arguments); B[k].apply(B, arguments); return r === A ? T : r; };
+  }
+  T.build = function () { const g = A.build(); g.userData.roundTwin = B.build(); return g; };
+  return T;
+}
+function antRoundOn(m, twin) {
+  const tw = twin || (m && m.geometry.userData.roundTwin);
+  if (m && tw && antGame && antGame.personRound) { antGame.personRound(m, tw); m.userData.roundAnimal = true; }
+  return m;
+}
 
 function antVC() {
   return grain(mat(0xffffff, { vertexColors: true }), { scale: 0.30, amount: 0.10, warp: 0.5 });
@@ -2435,7 +2456,8 @@ function antBuildPod(root) {
 function antBuildPenguins(root) {
   // ONE instanced mesh for fifty-six gentoos. A penguin is a bowling pin with
   // a black back, and at this camera distance that is genuinely all it is.
-  const M = antMerger();
+  // Drawn twice (AAA pass): the rounded twin is the bowling pin, not the crate.
+  const M = antTwin(0.4);
   M.box(0, 0.30, 0, 0.34, 0.60, 0.30, PALETTE.antPeng);
   M.box(0, 0.30, 0.10, 0.28, 0.52, 0.16, PALETTE.antPengW);
   M.box(0, 0.66, 0.02, 0.26, 0.20, 0.26, PALETTE.antPeng);
@@ -2526,12 +2548,12 @@ function antBuildPenguins(root) {
     }
   }
   m.instanceColor = new THREE.InstancedBufferAttribute(pc, 3);
-  antPengMesh = m;
+  antPengMesh = antRoundOn(m);
   root.add(m);
 
   // ...and a dozen of them in the water, which is where a gentoo is actually
   // fast. They porpoise, which is the only reason anybody knows what they are.
-  const S = antMerger();
+  const S = antTwin(0.4);
   S.box(0, 0, 0, 0.30, 0.28, 0.80, PALETTE.antPeng);
   S.box(0, -0.10, 0.06, 0.24, 0.14, 0.66, PALETTE.antPengW);
   S.box(0, 0.02, 0.46, 0.18, 0.16, 0.24, PALETTE.antPeng);
@@ -2545,7 +2567,7 @@ function antBuildPenguins(root) {
     antSwimData[i * 3 + 1] = rand(-7, 7);
     antSwimData[i * 3 + 2] = rand(0.030, 0.044);
   }
-  antSwimPeng = sm;
+  antSwimPeng = antRoundOn(sm);
   root.add(sm);
 }
 
@@ -2553,7 +2575,7 @@ function antBuildBirds(root) {
   // SNOW PETRELS. Pure white, and there is nothing else in the world that is.
   // They are here to give the glacier a SIZE — a forty-metre wall of ice with
   // nothing in front of it could be four metres or four hundred.
-  const M = antMerger();
+  const M = antTwin(0.4);      // body and head rounded (AAA pass); wings stay card
   M.box(0, 0, 0, 0.14, 0.10, 0.42, PALETTE.antPetrel);
   M.box(0, 0.01, 0.24, 0.09, 0.07, 0.14, PALETTE.antPetrel);
   for (let s = -1; s <= 1; s += 2) {
@@ -2570,7 +2592,7 @@ function antBuildBirds(root) {
     antPetrelData[o + 2] = rand(9, 26);
     antPetrelData[o + 3] = rand(0.20, 0.36) * (i % 2 ? 1 : -1);
   }
-  antPetrels = m;
+  antPetrels = antRoundOn(m);
   root.add(m);
 
   // ---- CAPE PETRELS, AND THE GATE HAD NOTHING ALIVE IN IT ----------------
@@ -2585,7 +2607,7 @@ function antBuildBirds(root) {
   // and round the headland all day. It gives the gate a size, it gives the
   // narrows a sound, and it is the reason the passage feels like arriving
   // somewhere rather than driving past a rock.
-  const C = antMerger();
+  const C = antTwin(0.4);
   C.box(0, 0, 0, 0.13, 0.09, 0.36, PALETTE.antPeng);
   C.box(0, -0.02, 0.04, 0.10, 0.06, 0.28, PALETTE.antPengW);
   C.box(0, 0.01, 0.21, 0.08, 0.07, 0.13, PALETTE.antPeng);
@@ -2606,12 +2628,12 @@ function antBuildBirds(root) {
     antCapeData[o + 2] = rand(6, 44);
     antCapeData[o + 3] = rand(0.12, 0.26) * (i % 2 ? 1 : -1);
   }
-  antCapes = cm;
+  antCapes = antRoundOn(cm);
   root.add(cm);
 
   // THE SKUA. One. It works the colony, it is a bully, and it is the only
   // thing in this chapter that is actively up to something.
-  const S = antMerger();
+  const S = antTwin(0.4);
   S.box(0, 0, 0, 0.26, 0.20, 0.62, PALETTE.antSkua);
   S.box(0, 0.03, 0.36, 0.16, 0.14, 0.22, PALETTE.antSkua);
   S.box(0, 0.02, 0.50, 0.07, 0.07, 0.14, PALETTE.antRockDk);
@@ -2623,6 +2645,7 @@ function antBuildBirds(root) {
   antSkua.castShadow = true;
   antSkua.frustumCulled = false;
   root.add(antSkua);
+  antRoundOn(antSkua);
 }
 
 // ------------------------------------------------------------------ seals ---
@@ -2637,7 +2660,10 @@ function antBuildBirds(root) {
  */
 function antBuildSeals(game, root) {
   const g = new THREE.Group();
-  const M = antMerger();
+  // every part drawn twice (AAA pass): the rounded twin is a seal, not a raft of
+  // planks. The body at 0.2, not 0.4: it is five slabs end to end and at 0.4
+  // each rounds its own ends off and the animal reads as a string of beads.
+  const M = antTwin(0.2);
   for (let k = 0; k < 5; k++) {
     const t = k / 4;
     const w = 1.05 - 0.62 * t;
@@ -2652,7 +2678,7 @@ function antBuildSeals(game, root) {
   body.castShadow = true;
   g.add(body);
 
-  const H = antMerger();
+  const H = antTwin(0.4);
   H.box(0, 0, 0.42, 0.66, 0.46, 1.10, PALETTE.antSealHide);
   H.box(0, 0.18, 0.98, 0.44, 0.26, 0.42, PALETTE.antSealHide);
   for (let s = -1; s <= 1; s += 2) {
@@ -2662,7 +2688,7 @@ function antBuildSeals(game, root) {
   antSealHead.position.set(0, 0.30, 1.55);
   g.add(antSealHead);
 
-  const J = antMerger();
+  const J = antTwin(0.4);
   J.box(0, -0.16, 0.50, 0.50, 0.20, 1.02, PALETTE.antSealHide);
   J.box(0, -0.06, 0.52, 0.40, 0.06, 0.94, PALETTE.antSealBelly);
   antSealJaw = new THREE.Mesh(J.build(), antVC());
@@ -2671,11 +2697,12 @@ function antBuildSeals(game, root) {
   g.visible = true;
   antSealGroup = g;
   root.add(g);
+  antRoundOn(body); antRoundOn(antSealHead); antRoundOn(antSealJaw);
 
   // A WEDDELL SEAL, on the beach, asleep, and it stays asleep. It is on no
   // list, it wants nothing, and it is the only thing in the chapter that is
   // having a nicer time than you are.
-  const W = antMerger();
+  const W = antTwin(0.2);      // slabs end to end: see the leopard seal
   for (let k = 0; k < 5; k++) {
     const t = k / 4;
     const w = 1.20 - 0.55 * t;
@@ -2690,6 +2717,7 @@ function antBuildSeals(game, root) {
   antWeddell.position.set(antWHAL.x - 4, wy + 0.55, antWHAL.z - 16);
   antWeddell.rotation.y = 1.1;
   root.add(antWeddell);
+  antRoundOn(antWeddell);
   // ...AND THREE HUNDRED KILOS OF SEAL IS A SOLID OBJECT. It was a hologram:
   // the one thing in the chapter that is having a nicer time than you are, and
   // you walked straight through the middle of it on the way to the whale bones

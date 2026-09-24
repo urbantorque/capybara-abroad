@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, swayMesh, makeMerger, mergeWearBand, makeMover } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, swayMesh, makeMerger, mergeWearBand, makeMover, roundBoxGeo } from './shared.js';
 import { npcPERSON, npcRoundParts } from './npc.js';
 
 // ===========================================================================
@@ -420,6 +420,27 @@ function sahMerger() {
   return makeMerger(sahG, {
     xform: sahXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [], normals: 'recompute', jitter: 0.058,
   });
+}
+// THE ROUNDED ANIMAL (AAA pass). A merger that draws every call twice, the
+// second time with makeMerger's `round` on, and hangs the second geometry on
+// the first as `roundTwin`; sahRoundOn hands it to the rounded person's switch
+// (npc.js, game.personRound), so a camel is the same camel, not a crate, on
+// the same flag and the same rung. Boxes under 4.5 cm (wings, bills, feet
+// on a bird) come out as they went in.
+function sahTwin(rf) {
+  const A = sahMerger(), B = sahMerger(), T = {};
+  B.round = rf || 0.4;
+  for (const k in A) {
+    if (typeof A[k] !== 'function' || k === 'build') continue;
+    T[k] = function () { const r = A[k].apply(A, arguments); B[k].apply(B, arguments); return r === A ? T : r; };
+  }
+  T.build = function () { const g = A.build(); g.userData.roundTwin = B.build(); return g; };
+  return T;
+}
+function sahRoundOn(m, twin) {
+  const tw = twin || (m && m.geometry.userData.roundTwin);
+  if (m && tw && sahGame && sahGame.personRound) { sahGame.personRound(m, tw); m.userData.roundAnimal = true; }
+  return m;
 }
 /**
  * EVERY SURFACE IN THIS CHAPTER WAS ONE FLAT VALUE.
@@ -1853,7 +1874,7 @@ function sahBuildProps(game, root) {
   // in it and goes back down when whatever it is leaves. Seven segments on a
   // taper with a hood and two eyes, and it sways: see sahUpdateTasks.
   const cg2 = new THREE.Group();
-  const C = sahMerger();
+  const C = sahTwin(0.4);      // the hood rounded (AAA pass)
   for (let i = 0; i < 7; i++) {
     const u = i / 6;
     C.cyl(Math.sin(u * 3.1) * 0.10, 0.10 + u * 0.62, 0, 0.13 - u * 0.045, 0.16,
@@ -1867,6 +1888,7 @@ function sahBuildProps(game, root) {
   cm.castShadow = false;
   cm.userData.noShadow = true;      // this file's own flag; see sahNoShadowOnGhosts
   cg2.add(cm);
+  sahRoundOn(cm);
   cg2.position.set(0, -0.9, 0);          // asleep, below the rim
   cg2.visible = false;
   bg.add(cg2);
@@ -3310,6 +3332,9 @@ function sahBuildGoats(game, root) {
     sahGoatBody.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   }
   if (sahGoatHead) {
+    // the head is the unit box scaled per goat; its rounded twin is the unit
+    // box with its edges off, a little oval under that scale (AAA pass)
+    sahRoundOn(sahGoatHead, roundBoxGeo(1, 1, 1, 0.4, 2));
     sahGoatHead.name = 'sahGoatHeads';
     sahGoatHead.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   }
@@ -4665,7 +4690,7 @@ function sahBuildCamp(game, root) {
  * triangles for the whole caravan, against three hundred for the crates.
  */
 function sahCamelGeo() {
-  const M = sahMerger();
+  const M = sahTwin(0.4);      // and its rounded twin (AAA pass): a barrel, not a crate
   // the barrel — deep, narrow, and tucked up at the flank
   M.box(0, 1.72, 0.05, 0.95, 1.02, 2.45, PALETTE.sahCamel);
   M.box(0, 1.30, -0.85, 0.80, 0.62, 0.95, PALETTE.sahCamelDk);      // the rump
@@ -4695,7 +4720,7 @@ function sahCamelGeo() {
   return M.build();
 }
 function sahCamelLegGeo() {
-  const M = sahMerger();
+  const M = sahTwin(0.4);
   M.cyl(0, -0.42, 0, 0.13, 0.86, PALETTE.sahCamel, 0, 0, 0, 4);      // upper
   M.cyl(0, -1.10, 0.06, 0.10, 0.62, PALETTE.sahCamelDk, 0.16, 0, 0, 4);  // shank
   M.box(0, -1.44, 0.10, 0.26, 0.14, 0.34, PALETTE.sahCamelDk);       // the pad
@@ -4708,14 +4733,14 @@ function sahBuildCaravan(game, root) {
   im.castShadow = true;
   im.frustumCulled = false;
   root.add(im);
-  sahCamelMesh = im;
+  sahCamelMesh = sahRoundOn(im);
   // four legs each, their own mesh because they swing
   const lm = new THREE.InstancedMesh(sahCamelLegGeo(), sahVC(), sahCARAVAN_N * 4);
   lm.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   lm.castShadow = true;
   lm.frustumCulled = false;
   root.add(lm);
-  sahCamelLegs = lm;
+  sahCamelLegs = sahRoundOn(lm);
 
   // ---- AND SOMEBODY IS LEADING IT ----------------------------------------
   // Five camels on a fixed route with NOBODY WITH THEM. A caravan is a group of
@@ -5155,7 +5180,7 @@ let sahStorkMesh = null, sahStorkSeed = null;
 let sahStorkT = 0, sahStorkClat = 4;
 
 function sahBuildStorks(root) {
-  const M = sahMerger();
+  const M = sahTwin(0.4);      // the body rounded (AAA pass); the wings stay card
   // A STORK IN THE AIR IS A CROSS: neck straight out in front (which is what
   // separates it from a heron at any distance), legs straight out behind, and
   // two very long black-tipped wings held dead flat. It barely ever flaps.
@@ -5174,6 +5199,7 @@ function sahBuildStorks(root) {
   sahStorkMesh.castShadow = false;      // shadows at 50 m over a medina are noise
   sahStorkMesh.userData.noShadow = true;   // ...and this is what makes it stick
   root.add(sahStorkMesh);
+  sahRoundOn(sahStorkMesh);
   sahStorkSeed = [];
   for (let i = 0; i < sahSTORK_N; i++) {
     sahStorkSeed.push({

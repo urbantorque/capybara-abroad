@@ -354,6 +354,27 @@ function driMerger() {
   };
   return M;
 }
+// THE ROUNDED ANIMAL (AAA pass). A merger that draws every call twice, the
+// second time with makeMerger's `round` on, and hangs the second geometry on
+// the first as `roundTwin`; driRoundOn hands it to the rounded person's switch
+// (npc.js, game.personRound), so a goose is the same animal with its edges
+// off, on the same flag and the same rung. Boxes under 4.5 cm (wings, bills,
+// feet on a bird) come out as they went in.
+function driTwin(rf) {
+  const A = driMerger(), B = driMerger(), T = {};
+  B.round = rf || 0.4;
+  for (const k in A) {
+    if (typeof A[k] !== 'function' || k === 'build') continue;
+    T[k] = function () { const r = A[k].apply(A, arguments); B[k].apply(B, arguments); return r === A ? T : r; };
+  }
+  T.build = function () { const g = A.build(); g.userData.roundTwin = B.build(); return g; };
+  return T;
+}
+function driRoundOn(m, twin) {
+  const tw = twin || (m && m.geometry.userData.roundTwin);
+  if (m && tw && driGame && driGame.personRound) { driGame.personRound(m, tw); m.userData.roundAnimal = true; }
+  return m;
+}
 /**
  * EVERY SURFACE IN THIS CHAPTER WAS ONE FLAT VALUE.
  *
@@ -4015,7 +4036,7 @@ const driSKEIN_HEAR = 150;        // m. It is a very quiet place.
 function driBuildSkein(root) {
   // ONE BOX AND TWO WINGS, and no more, because at two hundred metres a bird is
   // a mark. What sells it is the V and the fact that they are not in step.
-  const M = driMerger();
+  const M = driTwin(0.4);   // the body rounded on the twin (AAA pass)
   M.box(0, 0, 0, 0.22, 0.16, 1.30, PALETTE.driTimber);
   for (let s = -1; s <= 1; s += 2) {
     M.box(s * 1.05, 0.06, -0.10, 1.90, 0.07, 0.44, PALETTE.driTimber,
@@ -4027,6 +4048,7 @@ function driBuildSkein(root) {
   driSkeinMesh.castShadow = false;
   driSkeinMesh.visible = false;
   root.add(driSkeinMesh);
+  driRoundOn(driSkeinMesh);
   driSkeinT = -18;
 }
 

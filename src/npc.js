@@ -1542,6 +1542,7 @@ export function createNPCs(game) {
   // should not turn the whole population back into bricks.
   const npcRoundPeople = [];
   let npcRoundDogB = null, npcRoundDogH = null, npcRoundDogL = null;   // shared with Pasto's dogs
+  let npcRoundRegN = 0;
   let npcRoundPplOn = !game.state.noPersonRound && (game.state.perfRung | 0) < 2;
   let npcRoundCtrOn = !game.state.noPersonContour && (game.state.perfRung | 0) < 1;
   function npcRoundApply(r) {
@@ -1552,6 +1553,13 @@ export function createNPCs(game) {
     if (!mesh || !geo || mesh.userData.personContour || mesh.userData.personRound) return mesh;
     const rec = { mesh: mesh, inherited: mesh.geometry, inheritedMat: mesh.material, geo: geo,
                   mat: material || null, contour: null };
+    // A mesh that has left the graph altogether (a condor re-plumed, a pool
+    // rebuilt) is dropped from the list every 64 registrations, so a long
+    // session does not hold every twin it ever made. A PARKED chapter keeps
+    // its parent links (its root is detached, not its meshes), so it stays.
+    if (++npcRoundRegN % 64 === 0) {
+      for (let i = npcRoundPeople.length - 1; i >= 0; i--) if (!npcRoundPeople[i].mesh.parent) npcRoundPeople.splice(i, 1);
+    }
     npcRoundPeople.push(rec);
     mesh.userData.personRound = true;
     if (npcRoundPplOn) npcRoundApply(rec);

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matOwn, EMIT_OVER, emitSet, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue, swayMesh, makeMerger, mergeWearBand, warnOnce, causticSet } from './shared.js';
+import { PALETTE, mat, matOwn, EMIT_OVER, emitSet, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue, swayMesh, makeMerger, mergeWearBand, warnOnce, causticSet, roundBoxGeo } from './shared.js';
 import { farLayer, farMover, farBundle, farTone } from './far.js';
 
 // ===========================================================================
@@ -290,6 +290,27 @@ function palMerger() {
     return r;
   };
   return M;
+}
+// THE ROUNDED ANIMAL (AAA pass). A merger that draws every call twice, the
+// second time with makeMerger's `round` on, and hangs the second geometry on
+// the first as `roundTwin`; palRoundOn hands it to the rounded person's switch
+// (npc.js, game.personRound), so a turtle is the same animal with its edges
+// off, on the same flag and the same rung. Boxes under 4.5 cm (wings, bills,
+// feet on a bird) come out as they went in.
+function palTwin(rf) {
+  const A = palMerger(), B = palMerger(), T = {};
+  B.round = rf || 0.4;
+  for (const k in A) {
+    if (typeof A[k] !== 'function' || k === 'build') continue;
+    T[k] = function () { const r = A[k].apply(A, arguments); B[k].apply(B, arguments); return r === A ? T : r; };
+  }
+  T.build = function () { const g = A.build(); g.userData.roundTwin = B.build(); return g; };
+  return T;
+}
+function palRoundOn(m, twin) {
+  const tw = twin || (m && m.geometry.userData.roundTwin);
+  if (m && tw && palGame && palGame.personRound) { palGame.personRound(m, tw); m.userData.roundAnimal = true; }
+  return m;
 }
 /**
  * EVERY SURFACE IN THIS CHAPTER WAS ONE FLAT VALUE.
@@ -1824,7 +1845,7 @@ function palBuildSmallLife(root) {
   root.add(palAnemMesh);
 
   // ---- and the clownfish, one per anemone, on their own buffer ------------
-  const C = palMerger();
+  const C = palTwin(0.4);      // the body rounded on the twin (AAA pass); the stripes are 3.5 cm and stay bands
   C.box(0, 0, 0, 0.075, 0.11, 0.20, PALETTE.palCoralOrange);
   C.box(0, 0, 0.035, 0.078, 0.112, 0.035, PALETTE.palPearl);
   C.box(0, 0, -0.055, 0.078, 0.112, 0.035, PALETTE.palPearl);
@@ -1834,6 +1855,7 @@ function palBuildSmallLife(root) {
   palFishletMesh.userData.noShadow = true;
   palFishletMesh.name = 'palClownfish';
   root.add(palFishletMesh);
+  palRoundOn(palFishletMesh);
 
   palAnemData = new Float32Array(palANEM_N * 5);
   let n = 0, guard = 0;
@@ -1949,7 +1971,9 @@ function palBuildFish(root) {
   m.frustumCulled = false;
   m.name = 'palSchools';
   root.add(m);
-  palFishMesh = m;
+  // A FISH IS NOT A BRICK. The same box with its edges rounded off (AAA pass),
+  // on the rounded person's switch: 108 triangles against 12, times 150.
+  palFishMesh = palRoundOn(m, roundBoxGeo(0.16, 0.24, 0.55, 0.45, 3));
 }
 /**
  * AND THE SCHOOL HEARS YOU.
@@ -2211,7 +2235,7 @@ function palUpdateBaitBall(game, dt) {
 }
 
 function palBuildTurtle(root) {
-  const M = palMerger();
+  const M = palTwin(0.4);   // the flippers and eyes rounded on the twin (AAA pass)
   M.sph(0, 0, 0, 1.35, 0.5, 1.6, PALETTE.palTurtleShell, 8);
   M.sph(0, -0.16, 0, 1.15, 0.34, 1.4, PALETTE.palTurtle, 8);
   M.sph(0, 0.02, -1.75, 0.34, 0.30, 0.46, PALETTE.palTurtle, 8);
@@ -2228,6 +2252,7 @@ function palBuildTurtle(root) {
   g.add(mesh);
   g.userData.flippers = mesh;
   root.add(g);
+  palRoundOn(mesh);
   palTurtle = g;
 }
 /** Where the turtle is right now. A slow figure round the reef and the drop. */

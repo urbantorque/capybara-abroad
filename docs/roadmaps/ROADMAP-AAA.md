@@ -44,35 +44,53 @@ AGENTS.md stands.
   capsule limbs, tapered waist, rounded shoulders, flat faces kept. At most
   0.2 ms, which is noise.
 
-### A1: the living, all of them
+### A1: the living, all of them (shipped)
 
-Crowds, animals and Hanoi's bikers get the same treatment. The bikers also
-get continuous motion.
+Every roster, local, crowd, dog, llama and chapter animal now has a rounded
+twin on `noPersonRound`. The big crowds in Rio and the Erg keep boxed bodies
+for cost. `noBike2` is the redrawn Hanoi scooter: a seated rider, masks,
+passengers, a lean into bends and suspension. The choppiness was measured:
+the motion is exact and the frame pacing is not (see A7).
 
-### A2: the weak places
+### A2: the weak places (partly shipped)
 
-Lift the flattest chapters by composition and colour: the lantern glow
-discs, grey arcades, empty foregrounds.
+Göreme's square and bulbs (`noGorCalm`) and soft yuzu auras (`noAuraSoft`).
+The Drift, the cave and Monte Carlo were looked at and left alone: they are
+moody, not weak.
 
-### A3: mischief with consequences
+### A3: mischief with consequences (shipped)
 
-A nemesis who notices, chases and can be escaped or out-foxed. Visible
-"you did that" feedback, and trolls that pay off.
+- **A3a.** A march costs 1–3 yuzu, an escape pays 2, the marcher wears the
+  take, and the chase pulse starts on setting off. Three bugs fixed.
+- **A3b.** The takings: a pot on every carded chain, banked on a getaway and
+  lost on a catch (`noTakings`).
 
-### A4: a reason to be here
+### A4: a reason to be here (shipped)
 
-A premise in the first minute, a goal the paper states plainly, and an
-ending the goal points at.
+The premise card (`noPremise`) and "N of 19 memories" on the paper. The
+rival ibis, src/rival.js (`noRival`): it steals yuzu, and you catch it or
+wheek at it. It is introduced with a camera shot the first time, and the
+square comments on it.
 
-### A5: clarity
+### A5: clarity (shipped)
 
-One next thing at a time, in plain words.
+A one-line tab with an arrow and the verb. L opens the list. Modals no longer
+reopen the sheet. Arrows are on by default (`ar2`), and the footer is in plain
+words.
 
-### A6: the repository
+### A6: the repository (shipped)
 
-Archive the closed roadmaps, and write a README that fits on a screen.
+docs/roadmaps/, docs/CONTRACT.md, docs/archive/, and a one-screen README.
 
 ### A7: release
 
-Run the full gates and browser checks, merge to `master`, push, and verify
-Pages.
+Gates, browser checks, merge to `master`, push, and verify Pages.
+
+Open, and said plainly:
+
+- **Hanoi's frame.** Its world pass is 13 ms, spent on per-pixel grain()
+  shading of the ground and shells, and frame pacing alternates between 10
+  and 21 ms. A depth pre-pass or a far-field grain variant is the next lever;
+  neither was attempted.
+- **No human has played this pass.** Every check is a harness driver, not a
+  novice.
