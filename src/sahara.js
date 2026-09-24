@@ -267,6 +267,9 @@ let sahSeguia = null;
 // x, y, z of every brazier on the square, filled in by sahBuildSquare.
 const sahBRAZIER = [];
 let sahSmokeMesh = null, sahSmokeMat = null;
+// the square's joints (T2e, noSahStallSmoke): 70% of the way to the ground
+const sahSQ_JOINT_SOFT = 0.7;
+let sahSqJoints = null, sahSqJointCut = null, sahSqJointLive = null, sahSqJointOn = -1;
 const sahSMOKE_PER = 5;            // puffs in the air over each brazier at once
 const sahSMOKE_RISE = 5.4;         // m a puff climbs before it is gone
 // The three halqa rings: x, z, radius. sahHalqaBeat is where each one is in
@@ -1390,8 +1393,42 @@ function sahBuildSquare(game, root) {
     // the joints darker, the flags no paler than the worn ground already is:
     // the first cut used sahPlaster and the square read as a checkerboard
     const joint = PALETTE.sahOchreDk, flag = PALETTE.sahOchrePale;
-    for (let k = 0; k <= 13; k++) M.box(sahSQ_X0 + k * 4, 0.02, 4, 0.14, 0.05, 36, joint);
-    for (let k = 0; k <= 9; k++) M.box(0, 0.02, sahSQ_Z0 + k * 4, 52, 0.05, 0.14, joint);
+    // ...AND AT A THIRD OF THE CONTRAST (T2e, noSahStallSmoke). The reviewer's
+    // arrival shot: "a terracotta grid of 6 m tiles with thick dark-red joints
+    // running to the horizon", the loudest pattern in the frame, on a square
+    // that is trodden plaster. The joints are their own small mesh now so the
+    // flag can swap them back: the live colour is 70% of the way from the
+    // joint to the worn ground it lies on. The name is the roadmap's for the
+    // whole stretch; the worn paths (sahBuildGround's two bands and the L6
+    // wear path) and the stall smoke (sahBuildSmoke) were already built, and
+    // this is the one term of it that was not.
+    const J = sahMerger();
+    for (let k = 0; k <= 13; k++) J.box(sahSQ_X0 + k * 4, 0.02, 4, 0.14, 0.05, 36, joint);
+    for (let k = 0; k <= 9; k++) J.box(0, 0.02, sahSQ_Z0 + k * 4, 52, 0.05, 0.14, joint);
+    const jm = new THREE.Mesh(J.build(), sahVC());
+    jm.receiveShadow = true;
+    root.add(jm);
+    sahSqJoints = jm;
+    const ca = jm.geometry.attributes.color;
+    if (ca) {
+      sahSqJointCut = ca.array.slice();
+      sahSqJointLive = ca.array.slice();
+      // the ground they lie on is the WORN ground (sahBuildGround: ochrePale,
+      // and plaster where it is most walked), not the dust at the square's edge
+      // — measured against dust-to-pale, the joints only lost a third of their
+      // contrast in the rendered frame (0.42 -> 0.29)
+      const gnd = new THREE.Color(PALETTE.sahOchrePale).lerp(new THREE.Color(PALETTE.sahPlaster), 0.4);
+      // per channel, as a ratio on what the merger wrote: every vertex keeps
+      // its own jitter (the merger's 0.058) and only the mean moves
+      const jc = new THREE.Color(joint);
+      const mr = lerp(jc.r, gnd.r, sahSQ_JOINT_SOFT) / Math.max(jc.r, 1e-4);
+      const mg = lerp(jc.g, gnd.g, sahSQ_JOINT_SOFT) / Math.max(jc.g, 1e-4);
+      const mb = lerp(jc.b, gnd.b, sahSQ_JOINT_SOFT) / Math.max(jc.b, 1e-4);
+      for (let v = 0; v < sahSqJointLive.length; v += 3) {
+        sahSqJointLive[v] *= mr; sahSqJointLive[v + 1] *= mg; sahSqJointLive[v + 2] *= mb;
+      }
+      sahSqJointOn = -1;   // written on the first update
+    }
     for (let ix = 0; ix < 5; ix++) {
       for (let iz = 0; iz < 4; iz++) {
         if ((ix + iz) % 2) continue;
@@ -5025,6 +5062,18 @@ function sahBuildSmoke(root) {
   sahSmokeMesh = im;
 }
 
+/** The joints' colour, written only on the frame the flag changes. It costs
+ *  nothing on either side of the flag, so it does not park on the rung. */
+function sahUpdateSqJoints(game) {
+  if (!sahSqJoints || !sahSqJointLive) return;
+  const on = (game.state && game.state.noSahStallSmoke) ? 0 : 1;
+  if (on === sahSqJointOn) return;
+  sahSqJointOn = on;
+  const ca = sahSqJoints.geometry.attributes.color;
+  ca.array.set(on ? sahSqJointLive : sahSqJointCut);
+  ca.needsUpdate = true;
+}
+
 function sahUpdateSmoke() {
   if (!sahSmokeMesh) return;
   const nb = sahBRAZIER.length / 3;
@@ -6544,6 +6593,7 @@ export function createSahara(game) {
       sahUpdateJet(game, dt);   // X3
       sahUpdateDust(game, dt);
       sahUpdateSmoke();
+      sahUpdateSqJoints(game);   // T2e
       sahUpdateStorks(game, dt);
       sahUpdateGoats(dt);
       sahUpdateDates(game, dt);
