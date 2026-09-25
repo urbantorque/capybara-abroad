@@ -1634,6 +1634,143 @@ the proof at 20. U2a starts when the strangers report, about 40 minutes
 in. If a wave runs long, U2f is cut first, then U2b's lit windows. U2 has seven
 items against six concurrent agents, so U2f starts last.
 
+## V — THE SOFT MATTE PASS: people, objects, buildings (proposed 26 Sep, NOT scheduled)
+
+The author supplied four reference frames: a dusk town seen from above,
+a closer view of the same town at golden hour, a cook at a stove, and two
+people in a doorway. The author asked for this as another visual
+overhaul, mainly of the NPCs, characters and objects, and said it must
+not run until the author says so. It is not started and has no owner.
+
+### What the references show
+
+- **Bevelled, soft forms rather than hard boxes.** Every building is still
+  a simple block, but its edges are rounded or chamfered. Roofs have a
+  lip. Domes, pods and capsules sit among the blocks. Props (the blue
+  cylinder pack, the pot, the benches) are chunky and rounded, with
+  straps and rims. The silhouette stays low-poly; the edges catch light.
+- **Matte, smooth shading with a soft light.** The faces are not
+  faceted: gradients run across a surface, the light wraps gently
+  round a form, and the ambient occlusion is soft where forms meet.
+  There are no outlines and no textures. Colour comes from a muted
+  pastel palette: slate blue-greys, warm cream, sage, and teal accents.
+- **Light as the jewellery.** Windows at dusk are warm yellow emissive
+  panes with a soft bloom. Small cool accent lights (a cyan ring, a sign)
+  appear sparingly, and roof gardens give green tops to grey blocks.
+  The frame at golden hour is hazy and warm, with depth carried by
+  atmosphere.
+- **People as stylised adults, not toys.** The proportions are near
+  realistic, about seven heads tall, with long limbs and real shoulders
+  and hips. Faces are a few large planes (brow, nose, cheek, jaw) with no
+  drawn features beyond that. Hair is one sculpted solid mass with a
+  parting and a fringe. Clothes read as garments: a fitted top, loose
+  trousers, a long skirt, and the fold of a sleeve. Hands have a thumb
+  and a mitten of fingers. The poses are specific and full of weight:
+  stirring, leaning back under a load, eating with the elbow out.
+  Skin tones vary, flat and warm.
+
+### How it sits against the laws
+
+This pass would **change one law on purpose**: "low-poly flat Lambert for
+the built world (`flatShading: true`)". The references are low-poly but
+*smooth-shaded with bevels*. The proposal keeps low polygon counts and
+PALETTE-only colour, and changes the shading model for people, animals
+and props (full soft matte) and for buildings (bevelled edges, flat faces
+kept). That is the author's call to make, and this section asks for it
+explicitly. Everything else stands: no textures, synthesised audio, every
+term is a `noX` flag that parks at the governor's rungs, and there is no
+save field.
+
+### The items (sized for one 4–5 hour run of six agents, when approved)
+
+**V1 · shared.js · the soft matte material and the bevel helper.**
+- `matSoft(color, opts)`: smooth normals, a wrap diffuse (light
+  continues about 0.3 past the terminator), a gentle hemisphere ground
+  bounce from the chapter's grass/stone colour, and a faint cool rim.
+  It is built as an onBeforeCompile patch on the existing Lambert
+  program so that grain(), fog, shade, AO and shadows all still apply.
+  Flag `noSoftMatte` falls back to `mat()`.
+- `bevelBox(w, h, d, r, seg)` and `capsule` and `roundedCyl` geometry
+  helpers, with normals averaged across the bevel and kept flat on the
+  faces. That gives the reference's lit edges without faceting.
+  Triangle budget: a bevelled box is 44–92 triangles against a box's 12.
+  Buildings use the 1-segment chamfer, and props use 2 segments.
+- Proof: an A/B at rungs 0 and 1 on six chapters, and a close PNG of a
+  bevelled block beside a hard one.
+
+**V2 · npc.js · people (supersedes U1c).** A new figure, `npcFigure2`,
+written as new functions, since buildHuman, buildLocalFigure,
+npcMakeGeo, npcPERSON and npcPersonRegister/Tick are pinned byte-exact by
+tests:
+- Proportions about seven heads tall, with a separate pelvis, chest,
+  neck and shoulder mass.
+- The head: a skull, a brow plane, a wedge nose, a cheek plane and a
+  jaw, about 120 triangles. Six hair masses (bob, crop, bun, long,
+  cap, curls) as sculpted merged shapes.
+- Garments: a fitted top, a jacket, loose trousers, shorts, a long skirt
+  and an apron. Each is a tapered, flared form with one fold plane at
+  the knee or elbow.
+- Mitten hands with a thumb. Shoes with a sole.
+- `matSoft` throughout, a six-tone skin ramp, and hair and clothing
+  colours from the chapter palette.
+- Level of detail: the full figure within 25 m, the current rounded twin
+  from 25 to 60 m, and the boxed crowd beyond. The budget is about
+  1.4k triangles close up, with instanced crowds unchanged in draws.
+- Poses with weight: six "doing" loops (stir, carry-lean, eat, sweep,
+  phone, sit-lean) added to the existing loops. Idle breathing and a
+  weight shift for every figure.
+- Proof: close PNGs at 3 m, 8 m and 20 m in Sydney, Kyoto, Rio,
+  Marrakech and Hanoi, read against the author's references. The
+  triangle and draw counts per chapter, and the A/B cost at rungs 0 and
+  1. Flag `noFigure2`.
+
+**V3 · props.js (+ capybara.js for the hero only) · objects.** The
+common props rebuilt on `bevelBox` and `roundedCyl` with `matSoft`:
+bins, benches, crates, pots, barrels, cones, bags, stalls, bottles,
+umbrellas and lamps. They gain chunky rims, straps and lids where the
+reference has them. The capybara gets `matSoft` on its body (its rig
+already breathes) and keeps its silhouette. Flag `noPropSoft`. Proof: a
+prop sheet PNG (all kinds in one lit row) before and after, and the
+triangle delta.
+
+**V4 · chapter files, split across agents · buildings.** Town blocks
+move to `bevelBox` (chamfered edges, a roof lip), with occasional pods
+and domes where the place allows it: Kowloon, Hanoi, Monaco, Sydney's
+edges and Venice's roofs. Roof gardens go on flat roofs in green
+chapters. There are four agents, each owning four or five chapter
+files. Flag `noBevelWorld`. Proof: arrival PNGs from above for every
+chapter touched, and the A/B cost.
+
+**V5 · the evening light.** Emissive warm window panes (PALETTE `winWarm`,
+`winCool`) on every chapter that has a dusk or night grade. The bloom
+threshold is lowered only for those emissives, through the existing
+composite pass, and the grade itself is not re-based. One cool accent
+light per district. Flag `noWinGlow`. Proof: dusk PNGs of Kowloon,
+Hanoi, Monaco and Venice.
+
+**V6 · the proof slot and the gallery.** A headful rung-0 A/B for every V
+flag. Then the reference comparison: for each of the author's four
+frames, a matching composition from the game, side by side in
+`qa/ten-v-compare.png`, read by eye and scored honestly. Then refresh
+the README gallery (U3b) with the new look.
+
+**Order and ownership (when run):** V1 lands first, since everything else
+calls it: a 45-minute solo seed. Then V2 (npc.js), V3 (props.js and
+capybara.js) and V4 as three agents over chapter files, with V5 in
+systems.js/main.js, all in parallel for about 2.5 hours. Then merge, V6
+and the soak, about 1 hour.
+
+**Risks, said plainly:**
+- The whole look changes. The fallback is the flags: every V term can
+  be cut at once, and a rung-2 laptop falls back to today's look.
+- Triangles go up about 2–3x on people and props. The governor parks the
+  near LOD at rung 2.
+- Pinned byte-exact tests on npc.js mean V2 is new code beside the old,
+  not an edit of it.
+- The U1–U3 pivot (HAVOC and the rest) is still unrun and independent.
+  If both are approved, run V after U1, because U1c would otherwise be
+  thrown away.
+
 ## T5 — home, the first frame, the far places (SUPERSEDED by the pivot)
 
 **T5a · A · systems.js, shared.js · the garden and the first minute.**
