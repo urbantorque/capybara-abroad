@@ -27,6 +27,8 @@ export const PALETTE = {
   sandstone:    0xe4d3ad,
   sandstoneDark:0xcbb68d,
   finPlinth:    0xd9cbad,      // the keepsake plinths on the homecoming lawn: dressed sandstone, warmer than stone, or ten of them read as concrete
+  gardenWood:   0xa58e72,      // the garden's timber (hammock posts, the bench, the stones' edging): wood left out a few winters, greyed under woodDark's warmth
+  lanternWarm:  0xf8d898,      // a paper lantern strung over the lawn, lit: between paperLantern and capyLanternGlow, a glow and not a bulb
   glass:        0xa9cdd6,
   // The floatplane off Rose Bay. Not a task: the one thing on this harbour you
   // cannot get on, cannot rob, and that does not care that you are there.
@@ -174,6 +176,7 @@ export const PALETTE = {
   cloth8:       0xe9b384,
   denim:        0x7d93b0,
   khaki:        0xcbb181,
+  bagKhaki:     0xb5a077,      // the traveller's duffel: canvas a shade under khaki, worn by every wharf it has been set down on
   hiVis:        0xf2c14e,
 
   // props
@@ -662,6 +665,12 @@ export const PALETTE = {
   paramoDark:   0x76935f,
   paramoPale:   0xafc78d,
   paramoSoil:   0x8f7358,
+  // The colcha: the hillsides round Pasto quilted in small hedged fields. Three
+  // patches for the ridge ring, each a step off paramoGrass so the quilt reads
+  // as farmed and not as the paramo it borders. The air pales them at 140 m.
+  pastoField1:  0x78a35a,      // a fresh green: potatoes and beans in leaf
+  pastoField2:  0xa9b766,      // a yellow-green: barley turning
+  pastoField3:  0xcaa95e,      // harvest gold: wheat cut and standing, darker than maiz
   volcanoRock:  0x8d8378,
   volcanoDark:  0x6f665d,
   volcanoAsh:   0xa39a90,
