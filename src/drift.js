@@ -5616,14 +5616,17 @@ function driUpdateWisps(dt) {
 
 /**
  * T4f — WHICH CLOUD IS DRAWN (noCloudSoft). Three visibility writes, and only
- * on the frame the answer changes. The soft lobes are the lobes, so they stay
- * at every rung; the low wisps are the part that costs fill, and they park at
- * rung 1. Returns whether the low wisps are live.
+ * on the frame the answer changes. Returns whether the low wisps are live.
+ * The whole soft set parks at rung 1, not only the wisps: MEASURED in the
+ * proof slot (qa/ten-t4-proof-ab.mjs cloudin1, headful, Arc), the soft lobes
+ * and banks alone cost 0.54-1.05 ms of GPU at rung 1 with the wisps already
+ * gone, and a term that costs GPU parks (AGENTS.md). Parked, it is the flat
+ * cloud as it was.
  */
 function driSyncSoft(game) {
   const st = game && game.state;
-  const soft = !(st && st.noCloudSoft);
-  const low = soft && !(st && (st.perfRung | 0) >= 1);
+  const soft = !(st && (st.noCloudSoft || (st.perfRung | 0) >= 1));
+  const low = soft;
   const k = (soft ? 1 : 0) + (low ? 2 : 0);
   if (k !== driSoftWas) {
     driSoftWas = k;
