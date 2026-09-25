@@ -1426,7 +1426,194 @@ no mesh behind them, only the `.capyui-moment*` overlay, so they are HUD and not
 
 T4 seed (A): `PALETTE.palDeepClear`, `finPlinth` (if stone reads cold).
 
-## T5 — home, the first frame, the far places (hours 8–10)
+## THE PIVOT: U1–U3 replace T5 and T6 (26 Sep, one 4–5 hour run)
+
+The author played the T4 build and redirected the last two waves. T5 and
+T6 below stay as the record and are **superseded**. Most of their items
+were small increments. What survives from T5 is Manly, Pasto, the dry
+first frame and Venice's arcades. From T6 the stranger's hour and the
+release survive. The garden (the `garden` save field) moves to the next
+pass, and for now yuzu is Free Roam's score.
+
+What the author asked for, and what the code says:
+
+- **Water reflections and big background dynamics.** reflectRender
+  (shared.js) parks at the governor's first rung, and a busy laptop sits at
+  rung 1 or higher, so most players have never seen a reflection. Sydney
+  Harbour and Manly have no mirror row at all. The far planes (far.js,
+  438 lines) are flat silhouettes, and nothing big in any sky moves.
+- **People that look less blocky.** The rounded twins (npc.js ~1546) park
+  at rung 2, and the Rio and Marrakech crowds were always boxes. On the
+  author's machine the title screen's people are boxes.
+- **Free Roam is boring.** The sketchbook is a list for completionists.
+  Free Roam needs chaos, a short attention span, a clock and streaks: the
+  goose game played as an arcade.
+- **Monte Carlo is not driving.** The car is a point on a track
+  (`monMeS += monMeV * dt`, monaco.js ~3532) with a lateral offset. The
+  player never steers a car. The boats (quay.js helm, antarctic.js) are
+  the model: throttle, rudder, momentum, a hull that answers.
+- **The arrival subline.** `.capyui-placesub` and `.capyui-placenews`
+  (systems.js ~11292) are 10–14 px bold uppercase at 0.2–0.34 em tracking
+  in `accentInk` (the maroon), over a cream wash that fades to nothing.
+  Over a bright frame it cannot be read.
+
+### Decisions
+
+**Free Roam is HAVOC.** Every place is a playground with a clock in it.
+- **The streak.** Every piece of mischief (a knock-over, a spill, a hat
+  taken, a chase begun, a yuzu grabbed) chains within 4 s of the last:
+  x2, x3, up to x8. It has a meter and a pitch that climbs. When the
+  chain breaks it cashes in as yuzu. The streak is always on in Free Roam
+  and never on in Story.
+- **Havoc runs.** A glowing marker in every place starts a 60 s run.
+  There are six kinds: *knock 8 things over*, *grab 10 yuzu before they
+  fade* (a yuzu rain), *steal 3 hats*, *stay chased for 20 s*, *spill 4
+  stalls*, and *ride the marquee*. Each has bronze, silver and gold, a
+  countdown with music under it, and a results card (score, streak,
+  medal). R runs it again: "one more go" is the loop.
+- **The best score per place** shows on the free picker's tile as a medal
+  and a number. It is the pass's one save field, `havoc` (an object keyed
+  by chapter number, holding `{best, medal}`), named here as AGENTS.md
+  requires.
+- The sketchbook stays on the tab, off the screen.
+
+**Story stays calm.** It has no streak meter, no runs and no clock. The
+two modes now differ in tempo, not only in what is gated.
+
+**The car is a car.** Monte Carlo gets a car you drive freely: throttle,
+brake and reverse, steering that depends on speed, grip that breaks into
+a slide on the kerbs, and grass that slows it. It can leave the road; the
+track does not hold it. The race still counts progress by projecting the
+car onto the track polyline, and the pack still races. The lens is the
+boat helm's chase lens. `noFreeDrive` gives back the rails.
+
+**Light and scale over incidentals.** Reflections survive rung 1 at half
+resolution. The Harbour, Manly and Venice get the full mirror. Far planes
+become layered skylines with depth, lit windows where the chapter is
+dusk, and movement: cloud shadows sweeping the land.
+
+## U1 — Havoc, the car, the people (hours 0–2)
+
+Seed (first, on ten-pass): PALETTE `havocGold`, `havocSilver`,
+`havocBronze`, `havocMeter`, and a `skin1`–`skin6` ramp if npc.js lacks one.
+
+**U1a · A · systems.js · HAVOC and the arrival card.**
+- The streak meter (`noStreak`, Free only). It hooks the existing mischief
+  sources (the mischief beat, the reaction layer's record events, yuzu
+  pickups). It sits in the HUD bottom-centre with the multiplier, a
+  climbing pitch and a cash-in card.
+- Havoc runs (`noHavoc`, Free only). Six run kinds built from existing
+  counters: knock-overs, yuzu spawns through the existing spawner, hats,
+  chase state, stall spills and the marquee record. There is a start
+  marker near each chapter's spawn, then 3-2-1, a 60 s clock, a results
+  card with the medal, and R for another go. The yuzu rain drops 14
+  short-lived fruit in a 25 m ring.
+- The `havoc` save field goes in sysSAVE_SHAPE (default {}). The free
+  tile shows the medal and the best score. The Story picker is unchanged.
+- The arrival card, in every mode. The sub and news lines move to `ink`
+  on a solid rounded pill (PALETTE.sail at 0.92), at 15–17 px with
+  0.08 em tracking, and the news line in sentence case. Contrast against
+  the pill must be 4.5:1 or better. The maroon stays only as a 2 px rule.
+- Proof: `qa/ten-u1a-havoc.mjs`. On a free file, start a run and knock 8
+  things over with real keys in Sydney; the medal is saved, and after a
+  reload the tile shows it. Also arrival PNGs over three bright chapters,
+  the contrast number, and a PNG of a live 60 s run.
+
+**U1b · monaco.js · the car is a car** (`noFreeDrive`). A rigid-body car
+on the road surface, steered on a bicycle model. It reaches 32 m/s, grips
+at 0.9 on tarmac and 0.4 on grass, and coasts when you let go. The race
+counts laps and positions by projecting the car onto the track polyline;
+the pack is unchanged. A barrier hit bounces the car and scrubs speed,
+and never launches it (keep the monPACK_SHOVE_MAX cap). Proof: a lap
+with real keys in under 3 minutes, an off-road excursion and a return,
+the car never leaves the world, and a chase-lens PNG.
+
+**U1c · npc.js · people, not blocks** (`noPersonRound` extended,
+`noPersonFine`). The rounded twin at every rung: it is triangles only,
+and it measured as noise at rung 0. The Rio and Marrakech crowds get
+the rounded twin through their instancing. Figures within 25 m get
+finer detail:
+- a head with a jaw and a nose bump
+- hair shapes: short, bun, long or cap
+- hands and shoes
+- shirts and skirts as tapered forms
+- smooth normals (the living breathe)
+- a six-tone skin ramp, and clothes from the chapter palette
+
+Also lift npcCONCERT_N from 8 to 12. Proof: before and after PNGs in
+Sydney, Rio and Hanoi at 5 m and 20 m, triangles per figure, and the
+aaa-ab cost at rung 0.
+
+**U1d · shared.js + main.js · reflections that survive** (`noReflectHalf`).
+At rung 1 the reflection renders at half resolution, with only far planes
+and water, instead of parking. At rung 2 and above it parks as before.
+Proof: the rung-1 A/B cost is under 1.0 ms, plus PNGs of Kyoto's pond
+and Venice at rung 1.
+
+**U1e · manly.js + environment.js · the Pacific and the Harbour.** In
+Manly: the bins off the spawn path, the noticeboard turned to the
+promenade, and the glass faces (`noManlyGlass`). Mirror rows for Manly's
+break and for Sydney Harbour, so the Opera House and the Bridge show in
+the water. Proof: mirror PNGs of both, and W from the Manly spawn moves
+8 m or more.
+
+**U1f · pasto.js + weather.js · the colcha and a dry arrival.** The T5d
+colcha ring and the T5e `noRainPitch`. Proof: PNGs from the plaza and from
+condor height, and a Pasto arrival PNG with streak coverage under 5%.
+
+## U2 — skylines, scale, and the stranger (hours 2–4)
+
+U2 opens with the stranger's hour: two blind 35-minute playtests on the
+U1 build, one per mode, logging every card, bubble and pill. U2a starts
+from their findings.
+
+**U2a · A · systems.js · the stranger's fixes.** The ten findings that
+matter most, bugs first. Then the Havoc tuning they call for: medal
+thresholds, run length, marker visibility.
+
+**U2b · far.js · layered skylines** (`noFarLayers`). Each chapter's far
+set gets three depth layers with the airlight falloff, lit windows on
+dusk and night chapters (Kowloon, Monaco, Hanoi, Venice), and drifting
+far clouds. Proof: before and after arrival PNGs for six chapters, and a
+rung-0 cost under 0.3 ms.
+
+**U2c · shared.js · cloud shadows** (`noCloudShadow`). A slow, large-scale
+noise that darkens received light only, projected down the sun direction
+in the grain()/shade path. It sweeps the terrain and the big structures
+at the chapter's wind speed. The grade and the sun are untouched, and
+the term parks at rung 1. Proof: hide-and-diff sequence PNGs in Sydney,
+Göreme and Pasto, and the cost.
+
+**U2d · venice.js · the arcades and the mirror.** The T5f camCeil under
+the Procuratie, and the full mirror on the Grand Canal and the lagoon.
+Proof: the soffit test and a canal reflection PNG.
+
+**U2e · antarctic.js + pantanal.js · the stalls.** The soak's longest
+frames, 517 ms and 1017 ms. Attribute each (a first-use program, or a
+spike at build time), then warm it or spread it. Proof: the soak's
+longest frame under 150 ms in both.
+
+**U2f · kowloon.js + hanoi.js · the neon city.** Detail on the skyline
+towers: lit window grids, rooftop signs, and one animated sign per
+street. It stays inside Hanoi's grain() budget: no new grain materials.
+Proof: arrival PNGs and the cost.
+
+## U3 — ship (hours 4–4.75)
+
+Merge. Then the proof slot (the rung-0 and rung-1 A/B for every new
+flag), `npm test`, and one soak run alone. Then `master`, a check of the
+Pages hash, and the link to the author.
+
+| wave | A (systems.js) | B | C | D | E | F |
+|---|---|---|---|---|---|---|
+| U1 | Havoc, arrival card | monaco.js | npc.js | shared.js + main.js | manly.js + environment.js | pasto.js + weather.js |
+| U2 | stranger's fixes | far.js | shared.js | venice.js | antarctic.js + pantanal.js | kowloon.js + hanoi.js |
+
+Timing: builders are boxed at 75 minutes per wave, the merge at 15 and
+the proof at 20. U2a starts when the strangers report, about 40 minutes
+in. If a wave runs long, U2f is cut first, then U2b's lit windows.
+
+## T5 — home, the first frame, the far places (SUPERSEDED by the pivot)
 
 **T5a · A · systems.js, shared.js · the garden and the first minute.**
 - The garden (`noGarden`). This is the one save field of the pass: `garden`, an array of ids added
@@ -1474,7 +1661,7 @@ dithered. Move the arrival cone to the passerelle stack (4023).
 
 T5 seed (A): `PALETTE.bagKhaki`, `gardenWood`, `lanternWarm`, `pastoField1-3`.
 
-## T6 — play it as a stranger, then ship (hours 10–14)
+## T6 — play it as a stranger, then ship (SUPERSEDED by the pivot)
 
 **T6a · A · spill.** Whatever T1-T5 left open, in pass order, bugs first. The cave items, if they
 have not started: `noEchoPing` wall glints and the first-echo toast (cave.js:4100-4137), `noFern`.
