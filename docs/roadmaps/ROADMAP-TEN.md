@@ -1462,7 +1462,7 @@ What the author asked for, and what the code says:
 **Free Roam is HAVOC.** Every place is a playground with a clock in it.
 - **The streak.** Every piece of mischief (a knock-over, a spill, a hat
   taken, a chase begun, a yuzu grabbed) chains within 4 s of the last:
-  x2, x3, up to x8. It has a meter and a pitch that climbs. When the
+  x2, x3, up to x8. It has a meter and a soft tick per link, with no rising pitch (the author found it too sharp). When the
   chain breaks it cashes in as yuzu. The streak is always on in Free Roam
   and never on in Story.
 - **Havoc runs.** A glowing marker in every place starts a 60 s run.
@@ -1470,7 +1470,8 @@ What the author asked for, and what the code says:
   fade* (a yuzu rain), *steal 3 hats*, *stay chased for 20 s*, *spill 4
   stalls*, and *ride the marquee*. Each has bronze, silver and gold, a
   countdown with music under it, and a results card (score, streak,
-  medal). R runs it again: "one more go" is the loop.
+  medal). Enter (or the card's button) runs it again, because R is the stuck rescue: "one more go" is the loop.
+- **Pests and three hearts** (author's request, 26 Sep). Free Roam has enemies: two or three aggressive pests per place, drawn from three kinds. The *gull* dives, the *warden* charges with a net, and the *dog* is fast and gives up sooner. A hit costs a heart. With three hearts gone the animal is caught: the streak is lost, 5 yuzu are dropped, a short "caught" card plays, and it goes back to the place's spawn with 2 s of grace. A caught animal during a run ends the run as a loss. The animal answers with V, which flicks a yuzu pip: a 0.35 s cooldown, an aim-assist cone of 25 degrees toward the nearest pest, and a hit knocks the pest out in a tumble and a puff and drops a yuzu. Pests respawn after 20 s. Story has no pests and no hearts.
 - **The best score per place** shows on the free picker's tile as a medal
   and a number. It is the pass's one save field, `havoc` (an object keyed
   by chapter number, holding `{best, medal}`), named here as AGENTS.md
@@ -1500,16 +1501,18 @@ Seed (first, on ten-pass): PALETTE `havocGold`, `havocSilver`,
 **U1a · A · systems.js · HAVOC and the arrival card.**
 - The streak meter (`noStreak`, Free only). It hooks the existing mischief
   sources (the mischief beat, the reaction layer's record events, yuzu
-  pickups). It sits in the HUD bottom-centre with the multiplier, a
-  climbing pitch and a cash-in card.
+  pickups, and a knocked-out pest). It sits in the HUD bottom-centre with
+  the multiplier and a cash-in card. Each link is a soft tick at a constant
+  pitch; there is NO rising pitch.
 - Havoc runs (`noHavoc`, Free only). Six run kinds built from existing
   counters: knock-overs, yuzu spawns through the existing spawner, hats,
   chase state, stall spills and the marquee record. There is a start
   marker near each chapter's spawn, then 3-2-1, a 60 s clock, a results
-  card with the medal, and R for another go. The yuzu rain drops 14
+  card with the medal, and Enter for another go. A seventh run kind, *clear the pests*, knocks out 6 in 60 s. The yuzu rain drops 14
   short-lived fruit in a 25 m ring.
 - The `havoc` save field goes in sysSAVE_SHAPE (default {}). The free
   tile shows the medal and the best score. The Story picker is unchanged.
+- The hearts HUD (three hearts, top-left under the yuzu pill) and the caught card, answering U1g's bus events: `havoc:hit {hearts}`, `havoc:caught`, `havoc:ko {kind}`. On caught, systems.js does the respawn, the yuzu drop and the run loss.
 - The arrival card, in every mode. The sub and news lines move to `ink`
   on a solid rounded pill (PALETTE.sail at 0.92), at 15–17 px with
   0.08 em tracking, and the news line in sentence case. Contrast against
@@ -1518,6 +1521,8 @@ Seed (first, on ten-pass): PALETTE `havocGold`, `havocSilver`,
   things over with real keys in Sydney; the medal is saved, and after a
   reload the tile shows it. Also arrival PNGs over three bright chapters,
   the contrast number, and a PNG of a live 60 s run.
+
+**U1g · src/havoc.js (new module 30) + build.mjs + one import line in main.js · the pests** (`noPests`, Free only). The new module `createHavoc(game)` talks to systems.js only through bus events and `game` hooks, as rival.js does (read src/rival.js for the pattern; register the module the way rival is registered in main.js ~2573/2710 and build.mjs). Three pest kinds, rounded low-poly in PALETTE (smooth normals, since they breathe): the gull (a diving arc, a warning shadow on the ground 0.8 s before the dive), the warden (a hat, a net, a 1 s wind-up telegraph, then a charge), the dog (short fast bursts). They spawn 25-40 m from the animal on walkable ground (game.groundY), 2-3 alive at once, and never inside the first 20 s of an arrival. The V fling: an instanced pip pool, gravity, a hit radius of 0.6 m, and the KO tumble plus a puff through game.sparks. Hearts live here: `game.havoc.hearts()`, a hit with a 1.2 s invulnerability window, and the bus events above. Bumping a pest does not launch the animal (the monPACK_SHOVE_MAX lesson): the knockback is capped at 6 m/s. Proof: `qa/ten-u1g-pests.mjs` with real keys (V knocks out a gull and a warden; three hits give caught), a PNG of each pest, and the cost at rung 0 (all three under 0.3 ms together).
 
 **U1b · monaco.js · the car is a car** (`noFreeDrive`). A rigid-body car
 on the road surface, steered on a bicycle model. It reaches 32 m/s, grips
@@ -1593,6 +1598,8 @@ frames, 517 ms and 1017 ms. Attribute each (a first-use program, or a
 spike at build time), then warm it or spread it. Proof: the soak's
 longest frame under 150 ms in both.
 
+**U2g · props.js · more havoc** (`noHavocProps`, Free only). In each place, 8-12 havoc props from existing prop kinds plus four new ones: a yuzu crate that bursts into 6 fruit when knocked, a barrel that rolls downhill and bowls people over, a stack of chairs that dominoes, and a water balloon that splashes and makes people flinch. Each feeds the streak through the existing record events. Proof: a knock-over chain in Sydney and Marrakech PNGs, the prop count, and the cost.
+
 **U2f · kowloon.js + hanoi.js · the neon city.** Detail on the skyline
 towers: lit window grids, rooftop signs, and one animated sign per
 street. It stays inside Hanoi's grain() budget: no new grain materials.
@@ -1604,14 +1611,28 @@ Merge. Then the proof slot (the rung-0 and rung-1 A/B for every new
 flag), `npm test`, and one soak run alone. Then `master`, a check of the
 Pages hash, and the link to the author.
 
+**U3b · the GitHub page** (author's request). The repository's README
+gets a small gallery at the top: six to eight of the most beautiful
+frames. Candidates are the Kyoto torii in their wood, the Iceland aurora
+over the hot pool, Venice's canal mirror, the Sydney concert with the
+sails lit, a Hanoi or Kowloon night skyline, a Free Roam HAVOC run with
+pests mid-air, and the finale's plinths. They are captured headful on
+the real GPU at rung 0 and 1600x900, with the HUD hidden and the camera
+composed by hand, then read by eye and kept only if genuinely beautiful.
+Saved as optimised JPG (quality 82, under 300 KB each) in docs/images/,
+which is tracked because `qa/**/*.png` is ignored. Also a one-line pitch,
+a "Play in your browser" link to the Pages URL, and the controls, all in
+the README's existing voice. The Pages site itself stays the game.
+
 | wave | A (systems.js) | B | C | D | E | F |
 |---|---|---|---|---|---|---|
-| U1 | Havoc, arrival card | monaco.js | npc.js | shared.js + main.js | manly.js + environment.js | pasto.js + weather.js |
+| U1 | Havoc, hearts HUD, arrival card | monaco.js | npc.js | shared.js + main.js | manly.js + environment.js | pasto.js + weather.js | G: havoc.js + build.mjs (+1 import line in main.js) |
 | U2 | stranger's fixes | far.js | shared.js | venice.js | antarctic.js + pantanal.js | kowloon.js + hanoi.js |
 
 Timing: builders are boxed at 75 minutes per wave, the merge at 15 and
 the proof at 20. U2a starts when the strangers report, about 40 minutes
-in. If a wave runs long, U2f is cut first, then U2b's lit windows.
+in. If a wave runs long, U2f is cut first, then U2b's lit windows. U2 has seven
+items against six concurrent agents, so U2f starts last.
 
 ## T5 — home, the first frame, the far places (SUPERSEDED by the pivot)
 
