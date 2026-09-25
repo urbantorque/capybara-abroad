@@ -1,5 +1,17 @@
 # HANDOFF — state of play, 25 Sep 2026
 
+## ROADMAP-TEN, closed at T4 (26 Sep)
+
+The author cut the pass at about 13 hours. T5 (the garden, the first
+minute, Manly, Pasto's colcha, the dry first frame, Venice's arcades) was
+started twice and stopped both times with nothing committed; only its
+PALETTE seed (f008d4a) landed, and those six colours are unused. T6's
+two stranger playtests were stopped before they reported. Both are the
+next pass's opening work, in that order: T5a+T5b (the `garden` save
+field and its lawn) first, because yuzu still buys only stat rows.
+`ten-pass` was merged to `master` after a clean `npm test` (81/0) and a
+soak on f008d4a (qa/soak-history.jsonl).
+
 ## ROADMAP-TEN (25 Sep), state after T4
 
 The pass is docs/roadmaps/ROADMAP-TEN.md, worked on branch `ten-pass`
