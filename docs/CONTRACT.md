@@ -94,6 +94,42 @@ files; build 7323.0 KB, no collisions.
   for `noPanSkyFresnel`, the lagoon-wall A/B for `noPalKarstSolid`, and a
   Pantanal arrival p95 at rung 0 after the white card.
 
+**The proof slot (headful Edge on the Arc, alone, rung 0 pinned by prefs
+pf 1, the merged tree on port 5199).** `qa/ten-t4-proof-ab.mjs` is aaa-ab's
+method with a set-up per case: post.render's GPU time by timer query, the
+cut alternating in 30-frame blocks, the first two dropped. A flag nothing
+reads, run the same way, reads -0.6..+0.6 ms: that is the floor, and
+nothing inside it is a cost. Live minus cut:
+- `noCloudSoft`, the animal in open cloud: +1.26, +1.35, +1.32 ms at rung
+  0; the twelve low wisps alone -0.28..-0.01, so it is the soft lobes and
+  banks, which T4f kept at every rung (0.54-1.05 ms at rung 1). Fixed
+  (`2b8d885`): the whole soft set parks at rung >= 1, -0.12 ms after. The
+  rung-0 cost is over budget and is owed.
+- `noConcertBeat`: the ring before the note +0.63, -0.22, +0.16; during
+  the concert with Q every 3 s -0.07. Inside the floor.
+- `noFinPlinth` (the flag clears the lawn for good once set, so the plinth
+  mesh was alternated): -0.02, +0.34. `noFinPolish`, the held flash
+  re-armed every 45 ms: -0.18, +0.22. Inside the floor.
+- `noPanSkyFresnel` at rung 1: arrival +0.06 ms, the river lens pinned
+  +0.18. `noPalKarstSolid` at the wall +0.06; `noPalClear` under the water
+  -0.04; `noHerdCascade` +0.20 and `noPlaceFold` -0.24 (neither draws).
+- The lagoon wall (`qa/ten-t4-proof-karst.mjs`, T4e's three spots, cut and
+  live on the same instant): 0.01-9.1 % of pixels change, dither holes
+  0.007-0.015 per thousand in both arms. The holes did not come back cut
+  with the lens settled 7.3 m off; faint vertical streaks on the lit face
+  are in both.
+- Pantanal after the white card, rung 0: tick p95 16.3 ms (median 12.2),
+  rAF p95 33.2 ms (median 26.2).
+- The ending (`qa/ten-t4a-finale.mjs` on 5199, 13/13): with T4b's 2.2x in,
+  the keepsakes at the coda lens are median 27.6 px, min 10.5 (T4a's 18 px
+  floor is met). Traveller to bag 1.91 m, bag to animal 1.71 m, ledger
+  32.3 s after the sit. In the last frame the ibis sits between the lens
+  and the bag at the lower right, larger than the animal. The bag's frame
+  carries two bubbles, and the paper still says "the way on: the ferry
+  wharf".
+- The concert's payoff frame carries two bubbles (the gardener's "hold
+  Shift" and the queue) with the sails near white under the opera shot.
+
 ## TEN T3 — FREE ROAM GETS ITS OWN GAME; THE IBIS GETS AN ARC (25 Sep 2026)
 
 Six builders on six disjoint files, merged into `ten-pass` with no
