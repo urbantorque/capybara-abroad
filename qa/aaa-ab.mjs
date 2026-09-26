@@ -18,6 +18,9 @@ const out = { tag, flags, rows: {}, errors: h.metadata.errors };
 const setFlags = v => h.page.evaluate(([fl, v]) => { for (const f of fl) window.__capy.state[f] = v; }, [flags, v]);
 try {
   await h.start();
+  // AB_PRESET=noX,noY: flags set true once, before any chapter below is BUILT
+  // (ROADMAP-TEN V4: noBevelWorld is read at build, so it cannot alternate)
+  if (process.env.AB_PRESET) await h.page.evaluate(fl => { for (const f of fl) window.__capy.state[f] = true; }, process.env.AB_PRESET.split(','));
   for (const c of list) {
     await h.arrive(c);
     await h.page.bringToFront();

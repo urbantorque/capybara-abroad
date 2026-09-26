@@ -2320,12 +2320,13 @@ const _RIM_FS_SHADE = `capyShadowV = 1.0;
   irradiance *= mix(vec3(1.0), uShadeC, capyShT);
 #endif
   // CLOUD SHADOWS (ROADMAP-TEN U2c, noCloudShadow): the sun's own light only,
-  // under a slow two-octave field that drifts on the chapter's wind. A
+  // under a slow value-noise field that drifts on the chapter's wind. A
   // uniform branch: zero is the whole cut, and the rung parks it there.
   if (uCldK > 0.0) {
     vec2 cldP = vRimW.xz * uCldO.z + uCldO.xy;
-    float cldN = capyCldN(cldP) * 0.65 + capyCldN(cldP * 2.03 + 17.0) * 0.35;
-    reflectedLight.directDiffuse *= 1.0 - smoothstep(0.44, 0.62, cldN) * uCldK;
+    // one octave: two measured 0.9-4.2 ms live at rung 0 (qa/aaa-ab.mjs tencld)
+    float cldN = capyCldN(cldP);
+    reflectedLight.directDiffuse *= 1.0 - smoothstep(0.42, 0.66, cldN) * uCldK;
   }`;
 
 const _RIM_FS_COMMON = `#include <common>
