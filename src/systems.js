@@ -4,7 +4,7 @@ import * as THREE from 'three';
 // and the two shape-type constants it must ignore. See sysCamClear.
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount, rand, randInt, clamp, damp, lerp,
-         CHAPTERS, JOURNEY, HOMECOMING_ACTS, homecomingMemory, homecomingProgress, chapterExperience, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY, cloudSet,
+         CHAPTERS, JOURNEY, HOMECOMING_ACTS, cloudShadowTick, homecomingMemory, homecomingProgress, chapterExperience, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY, cloudSet,
          rimTick, shLerpTick, formShadeTick, cloudTick, skyTick, fresnelTick, paleTick, triTick, mirrorTick, shadeTick, bounceSlots, bounceTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo, keyDomeTick, keyDomeInfo, skyDomeLit, sky2CloudTick, sky2SunTick, sky2Info,
@@ -3191,6 +3191,27 @@ const sysREFLECT = {
   sydney:   { y: -0.5, k: 1.0, lift: 0.12, box: [-140, -150, 140, -8] },   // the harbour (environment.js water.position.y; ripple on the mesh)
   manly:    { y: -0.05, k: 0.9, lift: 0.08, box: [-800, -1600, 800, -50] }, // the outer ocean (manWATER - 0.05, flat); the surf zone does not ask
 };
+// ---- CLOUD SHADOWS (ROADMAP-TEN U2c, noCloudShadow) --------------------------
+// k: how much of the sun a cloud takes (0.8 at most); v: the drift, m/s over
+// the ground; s: cells per metre (0.012 is a cloud eighty metres across). No
+// row is no shadow: the night, the dark, the underground, Iceland's aurora,
+// Monte Carlo's evening and Hanoi (the dearest ground shader in the game).
+const sysCLOUDSH = {
+  sydney:    { k: 0.34, v: [3.0, 1.2], s: 0.020 },
+  pasto:     { k: 0.40, v: [2.2, -1.4], s: 0.018 },
+  quay:      { k: 0.34, v: [3.0, 1.2], s: 0.019 },
+  kyoto:     { k: 0.26, v: [1.4, 0.8], s: 0.021 },
+  cali:      { k: 0.30, v: [1.8, 1.6], s: 0.020 },
+  rio:       { k: 0.30, v: [2.6, -0.6], s: 0.019 },
+  sahara:    { k: 0.22, v: [4.0, 0.4], s: 0.017 },
+  venice:    { k: 0.30, v: [2.0, 1.0], s: 0.020 },
+  palawan:   { k: 0.30, v: [2.4, 1.8], s: 0.019 },
+  goreme:    { k: 0.24, v: [1.2, 0.6], s: 0.018 },
+  manly:     { k: 0.34, v: [3.6, 1.6], s: 0.019 },
+  pantanal:  { k: 0.36, v: [2.0, 1.2], s: 0.018 },
+  antarctic: { k: 0.28, v: [3.2, -1.0], s: 0.017 },
+};
+let sysCldX = 0, sysCldZ = 0;
 const sysLENS = {
   //             wide  splitW splitC
   sydney:    [0.35, 0.020, 0.026],
@@ -42769,6 +42790,23 @@ export function createSystems(game) {
       const under = (subT > 0.002) || !!(game.capy && game.capy.diving);
       reflectSet(ry, rk, under, sysSkyMesh && sysSkyMesh.visible ? sysSkyMesh : null,
                  game.locals || null, rr ? rr.lift : undefined, rr ? rr.box : null);
+    }
+
+    // ---- CLOUD SHADOWS (ROADMAP-TEN U2c). See sysCLOUDSH. -------------------
+    // The field drifts on the chapter's own direction at a cloud's pace; the
+    // strength follows the cover the weather says there is, and nothing is
+    // drawn at rung 1 or with the flag set.
+    {
+      const cs = sysCLOUDSH[name];
+      const cut = !!game.state.noCloudShadow || sysPerfRung >= 1 || !cs;
+      let k = 0;
+      if (!cut) {
+        const cv = game.weather && typeof game.weather.cloud === 'function' ? clamp(game.weather.cloud(), 0, 1) : 0.5;
+        k = cs.k * (0.75 + 0.25 * cv);
+        if (typeof game.state.qaCloudK === 'number') k = game.state.qaCloudK;   // a probe's fixed strength
+      }
+      sysCldX += dt * (cs ? cs.v[0] : 0) * 0.012; sysCldZ += dt * (cs ? cs.v[1] : 0) * 0.012;
+      cloudShadowTick(k, sysCldX, sysCldZ, cs ? cs.s : 0.012);
     }
 
     // ---- the grade --------------------------------------------------------

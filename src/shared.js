@@ -2318,11 +2318,28 @@ const _RIM_FS_SHADE = `capyShadowV = 1.0;
   irradiance *= mix(1.0, uShadowSky, max(capyShF, capyAway * uFormK));
   float capyShT = max(capyShF, 1.0 - clamp(dot(normalize(vRimN), uShadeSun), 0.0, 1.0));
   irradiance *= mix(vec3(1.0), uShadeC, capyShT);
-#endif`;
+#endif
+  // CLOUD SHADOWS (ROADMAP-TEN U2c, noCloudShadow): the sun's own light only,
+  // under a slow two-octave field that drifts on the chapter's wind. A
+  // uniform branch: zero is the whole cut, and the rung parks it there.
+  if (uCldK > 0.0) {
+    vec2 cldP = vRimW.xz * uCldO.z + uCldO.xy;
+    float cldN = capyCldN(cldP) * 0.65 + capyCldN(cldP * 2.03 + 17.0) * 0.35;
+    reflectedLight.directDiffuse *= 1.0 - smoothstep(0.44, 0.62, cldN) * uCldK;
+  }`;
 
 const _RIM_FS_COMMON = `#include <common>
 varying vec3 vRimW;
 varying vec3 vRimN;
+uniform float uCldK;
+uniform vec3 uCldO;
+float capyCldH(vec2 i) { return fract(sin(dot(i, vec2(127.1, 311.7))) * 43758.5453); }
+float capyCldN(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(capyCldH(i), capyCldH(i + vec2(1.0, 0.0)), f.x),
+             mix(capyCldH(i + vec2(0.0, 1.0)), capyCldH(i + vec2(1.0, 1.0)), f.x), f.y);
+}
 uniform float uRimK;
 uniform vec3 uRimC;
 uniform float uShadowSky;
@@ -2515,6 +2532,17 @@ const _RIM_FS_OUT = `{
 // reaches essentially every material. A program without the hook reads the
 // unset default, 0, which is the old filter — never a broken one.
 const _shLerp = { value: 1 };
+// ---- CLOUD SHADOWS (ROADMAP-TEN U2c) -----------------------------------------
+// The one big thing in any sky that moves across the land. A world-space field
+// in the lit shader (see _RIM_FS_SHADE): strength k (0 is off), the field's
+// offset (x, z) and its scale (z of the vec3: cells per metre).
+const _cldK = { value: 0 };
+const _cldO = { value: new THREE.Vector3(0, 0, 0.012) };
+export function cloudShadowTick(k, ox, oz, scale) {
+  _cldK.value = k > 0 ? (k < 0.8 ? k : 0.8) : 0;
+  _cldO.value.set(ox, oz, scale > 0 ? scale : 0.012);
+}
+export function cloudShadowInfo() { return { k: _cldK.value, o: [_cldO.value.x, _cldO.value.y, _cldO.value.z] }; }
 export function shLerpTick(on) { _shLerp.value = on ? 1 : 0; }
 function _rimInjectWith(kU, cU, capOnU) {
   return function (shader) {
@@ -2550,6 +2578,8 @@ function _rimInjectWith(kU, cU, capOnU) {
     shader.uniforms.uLensFade = _lensFadeU;
     // the smooth shadow filter's switch (AAA pass; systems.js, sysInstallShadowFilter)
     shader.uniforms.uShLerp = _shLerp;
+    shader.uniforms.uCldK = _cldK;   // TEN U2c
+    shader.uniforms.uCldO = _cldO;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', _RIM_VS_COMMON)
       .replace('#include <begin_vertex>', _RIM_VS_BEGIN);

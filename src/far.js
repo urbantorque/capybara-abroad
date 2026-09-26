@@ -119,6 +119,52 @@ export function farLayer(spec) {
   m.castShadow = false; m.receiveShadow = false;
   m.matrixAutoUpdate = false;
   m.userData.farTris = idx.length / 3;
+  // ...and the range behind it (TEN U2b). farBundle hangs it in the group.
+  if (!spec.noBack) m.userData.back = farBackLayer(spec, y0);
+  return m;
+}
+
+// ---- THE RANGE BEHIND THE RANGE (ROADMAP-TEN U2b, flag noFarLayers) --------
+// One row of ridges is a stage flat: it has a front and nothing behind it, and
+// in every chapter that calls farLayer the horizon was exactly one silhouette
+// deep. Real distance is ranks — near hills, a paler range behind them, a
+// ghost behind that — and the fog already knows how to make the far one pale.
+// So every wedge gets a partner further out along its own bearing from the
+// chapter's middle: a quarter again as far, wider, half again as tall, re-cut so
+// the two crests never rhyme. Same flat Lambert, same far tone; the fog makes
+// it the paler one. One merged draw per chapter, no shadow, no collider.
+// Wedges within 50 m of the middle are a near prop, not a horizon, and have
+// no partner. Parks with nothing: a static merged mesh is the cheap kind.
+function farHash(a, b) {
+  const t = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453;
+  return t - Math.floor(t);
+}
+function farBackLayer(spec, y0) {
+  const back = [];
+  const ws = spec.wedges || [];
+  for (let i = 0; i < ws.length; i++) {
+    const w = ws[i];
+    const dist = Math.hypot(w.x, w.z);
+    if (dist < 50) continue;
+    // a quarter again as far: at half again the linear fog swallowed it whole
+    // (qa/ten-u2b-far.mjs, Rio and Kyoto: no changed pixels worth the name)
+    const k = 1.22 + 0.12 * farHash(i, 1);
+    let prof = w.profile;
+    if (!prof) { const sk = w.skew || 0; prof = [[-1, 0], [sk, w.h || 20], [1, 0]]; }
+    // re-cut: the crest points move across and up by the hash, so the back
+    // range is not the front one enlarged
+    const np = [];
+    for (let j = 0; j < prof.length; j++) {
+      const t = prof[j][0], h = prof[j][1];
+      const shift = (j === 0 || j === prof.length - 1) ? 0 : (farHash(i, j + 3) - 0.5) * 0.3;
+      np.push([Math.max(-1, Math.min(1, t + shift)), h * (1.45 + 0.35 * farHash(i, j + 9))]);
+    }
+    back.push({ x: w.x * k, z: w.z * k, w: (w.w || 60) * 1.6, d: (w.d || 24) * 1.3,
+                yaw: (w.yaw || 0) + (farHash(i, 5) - 0.5) * 0.3, y0: w.y0, y: w.y, profile: np });
+  }
+  if (!back.length) return null;
+  const m = farLayer({ wedges: back, color: spec.color, y0: y0, name: (spec.name || 'far-layer') + '-back', noBack: true });
+  m.renderOrder = -1;
   return m;
 }
 
@@ -398,18 +444,21 @@ export function farBundle(spec) {
   group.name = 'far-' + (spec.name || 'chapter');
   const layer = spec.layer || null, mover = spec.mover || null, lights = spec.lights || null;
   const truss = spec.truss || null;
+  const back = layer && layer.userData.back ? layer.userData.back : null;   // TEN U2b
   if (layer) group.add(layer);
+  if (back) group.add(back);
   if (truss) group.add(truss);
   if (mover) group.add(mover.mesh);
   if (lights) group.add(lights);
   let parked = false;
   const handle = {
-    group, layer, mover, lights, truss,
+    group, layer, mover, lights, truss, back,
     update(game, dt) {
       const st = game.state || {};
       const cut = !!st.noFar;
       if (group.visible === cut) group.visible = !cut;
       if (cut) return;
+      if (back && back.visible === !!st.noFarLayers) back.visible = !st.noFarLayers;
       const park = (st.perfRung | 0) > 0;
       if (park !== parked) {
         parked = park;
