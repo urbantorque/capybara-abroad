@@ -2482,7 +2482,7 @@ function mainBoot() {
   // and the pass itself on demand, so an A/B can draw both arms in one task.
   game.reflectInfo = reflectInfo;
   game.reflectDraw = function () {
-    return reflectRender(game.renderer, game.scene, game.camera, !!game.state.noReflect, game.state.perfRung | 0, game.state.reflectScale);
+    return reflectRender(game.renderer, game.scene, game.camera, !!game.state.noReflect, game.state.perfRung | 0, game.state.reflectScale, !!game.state.noReflectHalf);
   };
 
   // Built before anything else: a module's constructor is allowed to ask for a
@@ -3003,7 +3003,7 @@ function mainBoot() {
         // reads the shadow maps the pass above just wrote and re-runs none of
         // it; parked from the governor's first rung. See reflectRender.
         if (game.post.enabled) {
-          reflectRender(renderer, game.scene, game.camera, !!game.state.noReflect, game.state.perfRung | 0, game.state.reflectScale);
+          reflectRender(renderer, game.scene, game.camera, !!game.state.noReflect, game.state.perfRung | 0, game.state.reflectScale, !!game.state.noReflectHalf);
         }
         game.post.render();
         game.state.frames = (game.state.frames | 0) + 1;

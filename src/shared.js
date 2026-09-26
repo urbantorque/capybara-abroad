@@ -6122,16 +6122,22 @@ export function reflectInfo() {
  * the scene draws. `cut` is game.state.noReflect; `rung` the governor's.
  * Returns true when the target holds this frame's picture.
  */
-export function reflectRender(renderer, scene, camera, cut, rung, scale) {
+export function reflectRender(renderer, scene, camera, cut, rung, scale, halfCut) {
   const now = performance.now();
   const dt = _reflSt.tAt ? Math.min(0.1, (now - _reflSt.tAt) / 1000) : 0.016;
   _reflSt.tAt = now;
   const y = _reflSt.y;
+  const thin = rung === 1;   // TEN U1d, see below
   let why = '';
   if (y === null) why = 'no water';
   else if (_reflSt.k <= 0) why = 'k 0';
   else if (cut) why = 'noReflect';
-  else if (rung > 0) why = 'parked rung ' + rung;
+  // ...THE FIRST RUNG KEEPS A THINNER MIRROR (ROADMAP-TEN U1d, noReflectHalf).
+  // A busy laptop sits at rung 1 most of the time, so parking there meant most
+  // players had never seen the water hold a sail. At rung 1 the mirror is a
+  // third of the frame, the small things and the people stay out of it; from
+  // rung 2 it parks, as before.
+  else if (rung > 1 || (rung === 1 && halfCut)) why = 'parked rung ' + rung;
   else if (_reflSt.under) why = 'eye under';
   else if (camera.position.y <= y + _reflSt.lift + 0.02) why = 'eye below plane';
   else if (_reflSt.box) {
@@ -6166,7 +6172,8 @@ export function reflectRender(renderer, scene, camera, cut, rung, scale) {
   const t0 = performance.now();
   renderer.getDrawingBufferSize(_reflSz);
   // Half by contract; `scale` is the probe's sweep knob (game.state.reflectScale).
-  const sc = (typeof scale === 'number' && scale > 0.05 && scale <= 1) ? scale : 0.5;
+  let sc = (typeof scale === 'number' && scale > 0.05 && scale <= 1) ? scale : 0.5;
+  if (thin) sc = Math.min(sc, 0.34);
   const w = Math.max(2, Math.floor(_reflSz.x * sc)), h = Math.max(2, Math.floor(_reflSz.y * sc));
   if (!_reflRT) {
     _reflRT = new THREE.WebGLRenderTarget(w, h, {
@@ -6231,7 +6238,8 @@ export function reflectRender(renderer, scene, camera, cut, rung, scale) {
     const si = _reflSmall[i], o = si.o;
     if (!o.visible || !o.parent) continue;
     const dx = si.c.x - ex, dy = si.c.y - ey, dz = si.c.z - ez;
-    if (si.r * si.r < _reflSMALL_A * _reflSMALL_A * (dx * dx + dy * dy + dz * dz)) { o.visible = false; _reflHid.push(o); }
+    const sa = thin ? _reflSMALL_A * 2.5 : _reflSMALL_A;
+    if (si.r * si.r < sa * sa * (dx * dx + dy * dy + dz * dz)) { o.visible = false; _reflHid.push(o); }
   }
   const loc = _reflSt.locals;
   if (loc) {
@@ -6240,7 +6248,7 @@ export function reflectRender(renderer, scene, camera, cut, rung, scale) {
       const g = L && L.fig && L.fig.group;
       if (!g || !g.visible) continue;
       const dx = L.x - _reflE.x, dz = L.z - _reflE.z;
-      if (dx * dx + dz * dz > 1600) { g.visible = false; _reflHid.push(g); }
+      if (thin || dx * dx + dz * dz > 1600) { g.visible = false; _reflHid.push(g); }
     }
   }
   _reflSt.hidden = _reflHid.length;
