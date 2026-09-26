@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matOwn, matRound, matEmit, TASKS, rand, randInt, clamp, damp, lerp, grain, waterYAt } from './shared.js';
+import { PALETTE, mat, matOwn, matRound, matEmit, TASKS, rand, randInt, clamp, damp, lerp, grain, waterYAt, roundBoxGeo, bevelWorldOn } from './shared.js';
 
 // ===========================================================================
 // AGENT C — world physics + interactive props.
@@ -784,7 +784,14 @@ function physAdd(group, geo, color, x, y, z, rx, ry, rz) {
   group.add(m);
   return m;
 }
-function physBoxG(w, h, d) { return new THREE.BoxGeometry(w, h, d); }
+// THE PROPS WITH THEIR EDGES OFF (ROADMAP-TEN V3, the same noBevelWorld as the
+// world): a part 4 cm or more on its thinnest side is a chamfered box, a sixth
+// of that side off each edge, off roundBoxGeo's per-size cache (props repeat,
+// and nothing here mutates or disposes a part's geometry). Read at build.
+function physBoxG(w, h, d) {
+  if (bevelWorldOn() && Math.min(w, h, d) >= 0.04) return roundBoxGeo(w, h, d, 0.16, 2);
+  return new THREE.BoxGeometry(w, h, d);
+}
 function physCylG(rt, rb, h, seg) { return new THREE.CylinderGeometry(rt, rb, h, seg || 8, 1); }
 function physSphG(r) { return new THREE.SphereGeometry(r, 8, 6); }
 function physConeG(r, h) { return new THREE.ConeGeometry(r, h, 8); }

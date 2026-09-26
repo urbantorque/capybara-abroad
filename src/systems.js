@@ -4,7 +4,7 @@ import * as THREE from 'three';
 // and the two shape-type constants it must ignore. See sysCamClear.
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount, rand, randInt, clamp, damp, lerp,
-         CHAPTERS, JOURNEY, HOMECOMING_ACTS, cloudShadowTick, homecomingMemory, homecomingProgress, chapterExperience, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY, cloudSet,
+         CHAPTERS, JOURNEY, HOMECOMING_ACTS, cloudShadowTick, softMatteSet, bevelWorldSet, homecomingMemory, homecomingProgress, chapterExperience, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY, cloudSet,
          rimTick, shLerpTick, formShadeTick, cloudTick, skyTick, fresnelTick, paleTick, triTick, mirrorTick, shadeTick, bounceSlots, bounceTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo, keyDomeTick, keyDomeInfo, skyDomeLit, sky2CloudTick, sky2SunTick, sky2Info,
@@ -42811,6 +42811,9 @@ export function createSystems(game) {
       sysCldX += dt * (cs ? cs.v[0] : 0) * 0.012; sysCldZ += dt * (cs ? cs.v[1] : 0) * 0.012;
       cloudShadowTick(k, sysCldX, sysCldZ, cs ? cs.s : 0.012);
     }
+    // ...and the soft matte on what breathes (TEN V1): a uniform, no cost to park
+    softMatteSet(game.state.noSoftMatte ? 0 : 0.4);
+    bevelWorldSet(!game.state.noBevelWorld);   // TEN V4: read by the next chapter build
 
     // ---- the grade --------------------------------------------------------
     // The hour first: which movement of the chapter this is, and how far the

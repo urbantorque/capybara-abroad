@@ -373,14 +373,14 @@ const npcROUND = {
   // the body, the shoulders (a bar with its ends rounded off is a pair of
   // shoulders), the hem, the placket (2 cm deep: stays a box). The body
   // narrows 12 % to the waist, and the hem goes with it so it does not flare.
-  torso:     [[0.3, 0.88], [0.48, 1], [0.35, 0.9], [0.3, 1]],
-  head:      [[0.2, 1], [0.35, 1], [0.45, 1]],      // skull, nose, neck
+  torso:     [[0.4, 0.86], [0.48, 1], [0.4, 0.9], [0.3, 1]],   // TEN V2: 0.3 -> 0.4, a touch more waist
+  head:      [[0.42, 1], [0.4, 1], [0.48, 1]],     // skull, nose, neck (TEN V2: the skull an egg, was 0.2)
   hairParts: [[0.42, 1], [0.4, 1]],
   hips:      [[0.32, 0.94]],
-  arm:       [[0.46, 0.9]],
+  arm:       [[0.5, 0.9]],
   forearm:   [[0.46, 0.8], [0.48, 1]],               // to the wrist; the hand
-  leg:       [[0.42, 0.86]],
-  shin:      [[0.42, 0.78]],
+  leg:       [[0.5, 0.86]],
+  shin:      [[0.5, 0.78]],
   shoe:      [[0.4, 1]],
 };
 
@@ -1543,16 +1543,32 @@ export function createNPCs(game) {
   const npcRoundPeople = [];
   let npcRoundDogB = null, npcRoundDogH = null, npcRoundDogL = null;   // shared with Pasto's dogs
   let npcRoundRegN = 0;
-  let npcRoundPplOn = !game.state.noPersonRound && (game.state.perfRung | 0) < 2;
+  // ...AND NOW AT EVERY RUNG (ROADMAP-TEN V2). The author, on a laptop that
+  // sits at rung 2: "so they look a bit less blocky". Triangles only, and the
+  // title screen's people were bricks on exactly the machine that asked.
+  let npcRoundPplOn = !game.state.noPersonRound;
   let npcRoundCtrOn = !game.state.noPersonContour && (game.state.perfRung | 0) < 1;
   function npcRoundApply(r) {
     r.mesh.geometry = npcRoundPplOn ? r.geo : (r.contour && npcRoundCtrOn ? r.contour : r.inherited);
     r.mesh.material = npcRoundPplOn && r.mat ? r.mat : r.inheritedMat;
   }
+  // A SMOOTH TWIN FOR A PLAIN FLAT MATERIAL (TEN V2): a rounded box under a
+  // flat-shaded material is a faceted box, which is what every local and every
+  // crowd still was. Only a plain rimmed Lambert (key rim2/rim2s) is swapped;
+  // anything carrying its own shader (grain, a glow) keeps what it has.
+  const npcSmoothCache = new Map();
+  function npcSmoothOf(m) {
+    if (!m || Array.isArray(m) || !m.isMeshLambertMaterial || !m.flatShading || m.transparent) return null;
+    const key = typeof m.customProgramCacheKey === 'function' ? m.customProgramCacheKey() : '';
+    if (key !== 'rim2' && key !== 'rim2s') return null;
+    let sm = npcSmoothCache.get(m);
+    if (!sm) { sm = matRound(m.color.getHex(), m.vertexColors ? { vertexColors: true } : undefined); npcSmoothCache.set(m, sm); }
+    return sm;
+  }
   function npcRoundRegister(mesh, geo, material) {
     if (!mesh || !geo || mesh.userData.personContour || mesh.userData.personRound) return mesh;
     const rec = { mesh: mesh, inherited: mesh.geometry, inheritedMat: mesh.material, geo: geo,
-                  mat: material || null, contour: null };
+                  mat: material || npcSmoothOf(mesh.material), contour: null };
     // A mesh that has left the graph altogether (a condor re-plumed, a pool
     // rebuilt) is dropped from the list every 64 registrations, so a long
     // session does not hold every twin it ever made. A PARKED chapter keeps
@@ -1584,7 +1600,7 @@ export function createNPCs(game) {
     return mesh;
   }
   function npcRoundTick() {
-    const on = !game.state.noPersonRound && (game.state.perfRung | 0) < 2;
+    const on = !game.state.noPersonRound;
     const ctr = !game.state.noPersonContour && (game.state.perfRung | 0) < 1;
     if (on === npcRoundPplOn && ctr === npcRoundCtrOn) return;
     npcRoundPplOn = on; npcRoundCtrOn = ctr;
@@ -1618,9 +1634,10 @@ export function createNPCs(game) {
     root.traverse(function (o) {
       if (!o.isMesh || o.userData.personRound) return;
       if (o.userData.personContour) {
-        // the shirt (0.50 x 0.62 x 0.28): rounded, 12 % in at the waist
+        // the shirt (0.50 x 0.62 x 0.28): rounded, 16 % in at the waist
         if (!npcRoundLocTorso) {
-          npcRoundLocTorso = npcRoundGeo([{ w: 0.50, h: 0.62, d: 0.28 }], [[0.3, 0.88]]);
+          // TEN V2: rounder, and a little more waist (was 0.3, 0.88)
+          npcRoundLocTorso = npcRoundGeo([{ w: 0.50, h: 0.62, d: 0.28 }], [[0.44, 0.84]]);
           npcRoundLocTorso.deleteAttribute('color');
         }
         npcRoundTakeTorso(o, npcRoundLocTorso, null);
@@ -1639,7 +1656,10 @@ export function createNPCs(game) {
           // a limb is long in y; a head is near a cube and keeps its face
           const limb = q.height > 1.8 * Math.max(q.width, q.depth);
           const cube = Math.max(q.width, q.height, q.depth) < 1.35 * Math.min(q.width, q.height, q.depth);
-          const rf = limb ? 0.44 : cube ? 0.2 : 0.4;
+          // ROADMAP-TEN V2: a head is an egg and a limb a capsule, not a box with
+          // its corners sanded (was 0.2 / 0.44 / 0.4); the face's features
+          // are their own boxes and sit on the front, which stays near-flat
+          const rf = limb ? 0.5 : cube ? 0.44 : 0.44;
           geo = npcRoundGeo([{ w: q.width, h: q.height, d: q.depth }], [[rf, limb ? 0.88 : 1]]);
           geo.deleteAttribute('color');
           npcRoundLocCache.set(key, geo);

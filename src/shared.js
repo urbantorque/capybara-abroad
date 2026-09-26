@@ -2331,6 +2331,7 @@ const _RIM_FS_SHADE = `capyShadowV = 1.0;
 const _RIM_FS_COMMON = `#include <common>
 varying vec3 vRimW;
 varying vec3 vRimN;
+uniform float uWrapK;
 uniform float uCldK;
 uniform vec3 uCldO;
 float capyCldH(vec2 i) { return fract(sin(dot(i, vec2(127.1, 311.7))) * 43758.5453); }
@@ -2544,8 +2545,20 @@ export function cloudShadowTick(k, ox, oz, scale) {
 }
 export function cloudShadowInfo() { return { k: _cldK.value, o: [_cldO.value.x, _cldO.value.y, _cldO.value.z] }; }
 export function shLerpTick(on) { _shLerp.value = on ? 1 : 0; }
+// ---- THE SOFT MATTE (ROADMAP-TEN V1, noSoftMatte) ---------------------------
+// The author's reference frames: people and things lit like matte clay, the
+// light running on past the terminator instead of stopping at it. For what
+// breathes (smooth normals: people, animals, the pests; FLAT_SHADED is never
+// touched, so the built world's flat law stands) the direct term wraps:
+// (N.L + w) / (1 + w), the peak unchanged and the edge softened. One uniform.
+const _wrapK = { value: 0.4 };
+export function softMatteSet(k) { _wrapK.value = k > 0 ? (k < 0.8 ? k : 0.8) : 0; }
+const _LAMBERT_WRAP = THREE.ShaderChunk.lights_lambert_pars_fragment.replace(
+  'float dotNL = saturate( dot( geometryNormal, directLight.direction ) );',
+  '#ifdef FLAT_SHADED\n\tfloat dotNL = saturate( dot( geometryNormal, directLight.direction ) );\n#else\n\tfloat dotNL = saturate( ( dot( geometryNormal, directLight.direction ) + uWrapK ) / ( 1.0 + uWrapK ) );\n#endif');
 function _rimInjectWith(kU, cU, capOnU) {
   return function (shader) {
+    shader.uniforms.uWrapK = _wrapK;   // TEN V1
     shader.uniforms.uRimK = kU;
     shader.uniforms.uRimC = cU;
     // the capsule (L7, E3): the world's materials open, the animal's do not
@@ -2585,6 +2598,7 @@ function _rimInjectWith(kU, cU, capOnU) {
       .replace('#include <begin_vertex>', _RIM_VS_BEGIN);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', _RIM_FS_COMMON)
+      .replace('#include <lights_lambert_pars_fragment>', _LAMBERT_WRAP)
       .replace('#include <opaque_fragment>', _RIM_FS_OUT);
     if (_shadeOn) {
       shader.fragmentShader = shader.fragmentShader
@@ -7843,6 +7857,29 @@ export function mergeWearBand(M, pts, w, yAt, color, seg, lift, k) {
 // Scratch for makeMerger's add(): one vector and one normal matrix, module-wide.
 const _mergeV = new THREE.Vector3();
 const _mergeNM = new THREE.Matrix3();
+// ---- THE WORLD WITH ITS EDGES TAKEN OFF (ROADMAP-TEN V4, noBevelWorld) ------
+// The author's reference town is simple blocks, every one of them with its
+// edges softened, and the edge is where the light catches. Every chapter's
+// merger draws its buildings through M.box, so the box grows a chamfer there:
+// anything 30 cm or more on its thinnest side gets an edge of a tenth of that
+// (35 cm at most). Written straight into the merger's arrays off one unit
+// template (a 2x2x2-segment box, 48 triangles for the 12 it replaces), so
+// there is no geometry per box and nothing cached per size. Flat Lambert
+// still: the chamfer is a face of its own, turned to the light at 45 degrees,
+// which is the soft edge. Read when a chapter BUILDS; a probe sets the flag
+// before the crossing (bevelWorldSet, from systems.js every frame).
+let _bevelWorld = true;
+export function bevelWorldSet(on) { _bevelWorld = !!on; }
+export function bevelWorldOn() { return _bevelWorld; }
+let _bevelT = null;   // the unit template: positions in {-0.5, 0, 0.5} and its index
+function _bevelTemplate() {
+  if (_bevelT) return _bevelT;
+  const g = new THREE.BoxGeometry(1, 1, 1, 2, 2, 2);
+  _bevelT = { p: g.attributes.position.array.slice(), i: g.index.array.slice() };
+  g.dispose();
+  return _bevelT;
+}
+const _bevelM = new THREE.Matrix4();
 // ---------------------------------------------------------------------------
 // A ROUNDED BOX (AAA pass, 24 Sep 2026). The same construction npc.js uses
 // for the rounded person (npcRoundBox): a subdivided unit box whose inner grid
@@ -7998,6 +8035,12 @@ export function makeMerger(G, opts) {
       // chamfered — the same people, drawn by the same code, twice.
       if (M.round > 0 && Math.min(sx, sy, sz) >= 0.045)
         return M.rbox(cx, cy, cz, sx, sy, sz, color, M.round, rx, ry, rz, 2);
+      // ...and the world's own blocks (TEN V4): see _bevelWorld.
+      // (typeof: the contour instruments lift this body into a sandbox without it)
+      if (typeof _bevelWorld !== 'undefined' && _bevelWorld && !o.noBevel && M.round === 0) {
+        const mn = Math.min(sx, sy, sz);
+        if (mn >= 0.3) return M.bbox(cx, cy, cz, sx, sy, sz, color, Math.min(0.1 * mn, 0.35), rx, ry, rz);
+      }
       return M.add(G.box, xform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
     },
     cyl(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
@@ -8011,6 +8054,37 @@ export function makeMerger(G, opts) {
     sph(cx, cy, cz, sx, sy, sz, color, seg) {
       return M.add(pick('sph', seg, sphSegs),
                    xform(cx, cy, cz, 0, 0, 0, sx * 2, sy * 2, sz * 2), color);
+    },
+    /** A chamfered box at its real size, no geometry made (TEN V4). */
+    bbox(cx, cy, cz, sx, sy, sz, color, rr, rx, ry, rz) {
+      const T = _bevelTemplate();
+      const m4 = xform(cx, cy, cz, rx || 0, ry || 0, rz || 0, 1, 1, 1);
+      _mergeNM.getNormalMatrix(m4);
+      c.set(color);
+      if (tint) tint(c);
+      if (jit) _mergeJitter(c, m4.elements[12], m4.elements[13], m4.elements[14], jit, jitHue);
+      const hx = sx / 2, hy = sy / 2, hz = sz / 2, ix = hx - rr, iy = hy - rr, iz = hz - rr;
+      const start = M.n, p = T.p;
+      for (let i = 0; i < p.length; i += 3) {
+        const u = p[i], v = p[i + 1], w = p[i + 2];
+        let x = Math.abs(u) < 0.3 ? (Math.abs(u) < 1e-6 ? 0 : Math.sign(u) * ix) : Math.sign(u) * hx;
+        let y = Math.abs(v) < 0.3 ? (Math.abs(v) < 1e-6 ? 0 : Math.sign(v) * iy) : Math.sign(v) * hy;
+        let z = Math.abs(w) < 0.3 ? (Math.abs(w) < 1e-6 ? 0 : Math.sign(w) * iz) : Math.sign(w) * hz;
+        const qx = Math.max(-ix, Math.min(ix, x)), qy = Math.max(-iy, Math.min(iy, y)), qz = Math.max(-iz, Math.min(iz, z));
+        let dx = x - qx, dy = y - qy, dz = z - qz;
+        const l = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (l > 1e-7) { dx /= l; dy /= l; dz /= l; x = qx + dx * rr; y = qy + dy * rr; z = qz + dz * rr; }
+        _mergeV.set(x, y, z).applyMatrix4(m4);
+        pos.push(_mergeV.x, _mergeV.y, _mergeV.z);
+        _mergeV.set(dx, dy, dz).applyNormalMatrix(_mergeNM);
+        nor.push(_mergeV.x, _mergeV.y, _mergeV.z);
+        col.push(c.r, c.g, c.b);
+      }
+      const ia = T.i;
+      for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]);
+      M.n += p.length / 3;
+      M.bevels = (M.bevels || 0) + 1;
+      return M;
     },
     /**
      * A box with its edges taken off (AAA pass) — see roundBoxGeo. Built at

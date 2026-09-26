@@ -27,7 +27,11 @@ equal(inner(source, 'buildLocalFigure').replace(newLocalLine, oldLocalLine), inn
   'local skeleton, collar, colours, accessories and animation anchors unchanged');
 for (const pattern of [/new THREE_?\.(?:Mesh|InstancedMesh)\(/g,
   /new THREE_?\.\w*Material\(/g, /\b(?:mat|matOwn|matRound)\(/g, /\bscene\.add\(/g]) {
-  equal(stripComments(source).match(pattern), stripComments(baseline).match(pattern), 'no mesh/material/draw insertion: ' + pattern);
+  // ROADMAP-TEN V2 adds ONE deliberate material door (npcSmoothOf: a smooth
+  // twin of a plain flat material, cached per material), outside the contour;
+  // it is taken out of the count so this still guards the contour's own code.
+  const src2 = source.replace(/  function npcSmoothOf\([^]*?\n  \}/, '');
+  equal(stripComments(src2).match(pattern), stripComments(baseline).match(pattern), 'no mesh/material/draw insertion: ' + pattern);
 }
 
 const torso = source.match(/  torso: \[([^]*?)\n  \],/)[1];
