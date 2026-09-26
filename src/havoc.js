@@ -886,6 +886,32 @@ export function createHavoc(game) {
   // them; they are the live chapter's runtime spawns, so they stay with it.
   // ===========================================================================
   const placedProps = Object.create(null);
+  // OPEN GROUND, SEEN FROM ABOVE. A height alone put a barrel inside a pier
+  // in Venice and the solver clamped it every frame (the soak's +14 saves):
+  // a ray down from six metres must meet nothing higher than the ground here,
+  // and nothing may stand within 1.2 m either side of it.
+  function hvClear(x, y, z) {
+    const w = game.world;
+    if (!w || typeof w.raycastAll !== 'function' || !w.bodies || !w.bodies[0]) return true;
+    const V = w.bodies[0].position.constructor;   // cannon's Vec3, without importing cannon here
+    for (const o of [[0, 0], [1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2]]) {
+      const hit = hvRayHit(w, new V(x + o[0], y + 6, z + o[1]), new V(x + o[0], y - 0.5, z + o[1]));
+      if (hit !== null && hit > y + 0.35) return false;
+    }
+    return true;
+  }
+  function hvRayHit(w, from, to) {
+    let top = null;
+    try {
+      w.raycastAll(from, to, { skipBackfaces: true }, function (r) {
+        const b = r.body; if (!b || b === (game.capy && game.capy.body)) return;
+        if (b.type !== 2) return;   // static only: CANNON.Body.STATIC
+        const hy = r.hitPointWorld.y;
+        if (top === null || hy > top) top = hy;
+      });
+    } catch (e) { return null; }
+    return top;
+  }
   const placedList = [];   // this place's kit, for a probe
   function placeProps() {
     if (st.noHavocProps || placedProps[biome] || !game.physics || typeof game.physics.spawnProp !== 'function') return;
@@ -898,7 +924,7 @@ export function createHavoc(game) {
       const a = k * 2.399 + 0.6, rr = 8 + (k % 5) * 2.2;
       const x = sp.x + Math.sin(a) * rr, z = sp.z + Math.cos(a) * rr;
       const y = gy(x, z, NaN);
-      if (y === y && Math.abs(y - y0) < 1.5 && Math.hypot(x - ringX, z - ringZ) > hvRING_R + 1.5) pts.push({ x: x, y: y, z: z });
+      if (y === y && Math.abs(y - y0) < 1.5 && Math.hypot(x - ringX, z - ringZ) > hvRING_R + 1.5 && hvClear(x, y, z)) pts.push({ x: x, y: y, z: z });
     }
     if (pts.length < 6) return;
     placedList.length = 0;

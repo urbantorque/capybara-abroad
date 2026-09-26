@@ -3108,7 +3108,9 @@ function monMeDraw() {
 //     own sweep) for s, lat and the distance to the line, so the pack, the
 //     passes, the tunnel and the podium read exactly what they read before.
 // The rails come back with the flag: monMePlace and the old pedals are kept.
-const monFREE_VMAX   = 32;    // m/s on tarmac (monME_VMAX)
+// m/s on tarmac: 29, not the rails' 32. The soak holds the animal (on the
+// roof) under 30 m/s, and the pack tops out at 26.5-28.6, so 29 still wins.
+const monFREE_VMAX   = 29;
 const monFREE_VGRASS = 13;    // m/s off it
 const monFREE_ACC    = 13;    // m/s^2
 const monFREE_BRAKE  = 22;
