@@ -204,6 +204,17 @@ const venCanalDeepCol = new THREE.Color(PALETTE.venCanalDeep);
 
 // ---------------------------------------------------------------- state -----
 let venGame = null;
+// THE ARCADES' CEILING (TEN U2d): the loggia strips, filled as the arcades
+// are built, and the height the lens may not go over inside them.
+const venArcCeil = [];
+function venCamCeil(x, z) {
+  if (venGame && venGame.state && venGame.state.noVenCeil) return Infinity;
+  for (let i = 0; i < venArcCeil.length; i++) {
+    const c = venArcCeil[i];
+    if (x >= c.x0 && x <= c.x1 && z >= c.z0 && z <= c.z1) return c.y;
+  }
+  return Infinity;
+}
 let venBuilt = false;
 let venRoot = null;
 let venTime = 0;
@@ -1078,6 +1089,7 @@ function venBuildSquares(game, root) {
   const venARC_SOF = 5.2;       // loggia ceiling, over the pier datum
   const venARC_TOP = 10.6;      // and the top of the wall, same datum
   const venArcPiers = [];       // x, z, halfX, halfZ per pier — for one body each
+  venArcCeil.length = 0;
   const venArcMass = [];        // x, y, z, sx, sy, sz for the back of the block
   function arcade(x0, z0, x1, z1, along, wall1, openMax) {
     const len = along ? x1 - x0 : z1 - z0;
@@ -1123,6 +1135,12 @@ function venBuildSquares(game, root) {
     bx(0.5, gy + 7.9, thick * 0.5 - 0.07, len, 0.3, thick + 0.14, PALETTE.venStone);
     // the loggia's ceiling, dark, which is what makes it read as a hole
     bx(0.5, SOF - 0.19, LOG * 0.5, len, 0.38, LOG, PALETTE.venStoneDark);
+    // ...and the lens keeps under it (TEN U2d): the strip between the façade
+    // and the back wall, out to a metre past the piers, for venCamCeil
+    {
+      const ax = PX(0, -1), az = PZ(0, -1), bxx = PX(1, LOG), bzz = PZ(1, LOG);
+      venArcCeil.push({ x0: Math.min(ax, bxx), x1: Math.max(ax, bxx), z0: Math.min(az, bzz), z1: Math.max(az, bzz), y: SOF - 0.55 });
+    }
 
     // ---- the colonnade -----------------------------------------------------
     const bay = len / nb;
@@ -5834,6 +5852,11 @@ export function createVenice(game) {
   });
 
   const api = {
+    // THE ARCADES HAVE A ROOF (ROADMAP-TEN U2d, noVenCeil): a lens following
+    // the animal down the Procuratie rose through the loggia's soffit and the
+    // animal was drawn dithered through a floor of stone. The Marrakech souk
+    // answer: a ceiling for the camera, only inside the loggia strips.
+    camCeil: venCamCeil,
     built() { return venBuilt; },
     terrainHeight: venTerrain,
     // ---- TWO HUNDRED AND FIVE SECONDS OF TIDE (P3) -----------------------
