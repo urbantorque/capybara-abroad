@@ -1608,8 +1608,11 @@ function manBuildTown(game, root) {
   // ---- a bin, a bubbler, a bike rack: the promenade needs to be furnished or
   // it is a car park
   const furn = manPoolBody();
+  // ...AND THE BINS ARE OFFSET TOO (ROADMAP-TEN U1e). -50 + i*25 put one at
+  // x = 0, 2.8 m in front of the spawn: the first W of the chapter walked the
+  // animal into it and the arrival frame was a green bin. Half a spacing over.
   for (let i = 0; i < 5; i++) {
-    const x = -50 + i * 25;
+    const x = -37.5 + i * 25;
     M.cyl(x, manPROM_Y + 0.55, manPROM_Z + 2.2, 0.5, 1.1, PALETTE.manBin, 0, 0, 0, 8);
     M.cyl(x, manPROM_Y + 1.14, manPROM_Z + 2.2, 0.55, 0.14, PALETTE.manRockDk, 0, 0, 0, 8);
     manPoolBox(furn, x, manPROM_Y + 0.55, manPROM_Z + 2.2, 0.5, 0.55, 0.5);
@@ -3488,6 +3491,9 @@ function manBuildWater(root) {
     scale: 0.12, amount: 0.045, warp: 0,
     sparkle: 0.5, sparkleScale: 0.55, sparkleSpeed: 0.3,
     sparkleCut: 0.66, sparkleBand: 0.1, sparkleColor: 0xeaf6ff, fresnel: 0.65,
+    // TEN U1e: the flat ocean holds the headlands. sysREFLECT.manly carries
+    // the plane at manWATER - 0.05; the live surf mesh does not ask.
+    reflect: { k: 0.8, pow: 1.1, wobble: 0.8, blur: 0 },
   });
   const seaPanels = [
     [0, -800, 1600, 1444],        // out to the horizon, seaward of the surf mesh

@@ -3186,6 +3186,10 @@ const sysREFLECT = {
               k: 1.0, lift: 0.07, box: [-210, -105, 80, 25] },   // the acqua alta (venWaterY; swell 0.05)
   iceland:  { y: -1.0, k: 1.0, lift: 0.07, box: [-260, -78, 260, 317] },   // ONE plane, two sheets: the old harbour's sea (iceSEA_Y) and the lagoon (iceLAG_Y), both -1.0
   rio:      { y: -1.0, k: 1.0, lift: 0.10, box: [-200, -18, 200, -12] },   // the wet band on the sand (rioBuildWetBand; the sea itself does not ask — its swell rides 1.7 m over the plane)
+  // ROADMAP-TEN U1e: the two that had none. Sydney's harbour holds the sails;
+  // Manly's flat ocean (the three panels past the surf mesh) holds the heads.
+  sydney:   { y: -0.5, k: 1.0, lift: 0.12, box: [-140, -150, 140, -8] },   // the harbour (environment.js water.position.y; ripple on the mesh)
+  manly:    { y: -0.05, k: 0.9, lift: 0.08, box: [-800, -1600, 800, -50] }, // the outer ocean (manWATER - 0.05, flat); the surf zone does not ask
 };
 const sysLENS = {
   //             wide  splitW splitC

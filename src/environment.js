@@ -2872,7 +2872,11 @@ export function createEnvironment(game) {
   const matVCSea = grain(mat(envVC_BASE, { vertexColors: true }),
     { scale: 0.5, amount: 0.055, warp: 0,
       sparkle: 0.55, sparkleScale: 1.1, sparkleSpeed: 0.30, sparkleCut: 0.63, fresnel: 0.65,
-      sparkleColor: PALETTE.foam });
+      sparkleColor: PALETTE.foam,
+      // THE HARBOUR HOLDS THE SAILS (ROADMAP-TEN U1e). sysREFLECT.sydney
+      // carries the plane at -0.5; the ripple bends the sample per facet.
+      // Never clone this material after this call: the clone drops the hook.
+      reflect: { k: 1.0, pow: 1.0, wobble: 1.0, blur: 0 } });
   const water = new THREE.Mesh(wGeo, matVCSea);
   water.position.y = -0.5;
   water.receiveShadow = false;
