@@ -4411,8 +4411,13 @@ const sysSAVE_SHAPE = {
   // written before this existed simply has none for any chapter, and those
   // sort by chapter number instead (see sysShelfStage). Never re-based.
   keptAt: 'object',
+  // HAVOC (ROADMAP-TEN U1a): chapter -> { best, medal }, Free Roam's one
+  // number per place. The pivot names it as the pass's one save field;
+  // additive, no version bump, and a file written before it existed reads as
+  // a player who has not run a single havoc yet.
+  havoc: 'object',
 };
-const sysSAVE_DEBOUNCE = 700;      // ms — a streak of ticks writes once
+const sysSAVE_DEBOUNCE = 700;     // ms — a streak of ticks writes once
 // ---- THE TWO WAYS STORAGE LETS A PLAYER DOWN, BOTH SILENT UNTIL R3 ---------
 // `sysSaveOff`: localStorage threw. A private window, a browser with site data
 // switched off, a full quota. The journey runs perfectly and is gone the moment
@@ -9072,6 +9077,15 @@ function sysBuildCSS() {
    hero, so the first row of places is on screen under it. */
 '@media (max-width:639px){.capyui-pick.hero.flat .capyui-pickart,.capyui-pick.hero.compact .capyui-pickart{aspect-ratio:64 / 16;}}',
 '@media (min-width:360px) and (max-width:639px){.capyui-picks.flat{grid-template-columns:repeat(2,minmax(0,1fr));}}',
+/* TEN U1a: a place's best havoc run on the wall, a medal disc and the score. */
+'.capyui-pickhavoc{position:absolute;right:6px;bottom:6px;display:flex;align-items:center;gap:5px;',
+  'font-size:clamp(9px,1.7vw,11px);font-weight:800;font-variant-numeric:tabular-nums;color:' + ink + ';',
+  'background:' + sysRgba(PALETTE.sail, 0.94) + ';border-radius:999px;padding:2px 8px 2px 3px;box-shadow:' + shSm + ';}',
+'.capyui-pickhavoc i{width:13px;height:13px;border-radius:50%;background:' + sysRgba(PALETTE.ibisHead, 0.25) + ';',
+  'box-shadow:inset 0 -2px 0 rgba(0,0,0,.18);}',
+'.capyui-pickhavoc.m1 i{background:' + sysHex(PALETTE.havocBronze) + ';}',
+'.capyui-pickhavoc.m2 i{background:' + sysHex(PALETTE.havocSilver) + ';}',
+'.capyui-pickhavoc.m3 i{background:' + sysHex(PALETTE.havocGold) + ';}',
 /* HOMECOMING atlas end. */
 /* ---------- THE REPERTOIRE, ON THE JOURNAL (Q2) ----------
    THE SHELF’S OWN RULE, applied to the forty names: always forty, and the
@@ -11300,6 +11314,26 @@ function sysBuildCSS() {
   'max-width:min(84vw,520px);line-height:1.5;text-wrap:balance;}',
 '.capyui-placerule{height:2px;width:min(38vw,190px);border-radius:' + rSm + ';background:' + rule + ';',
   'transform:rotate(.5deg);margin:2px 0;}',
+/* TEN U1a arrival card: the author could not read the maroon. 11-14 px of
+   accentInk in tracked capitals over a wash that fades to nothing sat at
+   2-3:1 over a bright frame. The sub and the rumour now sit on a solid paper
+   pill in ink (13.9:1 on the paper), a size up, at a word's tracking, and the
+   rumour in sentence case. The maroon is kept where it is decorative: the
+   rule under the name. */
+'.capyui-placesub{font-size:clamp(13px,2.4vw,16px);letter-spacing:.12em;color:' + ink + ';',
+  'background:' + sysRgba(PALETTE.sail, 0.92) + ';border-radius:999px;padding:5px 16px;',
+  'box-shadow:0 1px 3px ' + sysRgba(PALETTE.ibisHead, 0.18) + ';}',
+'.capyui-placenews{font-size:clamp(13px,2.1vw,15px);letter-spacing:.02em;text-transform:none;',
+  'font-weight:600;color:' + ink + ';background:' + sysRgba(PALETTE.sail, 0.92) + ';',
+  'border-radius:14px;padding:5px 14px;box-shadow:0 1px 3px ' + sysRgba(PALETTE.ibisHead, 0.18) + ';}',
+'.capyui-place:not(.earned-card) .capyui-placerule{background:' + accent + ';}',
+/* ...and the crossing's own name, under its postcard, was ink at 0.26 on the
+   paper: 1.5:1. It is the first word of every arrival, so it is read, not
+   hinted: ink at 0.78 (9.4:1), a size up, half the tracking. */
+'.capyui-fade.trip .capyui-fadename{font-size:clamp(14px,2.4vw,17px);letter-spacing:.2em;',
+  'color:' + sysRgba(PALETTE.ibisHead, 0.78) + ';}',
+'.capyui-fade.trip.rise .capyui-fademark{opacity:.16;}',
+/* TEN U1a arrival card end. */
 /* D4: the reward belongs beside the shot, not across its sails. Arrivals
    keep the full-width title. The instruction remains stored for the cut. */
 '.capyui-place.earned-card{left:auto;right:24px;top:22px;width:max-content;max-width:min(44vw,560px);',
@@ -25821,6 +25855,18 @@ export function createSystems(game) {
       // unattached in the top right of an empty field of paper.
       art.appendChild(tally);
     }
+    // ---- HAVOC'S NUMBER ON THE WALL (ROADMAP-TEN U1a) -----------------
+    // The flat wall only: a place's best havoc run as a medal disc and the
+    // score beside it, bottom-right of the picture, off the file. Nothing
+    // until a run has been finished there (the wallpaper rule again).
+    const hvRec = !atlas && jrFile && jrFile.havoc && jrFile.havoc[d.n];
+    if (hvRec && hvRec.best > 0) {
+      const hv = sysEl('span', 'capyui-pickhavoc m' + clamp(hvRec.medal | 0, 0, 3));
+      hv.appendChild(sysEl('i'));
+      hv.appendChild(document.createTextNode(String(hvRec.best | 0)));
+      hv.setAttribute('aria-label', 'best havoc ' + (hvRec.best | 0));
+      art.appendChild(hv);
+    }
     // AND WHAT A FINISHED PLACE GAVE YOU. The record line that used to live in
     // here with it has moved out — see the P3 block below for why the two are
     // not the same kind of fact.
@@ -35841,6 +35887,8 @@ export function createSystems(game) {
         // no version bump, and a file written before it existed reads as a
         // player who has not found any out, which is what they had.
         rep: jrRep,
+        // ...and HAVOC (ROADMAP-TEN U1a): chapter -> { best, medal }.
+        havoc: jrHavoc,
         // ...and THE NOTEBOOK (L6, F4): chapter -> { d, f }, and `fin`. Additive,
         // no version bump; a file written before it existed reads as a
         // traveller who has not written anything down yet.
@@ -40673,6 +40721,15 @@ export function createSystems(game) {
       // every arrival for the rest of the journey.
       const rp = jrFile.rep || {};
       for (const k in rp) if (typeof rp[k] === 'number' && rp[k] > 0) jrRep[k] = rp[k];
+      // HAVOC (U1a): a best is a number and a medal is 0-3; anything else on
+      // the key is left where it is.
+      const hv = jrFile.havoc || {};
+      for (const k in hv) {
+        const r = hv[k];
+        if (r && typeof r.best === 'number' && r.best >= 0) {
+          jrHavoc[k] = { best: Math.min(99999, r.best | 0), medal: clamp(r.medal | 0, 0, 3) };
+        }
+      }
       const ev = jrFile.eve || {};
       for (const k in ev) if (ev[k]) jrEve[k] = 1;
       // ...and THE NOTEBOOK (L6, F4), field by field: a page is a date and an
@@ -40804,9 +40861,11 @@ export function createSystems(game) {
     sysFreshT = 0;
     // Incomplete guidance survives a save. Old files without a tutorial bit
     // are left alone; their player can request the walk from Pause.
+    // ...and a story's: Free Roam is HAVOC from the first second (ROADMAP-TEN
+    // U1a), and its player can still ask for the walk from Pause.
     tutArm = !tutEver && ((!restore && doneCount === 0) ||
              (restore && jrFile && jrFile.tut === 0)) && !game.state.noTut &&
-             (where || 'sydney') === 'sydney';
+             (where || 'sydney') === 'sydney' && journeyMode !== 'free';
     tutT = 0;
     // THE OPENING, TEN SECONDS (ROADMAP-WOW2, N4.1): the same fresh-file
     // gate tutArm uses, one door earlier — this plays FIRST, before "be a
@@ -48368,6 +48427,7 @@ export function createSystems(game) {
     // through would put a thud and a shake on top of them.
     if (p && p.spill) {
       if (p.prop && p.prop.disturbed && p.position) {
+        sysMischief('spill', p.position.x, p.position.z, p.prop.type);
         incAdd(p.position.x, p.position.z, p.prop.id !== undefined ? p.prop.id : p.prop.type,
                'spill', p.prop.type);
       }
@@ -48406,6 +48466,7 @@ export function createSystems(game) {
     // did — and the speed gate is above a walk, so brushing past a crate is not
     // an event either.
     if (s >= sysINC_HIT && p && p.prop && p.prop.disturbed && p.position) {
+      sysMischief('bang', p.position.x, p.position.z, p.prop.type);
       incAdd(p.position.x, p.position.z, p.prop.id !== undefined ? p.prop.id : p.prop.type,
              'bang', p.prop.type);
     }
@@ -48424,6 +48485,7 @@ export function createSystems(game) {
     // Something went in the drink, and it counts if it was yours to put there.
     const wp = p && p.prop, wb = wp && wp.body;
     if (wp && wp.disturbed && wb) {
+      sysMischief('water', wb.position.x, wb.position.z, wp.type);
       incAdd(wb.position.x, wb.position.z, wp.id !== undefined ? wp.id : wp.type,
              'water', wp.type);
     }
@@ -48446,6 +48508,7 @@ export function createSystems(game) {
   game.events.on('prop:hitperson', function (p) {
     const hp = p && p.prop, hb = hp && hp.body;
     if (hp && hb) {
+      sysMischief('hit', hb.position.x, hb.position.z, hp.type);
       incAdd(hb.position.x, hb.position.z, hp.id !== undefined ? hp.id : hp.type,
              'hit', hp.type);
     }
@@ -48454,6 +48517,7 @@ export function createSystems(game) {
   game.events.on('prop:destroy', function (p) {
     const dp = p && p.prop, db = dp && dp.body;
     if (dp && dp.disturbed && db) {
+      sysMischief('break', db.position.x, db.position.z, dp.type);
       incAdd(db.position.x, db.position.z, dp.id !== undefined ? dp.id : dp.type,
              'break', dp.type);
     }
@@ -48464,6 +48528,7 @@ export function createSystems(game) {
     const gp = p && p.prop;
     const cp = game.capy && game.capy.position;
     if (gp && (gp.owner || (p && p.from)) && cp) {
+      sysMischief(gp.type === 'hat' ? 'hat' : 'theft', cp.x, cp.z, gp.type);
       incAdd(cp.x, cp.z, gp.id !== undefined ? gp.id : gp.type, 'theft', gp.type);
     }
   });
@@ -48559,7 +48624,15 @@ export function createSystems(game) {
     if (tutOn && n > 0) tutYuzuN++;    // beat five's other answer (ROADMAP-WOW2, T)
     yuzuGroundCtx = true;
     try { yuzuAdd(n, why, x, y, z); } finally { yuzuGroundCtx = false; }
+    // ...and a fruit off the ground is a link in Free Roam's streak (U1a).
+    if (n > 0) { sysYuzuGot.n = n; sysYuzuGot.x = x; sysYuzuGot.z = z; game.events.emit('yuzu:got', sysYuzuGot); }
   }
+  const sysYuzuGot = { n: 0, x: 0, z: 0 };
+  // HAVOC's two doors onto the wallet (U1a): a credit with the usual flying
+  // `+n`, and the one debit the game has besides a march fine — a caught
+  // animal drops five. Both go through yuzuAdd so the ledger has one owner.
+  game.yuzuGive = function (n, why, x, y, z) { yuzuAdd(n | 0, why || null, x, y, z); };
+  game.yuzuHave = function () { return jrYuzu; };
   game.state.qaYuzuLog = null;   // set to [] by a probe that wants the ledger
   /** A world point in CSS pixels, the `boardScreen` pattern. Null behind the lens. */
   function yuzuScreenPos(x, y, z) {
@@ -49386,6 +49459,37 @@ export function createSystems(game) {
            sysOpenT < 0 && !tutOn && !(game.capy && (game.capy.atHelm || game.capy.carriedBy));
   };
   game.groundY = function (x, z) { return sysGroundY(x, z); };
+  // ---- HAVOC'S TWO QUESTIONS (ROADMAP-TEN U1a/U1g) ------------------------
+  // Is the world the player's, in Free Roam, right now: rivalOK's list
+  // without the grace (HAVOC is the reason Free Roam exists, so it does not
+  // wait for a first name) and with the rides added, because a pest diving at
+  // a helmsman or a rider is a pest the player cannot answer.
+  game.havocOK = function () {
+    const c = game.capy;
+    return started && game.state.journeyMode === 'free' && !transBusy && !jrShown && !pauseShown &&
+           !game.state.paused && sysOpenT < 0 && !sysOpenPending && !tutOn &&
+           !(c && (c.atHelm || c.carriedBy)) && !(game.condor && game.condor.mounted);
+  };
+  // which of those said no, for a probe
+  game.havocWhy = function () {
+    const c = game.capy;
+    return { started: started, free: game.state.journeyMode === 'free', trans: transBusy, jr: jrShown, pause: pauseShown,
+             paused: !!game.state.paused, open: sysOpenT, tut: tutOn, helm: !!(c && c.atHelm), carried: !!(c && c.carriedBy),
+             mounted: !!(game.condor && game.condor.mounted) };
+  };
+  // ...and a caught animal goes back to where the place first put it down,
+  // with the rescue's blink: a stumble tidied up, not a journey.
+  game.havocHome = function () {
+    const capy = game.capy;
+    if (!capy || !capy.body || transBusy) return false;
+    const to = game.biome && game.biome.spawnOf ? game.biome.spawnOf(game.biome.current) : null;
+    if (!to) return false;
+    capy.carriedBy = null;
+    teleportCapy(to);
+    fadeEl.classList.add('on');
+    setTimeout(function () { fadeEl.classList.remove('on'); }, 160);
+    return true;
+  };
 
   /** Once a frame, from `update()`, only while the chapter is actually live
    *  — the `wxFrontT` pattern (weather.js). */
@@ -50141,6 +50245,17 @@ export function createSystems(game) {
    * `key` identifies the prop so the same one cannot count twice in a row.
    * `kind` and `type` are what it WAS — see the ring above. Both optional.
    */
+  // ---- A THING THE ANIMAL DID (ROADMAP-TEN U1a) ---------------------------
+  // The six handlers above already know whether the animal caused it (props.js
+  // stamps `disturbed`); incAdd then asks whether anybody SAW it, which is the
+  // story's question. Free Roam's streak asks only the first one, so the event
+  // goes out before the witness gate. One payload, rewritten in place.
+  const sysMischiefEv = { kind: '', x: 0, z: 0, type: '' };
+  function sysMischief(kind, x, z, type) {
+    if (!started || game.state.paused) return;
+    sysMischiefEv.kind = kind; sysMischiefEv.x = x; sysMischiefEv.z = z; sysMischiefEv.type = type || '';
+    game.events.emit('capy:mischief', sysMischiefEv);
+  }
   function incAdd(x, z, key, kind, type) {
     // THE FIRST MINUTE (L4, E3 / design #3): on a fresh file nothing on the
     // ladder counts until the player has ticked something on purpose or
@@ -50612,6 +50727,21 @@ export function createSystems(game) {
   ];
   const sysREP_R = 15;        // m of earshot for somebody to repeat the name
   const jrRep = Object.create(null);   // pattern id -> how many times
+  // HAVOC (ROADMAP-TEN U1a): chapter number -> { best, medal }. src/havoc.js
+  // owns the run and the score; this file owns the save, as it owns every
+  // other field, and hands it over through game.havocStore.
+  const jrHavoc = Object.create(null);
+  game.havocStore = {
+    get: function (n) { const r = jrHavoc[n]; return r ? { best: r.best, medal: r.medal } : null; },
+    put: function (n, best, medal) {
+      const r = jrHavoc[n];
+      if (r && r.best >= best && r.medal >= medal) return false;
+      jrHavoc[n] = { best: Math.max(r ? r.best : 0, best | 0), medal: Math.max(r ? r.medal : 0, medal | 0) };
+      saveSoon();
+      return true;
+    },
+    all: function () { return jrHavoc; },
+  };
 
   /**
    * DOES THIS CHAIN MATCH THIS PATTERN, and how specific was it.

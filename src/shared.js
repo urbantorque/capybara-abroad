@@ -178,6 +178,20 @@ export const PALETTE = {
   khaki:        0xcbb181,
   bagKhaki:     0xb5a077,      // the traveller's duffel: canvas a shade under khaki, worn by every wharf it has been set down on
   hiVis:        0xf2c14e,
+  // HAVOC (ROADMAP-TEN U1a/U1g): Free Roam's medals, its streak meter, its
+  // hearts and its three pests. Medals are metal read on paper, not jewellery.
+  havocGold:    0xe8b83a,      // the gold medal disc and the x8 meter
+  havocSilver:  0xb9c2c9,      // silver: cool, a step under the paper
+  havocBronze:  0xc07a45,      // bronze: warm copper, darker than cloth8
+  havocMeter:   0xef6a4c,      // the streak bar's fill: the coral a notch hotter
+  havocHeart:   0xe0524a,      // a full heart; an empty one is ibisHead at a third
+  pestGull:     0xf1efe8,      // the gull's body, a warm white
+  pestGullWing: 0x9aa4ab,      // the gull's back and wingtips
+  pestBeak:     0xf0a23a,      // beak and legs, gull and ibis orange
+  pestWarden:   0x3f5a74,      // the warden's uniform, a municipal navy
+  pestNet:      0xd9cfb6,      // the warden's net, pale cord
+  pestDog:      0x8a5a3c,      // the dog, a brown terrier
+  pestPip:      0xf3c338,      // a flicked yuzu pip, bright enough to track in flight
 
   // props
   wood:         0xc0956a,

@@ -509,6 +509,7 @@ const physImpactPayload = { prop: null, speed: 0, position: new THREE.Vector3(),
 const physWaterPayload = { prop: null };
 const physDestroyPayload = { prop: null };
 const physGrabPayload = { prop: null, from: null };
+const physTipEv = { kind: 'tip', x: 0, z: 0, type: '' };   // ROADMAP-TEN U1a, see physCheckTip
 const physDropPayload = { prop: null };
 const physSfxOpts = { volume: 1 };
 // A thud heard from the rim of a 60 m volcano: quiet AND an octave down. Kept as
@@ -4436,6 +4437,13 @@ function physCheckTip(prop) {
   physSfxOpts.volume = 0.9;
   physGame.sfx('rustle', physSfxOpts);
   if (!(mineTip && physBeat(0.3, 0.05))) physGame.shake(0.3);
+  // A knock-over the animal did is a link in Free Roam's streak and the
+  // count a havoc run is scored on (ROADMAP-TEN U1a). Same event, same shape
+  // as systems.js's sysMischief; tips never reach incAdd, so they go out here.
+  if (mineTip) {
+    physTipEv.x = b.position.x; physTipEv.z = b.position.z; physTipEv.type = prop.type || '';
+    physGame.events.emit('capy:mischief', physTipEv);
+  }
   // A bin that a tourist blunders into still spills its rubbish — but only the
   // capybara can tick the checklist, and only if it hit the thing just now.
   if (mineTip) physTask('bin-chicken');

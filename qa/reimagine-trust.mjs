@@ -121,21 +121,23 @@ for (const how of ['time', 'left', 'cut']) check(how + ' never records tutorial 
 });
 const armStart = source.indexOf('tutArm = !tutEver &&');
 const arm = source.slice(armStart, source.indexOf(';', armStart) + 1);
-for (const [label, restore, tut, done, where, want] of [
+for (const [label, restore, tut, done, where, want, mode] of [
   ['fresh Sydney', false, undefined, 0, 'sydney', true],
   ['unfinished restored Sydney', true, 0, 12, 'sydney', true],
   ['completed restored Sydney', true, 1, 12, 'sydney', false],
   ['legacy save', true, undefined, 12, 'sydney', false],
   ['unfinished abroad', true, 0, 12, 'pasto', false],
+  // ROADMAP-TEN U1a: Free Roam is HAVOC from the first second; the walk is Pause's
+  ['fresh Free Roam', false, undefined, 0, 'sydney', false, 'free'],
 ]) check(label + ' uses the intended guidance eligibility', () => {
-  Object.assign(t, { restore, jrFile: { tut }, tutEver: !!tut, doneCount: done, where });
+  Object.assign(t, { restore, jrFile: { tut }, tutEver: !!tut, doneCount: done, where, journeyMode: mode || 'story' });
   vm.runInContext(arm, t); assert.equal(t.tutArm, want);
 });
 check('Legacy restore stays opted out after writing and restoring its next save', () => {
   const restoreTut = source.match(/tutEver = jrFile\.tut[^;]*;/)?.[0];
   const saveTut = source.match(/\btut:\s*(tutEver[^,\n]*)/)?.[1];
   assert.ok(restoreTut && saveTut, 'shipped restore assignment and save projection exist');
-  Object.assign(t, { restore: true, jrFile: { v: 1, tasks: ['wheek'] }, doneCount: 1, where: 'sydney' });
+  Object.assign(t, { restore: true, jrFile: { v: 1, tasks: ['wheek'] }, doneCount: 1, where: 'sydney', journeyMode: 'story' });
   vm.runInContext(restoreTut + arm, t);
   assert.equal(t.tutArm, false);
   // Serialize the real writer's tutorial projection, then feed its saved

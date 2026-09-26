@@ -44,6 +44,7 @@ const ORDER = [
   'src/condor.js',
   'src/npc.js',
   'src/rival.js',
+  'src/havoc.js',
   'src/systems.js',
   'src/main.js',
 ];

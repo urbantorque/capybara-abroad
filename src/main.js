@@ -28,6 +28,7 @@ import { createWeather } from './weather.js';
 import { createGrass } from './grass.js';
 import { createCondor } from './condor.js';
 import { createRival } from './rival.js';
+import { createHavoc } from './havoc.js';
 
 // ---------------------------------------------------------------------------
 // Coordinator-owned bootstrap. Modules are wired in a fixed order and each is
@@ -2571,6 +2572,9 @@ function mainBoot() {
   const systems = mainSafe('systems',     () => createSystems(game));
   // THE RIVAL (AAA A4): after systems, whose drop and ground doors it uses.
   const rival   = mainSafe('rival',       () => createRival(game));
+  // HAVOC (ROADMAP-TEN U1a/U1g): Free Roam's streak, runs and pests. After
+  // systems too, for the same reason: the save, the wallet and the doors.
+  const havoc   = mainSafe('havoc',       () => createHavoc(game));
 
   // The locals service, now that npc.js exists. Biomes call game.addLocal()
   // from their build and game.say() from their update; both were no-ops until
@@ -2707,11 +2711,11 @@ function mainBoot() {
   // controller's grip, the locals' umbrellas and the atmosphere pass.
   const all = [env, pasto, quay, kyoto, cali, rio, iceland, sahara, drift, venice, kowloon,
                palawan, goreme, manly, pantanal, cave, antarctic, monaco, hanoi, weather, grass,
-               props, capy, condor, npcs, systems, rival];
+               props, capy, condor, npcs, systems, rival, havoc];
   const updaterNames = ['environment', 'pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland', 'sahara',
                         'drift', 'venice', 'kowloon', 'palawan', 'goreme',
                         'manly', 'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi', 'weather', 'grass',
-                        'props', 'capybara', 'condor', 'npc', 'systems', 'rival'];
+                        'props', 'capybara', 'condor', 'npc', 'systems', 'rival', 'havoc'];
   all.forEach((m, i) => { if (m) m.__name = updaterNames[i]; });
   const updaters = all.filter(m => m && typeof m.update === 'function');
   // The two the loop may never give up on. See the strike handler in tick().
