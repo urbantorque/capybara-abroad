@@ -1,19 +1,34 @@
 # Capybara Abroad
 
-**Play it: https://urbantorque.github.io/capybara-abroad/**. It's one file:
-no install, no account, and it saves in your browser.
+**Play in your browser: https://urbantorque.github.io/capybara-abroad/**.
+It's one file: no install, no account, and it saves in your browser.
 
 A cosy, mischievous travel game. A capybara follows a traveller's bag
 through nineteen real places and brings one memory home from each, for the
 shelf in Sydney's Botanic Gardens. On the way it knocks things over, steals
-hats and gets chased. An ibis from the Gardens keeps trying to steal its
+hats and gets chased, and an ibis from the Gardens keeps trying to steal its
 yuzu.
+
+| | |
+|---|---|
+| ![Sydney Harbour, the Bridge held in the water](docs/images/sydney-harbour.jpg) | ![The torii tunnel above Kyoto](docs/images/kyoto-torii.jpg) |
+| ![The aurora over an Icelandic hot pool](docs/images/iceland-aurora.jpg) | ![Kowloon at night](docs/images/kowloon-night.jpg) |
+| ![Balloons over Göreme before dawn](docs/images/goreme-dawn.jpg) | ![HAVOC: a warden, a dog, a crate of yuzu and a barrel under the sails](docs/images/havoc.jpg) |
+| ![Under the Procuratie in Venice](docs/images/venice-loggia.jpg) | ![Monte Carlo's harbour, lit](docs/images/monaco.jpg) |
 
 The places: Sydney, Pasto, Circular Quay, Kyoto and Uji, Cali, Rio,
 Iceland, Marrakech, the Drift, Venice, Hong Kong, Palawan, Cappadocia,
-Manly, the Pantanal, Sơn Đoòng, Antarctica, Monte Carlo and Hanoi. Each one
-has a big experience (a condor ride, a ferry to steer, a balloon at sunrise),
-a quieter way to the same memory, and small things to find.
+Manly, the Pantanal, Sơn Đoòng, Antarctica, Monte Carlo and Hanoi.
+
+## Two ways to play
+
+- **Story** is the bag going home: five folds of a map, two memories in
+  each, a keepsake for every one, an ibis with its own ideas, and an ending
+  on the lawn.
+- **Free roam** is HAVOC: all nineteen places on one wall, no list, a streak
+  for every piece of mischief, sixty-second runs from a gold ring with a
+  medal to beat, and pests (a gull, a warden, a dog) to see off with a
+  flicked yuzu pip. Three hearts; get caught and it drops five yuzu.
 
 ## Playing
 
@@ -21,24 +36,22 @@ a quieter way to the same memory, and small things to find.
 |---|---|
 | Move · run · hop | W A S D · Shift · Space |
 | Take / drop · wheek | E · Q |
+| Flick a yuzu pip (Free roam) | V |
+| Another go after a run | Enter |
 | The list of things to do · next thing | L · F |
-| Journal · look around · mute | Tab · drag or C · M |
+| Journal or departures · look around · mute | Tab · drag or C · M |
 | The map | hover over or hold the corner map |
 | Photo · hide the HUD · pause | K · P · Esc |
 
-- **Story** opens places two memories at a time.
-- **Free roam** opens all nineteen at once. It's on the title screen, and
-  it keeps everything you've done.
-- **Trouble costs something.** If someone who saw you comes over and
-  catches you, it costs a yuzu or three. Hiding in water or cover, or just
-  walking off, pays.
+In Monte Carlo the red car drives like a car: W and S, A and D, and E to get
+in and out.
 
 ## Running it
 
 ```
 npm start          # serves src/ unbundled on http://localhost:5188
 node build.mjs     # one self-contained dist/untitled-capybara-game.html
-npm test           # 77 static checks, ~2 minutes, no browser
+npm test           # 81 static checks, ~3 minutes, no browser
 ```
 
 There are no dependencies. Three.js and cannon-es are vendored in `vendor/`
