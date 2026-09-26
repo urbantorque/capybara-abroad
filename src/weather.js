@@ -828,6 +828,7 @@ export function createWeather(game) {
   let row = wxMOOD[name] || wxBASE;
   let rainT = 0;                  // 0..1 the shower's own envelope, damped
   let rainWant = 0;
+  let wxDryT = 0;                 // s since the arrival (TEN U1f): the first frame is dry
   let rainAt = 0;                 // s left of the current shower
   let cloudV = 0, pulseV = 0;
   let wet = row.wet;
@@ -1183,7 +1184,7 @@ export function createWeather(game) {
   function wxPrime(to) {
     name = to || 'sydney';
     row = wxMOOD[name] || wxBASE;
-    rainT = 0; rainWant = 0; rainAt = 0;
+    rainT = 0; rainWant = 0; rainAt = 0; wxDryT = 0;
     cloudV = 0; pulseV = 0;
     wet = row.wet;
     thunderAt = 0;
@@ -1404,6 +1405,14 @@ export function createWeather(game) {
     }
     // Damped rather than assigned, so the envelope's own corners are rounded
     // off and a biome change cannot step the rain from 0.7 to 0 in one frame.
+    // ---- A DRY FIRST FRAME (ROADMAP-TEN U1f, noRainPitch) -------------------
+    // The reviewers' Pasto arrival was streaks across the cone: the postcard
+    // lifts on a place and the first thing in it is rain on the lens. For the
+    // arrival shot and twenty seconds after, a shower waits; the front, the
+    // cloud and the wetness are untouched, and the shower comes in on its
+    // own damped rise after.
+    wxDryT += dt;
+    if (!(game.state && game.state.noRainPitch) && wxDryT < 20) rainWant = 0;
     rainT = damp(rainT, rainWant, 0.9, dt);
     if (rainT < 0.0015) rainT = 0;
 

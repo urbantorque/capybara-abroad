@@ -5713,7 +5713,10 @@ export function createNPCs(game) {
   // stage, a semicircle of faces with the harbour behind them, and from the
   // opera shot, an audience in the foreground of the sails.
   // =========================================================================
-  const npcCONCERT_N   = 8;
+  // TWELVE, IN THREE ROWS (ROADMAP-TEN U1c): T4a raised the opera-stage par to
+  // ten and the on-beat concert calls wider, so a house of eight capped the
+  // record below its own par. Five, four, three, each row narrower.
+  const npcCONCERT_N   = 12;
   const npcCONCERT_SPD = 1.7;     // m/s — quicker than the ending's stroll; something is happening
   const npcCONCERT_CEIL = 22;     // s. The ceiling. Same rule as the gather's.
   const npcCONCERT_MAX_D = npcCONCERT_CEIL * npcCONCERT_SPD * 0.7;
@@ -5751,10 +5754,10 @@ export function createNPCs(game) {
     for (let j = 0; j < n; j++) {
       const r = pool[j].r;
       const i = have + j;
-      const row = i < 5 ? 0 : 1;
-      const k = row === 0 ? i : i - 5;
-      const across = row === 0 ? 5 : 3;
-      let gx = sx + ((k + 0.5) / across - 0.5) * (row === 0 ? 13 : 8) + rand(-0.4, 0.4);
+      const row = i < 5 ? 0 : (i < 9 ? 1 : 2);
+      const k = row === 0 ? i : (row === 1 ? i - 5 : i - 9);
+      const across = row === 0 ? 5 : (row === 1 ? 4 : 3);
+      let gx = sx + ((k + 0.5) / across - 0.5) * (row === 0 ? 13 : (row === 1 ? 10 : 7)) + rand(-0.4, 0.4);
       let gz = sz + 4.4 + row * 1.9 + rand(-0.3, 0.3);
       for (let t = 0; t < 6 && navBlocked(gx, gz, 0.45); t++) { gx += rand(-1.2, 1.2); gz += 0.6; }
       r.gathX = gx; r.gathZ = gz;

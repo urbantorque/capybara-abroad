@@ -23,6 +23,15 @@ let pastoRoot = null;
 let pastoLocMusician = null, pastoTuneMv = null;
 let pastoApi = null;
 let pastoGame = null;
+// THE COLCHA (TEN U1f): the quilt, and the cone ring it stands in for.
+let pastoColcha = null, pastoFarNear = null, pastoColchaWas = null;
+function pastoColchaSync(game) {
+  const on = !(game && game.state && game.state.noPastoColcha);
+  if (on === pastoColchaWas || !pastoColcha) return;
+  pastoColchaWas = on;
+  pastoColcha.visible = on;
+  if (pastoFarNear) pastoFarNear.visible = !on;
+}
 
 // ===========================================================================
 // 1. THE TERRAIN LAW
@@ -588,7 +597,7 @@ function pastoBuildFarPeaks() {
       if (mm < 142) { const k = 142 / mm; px *= k; pz *= k; }
       const yaw = pastoRnd() * 1.3;
       parts.push({
-        g: (i % 2) ? cone5 : cone4, c: ring.c, gain: ring.gain,
+        g: (i % 2) ? cone5 : cone4, c: ring.c, gain: ring.gain, ring: k,
         m: pastoXf(px, ring.y + hh * 0.5, pz, 0, yaw, 0, ww * 0.5, hh, ww * 0.5),
       });
       // ROADMAP-WOW Part C (Heroes): a SHOULDER on every near-ring peak. One
@@ -606,14 +615,14 @@ function pastoBuildFarPeaks() {
         if (sm < 142) { const k = 142 / sm; sx *= k; sz *= k; }
         const sh = hh * pastoRndR(0.56, 0.66), sw = ww * 0.62;
         parts.push({
-          g: (i % 2) ? cone4 : cone5, c: ring.c, gain: ring.gain,
+          g: (i % 2) ? cone4 : cone5, c: ring.c, gain: ring.gain, ring: k,
           m: pastoXf(sx, ring.y + sh * 0.5, sz, 0, yaw + 0.5, 0, sw * 0.5, sh, sw * 0.5),
         });
         // snow on the shoulder too where the parent wears it: the line then
         // steps down between the two summits instead of ringing one of them
         if (i % 3 === 0) {
           parts.push({
-            g: cone5, c: PALETTE.volcanoSnow, gain: 1.55,
+            g: cone5, c: PALETTE.volcanoSnow, gain: 1.55, ring: k,
             m: pastoXf(sx, ring.y + sh * 0.84, sz, 0, yaw + 0.5, 0, sw * 0.08, sh * 0.16, sw * 0.08),
           });
         }
@@ -623,19 +632,100 @@ function pastoBuildFarPeaks() {
         // own radius there, and the cap's apex lands on the parent's apex, so
         // the snow sits in the silhouette instead of flaring out of it.
         parts.push({
-          g: cone5, c: PALETTE.volcanoSnow, gain: 1.55,
+          g: cone5, c: PALETTE.volcanoSnow, gain: 1.55, ring: k,
           m: pastoXf(px, ring.y + hh * 0.80, pz, 0, yaw, 0, ww * 0.10, hh * 0.20, ww * 0.10),
         });
       }
     }
   }
-  const mesh = new THREE.Mesh(pastoMerge(parts), mat(PALETTE.volcanoSnow, { vertexColors: true }));
+  // TEN U1f: the near ring is its own mesh now, so the colcha can stand in
+  // for it. The random stream above is drawn in exactly the old order.
+  const fm = mat(PALETTE.volcanoSnow, { vertexColors: true });
+  const near = new THREE.Mesh(pastoMerge(parts.filter(function (q) { return q.ring === 0; })), fm);
+  const far = new THREE.Mesh(pastoMerge(parts.filter(function (q) { return q.ring !== 0; })), fm);
+  const mesh = new THREE.Group();
   mesh.name = 'pastoFarPeaks';
-  mesh.castShadow = false;
-  mesh.receiveShadow = false;
+  for (const m of [near, far]) { m.castShadow = false; m.receiveShadow = false; mesh.add(m); }
+  mesh.userData.near = near;
   cone5.dispose(); cone4.dispose();
   return mesh;
 }
+
+// ===========================================================================
+// 2c. THE COLCHA (ROADMAP-TEN U1f, flag noPastoColcha).
+//
+// The reviewers: "Pasto's horizon is grey pyramids rather than the Andean
+// patchwork". Nariño is famous for exactly one view, and it is not a cone: it
+// is the colcha, the quilt of small fields laid over every hillside, each a
+// different green or gold, stitched with dark hedgerows. The near ring of
+// PALETTE.peakFar cones is where that view belongs, so it becomes one ridged
+// annulus hugging the terrain sheet's square edge (inner edge 134 m out on the
+// axes, further on the diagonals, so it never surfaces through the valley),
+// 96 x 6 quads, each field a colour off the three pastoField rows with a
+// hedgerow column every few fields. The far volcano ring stays behind it.
+// One draw call, 1 152 triangles, flat shaded, no shadow, no collider. Its own
+// hash, not pastoRnd: the seeded stream every later placement reads is left
+// exactly as it was.
+// ===========================================================================
+const pastoCOLCHA_N = 96, pastoCOLCHA_R = 6;
+const pastoCOLCHA_IN = 134, pastoCOLCHA_W = 46;
+function pastoColchaHash(i, j) {
+  const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+function pastoColchaY(a, t) {
+  // the crest has to clear the valley's own near hills from the plaza (eye
+  // about 4 m) and stay under the far volcano ring's snow: 25-60 m over the edge
+  const ridge = 40 + 12 * Math.sin(3 * a + 1.3) + 8 * Math.sin(7 * a + 0.4) + 5 * Math.sin(13 * a + 2.1);
+  const prof = Math.pow(Math.sin(Math.PI * 0.5 * clamp(t * 1.25, 0, 1)), 0.9) * (1 - 0.35 * clamp((t - 0.8) / 0.2, 0, 1));
+  return lerp(-22, -30, t) + ridge * prof;
+}
+function pastoBuildColcha() {
+  const N = pastoCOLCHA_N, R = pastoCOLCHA_R;
+  const pos = new Float32Array(N * R * 6 * 3), col = new Float32Array(N * R * 6 * 3);
+  const fields = [new THREE.Color(PALETTE.pastoField1), new THREE.Color(PALETTE.pastoField2),
+                  new THREE.Color(PALETTE.pastoField3), new THREE.Color(PALETTE.pastoField1).multiplyScalar(0.82),
+                  new THREE.Color(PALETTE.pastoField2).multiplyScalar(0.9)];
+  const hedge = new THREE.Color(PALETTE.pastoField1).multiplyScalar(0.46);
+  const c = new THREE.Color();
+  const vx = (i, j) => {
+    const a = (i / N) * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+    const rin = pastoCOLCHA_IN / Math.max(Math.abs(ca), Math.abs(sa));
+    const t = j / R, r = rin + t * pastoCOLCHA_W;
+    return [ca * r, pastoColchaY(a, t), sa * r];
+  };
+  let o = 0;
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < R; j++) {
+      const p00 = vx(i, j), p10 = vx(i + 1, j), p01 = vx(i, j + 1), p11 = vx(i + 1, j + 1);
+      // fields are two columns by one or two rows; a hedgerow column every
+      // third field, broken where the hash says a gate is
+      const fi = Math.floor(i / 2), fj = j >> (pastoColchaHash(fi, 7) > 0.5 ? 1 : 0);
+      const h = pastoColchaHash(fi, fj);
+      c.copy(fields[Math.floor(h * fields.length) % fields.length]);
+      if (i % 6 === 0 && pastoColchaHash(i, j + 31) > 0.25) c.copy(hedge);
+      else c.multiplyScalar(0.94 + 0.12 * pastoColchaHash(i + 57, j));
+      // wound so the normal is up: radial x tangential points down, so tangential first
+      const tri = [p00, p10, p01, p10, p11, p01];
+      for (let k = 0; k < 6; k++) {
+        pos[o] = tri[k][0]; pos[o + 1] = tri[k][1]; pos[o + 2] = tri[k][2];
+        col[o] = c.r; col[o + 1] = c.g; col[o + 2] = c.b;
+        o += 3;
+      }
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  const mesh = new THREE.Mesh(geo, grain(mat(0xffffff, { vertexColors: true }), { scale: 0.05, amount: 0.05, warp: 0 }));
+  mesh.name = 'pastoColcha';
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  return mesh;
+}
+
 
 // ===========================================================================
 // 3. PHYSICS — heightfields for the terrain, one box for the flat town shelf,
@@ -3368,6 +3458,7 @@ export function createPasto(game) {
     },
 
     update(dt) {
+      pastoColchaSync(game);
       if (!pastoBuilt) return;
       if (!game.biome.isActive('pasto')) { pastoSfxQ.length = 0; return; }  // biome not live
       // ---- THE SECOND CHAPTER IN THE GAME WAS SILENT (M13) ------------
@@ -3414,7 +3505,14 @@ function pastoBuild(game) {
   game.scene.add(pastoRoot);
 
   pastoRoot.add(pastoBuildTerrainMesh());
-  pastoRoot.add(pastoBuildFarPeaks());
+  {
+    const fp = pastoBuildFarPeaks();
+    pastoRoot.add(fp);
+    pastoFarNear = fp.userData.near;
+    pastoColcha = pastoBuildColcha();
+    pastoRoot.add(pastoColcha);
+    pastoColchaSync(game);
+  }
   pastoBuildGround(game);
   pastoRoot.add(pastoBuildSmoke());
   pastoRoot.add(pastoBuildMotes());
