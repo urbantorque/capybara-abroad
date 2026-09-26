@@ -49,7 +49,7 @@ server in headful Edge (see `qa/reimagine-harness.mjs`).
 
 | | |
 |---|---|
-| `src/` | 29 modules: `shared.js` (palette, chapters, tasks, shaders), `systems.js` (HUD, save, score, camera), `npc.js` (people and animals), `capybara.js`, `props.js`, `rival.js`, and one file per place |
+| `src/` | 30 modules: `shared.js` (palette, chapters, tasks, shaders), `systems.js` (HUD, save, score, camera), `npc.js` (people and animals), `capybara.js`, `props.js`, `rival.js`, `havoc.js` (Free Roam's HAVOC), and one file per place |
 | `qa/` | Instruments and checks. Results (`qa/**/*.png`) are git-ignored |
 | `docs/CONTRACT.md` | What shipped, newest first, with the measured numbers |
 | `docs/roadmaps/` | One roadmap per pass. `ROADMAP-AAA.md` is the latest |

@@ -1,3 +1,70 @@
+## TEN U1-U3 AND V — HAVOC, A CAR, THE LIGHT AND THE PEOPLE (26 Sep 2026)
+
+The author's pivot of T5/T6 and the soft matte pass, built in one run by
+one agent, no subagents, on `ten-pass` (`2029e88`..). Every item is under
+"THE PIVOT" and "V — THE SOFT MATTE PASS" in docs/roadmaps/ROADMAP-TEN.md.
+
+**HAVOC, Free Roam's own game (U1a + U1g, src/havoc.js, module 30).** The
+streak (`noStreak`): any mischief the animal causes chains within 4 s to
+x8, one constant tick per link (the author: no rising pitch), a chain of 3+
+cashes in as yuzu. Runs (`noHavoc`): a gold ring near every arrival starts
+one of seven 60 s runs (knockdown, yuzu rain, light paws, catch me, make a
+splash, pest control, mayhem) with bronze/silver/gold, a countdown, a
+results card and Enter for another go; the best per place is the pass's
+one save field, `havoc`, and shows as a medal on the Free Roam tile. Pests
+(`noPests`): a gull (dive, a ground shadow first), a warden (1 s wind-up,
+a charge with a net), a dog (bursts, gives up at 12 s); three hearts,
+caught = streak lost, 5 yuzu dropped, home with 2 s grace, a live run lost;
+V (RB, a touch button) flicks a pip with 25-degree aim-assist. systems.js
+gives the doors (havocOK/Home/Store, yuzuGive/Have) and the events
+('capy:mischief' before the witness gate, 'yuzu:got'); props.js emits a
+knock-over. The guided walk is Story only. ten-u1a-havoc 11/11 headful.
+Havoc props (U2g, `noHavocProps`): crates of yuzu that burst into six on a
+spill, a barrel, water balloons, a line of deck-chair dominoes; ten-u2g
+3/3. HAVOC's own programs are compiled once up front.
+
+**The car is a car (U1b, monaco.js, `noFreeDrive`).** A heading and a
+velocity: throttle, brake, reverse, speed-dependent lock, grip by surface
+(tarmac 8.5/s, grass 2.6/s: it slides), walls by a static raycast
+(heightfields skipped), bounce and scrub, never a launch; the lap is read
+off it by projection so the pack, the tunnel and the podium stand, and a
+grass shortcut does not count. ten-u1b-drive 7/7 with real keys: a lap in
+40 s, 32 m/s, 15 m off the road and back, reverse at -7 m/s.
+
+**Legible arrivals.** The place card's sub and rumour are ink on a paper
+pill at 16 px (were accentInk at 11-14 px, about 2.5:1); the crossing's
+name is 0.78 ink (was 0.26, 1.5:1).
+
+**Water and far things.** Reflections survive rung 1 at a third of the
+frame (`noReflectHalf`; 1.7 ms CPU pass). Sydney's harbour and Manly's ocean
+mirror (the Bridge's arch in the water); Venice mirrors at every tide
+(`noVenMirror`) and its arcades have a camera ceiling (`noVenCeil`, the lens
+held at 4.32 and 2.82 m under 4.83). A range behind every far range
+(`noFarLayers`; changed pixels Monaco 7.4 %, Iceland 2.4, Rio 1.8). Cloud
+shadows on thirteen sunlit places (`noCloudShadow`; Manly 72 % of pixels,
+Pasto 25, Kyoto 22), one octave after the proof slot (0.36 / -0.67 ms).
+Pasto's colcha replaces the near cone ring (`noPastoColcha`); a dry first
+twenty seconds (`noRainPitch`); Manly's spawn bin moved; the concert house
+seats twelve.
+
+**The soft matte pass (V).** Wrap light on smooth materials only
+(`noSoftMatte`, (N.L + 0.4)/1.4 under #ifndef FLAT_SHADED). People: rounded
+twins at every rung, smooth twins for locals and crowds (npcSmoothOf), heads
+as eggs, limbs as capsules. Every merged world box 30 cm or thicker is
+chamfered (`noBevelWorld`, read at build, no geometry per box), and prop
+parts too. Lit evening windows (V5) were found already built.
+
+**Measured on the Arc, rung 0, the same hour.** Published 89b21df: Kyoto
+27.8, Manly 32.0, Hanoi 32.6 ms GPU; ten-pass 28.4, 31.4, 35.3. The laptop
+was slow that day for both builds; the pass costs noise, up to 5 ms in Hanoi.
+
+**Misses, said plainly.** The Antarctic (517 ms, one late program) and
+Pantanal (1017 ms CPU) stalls are not attributed. A vertex-colour "glass"
+term on Manly's waves measured nothing and was cut: the haze decides that
+frame. The Kowloon/Hanoi neon towers (U2f) were not built. No blind stranger
+playtest happened: the run had no agents. V2 is the same rig rounded, not
+the new seven-head figure the V section describes.
+
 ## TEN T4 — THE ENDING, THE CONCERT AND FOUR PLACES (25 Sep 2026)
 
 Six builders on six disjoint files, merged into `ten-pass` with no

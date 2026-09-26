@@ -1771,6 +1771,30 @@ and the soak, about 1 hour.
   If both are approved, run V after U1, because U1c would otherwise be
   thrown away.
 
+### U1–U3 and V — shipped (26 Sep 2026)
+
+Built in one run by one agent, no subagents (the author's instruction), so
+there was no parallel wave and no blind stranger. What landed, by item:
+
+- **U1a/U1g HAVOC** — src/havoc.js: streak, seven runs, `havoc` save field,
+  tile medals, three pests, hearts, V fling. ten-u1a-havoc 11/11.
+- **U1b** the free car. ten-u1b-drive 7/7 (lap 40 s, reverse, off-road).
+- **U1c** folded into V2 (people) plus the twelve-seat concert.
+- **U1d** mirror at rung 1. ten-u1d-mirror: drawn at 435x244, 1.7 ms.
+- **U1e** Harbour and Manly mirrors, Manly's bin. The glass term measured
+  nothing and was cut; ten-u1e-waters 3/3.
+- **U1f** Pasto's colcha, the dry arrival. ten-u1f-pasto.
+- **U2b/U2c** far back ranges, cloud shadows. ten-u2b-far (frozen A/B).
+- **U2d** Venice ceiling and every-tide mirror. ten-u2d-venice 3/3.
+- **U2e** NOT DONE: the Antarctic/Pantanal stalls are not attributed.
+- **U2f** NOT DONE: the neon towers, first to be cut, were cut.
+- **U2g** havoc props. ten-u2g-props 3/3.
+- **U2a** NOT DONE as written: no stranger playtest could run without agents.
+- **V1** wrap light, **V2** rounder smooth people at every rung, **V3/V4**
+  chamfered props and world, **V5** found already built. ten-v-look.
+- **U3** proof: cloud shadows trimmed to one octave (0.36 / -0.67 ms); the
+  pass against 89b21df in the same hour is noise to +5 ms (Hanoi).
+
 ## T5 — home, the first frame, the far places (SUPERSEDED by the pivot)
 
 **T5a · A · systems.js, shared.js · the garden and the first minute.**

@@ -10,8 +10,8 @@ docs/handoff/HANDOFF.md first for the state of play.
 
 A single-file browser game (Three.js + cannon-es, no bundler, no
 dependencies): a capybara loose in nineteen real places. `npm start`
-serves `src/` unbundled on a port; `node build.mjs` inlines twenty-nine
-modules into `dist/untitled-capybara-game.html`; `npm test` runs 77
+serves `src/` unbundled on a port; `node build.mjs` inlines thirty
+modules into `dist/untitled-capybara-game.html`; `npm test` runs 81
 static checks in about two minutes. `master` is the published build
 (GitHub Pages builds from it); the latest pass (ROADMAP-AAA) was worked
 on `aaa-polish` and merged.
@@ -41,7 +41,7 @@ on `aaa-polish` and merged.
 
 1. `node --check src/<every file you edited>.js`
 2. `node build.mjs`
-3. `npm test` (77 checks, 0 failed — the "reports" section cannot fail;
+3. `npm test` (81 checks, 0 failed — the "reports" section cannot fail;
    the soak-diff staleness line is informational)
 4. `git status`, then `git add` only your files BY NAME. Never `git add
    -A`, never stash while another agent is live, never amend or rebase.

@@ -1,5 +1,26 @@
 # HANDOFF — state of play, 25 Sep 2026
 
+## ROADMAP-TEN, the pivot and the soft matte pass (26 Sep, newest)
+
+The author redirected T5/T6 (see THE PIVOT in docs/roadmaps/ROADMAP-TEN.md)
+and added a visual overhaul from four reference frames (V). Both were built
+in one run, no subagents, on `ten-pass`; the CONTRACT's top entry has the
+numbers. What is new in play:
+
+- **Free Roam is HAVOC** (src/havoc.js, module 30): streaks, seven 60 s
+  runs from a gold ring, medals saved per place (`havoc`, the one new save
+  field), three pests, three hearts, V to fling, a kit of havoc props.
+  Story has none of it; the guided walk is Story only.
+- **Monte Carlo's car drives** (`noFreeDrive` restores the rails).
+- **Water and sky:** reflections at rung 1, Sydney/Manly/Venice mirrors, a
+  range behind every range, cloud shadows, Pasto's colcha.
+- **Soft matte:** wrap light on what breathes, rounder people at every rung,
+  chamfered world and props (`noBevelWorld` is read at chapter BUILD).
+- **Arrival text** is ink on paper, legible.
+
+Open: the Antarctic/Pantanal stalls, the Kowloon/Hanoi neon towers, a true
+seven-head figure (V2 rounded the old rig), and a blind human playtest.
+
 ## ROADMAP-TEN, closed at T4 (26 Sep)
 
 The author cut the pass at about 13 hours. T5 (the garden, the first
