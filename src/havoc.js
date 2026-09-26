@@ -879,6 +879,64 @@ export function createHavoc(game) {
   }
 
   // ===========================================================================
+  // THE PROPS (U2g, noHavocProps): once per place per session, near the ring,
+  // a small kit for the animal to ruin — two crates of yuzu that burst when
+  // they go over, a barrel on the highest ground nearby, three water balloons
+  // and a line of six deck chairs stood up like dominoes. props.js builds
+  // them; they are the live chapter's runtime spawns, so they stay with it.
+  // ===========================================================================
+  const placedProps = Object.create(null);
+  const placedList = [];   // this place's kit, for a probe
+  function placeProps() {
+    if (st.noHavocProps || placedProps[biome] || !game.physics || typeof game.physics.spawnProp !== 'function') return;
+    const sp = game.biome && typeof game.biome.spawnOf === 'function' ? game.biome.spawnOf(biome) : null;
+    if (!sp) return;
+    placedProps[biome] = true;
+    const y0 = gy(sp.x, sp.z, sp.y);
+    const pts = [];
+    for (let k = 0; k < 24 && pts.length < 12; k++) {
+      const a = k * 2.399 + 0.6, rr = 8 + (k % 5) * 2.2;
+      const x = sp.x + Math.sin(a) * rr, z = sp.z + Math.cos(a) * rr;
+      const y = gy(x, z, NaN);
+      if (y === y && Math.abs(y - y0) < 1.5 && Math.hypot(x - ringX, z - ringZ) > hvRING_R + 1.5) pts.push({ x: x, y: y, z: z });
+    }
+    if (pts.length < 6) return;
+    placedList.length = 0;
+    const spawn = (t, p, yaw) => { let pr = null; try { pr = game.physics.spawnProp(t, p.x, p.z, undefined, yaw || 0); } catch (e) { pr = null; } if (pr) placedList.push(pr); return pr; };
+    spawn('yuzucrate', pts[0], 0.3); spawn('yuzucrate', pts[1], 1.1);
+    // the barrel goes on the highest of the candidates, so it has somewhere to go
+    let hi = pts[2];
+    for (const p of pts) if (p.y > hi.y) hi = p;
+    spawn('barrel', hi);
+    spawn('balloon', pts[3]); spawn('balloon', pts[4]); spawn('balloon', pts[5]);
+    // the dominoes: six deck chairs in a line, 0.8 m apart, all facing along it
+    const d0 = pts[6] || pts[0], yaw = Math.atan2(sp.x - d0.x, sp.z - d0.z) + Math.PI / 2;
+    for (let i = 0; i < 6; i++) {
+      const x = d0.x + Math.sin(yaw) * i * 0.8, z = d0.z + Math.cos(yaw) * i * 0.8;
+      spawn('deckchair', { x: x, z: z }, yaw);
+    }
+  }
+  // a crate that goes over is six live yuzu on the ground
+  game.events.on('prop:impact', function (e) {
+    if (!e || !e.spill || !e.prop || e.prop.type !== 'yuzucrate' || !free()) return;
+    const p = e.position;
+    for (let i = 0; i < 6; i++) {
+      const a = i * 1.047 + 0.3;
+      if (typeof game.dropGive === 'function') game.dropGive(p.x + Math.sin(a) * 1.1, p.z + Math.cos(a) * 1.1, i === 0 ? 3 : 1);
+    }
+    try { if (typeof game.sparks === 'function') game.sparks(p.x, p.y + 0.4, p.z, 22, { spd: 3.5, up: 2, grav: 8, life: 0.8, size: 0.2, rgb: [2.4, 2.0, 0.5] }); } catch (err) { /* optional */ }
+    sfx('pop', 0.7, 1.0);
+  });
+  // a balloon that breaks is a splash where it broke
+  game.events.on('prop:destroy', function (e) {
+    const pr = e && e.prop;
+    if (!pr || pr.type !== 'balloon' || !pr.body || !free()) return;
+    const b = pr.body.position;
+    try { if (typeof game.sparks === 'function') game.sparks(b.x, b.y + 0.2, b.z, 26, { spd: 4, up: 2.5, grav: 12, life: 0.6, size: 0.18, rgb: [1.2, 1.9, 2.4] }); } catch (err) { /* optional */ }
+    try { game.events.emit('prop:water', { prop: pr, position: { x: b.x, y: b.y, z: b.z } }); } catch (err) { /* bus */ }
+  });
+
+  // ===========================================================================
   // THE EVENTS
   // ===========================================================================
   const KNOCK = { tip: 1, bang: 1, break: 1 }, SPLASH = { spill: 1, water: 1 }, THEFT = { theft: 1, hat: 1 };
@@ -935,6 +993,21 @@ export function createHavoc(game) {
     heartsEl.classList.remove('show'); streakEl.classList.remove('show'); runEl.classList.remove('show');
     tagEl.classList.remove('show'); flingEl.classList.remove('show');
   }
+  // ONE COMPILE, UP FRONT. Every pest, the ring and the pip are programs the
+  // chapter's own warm pass never sees (they belong to no chapter), so the
+  // first gull would link its shaders on the frame it appeared: a stall at the
+  // worst moment. One of each is made, shown for one compile, and hidden.
+  let warmed = false;
+  function warm() {
+    warmed = true;
+    try {
+      for (const k of ['gull', 'warden', 'dog']) { let has = false; for (const pe of pests) if (pe.kind === k) has = true; if (!has) pestMake(k); }
+      const was = [];
+      root.traverse(function (o) { was.push([o, o.visible]); o.visible = true; });
+      if (game.renderer && game.camera && typeof game.renderer.compile === 'function') game.renderer.compile(root, game.camera);
+      for (const w of was) w[0].visible = w[1];
+    } catch (e) { /* the draw compiles on first use, as before */ }
+  }
   function reset() {
     streakBreak(true); runCancel(); pestsClear();
     for (const pp of pips) pp.on = false; pipMesh.count = 0;
@@ -968,6 +1041,8 @@ export function createHavoc(game) {
       return;
     }
     if (!ringOn) placeRing();
+    if (arriveT > 1 && !placedProps[biome]) placeProps();
+    if (!warmed) warm();
     root.visible = true;
     arriveT += dt;
     if (graceT > 0) graceT -= dt;
@@ -1001,9 +1076,11 @@ export function createHavoc(game) {
         hearts: hearts, invuln: invulnT, grace: graceT, chasers: chasers,
         pests: pests.filter(function (pe) { return pe.on; }).map(function (pe) { return { kind: pe.kind, state: pe.state, x: +pe.x.toFixed(2), y: +pe.y.toFixed(2), z: +pe.z.toFixed(2) }; }),
         pips: pips.filter(function (pp) { return pp.on; }).length,
+        props: placedList.map(function (p) { return p.type; }),
       };
     },
     fling: fling,
+    placed: function () { return placedList; },
     // test doors: start a run where the animal stands; put a pest in front of it
     qaStart: function (kind) { if (kind && hvKINDS[kind]) kindAt[biome] = hvORDER.indexOf(kind); runStart(); },
     qaPest: function (kind, dist) {

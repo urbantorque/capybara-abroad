@@ -1054,6 +1054,42 @@ function physBuildYuzu(g) {
   physAdd(g, physSphG(0.30), PALETTE.yuzu, 0, 0, 0);
   physAdd(g, physBoxG(0.034, 0.10, 0.034), PALETTE.yuzuLeaf, 0.08, 0.30, 0, 0, 0, 0.5);
 }
+// ---- HAVOC'S PROPS (ROADMAP-TEN U2g) ----------------------------------------
+// Three things Free Roam puts near an arrival for the animal to ruin (see
+// havoc.js, hvPlaceProps): a crate of yuzu that bursts into fruit when it goes
+// over, a barrel that rolls and bowls people over, a water balloon that breaks
+// on whatever it hits. Built like every other prop: boxes, cylinders and
+// spheres off PALETTE.
+function physBuildYuzuCrate(g) {
+  physAdd(g, physBoxG(0.6, 0.46, 0.6), PALETTE.wood, 0, 0.23, 0);
+  for (let i = -1; i <= 1; i += 2) {
+    physAdd(g, physBoxG(0.62, 0.07, 0.04), PALETTE.woodDark, 0, 0.12, i * 0.3);
+    physAdd(g, physBoxG(0.62, 0.07, 0.04), PALETTE.woodDark, 0, 0.36, i * 0.3);
+    physAdd(g, physBoxG(0.04, 0.07, 0.62), PALETTE.woodDark, i * 0.3, 0.12, 0);
+    physAdd(g, physBoxG(0.04, 0.07, 0.62), PALETTE.woodDark, i * 0.3, 0.36, 0);
+  }
+  const at = [[-0.14, -0.12], [0.13, -0.1], [0, 0.12], [-0.15, 0.14], [0.15, 0.14]];
+  for (let i = 0; i < at.length; i++) physAdd(g, physSphG(0.11), PALETTE.yuzu, at[i][0], 0.5, at[i][1]);
+}
+/** The crate on its side and the fruit gone everywhere (the burst itself is
+ *  six live yuzu, havoc.js's; this is what is left). */
+function physBuildYuzuCrateSpill(g) {
+  physAdd(g, physBoxG(0.6, 0.46, 0.6), PALETTE.wood, 0, 0.3, 0, 1.45, 0, 0);
+  physAdd(g, physBoxG(0.62, 0.07, 0.04), PALETTE.woodDark, 0, 0.12, 0.3);
+}
+function physBuildBarrel(g) {
+  physAdd(g, physCylG(0.36, 0.36, 0.78, 12), PALETTE.woodDark, 0, 0, 0);
+  physAdd(g, physCylG(0.41, 0.41, 0.34, 12), PALETTE.wood, 0, 0, 0);
+  physAdd(g, physCylG(0.42, 0.42, 0.05, 12), PALETTE.ibisHead, 0, 0.2, 0);
+  physAdd(g, physCylG(0.42, 0.42, 0.05, 12), PALETTE.ibisHead, 0, -0.2, 0);
+  physAdd(g, physCylG(0.37, 0.37, 0.05, 12), PALETTE.ibisHead, 0, 0.36, 0);
+  physAdd(g, physCylG(0.37, 0.37, 0.05, 12), PALETTE.ibisHead, 0, -0.36, 0);
+}
+function physBuildBalloon(g) {
+  const b = physAdd(g, physSphG(0.2), PALETTE.water, 0, 0.2, 0);
+  b.scale.set(1, 1.12, 1);
+  physAdd(g, physSphG(0.035), PALETTE.water, 0, 0.43, 0);
+}
 function physBuildYuzuGold(g) {
   physAdd(g, physSphG(0.34), PALETTE.yuzuGold, 0, 0, 0);
   physAdd(g, physSphG(0.345), PALETTE.yuzuGoldDk, 0, 0, 0).scale.set(1, 0.94, 1);
@@ -1470,6 +1506,10 @@ const physTYPES = {
   // carried to the wheel and consumed there for what the pocket says. Light,
   // flat, and it slides — which is most of the joke, because a plaque nudged
   // across a marble floor goes a very long way.
+  // ---- HAVOC (ROADMAP-TEN U2g). Free Roam only; havoc.js places them.
+  yuzucrate:  { name: 'a crate of yuzu', mass: 3.0, hy: 0.3,  shape: ['box', 0.3, 0.3, 0.3],   hold: [0, 0.08, 0.34], spin: 0.6, receive: true, build: physBuildYuzuCrate, spill: physBuildYuzuCrateSpill, spillSfx: 'rustle' },
+  barrel:     { name: 'a barrel',        mass: 11,  hy: 0.42, shape: ['sph', 0.42],             hold: [0, 0.1, 0.42],  spin: 0.5, grabbable: false, build: physBuildBarrel },
+  balloon:    { name: 'a water balloon', mass: 0.5, hy: 0.22, shape: ['sph', 0.2],              hold: [0, 0.02, 0.12], spin: 1.2, fragile: true, build: physBuildBalloon },
   plaque:     { name: 'a plaque',       mass: 0.06, hy: 0.03, shape: ['box', 0.26, 0.03, 0.15], hold: [0, 0.0, 0.06],  spin: 2.4, build: physBuildPlaque },
   dinnerjacket: { name: 'dinner jacket',mass: 1.1,  hy: 0.13, shape: ['box', 0.36, 0.13, 0.28], hold: [0, 0.05, 0.30], spin: 0.5, receive: true, build: physBuildDinnerjacket },
 
