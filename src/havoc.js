@@ -833,7 +833,7 @@ export function createHavoc(game) {
       pp.on = true; pp.t = 0; pp.x = ox; pp.y = oy; pp.z = oz; pp.vx = vx; pp.vy = vy; pp.vz = vz;
       break;
     }
-    sfx('pop', 0.45, 1.5);
+    sfx('pop', 0.45, 1.35);
   }
   function pipsTick(dt) {
     let n = 0;
