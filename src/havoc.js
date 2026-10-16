@@ -76,7 +76,7 @@ const hvNO_SPLASH = { sahara: 1, drift: 1, goreme: 1 };
 const hvRAIN_N = 14;
 // ---- the pests ----------------------------------------------------------------
 const hvHEARTS = 3;
-const hvINVULN = 1.2;          // s after a hit
+const hvINVULN = 2.5;          // s after a hit: room to turn and get clear
 const hvHOME_GRACE = 2.0;      // s after being caught
 const hvARRIVE_QUIET = 20;     // s after an arrival before any pest
 const hvPEST_ALIVE = 2;        // alive at once, ordinarily
@@ -84,7 +84,9 @@ const hvPEST_ALIVE_RUN = 3;    // ...during any run
 const hvPEST_ALIVE_HUNT = 4;   // ...during PEST CONTROL
 const hvPEST_RESPAWN = 20;     // s after a knock-out before another comes
 const hvPEST_NEAR = 25, hvPEST_FAR = 40;
-const hvKNOCK_MAX = 6;         // m/s of shove at most: the monPACK_SHOVE_MAX lesson
+const hvKNOCK_MAX = 4;         // m/s of shove at most: keep a hit controllable
+const hvGULL_TELL = 1.4;       // s with the target shadow fixed, before the dive
+const hvWARDEN_TELL = 1.6;     // s with the net up, before committing to a line
 // ---- the pip -----------------------------------------------------------------
 const hvPIP_N = 16;
 const hvPIP_SPEED = 21;        // m/s
@@ -689,30 +691,30 @@ export function createHavoc(game) {
       const wings = g.userData.wings, flap = pe.state === 'dive' ? 0.1 : Math.sin(pe.life * 11) * 0.6;
       wings[0].rotation.z = flap; wings[1].rotation.z = -flap;
       if (pe.state === 'circle') {
-        // circle the animal at 11 m, 8 m up, and close in; after 3-5 s, commit
+        // circle at 11 m, 8 m up; 6-8 s between attempts leaves room to explore
         pe.orbitA += dt * 0.9;
         const tx = p.x + Math.sin(pe.orbitA) * 11, tz = p.z + Math.cos(pe.orbitA) * 11, ty = p.y + 8;
         pe.x += (tx - pe.x) * Math.min(1, dt * 1.6); pe.z += (tz - pe.z) * Math.min(1, dt * 1.6);
         pe.y += (ty - pe.y) * Math.min(1, dt * 1.2);
         faceTo(pe, tx - pe.x, tz - pe.z, dt, 5);
-        if (pe.t > 3 + (pe.life % 2) && graceT <= 0) {
+        if (pe.t > 6 + (pe.life % 2) && graceT <= 0) {
           pe.state = 'aim'; pe.t = 0;
           const v = capy().body ? capy().body.velocity : null;
-          pe.tx = p.x + (v ? v.x * 0.5 : 0); pe.tz = p.z + (v ? v.z * 0.5 : 0);
+          pe.tx = p.x + (v ? v.x * 0.2 : 0); pe.tz = p.z + (v ? v.z * 0.2 : 0);
           pe.ty = gy(pe.tx, pe.tz, p.y);
           if (pe.shadow) { pe.shadow.visible = true; pe.shadow.position.set(pe.tx, pe.ty + 0.05, pe.tz); }
           sfx('gull', 0.45, 1.1);
         }
       } else if (pe.state === 'aim') {
-        // hang for 0.8 s, the shadow grows: that is the whole tell
-        const k = clamp(pe.t / 0.8, 0, 1);
+        // the shadow grows over the whole warning, at the committed target
+        const k = clamp(pe.t / hvGULL_TELL, 0, 1);
         if (pe.shadow) { pe.shadow.scale.setScalar(0.4 + k * 0.9); pe.shadow.material.opacity = 0.12 + k * 0.33; }
         faceTo(pe, pe.tx - pe.x, pe.tz - pe.z, dt, 10);
-        if (pe.t > 0.8) { pe.state = 'dive'; pe.t = 0; }
+        if (pe.t > hvGULL_TELL) { pe.state = 'dive'; pe.t = 0; }
       } else if (pe.state === 'dive') {
         const ddx = pe.tx - pe.x, ddz = pe.tz - pe.z, ddy = (pe.ty + 0.5) - pe.y;
         const dd = Math.hypot(ddx, ddy, ddz);
-        const step = Math.min(dd, 17 * dt);
+        const step = Math.min(dd, 12 * dt);
         if (dd > 0.01) { pe.x += ddx / dd * step; pe.y += ddy / dd * step; pe.z += ddz / dd * step; }
         pestHitsCapy(pe, 1.1);
         if (dd < 0.3 || pe.t > 2) { pe.state = 'climb'; pe.t = 0; if (pe.shadow) pe.shadow.visible = false; }
@@ -730,31 +732,31 @@ export function createHavoc(game) {
       const tell = g.userData.tell, arm = g.userData.arm;
       if (pe.state === 'in') {
         faceTo(pe, dx, dz, dt, 6);
-        if (dist > 8.5) {
-          const s = 2.4;
+        if (dist > 6.5) {
+          const s = 1.8;
           pe.x += dx / dist * s * dt; pe.z += dz / dist * s * dt;
           for (let i = 0; i < legs.length; i++) legs[i].rotation.x = Math.sin(pe.life * 7 + i * Math.PI) * 0.5;
         } else if (graceT <= 0) { pe.state = 'wind'; pe.t = 0; tell.visible = true; sfx('whistle', 0.4, 1.3); }
         arm.rotation.x = -0.3;
       } else if (pe.state === 'wind') {
-        // a second with the net up and the bar over its head
+        // the net rises through the whole tell; the charge cannot steer
         faceTo(pe, dx, dz, dt, 10);
-        arm.rotation.x = -0.3 - clamp(pe.t, 0, 1) * 1.6;
+        arm.rotation.x = -0.3 - clamp(pe.t / hvWARDEN_TELL, 0, 1) * 1.6;
         tell.scale.setScalar(1 + Math.sin(pe.t * 18) * 0.15);
-        if (pe.t > 1.0) {
+        if (pe.t > hvWARDEN_TELL) {
           pe.state = 'charge'; pe.t = 0; tell.visible = false;
           const d = dist || 1;
-          pe.vx = dx / d * 8.5; pe.vz = dz / d * 8.5;
+          pe.vx = dx / d * 6; pe.vz = dz / d * 6;
         }
       } else if (pe.state === 'charge') {
         pe.x += pe.vx * dt; pe.z += pe.vz * dt;
         arm.rotation.x = -1.9 + clamp(pe.t * 4, 0, 1) * 1.7;
         for (let i = 0; i < legs.length; i++) legs[i].rotation.x = Math.sin(pe.life * 16 + i * Math.PI) * 0.8;
-        if (pestHitsCapy(pe, 1.2) || pe.t > 1.2) { pe.state = 'tired'; pe.t = 0; }
+        if (pestHitsCapy(pe, 1.2) || pe.t > 1.1) { pe.state = 'tired'; pe.t = 0; }
       } else if (pe.state === 'tired') {
         arm.rotation.x = -0.1;
         for (let i = 0; i < legs.length; i++) legs[i].rotation.x *= 0.9;
-        if (pe.t > 1.6) pe.state = 'in';
+        if (pe.t > 3.5) { pe.state = 'in'; pe.t = 0; }
       }
     } else {
       // THE DOG: bursts of 6.5 m/s (the animal sprints at 7.4), a pause, a
